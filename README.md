@@ -1,1 +1,1 @@
-"# js-lib" 
+Template for making JavaScript libraries.
