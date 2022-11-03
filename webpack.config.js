@@ -1,6 +1,6 @@
 const path = require("path");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
-const libraryName = "js-lib";
+const libraryName = "Bundler";
 module.exports = {
 	entry: {
 		index: path.resolve(__dirname, "./index.js")

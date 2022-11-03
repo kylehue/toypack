@@ -1,1 +1,1 @@
-Template for making JavaScript libraries.
+A small library for bundling chunks of codes in-browser.

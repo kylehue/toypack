@@ -1,8 +1,8 @@
 {
-  "name": "js-lib",
+  "name": "@kylehue/bundler",
   "version": "1.0.0",
-  "description": "Template for making JavaScript libraries.",
-  "main": "./dist/index.js",
+  "description": "A small library for bundling chunks of codes in-browser.",
+  "main": "./dist/bundler.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kylehue/js-lib.git"
