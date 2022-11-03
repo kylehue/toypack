@@ -1,7 +1,7 @@
 {
   "name": "js-lib",
   "version": "1.0.0",
-  "description": "",
+  "description": "Template for making JavaScript libraries.",
   "main": "./dist/index.js",
   "repository": {
     "type": "git",
@@ -13,6 +13,7 @@
     "@babel/preset-env": "^7.19.3",
     "babel-loader": "^8.2.5",
     "css-loader": "^6.7.1",
+    "node-polyfill-webpack-plugin": "^2.0.1",
     "sass": "^1.55.0",
     "sass-loader": "^13.0.2",
     "style-loader": "^3.3.1",
@@ -20,10 +21,9 @@
     "webpack-cli": "^4.10.0"
   },
   "scripts": {
-    "build": "webpack --config ./webpack.config.js"
-  },
-  "engines": {
-    "node": "14.x"
+    "watch": "webpack --mode=development --watch",
+    "build": "webpack --mode=production",
+    "publish": "npm run build && npm publish"
   },
   "author": "",
   "license": "ISC",
@@ -32,5 +32,6 @@
   },
   "files": [
     "dist/"
-  ]
+  ],
+  "keywords": []
 }

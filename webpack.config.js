@@ -1,7 +1,7 @@
 const path = require("path");
-
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
+const libraryName = "js-lib";
 module.exports = {
-	mode: "production",
 	entry: {
 		index: path.resolve(__dirname, "./index.js")
 	},
@@ -25,12 +25,22 @@ module.exports = {
 				"css-loader",
 				"sass-loader"
 			]
+		}, {
+			test: /\.(png|jpg|gif|woff2)$/i,
+			type: "asset/inline"
 		}]
 	},
 	output: {
 		path: path.resolve(__dirname, "./dist"),
-		publicPath: "/",
-		filename: "[name].js",
-		clean: true
-	}
+		filename: libraryName + ".js",
+		clean: true,
+		library: {
+			name: libraryName,
+			type: "umd",
+			export: "default"
+		}
+	},
+	plugins: [
+		new NodePolyfillPlugin()
+	]
 };
