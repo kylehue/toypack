@@ -2,7 +2,7 @@
   "name": "@kylehue/bundler",
   "version": "1.0.0",
   "description": "A small library for bundling chunks of codes in-browser.",
-  "main": "./dist/bundler.js",
+  "main": "./dist/Bundler.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kylehue/js-lib.git"
@@ -33,5 +33,11 @@
   "files": [
     "dist/"
   ],
-  "keywords": []
+  "keywords": [],
+  "dependencies": {
+    "@babel/standalone": "^7.20.2",
+    "acorn": "^8.8.1",
+    "acorn-walk": "^8.2.0",
+    "magic-string": "^0.26.7"
+  }
 }

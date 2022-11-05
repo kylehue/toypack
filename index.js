@@ -1,4 +1,3 @@
-import "./styles/main.scss";
-import Main from "./src/main";
+import Bundler from "./src/Bundler";
 
-export default Main;
+export default Bundler;
