@@ -1,14 +1,14 @@
 export function traverseHTMLAST(AST, callback) {
-	function traverse(nodes) {
-		for (let node of nodes) {
-			callback(node);
-			if (node.children) {
-				traverse(node.children);
-			}
-		}
-	}
+  function traverse(nodes) {
+    for (let node of nodes) {
+      callback(node);
+      if (node.children) {
+        traverse(node.children);
+      }
+    }
+  }
 
-	traverse(AST);
+  traverse(AST);
 }
 
 export function trim(str) {

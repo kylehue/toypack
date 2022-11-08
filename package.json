@@ -36,9 +36,11 @@
   "keywords": [],
   "dependencies": {
     "@babel/standalone": "^7.20.2",
+    "@freecodecamp/loop-protect": "^3.0.0",
     "acorn": "^8.8.1",
     "acorn-walk": "^8.2.0",
     "html-parse-stringify": "^3.0.1",
+    "jshint": "^2.13.5",
     "magic-string": "^0.26.7"
   }
 }

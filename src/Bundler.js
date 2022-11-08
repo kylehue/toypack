@@ -1,14 +1,25 @@
 import { parse as acornParse } from "acorn";
 import { fullAncestor as acornWalk } from "acorn-walk";
-import { transform as babelTransform } from "@babel/standalone";
+import {
+  transform as babelTransform,
+  registerPlugin as babelRegisterPlugin
+} from "@babel/standalone";
 import HTML from "html-parse-stringify";
 import * as path from "path";
 import * as utils from "./utils";
+import loopProtect from "@freecodecamp/loop-protect";
+import { JSHINT } from "jshint";
+
+const indexHTMLSRC = "/index.html";
+const assetsMap = new Map();
+let babelOptions = {
+  presets: ["es2015-loose"],
+  plugins: []
+};
 
 let _ID = 0;
-const assetsMap = new Map();
 export default class Bundler {
-  constructor() {
+  constructor(options = {}) {
     this.assets = {
       entry: null,
       files: {}
@@ -17,6 +28,55 @@ export default class Bundler {
     this.dependencies = {
       uuid: "latest"
     };
+
+    options = Object.assign({
+      loopProtection: false,
+      skipErrors: typeof options.onError == "function"
+    }, options);
+
+    this.options = options;
+
+    if (typeof this.options.babelOptions == "object") {
+      babelOptions = Object.assign(this.options.babelOptions, babelOptions);
+    }
+
+    if (this.options.loopProtection) {
+      this.options.loopProtection = Object.assign({
+        limit: 100,
+        onLimit: null,
+        maxIterations: undefined
+      }, this.options.loopProtection);
+      babelRegisterPlugin("loop-protect", loopProtect(this.options.loopProtection.limit, this.options.loopProtection.onLimit, this.options.loopProtection.maxIterations));
+      babelOptions.plugins.push("loop-protect");
+    }
+
+		this.JSHINTOptions = {
+			esversion: 6,
+			undef: true,
+			trailingcomma: false,
+			unused: false,
+			curly: false,
+			asi: true,
+			boss: true,
+			debug: true,
+			elision: true,
+			eqnull: true,
+			evil: true,
+			expr: true,
+			lastsemic: true,
+			loopfunc: true,
+			notypeof: true,
+			noyield: true,
+			plusplus: true,
+			proto: true,
+			scripturl: true,
+			supernew: true,
+			validthis: true,
+			withstmt: true,
+			browser: true,
+			devel: true,
+			module: true
+		};
   }
 
   _createAsset(file) {
@@ -26,6 +86,42 @@ export default class Bundler {
       return duplicate;
     }
 
+		let fileExt = path.extname(file.src);
+
+    // Asset object
+    let asset = {
+      id: duplicate ? duplicate.id : _ID++,
+      src: file.src,
+      code: file.code,
+      transpiledCode: "",
+      dependencies: []
+    };
+
+		// Pass errors
+		let errorFound = false;
+		let hasErrorCallback = typeof this.options.onError == "function";
+		let isJS = fileExt === ".js";
+    if (hasErrorCallback && isJS) {
+      JSHINT(file.code, this.JSHINTOptions);
+
+      const errors = JSHINT.data().errors;
+      if (errors) {
+				errors.forEach(error => {
+	        // Check if error is really an error and not a warning nor an info
+	        if (error.code.startsWith("E") || error.code.startsWith("W")) {
+	          errorFound = true;
+	          this.options.onError(file, error);
+	        }
+
+					console.log("ERROR!!!!!!!");
+					console.log(error);
+	      });
+			}
+    }
+
+		// Skip errors?
+    if (this.options.skipErrors && errorFound) return asset;
+
     // Transform
     // Get AST
     const AST = acornParse(file.code, {
@@ -34,32 +130,28 @@ export default class Bundler {
     });
 
     // Scan AST and get dependencies
-    const dependencies = [];
     acornWalk(AST, node => {
       if (node.type == "ImportDeclaration") {
-        dependencies.push(node.source.value);
+        asset.dependencies.push(node.source.value);
       } else if (node.type == "CallExpression" && node.callee.name == "require") {
         if (node.arguments.length) {
-          dependencies.push(node.arguments[0].value);
+          asset.dependencies.push(node.arguments[0].value);
         }
       }
     });
 
-    const id = duplicate ? duplicate.id : _ID++;
+		// onBeforeTranspile callback
+    if (typeof this.options.onBeforeTranspile == "function") {
+      file.code = this.options.onBeforeTranspile(file) || file.code;
+    }
 
     // Transpile code
-    const transpiledCode = babelTransform(file.code, {
-      presets: ["es2015-loose"]
-    }).code;
+    asset.transpiledCode = babelTransform(file.code, babelOptions).code;
 
-    // Asset object
-    let asset = {
-      id,
-      src: file.src,
-      code: file.code,
-      transpiledCode,
-      dependencies
-    };
+		// onTranspile callback
+    if (typeof this.options.onTranspile == "function") {
+      asset.transpiledCode = this.options.onTranspile(file, asset.transpiledCode) || asset.transpiledCode;
+    }
 
     // Add asset to cache
     assetsMap.set(file.src, asset);
@@ -77,7 +169,7 @@ export default class Bundler {
       if (!asset) continue;
       const dirname = path.dirname(asset.src);
 
-      // Create dependency map for referencing the dependency's ids
+      // Create dependency map for referencing the dependencies's ids
       asset.dependencyMap = {};
 
       // Scan asset's dependencies
@@ -125,6 +217,59 @@ export default class Bundler {
   removeFile(fileSrc) {
     fileSrc = path.resolve(fileSrc);
     delete this.assets.files[fileSrc];
+  }
+
+  _injectHTML(bundle, htmlCode) {
+    let result = bundle;
+
+    let headTemplate = `
+				<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+				<title></title>
+			`;
+
+    let htmlCacheSrc = "HTML";
+    let bodyTemplate = "";
+    // Inject index.html file if it exists
+    if (htmlCode) {
+      // Only scan AST if the code changed
+      let htmlCache = assetsMap.get(htmlCacheSrc);
+      let hasScanned = !!htmlCache;
+      let indexHTMLChanged = htmlCache && htmlCode != htmlCache;
+      if (!hasScanned || indexHTMLChanged) {
+        const indexHTMLAST = HTML.parse(htmlCode);
+        utils.traverseHTMLAST(indexHTMLAST, node => {
+          if (node.type == "tag") {
+            if (node.name == "head") {
+              headTemplate = HTML.stringify(node.children);
+              assetsMap.set(htmlCacheSrc + ":head", headTemplate);
+            } else if (node.name == "body") {
+              bodyTemplate = HTML.stringify(node.children);
+              assetsMap.set(htmlCacheSrc + ":body", bodyTemplate);
+            }
+          }
+        });
+
+        assetsMap.set(htmlCacheSrc, htmlCode);
+      }
+    }
+
+    headTemplate = assetsMap.get(htmlCacheSrc + ":head") || headTemplate;
+    bodyTemplate = assetsMap.get(htmlCacheSrc + ":body") || bodyTemplate;
+
+    result = `data:text/html;charset=utf-8,
+			<!DOCTYPE html>
+			<html>
+				<head>
+					${headTemplate}
+					<script>addEventListener("DOMContentLoaded", () => {${result}})</script>
+				</head>
+				<body>
+					${bodyTemplate}
+				</body>
+			</html>
+			`;
+
+    return result;
   }
 
   bundle(options = {}) {
@@ -183,43 +328,9 @@ export default class Bundler {
 			})({${modules}});
 		`;
 
-    let indexHTML = this.assets.files["/index.html"];
-
-    if (options.iframeSrc || (indexHTML && options.injectHTML)) {
-      let headTemplate = `
-				<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
-				<title></title>
-			`
-
-      let bodyTemplate = "";
-
-      // Inject index.html file if it exists
-      if (indexHTML) {
-        const indexHTMLAST = HTML.parse(indexHTML.code);
-
-        utils.traverseHTMLAST(indexHTMLAST, node => {
-          if (node.type == "tag") {
-            if (node.name == "head") {
-              headTemplate = HTML.stringify(node.children);
-            } else if (node.name == "body") {
-              bodyTemplate = HTML.stringify(node.children);
-            }
-          }
-        });
-      }
-
-      result = `data:text/html;charset=utf-8,
-			<!DOCTYPE html>
-			<html>
-				<head>
-					${headTemplate}
-					<script>addEventListener("DOMContentLoaded", () => {${result}})</script>
-				</head>
-				<body>
-					${bodyTemplate}
-				</body>
-			</html>
-			`
+    let htmlCode = this.assets.files[indexHTMLSRC]?.code;
+    if (options.iframeSrc || (htmlCode && options.injectHTML)) {
+      result = this._injectHTML(result, htmlCode);
     }
 
     return utils.trim(result);
