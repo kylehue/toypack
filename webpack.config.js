@@ -7,29 +7,28 @@ module.exports = {
   },
   module: {
     rules: [{
-        test: /\.js$/,
-        include: path.resolve(__dirname, "./src"),
-        exclude: /node_modules/,
-        loader: "babel-loader",
-        options: {
-          presets: [
-            ["@babel/preset-env", {
-              targets: "defaults"
-            }]
-          ]
-        }
-      }, {
-        test: /\.(scss)$/,
-        use: [
-          "style-loader",
-          "css-loader",
-          "sass-loader"
+      test: /\.js$/,
+      include: path.resolve(__dirname, "./src"),
+      exclude: /node_modules/,
+      loader: "babel-loader",
+      options: {
+        presets: [
+          ["@babel/preset-env", {
+            targets: "defaults"
+          }]
         ]
-      }, {
-        test: /\.(png|jpg|gif|woff2)$/i,
-        type: "asset/inline"
       }
-    ]
+    }, {
+      test: /\.(scss)$/,
+      use: [
+        "style-loader",
+        "css-loader",
+        "sass-loader"
+      ]
+    }, {
+      test: /\.(png|jpg|gif|woff2)$/i,
+      type: "asset/inline"
+    }]
   },
   output: {
     path: path.resolve(__dirname, "./dist"),
@@ -40,7 +39,7 @@ module.exports = {
       type: "umd",
       export: "default"
     },
-		publicPath: "/"
+    publicPath: "/"
   },
   plugins: [
     new NodePolyfillPlugin()

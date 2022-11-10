@@ -12,11 +12,23 @@ import { JSHINT } from "jshint";
 
 const indexHTMLSRC = "/index.html";
 const assetsMap = new Map();
+const dependenciesCache = new Map();
 let babelOptions = {
   presets: ["es2015-loose"],
-  plugins: []
+  plugins: [],
+	compact: false
 };
 
+
+/**
+ * 1. Get package in npm registry
+ * 2. Read the package json
+ * 3. Get package's "main" src
+ * 4. Create a bundler instance
+ * 5. Add package's files in bundler
+ * 6. Bundle
+ * 7. Add to cache
+ */
 let _ID = 0;
 export default class Bundler {
   constructor(options = {}) {
@@ -31,7 +43,8 @@ export default class Bundler {
 
     options = Object.assign({
       loopProtection: false,
-      skipErrors: typeof options.onError == "function"
+      skipErrors: typeof options.onError == "function",
+      transpile: true
     }, options);
 
     this.options = options;
@@ -50,43 +63,45 @@ export default class Bundler {
       babelOptions.plugins.push("loop-protect");
     }
 
-		this.JSHINTOptions = {
-			esversion: 6,
-			undef: true,
-			trailingcomma: false,
-			unused: false,
-			curly: false,
-			asi: true,
-			boss: true,
-			debug: true,
-			elision: true,
-			eqnull: true,
-			evil: true,
-			expr: true,
-			lastsemic: true,
-			loopfunc: true,
-			notypeof: true,
-			noyield: true,
-			plusplus: true,
-			proto: true,
-			scripturl: true,
-			supernew: true,
-			validthis: true,
-			withstmt: true,
-			browser: true,
-			devel: true,
-			module: true
-		};
+    this.JSHINTOptions = {
+      esversion: 6,
+      undef: true,
+      trailingcomma: false,
+      unused: false,
+      curly: false,
+      asi: true,
+      boss: true,
+      debug: true,
+      elision: true,
+      eqnull: true,
+      evil: true,
+      expr: true,
+      lastsemic: true,
+      loopfunc: true,
+      notypeof: true,
+      noyield: true,
+      plusplus: true,
+      proto: true,
+      scripturl: true,
+      supernew: true,
+      validthis: true,
+      withstmt: true,
+      browser: true,
+      devel: true,
+      module: true
+    };
   }
 
   _createAsset(file) {
+		if (!file) return;
     // Avoid transforming files that didn't change
     let duplicate = assetsMap.get(file.src);
     if (duplicate && duplicate.code == file.code) {
+			console.log("duplicate found");
       return duplicate;
     }
 
-		let fileExt = path.extname(file.src);
+		console.log(file);
 
     // Asset object
     let asset = {
@@ -97,64 +112,69 @@ export default class Bundler {
       dependencies: []
     };
 
-		// Pass errors
-		let errorFound = false;
-		let hasErrorCallback = typeof this.options.onError == "function";
-		let isJS = fileExt === ".js";
-    if (hasErrorCallback && isJS) {
+    let fileExt = path.extname(file.src);
+    let isJS = fileExt === ".js";
+
+    if (isJS) {
+      // Check for code errors
+      let errorFound = false;
       JSHINT(file.code, this.JSHINTOptions);
 
       const errors = JSHINT.data().errors;
-      if (errors) {
-				errors.forEach(error => {
-	        // Check if error is really an error and not a warning nor an info
-	        if (error.code.startsWith("E") || error.code.startsWith("W")) {
-	          errorFound = true;
-	          this.options.onError(file, error);
-	        }
-
-					console.log("ERROR!!!!!!!");
-					console.log(error);
-	      });
-			}
-    }
-
-		// Skip errors?
-    if (this.options.skipErrors && errorFound) return asset;
-
-    // Transform
-    // Get AST
-    const AST = acornParse(file.code, {
-      ecmaVersion: 2020,
-      sourceType: "module"
-    });
-
-    // Scan AST and get dependencies
-    acornWalk(AST, node => {
-      if (node.type == "ImportDeclaration") {
-        asset.dependencies.push(node.source.value);
-      } else if (node.type == "CallExpression" && node.callee.name == "require") {
-        if (node.arguments.length) {
-          asset.dependencies.push(node.arguments[0].value);
-        }
+      if (errors && errors.length) {
+        errorFound = true;
+        errors.forEach(error => {
+          if (typeof this.options.onError == "function") {
+            this.options.onError(file, error);
+          }
+        });
       }
-    });
 
-		// onBeforeTranspile callback
-    if (typeof this.options.onBeforeTranspile == "function") {
-      file.code = this.options.onBeforeTranspile(file) || file.code;
+      // Skip errors?
+      if (this.options.skipErrors && errorFound) return asset;
+
+      // Transform
+      // Get AST
+      const AST = acornParse(file.code, {
+        ecmaVersion: 2020,
+        sourceType: "module"
+      });
+
+      // Scan AST and get dependencies
+      acornWalk(AST, node => {
+        if (node.type == "ImportDeclaration") {
+					let pkg = node.source.value;
+					let isLocal = pkg.startsWith("./") || pkg.startsWith("/");
+          if (!utils.isExternal(pkg)) {
+            asset.dependencies.push(pkg);
+          }
+        } else if (node.type == "CallExpression" && node.callee.name == "require") {
+          if (node.arguments.length) {
+            asset.dependencies.push(node.arguments[0].value);
+          }
+        }
+      });
+
+      if (this.options.transpile) {
+        // onBeforeTranspile callback
+        if (typeof this.options.onBeforeTranspile == "function") {
+          file.code = this.options.onBeforeTranspile(file) || file.code;
+        }
+
+        // Transpile code
+        asset.transpiledCode = babelTransform(file.code, babelOptions).code;
+
+        // onTranspile callback
+        if (typeof this.options.onTranspile == "function") {
+          asset.transpiledCode = this.options.onTranspile(file, asset.transpiledCode) || asset.transpiledCode;
+        }
+      } else {
+        asset.transpiledCode = file.code;
+      }
+
+      // Add asset to cache
+      assetsMap.set(file.src, asset);
     }
-
-    // Transpile code
-    asset.transpiledCode = babelTransform(file.code, babelOptions).code;
-
-		// onTranspile callback
-    if (typeof this.options.onTranspile == "function") {
-      asset.transpiledCode = this.options.onTranspile(file, asset.transpiledCode) || asset.transpiledCode;
-    }
-
-    // Add asset to cache
-    assetsMap.set(file.src, asset);
 
     return asset;
   }
@@ -180,7 +200,7 @@ export default class Bundler {
         // If it does, don't add it in dependencyGraph
         if (!graphMap.has(assetAbsolutePath)) {
           const assetDependency = this._createAsset(this.assets.files[assetAbsolutePath]);
-
+					console.log(assetAbsolutePath);
           if (assetDependency) {
             asset.dependencyMap[assetRelativePath] = assetDependency.id;
             dependencyGraph.push(assetDependency);
@@ -219,15 +239,64 @@ export default class Bundler {
     delete this.assets.files[fileSrc];
   }
 
+  addDependency(name, version) {
+		let sample = "canvas-confetti";
+		let duplicate = assetsMap.get(sample);
+
+		if (!duplicate) {
+			let bundler = new Bundler();
+
+			new Promise((resolve, reject) => {
+				let assetCounter = 0;
+				utils.getDependency(sample, "latest").then(pkg => {
+					bundler.setEntry(pkg.entry);
+					for (let file of pkg.files) {
+						file.blob.text().then(code => {
+							bundler.addFile({
+								src: file.name,
+								code
+							});
+
+							assetCounter++;
+
+							if (assetCounter >= pkg.files.length) {
+								resolve();
+							}
+						});
+					}
+		    }).catch(error => {
+		      console.log(error);
+		    });
+			}).then(res => {
+				let pkgBundle = bundler.bundle();
+				//console.log(pkgBundle);
+				// this._createAsset({
+				// 	src: "sample",
+				// 	code: pkgBundle
+				// })
+
+				console.log(assetsMap);
+			})
+		}
+
+
+
+    // dependenciesCache.set(`${name}`, {
+    //   name: name,
+    //   version: version,
+    //   code: 1
+    // });
+  }
+
   _injectHTML(bundle, htmlCode) {
     let result = bundle;
 
+    let htmlCacheSrc = "HTML";
     let headTemplate = `
 				<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
 				<title></title>
 			`;
 
-    let htmlCacheSrc = "HTML";
     let bodyTemplate = "";
     // Inject index.html file if it exists
     if (htmlCode) {

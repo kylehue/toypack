@@ -33,6 +33,7 @@ export function getDependency(name, version) {
     try {
       const host = "registry.npmjs.org";
       const targetURL = "https://" + path.join(host, name);
+
       fetch(targetURL)
         .then(response => response.text()).catch(error => {
           reject(error);
@@ -49,7 +50,22 @@ export function getDependency(name, version) {
               .then(array => array.buffer)
               .then(untar)
               .then(files => {
-                resolve(files);
+								const pkgObject = {
+									name,
+									files
+								};
+
+								for (let file of files) {
+									file.name = file.name.substr("package/".length);
+									if (file.name == "package.json") {
+										file.blob.text().then(pkgText => {
+											let pkgJSON = JSON.parse(pkgText);
+											pkgObject.package = pkgJSON;
+											pkgObject.entry = pkgJSON.main;
+			                resolve(pkgObject);
+										});
+									}
+								}
               });
           } else {
             reject("Package not found.");
@@ -62,3 +78,9 @@ export function getDependency(name, version) {
     }
   });
 }
+
+// export function bundleDependency() {
+// 	return new Promise(() => {
+//
+// 	});
+// }

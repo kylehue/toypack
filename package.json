@@ -40,7 +40,9 @@
     "acorn": "^8.8.1",
     "acorn-walk": "^8.2.0",
     "html-parse-stringify": "^3.0.1",
+    "js-untar": "^2.0.0",
     "jshint": "^2.13.5",
-    "magic-string": "^0.26.7"
+    "pako": "^2.1.0",
+    "whatwg-fetch": "^3.6.2"
   }
 }
