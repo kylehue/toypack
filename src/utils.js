@@ -28,7 +28,8 @@ export function isExternal(url) {
 import * as path from "path";
 import untar from "js-untar";
 import pako from "pako";
-export function getDependency(name, version) {
+export function getDependency(name, version = "latest") {
+	if (!name) throw new Error("Dependency name is not defined.");
   return new Promise((resolve, reject) => {
     try {
       const host = "registry.npmjs.org";
@@ -79,8 +80,6 @@ export function getDependency(name, version) {
   });
 }
 
-// export function bundleDependency() {
-// 	return new Promise(() => {
-//
-// 	});
-// }
+export function isLocal(pathSrc) {
+	return pathSrc.startsWith("./") || pathSrc.startsWith("/");
+}

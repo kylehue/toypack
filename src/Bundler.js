@@ -9,6 +9,7 @@ import * as path from "path";
 import * as utils from "./utils";
 import loopProtect from "@freecodecamp/loop-protect";
 import { JSHINT } from "jshint";
+import Dependency from "./Dependency";
 
 const indexHTMLSRC = "/index.html";
 const assetsMap = new Map();
@@ -19,16 +20,6 @@ let babelOptions = {
 	compact: false
 };
 
-
-/**
- * 1. Get package in npm registry
- * 2. Read the package json
- * 3. Get package's "main" src
- * 4. Create a bundler instance
- * 5. Add package's files in bundler
- * 6. Bundle
- * 7. Add to cache
- */
 let _ID = 0;
 export default class Bundler {
   constructor(options = {}) {
@@ -64,11 +55,37 @@ export default class Bundler {
     }
 
     this.JSHINTOptions = {
+      /* Enforcing */
       esversion: 6,
-      undef: true,
-      trailingcomma: false,
-      unused: false,
       curly: false,
+      plusplus: false,
+      eqeqeq: false,
+      forin: false,
+      freeze: false,
+      futurehostile: false,
+      globals: false,
+      latedef: false,
+      leanswitch: false,
+      maxcomplexity: false,
+      maxdepth: false,
+      maxerr: false,
+      maxparams: false,
+      maxstatements: false,
+      noarg: false,
+      nocomma: false,
+      nonbsp: false,
+      nonew: false,
+      noreturnawait: false,
+      predef: false,
+      regexpu: false,
+      shadow: false,
+      singleGroups: false,
+      strict: false,
+      trailingcomma: false,
+      undef: true,
+      unused: false,
+      varstmt: false,
+      /* Relaxing */
       asi: true,
       boss: true,
       debug: true,
@@ -76,19 +93,23 @@ export default class Bundler {
       eqnull: true,
       evil: true,
       expr: true,
+      funcscope: true,
+      iterator: true,
       lastsemic: true,
       loopfunc: true,
       notypeof: true,
       noyield: true,
-      plusplus: true,
       proto: true,
       scripturl: true,
       supernew: true,
       validthis: true,
       withstmt: true,
+      /* Environments */
       browser: true,
+      browserify: true,
       devel: true,
-      module: true
+      module: true,
+      worker: true
     };
   }
 
@@ -97,11 +118,8 @@ export default class Bundler {
     // Avoid transforming files that didn't change
     let duplicate = assetsMap.get(file.src);
     if (duplicate && duplicate.code == file.code) {
-			console.log("duplicate found");
       return duplicate;
     }
-
-		console.log(file);
 
     // Asset object
     let asset = {
@@ -115,7 +133,7 @@ export default class Bundler {
     let fileExt = path.extname(file.src);
     let isJS = fileExt === ".js";
 
-    if (isJS) {
+    if (isJS || !utils.isLocal(file.src)) {
       // Check for code errors
       let errorFound = false;
       JSHINT(file.code, this.JSHINTOptions);
@@ -131,7 +149,7 @@ export default class Bundler {
       }
 
       // Skip errors?
-      if (this.options.skipErrors && errorFound) return asset;
+      //if (this.options.skipErrors && errorFound) return asset;
 
       // Transform
       // Get AST
@@ -144,7 +162,6 @@ export default class Bundler {
       acornWalk(AST, node => {
         if (node.type == "ImportDeclaration") {
 					let pkg = node.source.value;
-					let isLocal = pkg.startsWith("./") || pkg.startsWith("/");
           if (!utils.isExternal(pkg)) {
             asset.dependencies.push(pkg);
           }
@@ -173,6 +190,7 @@ export default class Bundler {
       }
 
       // Add asset to cache
+      console.log("Added to assets: " + file.src);
       assetsMap.set(file.src, asset);
     }
 
@@ -194,13 +212,13 @@ export default class Bundler {
 
       // Scan asset's dependencies
       asset.dependencies.forEach(assetRelativePath => {
-        const assetAbsolutePath = path.join(dirname, assetRelativePath);
+        // External modules' path should be the same as the absolute path
+        const assetAbsolutePath = utils.isLocal(assetRelativePath) ? path.join(dirname, assetRelativePath) : assetRelativePath;
 
         // Check if the asset already exists
         // If it does, don't add it in dependencyGraph
         if (!graphMap.has(assetAbsolutePath)) {
           const assetDependency = this._createAsset(this.assets.files[assetAbsolutePath]);
-					console.log(assetAbsolutePath);
           if (assetDependency) {
             asset.dependencyMap[assetRelativePath] = assetDependency.id;
             dependencyGraph.push(assetDependency);
@@ -216,6 +234,9 @@ export default class Bundler {
       });
     }
 
+    console.log("Dependency Graph: ");
+    console.log(dependencyGraph);
+
     return dependencyGraph;
   }
 
@@ -224,8 +245,8 @@ export default class Bundler {
     this.assets.entry = src;
   }
 
-  addFile(file) {
-    file.src = path.resolve(file.src);
+  addFile(file, _isExternalModule) {
+    file.src = utils.isLocal(file.src) ? path.resolve(file.src) : file.src;
     this.assets.files[file.src] = file;
   }
 
@@ -240,64 +261,36 @@ export default class Bundler {
   }
 
   addDependency(name, version) {
-		let sample = "canvas-confetti";
+		let sample = "@kylehue/drawer";
 		let duplicate = assetsMap.get(sample);
 
-		if (!duplicate) {
-			let bundler = new Bundler();
+		utils.getDependency(sample).then(pkg => {
+			// Scan dependency's dependencies
+			for (let file of pkg.files) {
+				if (file.name == "dist/drawer.js") {
+					file.blob.text().then(code => {
+						this.addFile({
+							src: sample,
+							code
+						}, true);
 
-			new Promise((resolve, reject) => {
-				let assetCounter = 0;
-				utils.getDependency(sample, "latest").then(pkg => {
-					bundler.setEntry(pkg.entry);
-					for (let file of pkg.files) {
-						file.blob.text().then(code => {
-							bundler.addFile({
-								src: file.name,
-								code
-							});
+						console.log(this.assets);
+						console.log(assetsMap);
+					});
+				}
+			}
 
-							assetCounter++;
-
-							if (assetCounter >= pkg.files.length) {
-								resolve();
-							}
-						});
-					}
-		    }).catch(error => {
-		      console.log(error);
-		    });
-			}).then(res => {
-				let pkgBundle = bundler.bundle();
-				//console.log(pkgBundle);
-				// this._createAsset({
-				// 	src: "sample",
-				// 	code: pkgBundle
-				// })
-
-				console.log(assetsMap);
-			})
-		}
-
-
-
-    // dependenciesCache.set(`${name}`, {
-    //   name: name,
-    //   version: version,
-    //   code: 1
-    // });
+      console.log(pkg);
+		});
   }
 
   _injectHTML(bundle, htmlCode) {
     let result = bundle;
 
     let htmlCacheSrc = "HTML";
-    let headTemplate = `
-				<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
-				<title></title>
-			`;
-
+    let headTemplate = "";
     let bodyTemplate = "";
+    
     // Inject index.html file if it exists
     if (htmlCode) {
       // Only scan AST if the code changed
@@ -325,12 +318,11 @@ export default class Bundler {
     headTemplate = assetsMap.get(htmlCacheSrc + ":head") || headTemplate;
     bodyTemplate = assetsMap.get(htmlCacheSrc + ":body") || bodyTemplate;
 
-    result = `data:text/html;charset=utf-8,
-			<!DOCTYPE html>
+    result = `<!DOCTYPE html>
 			<html>
 				<head>
-					${headTemplate}
 					<script>addEventListener("DOMContentLoaded", () => {${result}})</script>
+					${headTemplate}
 				</head>
 				<body>
 					${bodyTemplate}
@@ -343,8 +335,7 @@ export default class Bundler {
 
   bundle(options = {}) {
     options = Object.assign({
-      iframeSrc: false,
-      injectHTML: false
+      injectHTML: true
     }, options);
 
     let entry = this.assets.files[this.assets.entry];
@@ -398,7 +389,7 @@ export default class Bundler {
 		`;
 
     let htmlCode = this.assets.files[indexHTMLSRC]?.code;
-    if (options.iframeSrc || (htmlCode && options.injectHTML)) {
+    if (htmlCode && options.injectHTML) {
       result = this._injectHTML(result, htmlCode);
     }
 
