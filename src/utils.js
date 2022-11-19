@@ -80,6 +80,10 @@ export function getDependency(name, version = "latest") {
   });
 }
 
-export function isLocal(pathSrc) {
-	return pathSrc.startsWith("./") || pathSrc.startsWith("/");
+export function isLocal(pathStr) {
+	return pathStr.startsWith("./") || pathStr.startsWith("/");
+}
+
+export function resolveRequest(relative, pathStr) {
+  return path.join(path.dirname(relative), pathStr);
 }
