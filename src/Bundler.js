@@ -9,7 +9,6 @@ import * as path from "path";
 import * as utils from "./utils";
 import loopProtect from "@freecodecamp/loop-protect";
 import { JSHINT } from "jshint";
-import Dependency from "./Dependency";
 import nodePolyfills from "./node-polyfills";
 
 const indexHTMLSRC = "/index.html";
