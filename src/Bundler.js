@@ -12,26 +12,6 @@ export default class Bundler {
 			coreModulesPath: "node_modules",
 		};
 
-		this.addFile(
-			"hello/package.json",
-			`{
-			"main": "broom/testing.json"
-		}`,
-			{
-				isCoreModule: true,
-			}
-		);
-
-		this.addFile("hello/broom/testing.js", "test me!", {
-			isCoreModule: true,
-		});
-
-		try {
-			console.log(this.resolve("hello"));
-		} catch (error) {
-			console.error(error);
-		}
-
 		this.dependencies = {};
 	}
 
@@ -98,16 +78,7 @@ export default class Bundler {
 		return result;
 	}
 
-	resolve() {
-		let root = "";
-		let relativePath = "";
-		if (arguments.length >= 2) {
-			root = arguments[0];
-			relativePath = arguments[1];
-		} else if (arguments.length == 1) {
-			relativePath = arguments[0];
-		}
-
+	resolve(root, relativePath) {
 		let result = "";
 		let isCoreModule = utils.isCoreModule(relativePath);
 		if (isCoreModule) {
@@ -241,7 +212,7 @@ export default class Bundler {
 	}
 
 	async bundle() {
-		console.time("Bundle time: ");
+		console.time("Bundle time");
 		// Get dependency graph
 		const entryModule = this.input.files[this.input.entry];
 		let graph = await this._getGraph(entryModule);
@@ -278,7 +249,7 @@ export default class Bundler {
 		modules = `{${modules}}`.trim();
 
 		let bundle = await this._addRuntime(modules, this.input.entry);
-		console.timeEnd("Bundle time: ");
+		console.timeEnd("Bundle time");
 
 		//console.log(bundle);
 		return bundle;
