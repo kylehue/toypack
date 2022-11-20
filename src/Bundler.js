@@ -2,18 +2,161 @@ import Module from "./Module";
 import * as path from "path";
 import * as utils from "./utils";
 
+const graphCache = {};
 export default class Bundler {
 	constructor() {
 		this.input = {
 			entry: "",
 			files: {},
+			root: "fs",
+			coreModulesPath: "node_modules",
 		};
+
+		this.addFile(
+			"hello/package.json",
+			`{
+			"main": "broom/testing.json"
+		}`,
+			{
+				isCoreModule: true,
+			}
+		);
+
+		this.addFile("hello/broom/testing.js", "test me!", {
+			isCoreModule: true,
+		});
+
+		try {
+			console.log(this.resolve("hello"));
+		} catch (error) {
+			console.error(error);
+		}
 
 		this.dependencies = {};
 	}
 
-	addFile(src, code) {
-		src = path.resolve(src);
+	_loadIndex(modulePath) {
+		let noext = path.join(this.input.root, modulePath, "index");
+		let files = this.input.files;
+
+		if (files[noext + ".js"]) {
+			return noext + ".js";
+		} else if (files[noext + ".json"]) {
+			return noext + ".json";
+		}
+	}
+
+	_loadAsFile(relativePath) {
+		let ext = path.extname(relativePath);
+		let noext = ext
+			? relativePath.substr(0, relativePath.indexOf(ext))
+			: relativePath;
+		let files = this.input.files;
+
+		if (files[noext + ".js"]) {
+			return noext + ".js";
+		} else if (files[noext + ".json"]) {
+			return noext + ".json";
+		}
+	}
+
+	_loadAsDirectory(relativePath) {
+		let files = this.input.files;
+		let packageJSONPath = path.join(
+			this.input.root,
+			relativePath,
+			"package.json"
+		);
+		let packageText = files[packageJSONPath]?.code;
+		let result;
+		if (packageText) {
+			let packageJSON = JSON.parse(packageText);
+			let mainPath = packageJSON.main;
+			// If package.json's "main" is falsy, just load the index using relativePath
+			if (!mainPath) {
+				result = this._loadIndex(relativePath);
+			} else {
+				// Get absolute path
+				let absolutePath = path.join(this.input.root, relativePath, mainPath);
+				// [A] - Load the path using the absolutePath
+				let asFile = this._loadAsFile(absolutePath);
+				if (asFile) {
+					result = asFile;
+				} else {
+					// [B] - If [A] didn't work, load the index's path using absolutePath
+					let index = this._loadIndex(absolutePath);
+					if (index) {
+						result = index;
+					} else {
+						// [C] - If [B] didn't work, load the index's path using relativePath
+						result = this._loadIndex(relativePath);
+					}
+				}
+			}
+		}
+
+		return result;
+	}
+
+	resolve() {
+		let root = "";
+		let relativePath = "";
+		if (arguments.length >= 2) {
+			root = arguments[0];
+			relativePath = arguments[1];
+		} else if (arguments.length == 1) {
+			relativePath = arguments[0];
+		}
+
+		let result = "";
+		let isCoreModule = utils.isCoreModule(relativePath);
+		if (isCoreModule) {
+			result = this._loadAsDirectory(
+				path.join(this.input.coreModulesPath, relativePath)
+			);
+		} else {
+			let absolutePath = path.join(path.dirname(root), relativePath);
+			let asFile = this._loadAsFile(absolutePath);
+			if (asFile) {
+				result = asFile;
+			} else {
+				result = this._loadAsDirectory(absolutePath);
+			}
+		}
+
+		if (result) {
+			return result;
+		} else {
+			throw new Error(`Unable to resolve ${relativePath}.`);
+		}
+	}
+
+	getFile(src, options) {
+		options = Object.assign(
+			{
+				isCoreModule: false,
+			},
+			options
+		);
+
+		let cmRoot = options.isCoreModule ? this.input.coreModulesPath : "";
+
+		src = path.join(this.input.root, cmRoot, src);
+
+		return this.input.files[src];
+	}
+
+	addFile(src, code, options) {
+		options = Object.assign(
+			{
+				isCoreModule: false,
+			},
+			options
+		);
+
+		let cmRoot = options.isCoreModule ? this.input.coreModulesPath : "";
+
+		src = path.join(this.input.root, cmRoot, src);
 		let ext = path.extname(src);
 
 		if (ext == ".js") {
@@ -28,7 +171,7 @@ export default class Bundler {
 	}
 
 	setEntry(src) {
-		this.input.entry = src;
+		this.input.entry = path.join(this.input.root, src);
 	}
 
 	async _getGraph(entryModule) {
@@ -39,18 +182,10 @@ export default class Bundler {
 		const graph = [entryModule];
 
 		for (let mod of graph) {
-			// Avoid duplicates
-			if (graph.includes(mod) && mod != entryModule) {
-				continue;
-			}
-
 			// Scan dependency's dependencies
 			for (let dependencyPath of mod.dependencies) {
 				// Get resolved path
-				let resolvedDependencyPath = utils.resolveRequest(
-					mod.src,
-					dependencyPath
-				);
+				let resolvedDependencyPath = this.resolve(mod.src, dependencyPath);
 
 				// Get module
 				let dependencyModule = this.input.files[resolvedDependencyPath];
@@ -58,8 +193,11 @@ export default class Bundler {
 				// Load dependency's dependencies
 				await dependencyModule.loadDependencies();
 
-				// Add to graph
-				graph.push(dependencyModule);
+				// Avoid duplicates
+				if (!graph.includes(dependencyModule)) {
+					// Add to graph
+					graph.push(dependencyModule);
+				}
 			}
 		}
 
@@ -103,8 +241,10 @@ export default class Bundler {
 	}
 
 	async bundle() {
+		console.time("Bundle time: ");
 		// Get dependency graph
-		let graph = await this._getGraph(this.input.files[this.input.entry]);
+		const entryModule = this.input.files[this.input.entry];
+		let graph = await this._getGraph(entryModule);
 
 		let modules = "";
 
@@ -112,7 +252,6 @@ export default class Bundler {
 		for (let mod of graph) {
 			// Make sure the current module is a javascipt file
 			if (mod.ext == ".js") {
-
 				// Transpile
 				await mod.loadTranspiledCode();
 
@@ -120,7 +259,7 @@ export default class Bundler {
 				// This will be useful for requiring modules
 				let dependencyMap = {};
 				mod.dependencies.forEach((dep) => {
-					dependencyMap[dep] = utils.resolveRequest(mod.src, dep);
+					dependencyMap[dep] = this.resolve(mod.src, dep);
 				});
 
 				// Concatinate each module into the stringified collection of modules
@@ -137,10 +276,11 @@ export default class Bundler {
 
 		// Fix format
 		modules = `{${modules}}`.trim();
-		
-		let bundle = await this._addRuntime(modules, this.input.entry);
 
-		console.log(bundle);
+		let bundle = await this._addRuntime(modules, this.input.entry);
+		console.timeEnd("Bundle time: ");
+
+		//console.log(bundle);
 		return bundle;
 	}
 

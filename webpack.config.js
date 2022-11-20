@@ -1,4 +1,6 @@
 const path = require("path");
+const webpack = require("webpack");
+const TerserPlugin = require("terser-webpack-plugin");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const libraryName = "Bundler";
 module.exports = {
@@ -30,21 +32,12 @@ module.exports = {
 			{
 				test: /\.(png|jpg|gif|woff2)$/i,
 				type: "asset/inline",
-			},
-			{
-				test: /\.worker\.js$/i,
-				exclude: /node_modules/,
-				loader: "worker-loader",
-				options: {
-					filename: "[name].js",
-					inline: "fallback",
-				},
-			},
+			}
 		],
 	},
 	output: {
 		path: path.resolve(__dirname, "./dist"),
-		filename: libraryName + ".js",
+		filename: libraryName + ".[contenthash].js",
 		clean: true,
 		library: {
 			name: libraryName,
@@ -53,6 +46,25 @@ module.exports = {
 		},
 		publicPath: "/",
 	},
-	devtool: "eval-source-map",
-	plugins: [new NodePolyfillPlugin()],
+	devtool:
+		process.env.NODE_ENV == "development" ? "eval-source-map" : undefined,
+	plugins: [
+		new NodePolyfillPlugin(),
+		new webpack.ContextReplacementPlugin(
+			/(.+)?@babel(\\|\/)standalone(.+)?/,
+			path.resolve(__dirname, "./src"),
+			{}
+		),
+	],
+	optimization:
+		process.env.NODE_ENV == "production"
+			? {
+					minimize: true,
+					minimizer: [
+						new TerserPlugin({
+							test: /\.js(\?.*)?$/i,
+						}),
+					],
+			  }
+			: undefined,
 };

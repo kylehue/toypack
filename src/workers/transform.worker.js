@@ -1,5 +1,6 @@
 import { transform as babelTransform } from "@babel/standalone";
 
 addEventListener("message", event => {
-  postMessage(event.data + 1);
+  let data = event.data;
+  postMessage(babelTransform(data.code, data.options).code);
 });
