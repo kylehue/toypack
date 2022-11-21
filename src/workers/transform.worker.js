@@ -1,11 +1,12 @@
 import { transform as babelTransform } from "@babel/standalone";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
+console.log(babelTransform(""));
 addEventListener("message", (event) => {
 	let reqData = event.data;
 	let data = reqData.data;
 
-  if (data.type == "AST") {
+  if (data.mode == "AST") {
     let AST = [];
 
     try {
@@ -13,14 +14,14 @@ addEventListener("message", (event) => {
     } catch (error) {
       
     }
-    
+
 		let response = {
 			id: reqData.id,
 			data: AST,
 		};
 
 	  postMessage(response);
-  } else if (data.type == "scan") {
+  } else if (data.mode == "scan") {
     const dependencies = [];
 
     try {
@@ -47,7 +48,7 @@ addEventListener("message", (event) => {
 		};
 
 	  postMessage(response);
-  } else if (data.type == "transpile") {
+  } else if (data.mode == "transpile") {
     let transpiledCode = "";
 
     try {

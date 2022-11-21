@@ -2,10 +2,9 @@ import Module from "./Module";
 import * as path from "path";
 import HTML from "html-parse-stringify";
 import * as utils from "./utils";
-
+import CSSLoader from "./loaders/css.loader";
 var previousBundleURL;
 const htmlMap = new Map();
-const graphCache = {};
 export default class Bundler {
 	constructor(options = {}) {
 		this.options = Object.assign(
@@ -23,17 +22,18 @@ export default class Bundler {
 		};
 
 		this.dependencies = {};
+		this.loaders = [
+			{
+				ext: ".css",
+				use: [new CSSLoader()],
+			},
+		];
 	}
 
 	_loadIndex(modulePath) {
-		let noext = path.join(this.input.root, modulePath, "index");
-		let files = this.input.files;
+		let noext = path.join(modulePath, "index");
 
-		if (files[noext + ".js"]) {
-			return noext + ".js";
-		} else if (files[noext + ".json"]) {
-			return noext + ".json";
-		}
+		return this._loadAsFile(noext);
 	}
 
 	_loadAsFile(relativePath) {
@@ -48,15 +48,21 @@ export default class Bundler {
 		} else if (files[noext + ".json"]) {
 			return noext + ".json";
 		}
+		
+		for (let loader of this.loaders) {
+			if (files[noext + loader.ext]) {
+				return noext + loader.ext;
+			}
+		}
 	}
 
 	_loadAsDirectory(relativePath) {
 		let files = this.input.files;
 		let packageJSONPath = path.join(
-			this.input.root,
 			relativePath,
 			"package.json"
 		);
+
 		let packageText = files[packageJSONPath]?.code;
 		let result;
 		if (packageText) {
@@ -67,7 +73,8 @@ export default class Bundler {
 				result = this._loadIndex(relativePath);
 			} else {
 				// Get absolute path
-				let absolutePath = path.join(this.input.root, relativePath, mainPath);
+				let absolutePath = path.join(relativePath, mainPath);
+
 				// [A] - Load the path using the absolutePath
 				let asFile = this._loadAsFile(absolutePath);
 				if (asFile) {
@@ -83,6 +90,8 @@ export default class Bundler {
 					}
 				}
 			}
+		} else {
+			result = this._loadIndex(relativePath);
 		}
 
 		return result;
@@ -96,7 +105,15 @@ export default class Bundler {
 				path.join(this.input.coreModulesPath, relativePath)
 			);
 		} else {
-			let absolutePath = path.join(path.dirname(root), relativePath);
+			let dirname = path.dirname(root);
+			if (root.split(path.sep)[0] != this.input.root) {
+				dirname = this.input.root;
+			}
+			let absolutePath = path.join(
+				dirname,
+				relativePath
+			);
+
 			let asFile = this._loadAsFile(absolutePath);
 			if (asFile) {
 				result = asFile;
@@ -108,7 +125,7 @@ export default class Bundler {
 		if (result) {
 			return result;
 		} else {
-			throw new Error(`Unable to resolve ${relativePath}.`);
+			console.error(`Unable to resolve ${relativePath}.`);
 		}
 	}
 
@@ -156,36 +173,6 @@ export default class Bundler {
 
 	setEntry(src) {
 		this.input.entry = path.join(this.input.root, src);
-	}
-
-	async _getGraph(entryModule) {
-		// Load entry's dependencies
-		await entryModule.loadDependencies();
-
-		// Instantiate graph and add the entry in it
-		const graph = [entryModule];
-
-		for (let mod of graph) {
-			// Scan dependency's dependencies
-			for (let dependencyPath of mod.dependencies) {
-				// Get resolved path
-				let resolvedDependencyPath = this.resolve(mod.src, dependencyPath);
-
-				// Get module
-				let dependencyModule = this.input.files[resolvedDependencyPath];
-
-				// Load dependency's dependencies
-				await dependencyModule.loadDependencies();
-
-				// Avoid duplicates
-				if (!graph.includes(dependencyModule)) {
-					// Add to graph
-					graph.push(dependencyModule);
-				}
-			}
-		}
-
-		return graph;
 	}
 
 	_injectHTML(bundle) {
@@ -247,40 +234,34 @@ export default class Bundler {
 		}
 	}
 
-	_addRuntime(modules, entry) {
-		let runtime = `	const moduleCache = {};
+	async _getGraph(entryModule) {
+		// Load entry's dependencies
+		await entryModule.loadDependencies();
 
-	function require(modulePath) {
-		const { init, map } = modules[modulePath];
-		const module = { exports: {} };
+		// Instantiate graph and add the entry in it
+		const graph = [entryModule];
 
-		moduleCache[modulePath] = module.exports;
+		for (let mod of graph) {
+			// Scan dependency's dependencies
+			for (let dependencyPath of mod.dependencies) {
+				// Get resolved path
+				let resolvedDependencyPath = this.resolve(mod.src, dependencyPath);
 
-		function localRequire(assetRelativePath) {
-			if (!moduleCache[map[assetRelativePath]]) {
-				moduleCache[map[assetRelativePath]] = module.exports;
+				// Get module
+				let dependencyModule = this.input.files[resolvedDependencyPath];
 
-				var mod = require(map[assetRelativePath]);
-				moduleCache[map[assetRelativePath]] = mod;
-				return mod;
+				// Load dependency's dependencies
+				await dependencyModule.loadDependencies();
+
+				// Avoid duplicates
+				if (!graph.includes(dependencyModule)) {
+					// Add to graph
+					graph.push(dependencyModule);
+				}
 			}
-
-			return moduleCache[map[assetRelativePath]];
 		}
 
-		init(module, module.exports, localRequire);
-		return module.exports;
-	}
-
-	require(entry);`;
-
-		let result = [
-			`(function(modules, entry) {`,
-			runtime,
-			`})(${modules}, "${entry}");`,
-		].join("\n");
-
-		return result;
+		return graph;
 	}
 
 	async bundle() {
@@ -330,6 +311,42 @@ export default class Bundler {
 
 		//console.log(bundle);
 		return bundle;
+	}
+
+	_addRuntime(modules, entry) {
+		let runtime = `	const moduleCache = {};
+
+	function require(modulePath) {
+		const { init, map } = modules[modulePath];
+		const module = { exports: {} };
+
+		moduleCache[modulePath] = module.exports;
+
+		function localRequire(assetRelativePath) {
+			if (!moduleCache[map[assetRelativePath]]) {
+				moduleCache[map[assetRelativePath]] = module.exports;
+
+				var mod = require(map[assetRelativePath]);
+				moduleCache[map[assetRelativePath]] = mod;
+				return mod;
+			}
+
+			return moduleCache[map[assetRelativePath]];
+		}
+
+		init(module, module.exports, localRequire);
+		return module.exports;
+	}
+
+	require(entry);`;
+
+		let result = [
+			`(function(modules, entry) {`,
+			runtime,
+			`})(${modules}, "${entry}");`,
+		].join("\n");
+
+		return result;
 	}
 
 	addDependency() {}

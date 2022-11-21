@@ -24,6 +24,7 @@ if (window.Worker) {
 }
 
 window.wm = workerManager;
+window.utils = utils;
 
 export default class Module {
 	constructor(src, code) {
@@ -54,12 +55,12 @@ export default class Module {
 			try {
 				if (window.Worker) {
 					this.AST = await workerManager.post({
-						type: "AST",
+						mode: "AST",
 						code: this.code,
 						ASToptions,
 					});
 				} else {
-					this.AST = await getAST(this.code, ASToptions);
+					this.AST = getAST(this.code, ASToptions);
 				}
 			} catch (error) {
 				this.AST = [];
@@ -76,13 +77,13 @@ export default class Module {
 			try {
 				if (window.Worker) {
 					dependencies = await workerManager.post({
-						type: "scan",
+						mode: "scan",
 						code: this.code,
 						options: ASToptions,
 					});
 				} else {
 					await this.loadAST();
-					await traverseAST(this.AST, {
+					traverseAST(this.AST, {
 						ImportDeclaration: (path) => {
 							dependencies.push(path.node.source.value);
 						},
@@ -110,12 +111,12 @@ export default class Module {
 			try {
 				if (window.Worker) {
 					this.transpiledCode = await workerManager.post({
-						type: "transpile",
+						mode: "transpile",
 						code: this.code,
 						options: babelOptions,
 					});
 				} else {
-					this.transpiledCode = await babelTransform(this.code, babelOptions)
+					this.transpiledCode = babelTransform(this.code, babelOptions)
 						.code;
 				}
 			} catch (error) {
