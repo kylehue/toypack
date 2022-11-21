@@ -6,12 +6,20 @@ let babelOptions = {
 	presets: ["es2015-loose"],
 	compact: false,
 };
+let ASToptions = {
+	allowImportExportEverywhere: true,
+	sourceType: "module",
+};
 
+import WorkerManager from "./WorkerManager";
 import { transform as babelTransform } from "@babel/standalone";
 
-let worker;
+let workerManager;
 if (window.Worker) {
-	worker = new Worker(new URL("./workers/transform.worker", import.meta.url));
+	let worker = new Worker(
+		new URL("./workers/transform.worker", import.meta.url)
+	);
+	workerManager = new WorkerManager(worker);
 }
 
 export default class Module {
@@ -40,67 +48,66 @@ export default class Module {
 
 	async loadAST() {
 		if (this._codeCache.get("loadAST") != this.code) {
-			this.AST = await getAST(this.code, {
-				allowImportExportEverywhere: true,
-				sourceType: "module",
-			});
+			if (window.Worker) {
+				this.AST = await workerManager.post({
+					type: "AST",
+					code: this.code,
+					ASToptions,
+				});
+			} else {
+				this.AST = await getAST(this.code, ASToptions);
+			}
 
 			this._codeCache.set("loadAST", this.code);
 		}
-
-		return this.AST;
 	}
 
 	async loadDependencies() {
-		const dependencies = [];
+		let dependencies = [];
 
 		if (this._codeCache.get("loadDependencies") != this.code) {
-			await this.loadAST();
-
-			await traverseAST(this.AST, {
-				ImportDeclaration: (path) => {
-					dependencies.push(path.node.source.value);
-				},
-				CallExpression: (path) => {
-					if (
-						path.node.callee.name == "require" &&
-						path.node.arguments.length
-					) {
-						dependencies.push(path.node.arguments[0].value);
-					}
-				},
-			});
+			if (window.Worker) {
+				dependencies = await workerManager.post({
+					type: "scan",
+					code: this.code,
+					options: ASToptions,
+				});
+			} else {
+				await this.loadAST();
+				await traverseAST(this.AST, {
+					ImportDeclaration: (path) => {
+						dependencies.push(path.node.source.value);
+					},
+					CallExpression: (path) => {
+						if (
+							path.node.callee.name == "require" &&
+							path.node.arguments.length
+						) {
+							dependencies.push(path.node.arguments[0].value);
+						}
+					},
+				});
+			}
 
 			this.dependencies = dependencies;
 			this._codeCache.set("loadDependencies", this.code);
 		}
-
-		return this.dependencies;
 	}
 
 	async loadTranspiledCode() {
 		if (this._codeCache.get("loadTranspiledCode") != this.code) {
-			if (worker) {
-				worker.postMessage({
+			if (window.Worker) {
+				this.transpiledCode = await workerManager.post({
+					type: "transpile",
 					code: this.code,
 					options: babelOptions,
 				});
-
-				this.transpiledCode = await new Promise((resolve) => {
-					worker.onmessage = (event) => {
-						resolve(event.data);
-					};
-				});
 			} else {
-				this.transpiledCode = await babelTransform(
-					this.code,
-					babelOptions
-				).code;
+				this.transpiledCode = await babelTransform(this.code, babelOptions)
+					.code;
 			}
 
 			this._codeCache.set("loadTranspiledCode", this.code);
 		}
-
-		return this.transpiledCode;
 	}
 }

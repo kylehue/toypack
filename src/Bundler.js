@@ -1,10 +1,20 @@
 import Module from "./Module";
 import * as path from "path";
+import HTML from "html-parse-stringify";
 import * as utils from "./utils";
 
+var previousBundleURL;
+const htmlMap = new Map();
 const graphCache = {};
 export default class Bundler {
-	constructor() {
+	constructor(options = {}) {
+		this.options = Object.assign(
+			{
+				injectHTML: true,
+			},
+			options
+		);
+
 		this.input = {
 			entry: "",
 			files: {},
@@ -137,6 +147,9 @@ export default class Bundler {
 				src,
 				code,
 				ext,
+				updateCode(code) {
+					this.code = code;
+				},
 			};
 		}
 	}
@@ -173,6 +186,65 @@ export default class Bundler {
 		}
 
 		return graph;
+	}
+
+	_injectHTML(bundle) {
+		let mainHTML = this.getFile("index.html");
+		if (mainHTML) {
+			let headTemplate = "";
+			let bodyTemplate = "";
+			let htmlCacheSrc = "HTML";
+
+			let htmlCode = mainHTML.code;
+			let htmlCache = htmlMap.get(htmlCacheSrc);
+
+			let hasScanned = !!htmlCache;
+			let mainHTMLChanged = htmlCache && htmlCode != htmlCache;
+
+			// Only scan AST if the code changed
+			if (!hasScanned || mainHTMLChanged) {
+				const mainHTMLAST = HTML.parse(htmlCode);
+				// Get head and body codes
+				utils.traverseHTMLAST(mainHTMLAST, (node) => {
+					if (node.type == "tag") {
+						if (node.name == "head") {
+							headTemplate = HTML.stringify(node.children);
+							htmlMap.set(htmlCacheSrc + ":head", headTemplate);
+						} else if (node.name == "body") {
+							bodyTemplate = HTML.stringify(node.children);
+							htmlMap.set(htmlCacheSrc + ":body", bodyTemplate);
+						}
+					}
+				});
+
+				// Update html cache
+				htmlMap.set(htmlCacheSrc, htmlCode);
+			}
+
+			headTemplate = htmlMap.get(htmlCacheSrc + ":head") || headTemplate;
+			bodyTemplate = htmlMap.get(htmlCacheSrc + ":body") || bodyTemplate;
+
+			let bundleURL = URL.createObjectURL(new Blob([bundle]));
+			if (previousBundleURL) {
+				URL.revokeObjectURL(previousBundleURL);
+			}
+
+			previousBundleURL = bundleURL;
+
+			return `<!DOCTYPE html>
+<html>
+	<head>
+		<script defer src="${bundleURL}"></script>
+		${headTemplate}
+	</head>
+	<body>
+		${bodyTemplate}
+	</body>
+</html>
+`;
+		} else {
+			return bundle;
+		}
 	}
 
 	_addRuntime(modules, entry) {
@@ -249,7 +321,12 @@ export default class Bundler {
 		modules = `{${modules}}`.trim();
 
 		let bundle = await this._addRuntime(modules, this.input.entry);
+		//console.log(bundle);
 		console.timeEnd("Bundle time");
+
+		if (this.options.injectHTML) {
+			bundle = this._injectHTML(bundle);
+		}
 
 		//console.log(bundle);
 		return bundle;
