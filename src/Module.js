@@ -9,6 +9,7 @@ let babelOptions = {
 let ASToptions = {
 	allowImportExportEverywhere: true,
 	sourceType: "module",
+	errorRecovery: true,
 };
 
 import WorkerManager from "./WorkerManager";
@@ -21,6 +22,8 @@ if (window.Worker) {
 	);
 	workerManager = new WorkerManager(worker);
 }
+
+window.wm = workerManager;
 
 export default class Module {
 	constructor(src, code) {
@@ -48,16 +51,20 @@ export default class Module {
 
 	async loadAST() {
 		if (this._codeCache.get("loadAST") != this.code) {
-			if (window.Worker) {
-				this.AST = await workerManager.post({
-					type: "AST",
-					code: this.code,
-					ASToptions,
-				});
-			} else {
-				this.AST = await getAST(this.code, ASToptions);
+			try {
+				if (window.Worker) {
+					this.AST = await workerManager.post({
+						type: "AST",
+						code: this.code,
+						ASToptions,
+					});
+				} else {
+					this.AST = await getAST(this.code, ASToptions);
+				}
+			} catch (error) {
+				this.AST = [];
 			}
-
+			
 			this._codeCache.set("loadAST", this.code);
 		}
 	}
@@ -66,45 +73,53 @@ export default class Module {
 		let dependencies = [];
 
 		if (this._codeCache.get("loadDependencies") != this.code) {
-			if (window.Worker) {
-				dependencies = await workerManager.post({
-					type: "scan",
-					code: this.code,
-					options: ASToptions,
-				});
-			} else {
-				await this.loadAST();
-				await traverseAST(this.AST, {
-					ImportDeclaration: (path) => {
-						dependencies.push(path.node.source.value);
-					},
-					CallExpression: (path) => {
-						if (
-							path.node.callee.name == "require" &&
-							path.node.arguments.length
-						) {
-							dependencies.push(path.node.arguments[0].value);
-						}
-					},
-				});
-			}
+			try {
+				if (window.Worker) {
+					dependencies = await workerManager.post({
+						type: "scan",
+						code: this.code,
+						options: ASToptions,
+					});
+				} else {
+					await this.loadAST();
+					await traverseAST(this.AST, {
+						ImportDeclaration: (path) => {
+							dependencies.push(path.node.source.value);
+						},
+						CallExpression: (path) => {
+							if (
+								path.node.callee.name == "require" &&
+								path.node.arguments.length
+							) {
+								dependencies.push(path.node.arguments[0].value);
+							}
+						},
+					});
+				}
 
-			this.dependencies = dependencies;
+				this.dependencies = dependencies;
+			} catch (error) {
+				this.dependencies = [];
+			}
 			this._codeCache.set("loadDependencies", this.code);
 		}
 	}
 
 	async loadTranspiledCode() {
 		if (this._codeCache.get("loadTranspiledCode") != this.code) {
-			if (window.Worker) {
-				this.transpiledCode = await workerManager.post({
-					type: "transpile",
-					code: this.code,
-					options: babelOptions,
-				});
-			} else {
-				this.transpiledCode = await babelTransform(this.code, babelOptions)
-					.code;
+			try {
+				if (window.Worker) {
+					this.transpiledCode = await workerManager.post({
+						type: "transpile",
+						code: this.code,
+						options: babelOptions,
+					});
+				} else {
+					this.transpiledCode = await babelTransform(this.code, babelOptions)
+						.code;
+				}
+			} catch (error) {
+				this.transpiledCode = "";
 			}
 
 			this._codeCache.set("loadTranspiledCode", this.code);
