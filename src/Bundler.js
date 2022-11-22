@@ -2,8 +2,6 @@ import Module from "./Module";
 import * as path from "path";
 import HTML from "html-parse-stringify";
 import * as utils from "./utils";
-import CSSLoader from "./loaders/css.loader";
-var previousBundleURL;
 const htmlMap = new Map();
 export default class Bundler {
 	constructor(options = {}) {
@@ -21,13 +19,9 @@ export default class Bundler {
 			coreModulesPath: "node_modules",
 		};
 
+		this._scriptBundleURL;
+
 		this.dependencies = {};
-		this.loaders = [
-			{
-				ext: ".css",
-				use: [new CSSLoader()],
-			},
-		];
 	}
 
 	_loadIndex(modulePath) {
@@ -47,12 +41,6 @@ export default class Bundler {
 			return noext + ".js";
 		} else if (files[noext + ".json"]) {
 			return noext + ".json";
-		}
-		
-		for (let loader of this.loaders) {
-			if (files[noext + loader.ext]) {
-				return noext + loader.ext;
-			}
 		}
 	}
 
@@ -212,11 +200,11 @@ export default class Bundler {
 			bodyTemplate = htmlMap.get(htmlCacheSrc + ":body") || bodyTemplate;
 
 			let bundleURL = URL.createObjectURL(new Blob([bundle]));
-			if (previousBundleURL) {
-				URL.revokeObjectURL(previousBundleURL);
+			if (this._scriptBundleURL) {
+				URL.revokeObjectURL(this._scriptBundleURL);
 			}
 
-			previousBundleURL = bundleURL;
+			this._scriptBundleURL = bundleURL;
 
 			return `<!DOCTYPE html>
 <html>

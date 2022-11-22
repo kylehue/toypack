@@ -1,7 +1,6 @@
 import { transform as babelTransform } from "@babel/standalone";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
-console.log(babelTransform(""));
 addEventListener("message", (event) => {
 	let reqData = event.data;
 	let data = reqData.data;
