@@ -3,21 +3,21 @@ export default class WorkerManager {
 		this.worker = worker;
 		this.queue = [];
 
-    this.worker.onmessage = (event) => {
-      let reqData = event.data;
+		this.worker.onmessage = (event) => {
+			let reqData = event.data;
 			let data = reqData.data;
 			this.queue.forEach((item, index) => {
 				if (item.id == reqData.id) {
-          item.resolve(data);
+					item.resolve(data);
 					this.queue.splice(index, 1);
 
-          // Next
+					// Next
 					if (this.queue.length >= 1) {
-            let first = this.queue[0];
+						let first = this.queue[0];
 						this.worker.postMessage({
 							id: first.id,
 							data: first.data,
-            });
+						});
 					}
 				}
 			});

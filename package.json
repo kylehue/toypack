@@ -44,6 +44,7 @@
     "@freecodecamp/loop-protect": "^3.0.0",
     "html-parse-stringify": "^3.0.1",
     "js-untar": "^2.0.0",
+    "memfs": "^3.4.12",
     "pako": "^2.1.0",
     "whatwg-fetch": "^3.6.2"
   }

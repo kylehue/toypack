@@ -5,26 +5,24 @@ addEventListener("message", (event) => {
 	let reqData = event.data;
 	let data = reqData.data;
 
-  if (data.mode == "AST") {
-    let AST = [];
+	if (data.mode == "AST") {
+		let AST = [];
 
-    try {
-      AST = getAST(data.code, data.options);
-    } catch (error) {
-      
-    }
+		try {
+			AST = getAST(data.code, data.options);
+		} catch (error) {}
 
 		let response = {
 			id: reqData.id,
 			data: AST,
 		};
 
-	  postMessage(response);
-  } else if (data.mode == "scan") {
-    const dependencies = [];
+		postMessage(response);
+	} else if (data.mode == "scan") {
+		const dependencies = [];
 
-    try {
-      traverseAST(getAST(data.code, data.options), {
+		try {
+			traverseAST(getAST(data.code, data.options), {
 				ImportDeclaration: (path) => {
 					dependencies.push(path.node.source.value);
 				},
@@ -37,30 +35,26 @@ addEventListener("message", (event) => {
 					}
 				},
 			});
-    } catch (error) {
-      
-    }
-    
-    let response = {
+		} catch (error) {}
+
+		let response = {
 			id: reqData.id,
 			data: dependencies,
 		};
 
-	  postMessage(response);
-  } else if (data.mode == "transpile") {
-    let transpiledCode = "";
+		postMessage(response);
+	} else if (data.mode == "transpile") {
+		let transpiledCode = "";
 
-    try {
-      transpiledCode = babelTransform(data.code, data.options).code;
-    } catch (error) {
-      
-    }
+		try {
+			transpiledCode = babelTransform(data.code, data.options).code;
+		} catch (error) {}
 
 		let response = {
 			id: reqData.id,
 			data: transpiledCode,
 		};
 
-	  postMessage(response);
+		postMessage(response);
 	}
 });
