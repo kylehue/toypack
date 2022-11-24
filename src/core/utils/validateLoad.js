@@ -1,3 +1,3 @@
 export default function (load) {
-   return Array.isArray(load) && load.length == 2;
+   return load && Array.isArray(load) && load.length == 2;
 }
