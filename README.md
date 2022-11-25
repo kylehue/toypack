@@ -21,9 +21,10 @@ GET_HTML_SCRIPTS(html_file)
 
 
 1. Load files like .vue, .scss, .ts, .jsx, etc. and exclude the .js and .css files
-2. Get the type of their outputs and then find the loader dedicated for it (type can be .js or .css)
+2. Get the type of their outputs and then find the transformer dedicated for it (type can be .js or .css)
 3. Transform all .js and .css files
-4. Get the graph and bundle
+4. Get the graph of each entry
+5. Bundle
 
 
 
@@ -34,3 +35,8 @@ f. create an object url for each bundle
 g. change src attribute's value to the object url
 h. return array of rendered AST
 ```
+
+### Final output can either be
+1. html text (for iframes)
+2. object with all of the bundled files (for production)
+3. object with all of the files + the bundler files (for further development outside the playground app)

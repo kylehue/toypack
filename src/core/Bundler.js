@@ -3,6 +3,7 @@ import validateLoad from "./utils/validateLoad";
 import assets from "./AssetManager";
 import { parser as parseHTML } from "posthtml-parser";
 import traverseHTMLAST from "./utils/traverseHTMLAST";
+import getModuleType from "./utils/getModuleType";
 export default class Bundler {
 	constructor(options) {
 		this.options = Object.assign(
@@ -13,13 +14,13 @@ export default class Bundler {
 		);
 
 		this.entry = "";
-
+		assets.vol = {};
 		/* assets.add("hello/index.js", "", true);
-		assets.add("hello/bro/cool", "", true);
+		assets.add("hello/bro/index.js", "", true);
 		assets.add("hello/package.json", JSON.stringify({
-			main: "bro/cool.js"
+			main: "index.js"
 		}), true);
-		console.log(assets.resolve("", "hello")); */
+		console.log(assets.resolve("", "hello/bro")); */
 
 		/* assets.add(
 			"https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
@@ -50,12 +51,20 @@ export default class Bundler {
 				traverseHTMLAST(AST, (node) => {
 					// [3.1] - Search for script tags that has "src" attribute
 					if (node.tag == "script" && node.attrs?.src) {
-						htmlDependencies.push(node.attrs.src);
+						let dep = node.attrs.src;
+						if (getModuleType(dep) != "external") {
+							dep = path.join("/", dep);
+						}
+						htmlDependencies.push(dep);
 					}
 
 					// [3.2] - Search for link tags that has "href" attribute
 					if (node.tag == "link" && node.attrs?.href) {
-						htmlDependencies.push(node.attrs.href);
+						let dep = node.attrs.href;
+						if (getModuleType(dep) != "external") {
+							dep = path.join("/", dep);
+						}
+						htmlDependencies.push(dep);
 					}
 				});
 
@@ -71,9 +80,10 @@ export default class Bundler {
 		return graph;
 	}
 
-	_getDependencyGraph(entry) {
-		//console.log(entry);
-
+	async _getDependencyGraph(entry) {
+		let entryAsset = assets.get(entry);
+	
+		console.log(await entryAsset.getDependencyGraph());
 		return [];
 	}
 
@@ -113,39 +123,24 @@ export default class Bundler {
 			}
 		}
 
-		let bundles = [];
+		/* let bundles = [];
 
 		// Scan assets
-		// for (let asset of dependencyGraph) {
-		// 	let ext = path.extname(asset.src);
+		for (let asset of dependencyGraph) {
+			let ext = path.extname(asset.src);
 
-		// 	// Get asset's transformer
-		// 	let transformer = this._getTransformer(ext);
-		// 	let loader = this._getLoader(ext);
+			// Get asset's transformer
+			let transformer = this._getTransformer(ext);
 
-		// 	if (transformer && loader) {
-		// 		// Apply transformer to asset's code
-		// 		let transform = transformer.apply(asset.code);
+			if (transformer) {
+				// Apply transformer to asset's code
+				let {js, css} = transformer.apply(asset.code);
 
-		// 		// Apply plugins
-		// 		let plugins = this._getPlugins(ext);
-		// 		for (let plugin of plugins) {
-		// 			transform = plugin.apply(transform) || transform;
-		// 		}
-
-		// 		// Apply loader
-		// 		let load = loader.apply(transform);
-		// 		/* let isProperLoad = validateLoad(load);
-		// 		if (isProperLoad) {
-		// 			let bundle = this._createBundle();
-		// 			bundles.push(bundle);
-		// 			bundle.head.push(load[0]);
-		// 			bundle.body.push(load[1]);
-		// 		} */
-		// 	} else {
-		// 		// If transformer doesn't exist, throw an error
-		// 		console.error(`${ext} files are not supported.`);
-		// 	}
-		// }
+				
+			} else {
+				// If transformer doesn't exist, throw an error
+				console.error(`${ext} files are not supported.`);
+			}
+		} */
 	}
 }

@@ -1,4 +1,5 @@
 import * as path from "path";
+import Asset from "./Asset";
 import getModuleType from "./utils/getModuleType";
 class AssetManager {
 	constructor() {
@@ -7,6 +8,7 @@ class AssetManager {
 
 	async add(src, content = "", isCoreModule = false) {
 		if (getModuleType(src) == "external") {
+			// If src is external, get the content
 			let module = this.get(src);
 			if (!module) {
 				let response = await fetch(src);
@@ -20,6 +22,7 @@ class AssetManager {
 				content = module.content;
 			}
 		} else {
+			// If src is a core module, change its dirname to "node_modules"
 			src = isCoreModule
 				? path.join("/node_modules", src)
 				: path.join("/", src);
@@ -27,6 +30,8 @@ class AssetManager {
 
 		let ext = path.extname(src)?.substr(1);
 		let group = this.vol[ext];
+
+		// Instantiate group if it doesn't exist
 		if (!group) {
 			this.vol[ext] = [];
 			group = this.vol[ext];
@@ -40,10 +45,9 @@ class AssetManager {
 			}
 		}
 
-		group.push({
-			src,
-			content,
-		});
+		// If it doesn't exist, add
+		let asset = new Asset(src, content);
+		group.push(asset);
 	}
 
 	get(src) {
@@ -80,6 +84,16 @@ class AssetManager {
 		let secondPriority = this.get(noext + ".json");
 		if (secondPriority) {
 			return secondPriority.src;
+		}
+
+		// If .js or .json files aren't located, return src that matches the target with any extname
+		let anyExtRegex = new RegExp(`^(/?${noext})\.[^.]+$`);
+		for (let group of Object.values(this.vol)) {
+			for (let content of group) {
+				if (anyExtRegex.test(content.src)) {
+					return content.src;
+				}
+			}
 		}
 	}
 
@@ -148,5 +162,4 @@ class AssetManager {
 }
 
 let assetManager = new AssetManager();
-
 export default assetManager;

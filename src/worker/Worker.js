@@ -5,7 +5,7 @@ addEventListener("message", (event) => {
 	let reqData = event.data;
 	let data = reqData.data;
 
-	if (data.mode == "AST") {
+	/* if (data.mode == "AST") {
 		let AST = [];
 
 		try {
@@ -18,11 +18,12 @@ addEventListener("message", (event) => {
 		};
 
 		postMessage(response);
-	} else if (data.mode == "scan") {
+	} else  */if (data.mode == "scan") {
 		const dependencies = [];
-
+		let AST = [];
 		try {
-			traverseAST(getAST(data.code, data.options), {
+			AST = getAST(data.code, data.options);
+			traverseAST(AST, {
 				ImportDeclaration: (path) => {
 					dependencies.push(path.node.source.value);
 				},
@@ -39,7 +40,9 @@ addEventListener("message", (event) => {
 
 		let response = {
 			id: reqData.id,
-			data: dependencies,
+			data: {
+				AST, dependencies
+			},
 		};
 
 		postMessage(response);
