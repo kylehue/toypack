@@ -1,4 +1,4 @@
-export default class WorkerManager {
+class WorkerManager {
 	constructor(worker) {
 		this.worker = worker;
 		this.queue = [];
@@ -55,3 +55,7 @@ export default class WorkerManager {
 		return promise;
 	}
 }
+
+let workerManager = new WorkerManager(new Worker(new URL("./Worker.js", import.meta.url)));
+
+export default workerManager;

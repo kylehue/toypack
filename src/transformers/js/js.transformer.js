@@ -1,18 +1,14 @@
-import WorkerManager from "../../worker/WorkerManager";
-import { transform as babelTransform } from "@babel/standalone";
+import workerManager from "../../worker/WorkerManager";
+import { transformFromAst as babelTransform } from "@babel/standalone";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
-
-let workerManager;
-if (window.Worker) {
-	let worker = new Worker(new URL("../../worker/Worker.js", import.meta.url));
-	workerManager = new WorkerManager(worker);
-}
-
+import MagicString from "magic-string";
+import * as path from "path";
 let babelOptions = {
 	presets: ["es2015-loose"],
 	compact: false,
 };
+
 
 let ASToptions = {
 	allowImportExportEverywhere: true,
@@ -20,28 +16,35 @@ let ASToptions = {
 	errorRecovery: true,
 };
 
+/* const outputSchema = {
+	content: "string",
+	AST: (test) => Array.isArray(test),
+	dependencies: (test) => Array.isArray(test),
+}; */
+
 export default class JSTransformer {
 	constructor() {
 		this.js = {
-			transpiled: "",
+			content: "",
 			AST: [],
 			dependencies: []
 		};
 	}
 
-	async _transpileCode(code) {
+	async _transpileCode(AST) {
 		let result = "";
 		try {
 			if (workerManager) {
 				result = await workerManager.post({
-					mode: "transpile",
-					code: code,
+					mode: "js:transpile",
 					options: babelOptions,
+					AST
 				});
 			} else {
-				result = babelTransform(code, babelOptions).code;
+				result = babelTransform(AST, null, babelOptions).code;
 			}
 		} catch (error) {
+			console.warn(error);
 			result = "";
 		}
 
@@ -56,7 +59,7 @@ export default class JSTransformer {
 		try {
 			if (workerManager) {
 				result = await workerManager.post({
-					mode: "scan",
+					mode: "js:scan",
 					code: code,
 					options: ASToptions,
 				});
@@ -64,15 +67,27 @@ export default class JSTransformer {
 				let dependencies = [];
 				let AST = getAST(code, ASToptions);
 				traverseAST(AST, {
-					ImportDeclaration: (path) => {
-						dependencies.push(path.node.source.value);
+					ImportDeclaration: (dir) => {
+						let id = dir.node.source.value;
+						dependencies.push(id);
+
+						// Remove import if not .js
+						if (!id.endsWith(".js") && path.extname(id).length) {
+							dir.remove();
+						}
 					},
-					CallExpression: (path) => {
+					CallExpression: (dir) => {
 						if (
-							path.node.callee.name == "require" &&
-							path.node.arguments.length
+							dir.node.callee.name == "require" &&
+							dir.node.arguments.length
 						) {
-							dependencies.push(path.node.arguments[0].value);
+							let id = dir.node.arguments[0].value;
+							dependencies.push(id);
+
+							// Remove import if not .js
+							if (!id.endsWith(".js") && path.extname(id).length) {
+								dir.remove();
+							}
 						}
 					},
 				});
@@ -82,7 +97,7 @@ export default class JSTransformer {
 				};
 			}
 		} catch (error) {
-			console.error("Scan failed.")
+			console.warn(error);
 			result = {
 				dependencies: [],
 				AST: []
@@ -92,9 +107,9 @@ export default class JSTransformer {
 		return result;
 	}
 
-	async apply(code) {
-		this.js.transpiled = await this._transpileCode(code);
-		let { AST, dependencies } = await this._scan(code);
+	async apply(asset) {
+		let { AST, dependencies } = await this._scan(asset.content);
+		this.js.content = await this._transpileCode(AST);
 		this.js.AST = AST;
 		this.js.dependencies = dependencies;
 	}

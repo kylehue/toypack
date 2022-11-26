@@ -15,7 +15,7 @@
     "compression-webpack-plugin": "^10.0.0",
     "css-loader": "^6.7.1",
     "node-polyfill-webpack-plugin": "^2.0.1",
-    "sass": "^1.55.0",
+    "sass": "^1.56.1",
     "sass-loader": "^13.0.2",
     "style-loader": "^3.3.1",
     "terser-webpack-plugin": "^5.3.6",
@@ -42,12 +42,18 @@
     "@babel/standalone": "^7.20.2",
     "@babel/traverse": "^7.20.1",
     "@freecodecamp/loop-protect": "^3.0.0",
+    "@vue/compiler-sfc": "^3.2.45",
+    "autoprefixer": "^10.4.13",
     "html-parse-stringify": "^3.0.1",
     "js-untar": "^2.0.0",
+    "magic-string": "^0.26.7",
     "memfs": "^3.4.12",
     "pako": "^2.1.0",
+    "postcss": "^8.4.19",
+    "postcss-value-parser": "^4.2.0",
     "posthtml-parser": "^0.11.0",
     "posthtml-render": "^3.0.0",
+    "vue": "^3.2.45",
     "whatwg-fetch": "^3.6.2"
   }
 }

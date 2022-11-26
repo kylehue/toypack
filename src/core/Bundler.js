@@ -29,8 +29,8 @@ export default class Bundler {
 		console.log(assets); */
 	}
 
-	addAsset(src, content) {
-		assets.add(src, content);
+	async addAsset(src, content) {
+		await assets.add(src, content);
 	}
 
 	setEntry(src) {
@@ -72,19 +72,12 @@ export default class Bundler {
 					src: html.src,
 					content: html.content,
 					dependencies: htmlDependencies,
-					AST
+					AST,
 				});
 			}
 		}
 
 		return graph;
-	}
-
-	async _getDependencyGraph(entry) {
-		let entryAsset = assets.get(entry);
-	
-		console.log(await entryAsset.getDependencyGraph());
-		return [];
 	}
 
 	_getTransformer(ext) {
@@ -115,10 +108,20 @@ export default class Bundler {
 		let htmlGraph = this._getHTMLGraph();
 
 		for (let htmlAsset of htmlGraph) {
-			for (let dependency of htmlAsset.dependencies) {
-				let ext = path.extname(dependency);
-				if (ext == ".js") {
-					this._getDependencyGraph(dependency);
+			for (let dependencyPath of htmlAsset.dependencies) {
+				// [1] - Add externals in assets
+				if (getModuleType(dependencyPath) == "external") {
+					await assets.add(dependencyPath);
+				}
+
+				let ext = path.extname(dependencyPath);
+				let type = ext.substr(1);
+				if (ext == ".js" || true) {
+					let dependencyAsset = assets.get(dependencyPath);
+
+					// [2] - Pack
+					await dependencyAsset.pack();
+					console.log(dependencyAsset);
 				}
 			}
 		}

@@ -55,6 +55,11 @@ module.exports = {
 			path.resolve(__dirname, "./src"),
 			{}
 		),
+		new webpack.ContextReplacementPlugin(
+			/(.+)?@vue(\\|\/)compiler\-sfc(.+)?/,
+			path.resolve(__dirname, "./src"),
+			{}
+		),
 	],
 	optimization:
 		process.env.NODE_ENV == "production"
