@@ -3,70 +3,241 @@ import {
 	compileScript,
 	compileStyleAsync,
 	rewriteDefault,
+	compileTemplate,
+	MagicString,
 } from "@vue/compiler-sfc";
 import uuid from "../../core/utils/uuid";
+import JSTransformer from "../js/js.transformer";
+import postcssNested from "postcss-nested";
+import postcssVariables from "postcss-simple-vars";
+import postcssColors from "postcss-color-function";
 let sample = `
 <template>
    <span>{{t}}</span>
 </template>
-<script setup>
+<script lang="ts" setup>
 import {ref} from "vue";
 let t = ref(0);
+let s:string = "test";
 </script>
-
 <style lang="scss" scoped>
+$v: color(green shade(20%));
 body {
-   background: blue;
+   background: $v;
    span {
-   color: green;
+		color: green;
+	}
 }
+
+@mixin flex {
+	display: flex;
 }
 </style>
 `;
+
 const COMP_NAME = "__sfc__";
+const SUPPORTED_SCRIPT_LANGS = [
+	{
+		ext: "ts",
+		babelParserPlugin: "typescript",
+		babelTransformerPlugin: "transform-typescript",
+	},
+];
+
+const SUPPORTED_STYLE_LANGS = [
+	{
+		ext: "scss",
+		postCSSParserPlugin: "sass",
+		postCSSTransformerPlugin: "sass",
+	},
+	{
+		ext: "sass",
+		postCSSParserPlugin: "sass",
+		postCSSTransformerPlugin: "sass",
+	},
+];
+
 export default class VueTransformer {
-	constructor() {}
+	constructor() {
+		this.errors = [];
+		this._jsTransformer = new JSTransformer();
+	}
+
+	async _doCompileStyle(scopeId, descriptor) {
+		try {
+			let styles = [];
+			for (let style of descriptor.styles) {
+				if (style.lang && style.lang != "css") {
+					let error = `${style.lang} is not yet supported.`;
+					console.warn(error);
+					this.errors.push(error);
+				}
+
+				const parsedStyle = await compileStyleAsync({
+					source: style.content,
+					id: scopeId,
+					scoped: style.scoped,
+					// TODO: Use CSSTransformer or .. ?
+					postcssPlugins: [
+						postcssNested,
+						postcssColors,
+						postcssVariables
+					]
+				});
+
+				styles.push({
+					content: parsedStyle.code,
+				});
+			}
+
+			return styles;
+		} catch (error) {
+			console.warn(error);
+			this.errors.push(error);
+		}
+	}
+
+	async _doCompileScript(scopeId, descriptor) {
+		try {
+			let scriptDescriptor = descriptor.script
+				? descriptor.script
+				: descriptor.scriptSetup;
+			// Only accept supported langs
+			const dedicatedLang = SUPPORTED_SCRIPT_LANGS.find(
+				(lang) => lang.ext === scriptDescriptor.lang
+			);
+
+			if (!scriptDescriptor.lang || dedicatedLang) {
+				const templateOptions = {
+					id: scopeId,
+					source: descriptor.template.content,
+					isProd: false,
+					slotted: descriptor.slotted,
+					scoped: descriptor.styles.some((s) => s.scoped),
+				};
+
+				// [1] - Compile script
+				const parsedScript = compileScript(descriptor, {
+					id: scopeId,
+					inlineTemplate: true,
+					reactivityTransform: true,
+					templateOptions,
+					isProd: false,
+					babelParserPlugins: [dedicatedLang?.babelParserPlugin],
+				});
+
+				// [2] - Instantiate the script code
+				let scriptCode = new MagicString("");
+
+				// Manage bindings
+				if (parsedScript.bindings) {
+					scriptCode.append(
+						`\n/* Analyzed bindings: ${JSON.stringify(
+							parsedScript.bindings,
+							null,
+							4
+						)} */\n`
+					);
+
+					templateOptions.compilerOptions = {
+						prefixIdentifiers: true,
+						bindingMetadata: parsedScript.bindings,
+					};
+				}
+
+				// [3] - Append the parsed script into script code
+				scriptCode.append("\n");
+				scriptCode.append(rewriteDefault(parsedScript.content, COMP_NAME));
+
+				// Only compile template if there is no script setup
+				if (descriptor.template && !descriptor.scriptSetup) {
+					const parsedTemplate = compileTemplate(templateOptions);
+
+					if (parsedTemplate.code) {
+						// ?[4] - Append parsed template script into script code
+						scriptCode.append("\n");
+						scriptCode.append(
+							parsedTemplate.code.replace(
+								/\nexport (function|const) (render|ssrRender)/,
+								`function render`
+							)
+						);
+
+						// Append renderer function to SFC instance
+						scriptCode.append("\n");
+						scriptCode.append(`${COMP_NAME}.render = render;`);
+					}
+				}
+
+				// [5] - Append scope id to SFC instance
+				scriptCode.append("\n");
+				scriptCode.append(`${COMP_NAME}.__scopeId = "data-v-${scopeId}";`);
+
+				// [6] - Export the SFC instance
+				scriptCode.append("\n");
+				scriptCode.append(`export default ${COMP_NAME};`);
+
+				return {
+					lang: dedicatedLang,
+					content: scriptCode.toString(),
+				};
+			} else {
+				let error = `${parsedScript.lang} is not yet supported.`;
+				console.warn(error);
+				this.errors.push(error);
+			}
+		} catch (error) {
+			console.warn(error);
+			this.errors.push(error);
+		}
+	}
 
 	async apply(asset) {
-		let id = uuid();
-		let parsed = parseSFC(sample).descriptor;
+		this.errors = [];
+		const { descriptor, errors } = parseSFC(sample);
 
-		let compiledScript = compileScript(parsed, {
-			id,
-			inlineTemplate: true,
-			reactivityTransform: true,
-			templateOptions: {
-				id,
-				source: parsed.template.content,
-				isProd: false,
-				slotted: parsed.slotted,
-				scoped: parsed.styles.some((s) => s.scoped),
-			},
-		});
+		// Handle errors
+		if (errors.length) {
+			for (let error of errors) {
+				console.warn(error);
+			}
 
-		let scriptCode = "";
-		if (compiledScript.bindings) {
-			scriptCode += `\n/* Analyzed bindings: ${JSON.stringify(
-				compiledScript.bindings,
-				null,
-				4
-			)} */\n`;
+			this.errors.push(...errors);
 		}
 
-		scriptCode += rewriteDefault(compiledScript.content, COMP_NAME);
-		scriptCode += `\n${COMP_NAME}.__scopeId = "data-v-${id}";`;
-		scriptCode += `\nexport default ${COMP_NAME};`;
+		const scopeId = uuid();
 
-		/* let styles = {};
-		for (let style of parsed.styles) {
-			styles.push(
-				await compileStyleAsync({
-					source: style.content,
-					id,
-					scoped: style.scoped,
-					modules: !!style.module,
-				})
-			);
-		} */
+		// [1] - Compile SFC's script
+		const script = await this._doCompileScript(scopeId, descriptor);
+
+		if (script) {
+			// [2] - Transform SFC script
+			await this._jsTransformer.apply(script, {
+				babelTransformerOptions: {
+					presets: ["es2015-loose"],
+					compact: false,
+					plugins: [script.lang?.babelTransformerPlugin],
+				},
+				babelParserOptions: {
+					allowImportExportEverywhere: true,
+					sourceType: "module",
+					errorRecovery: true,
+					plugins: [script.lang?.babelParserPlugin],
+				},
+			});
+
+			this.js = {
+				AST: this._jsTransformer.js.AST,
+				dependencies: this._jsTransformer.js.dependencies,
+				content: this._jsTransformer.js.content,
+			};
+		}
+
+		// [3] - Compile SFC's style
+		const style = this._doCompileStyle(scopeId, descriptor);
+
+		if (style) {
+		}
+		console.log(this);
 	}
 }

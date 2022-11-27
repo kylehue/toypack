@@ -21,7 +21,8 @@ export default class CSSTransformer {
 					code: code,
 				});
 			} else {
-				result = postcss([autoprefixer]).process(code).css;
+				let {css} = await postcss([autoprefixer]).process(code);
+				result = css;
 			}
 		} catch (error) {
 			console.warn(error);

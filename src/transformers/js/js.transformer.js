@@ -1,47 +1,35 @@
 import workerManager from "../../worker/WorkerManager";
-import { transformFromAst as babelTransform } from "@babel/standalone";
+import { transformFromAst as babelTransform, availablePlugins } from "@babel/standalone";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
-import MagicString from "magic-string";
 import * as path from "path";
-let babelOptions = {
-	presets: ["es2015-loose"],
-	compact: false,
-};
-
-
-let ASToptions = {
-	allowImportExportEverywhere: true,
-	sourceType: "module",
-	errorRecovery: true,
-};
-
-/* const outputSchema = {
-	content: "string",
-	AST: (test) => Array.isArray(test),
-	dependencies: (test) => Array.isArray(test),
-}; */
 
 export default class JSTransformer {
 	constructor() {
 		this.js = {
 			content: "",
 			AST: [],
-			dependencies: []
+			dependencies: [],
 		};
 	}
 
-	async _transpileCode(AST) {
+	async _transpileCode(AST, babelTransformerOptions) {
 		let result = "";
 		try {
 			if (workerManager) {
 				result = await workerManager.post({
 					mode: "js:transpile",
-					options: babelOptions,
-					AST
+					options: babelTransformerOptions,
+					AST,
 				});
 			} else {
-				result = babelTransform(AST, null, babelOptions).code;
+				babelTransformerOptions.plugins = babelTransformerOptions.plugins?.map(
+					(plugin) => {
+						return availablePlugins[plugin];
+					}
+				);
+
+				result = babelTransform(AST, null, babelTransformerOptions).code;
 			}
 		} catch (error) {
 			console.warn(error);
@@ -51,26 +39,29 @@ export default class JSTransformer {
 		return result;
 	}
 
-	async _scan(code) {
+	async _scan(code, babelParserOptions) {
 		let result = {
 			dependencies: [],
-			AST: []
+			AST: [],
 		};
 		try {
 			if (workerManager) {
 				result = await workerManager.post({
 					mode: "js:scan",
 					code: code,
-					options: ASToptions,
+					options: babelParserOptions,
 				});
 			} else {
 				let dependencies = [];
-				let AST = getAST(code, ASToptions);
+				let AST = getAST(code, babelParserOptions);
 				traverseAST(AST, {
 					ImportDeclaration: (dir) => {
 						let id = dir.node.source.value;
+
+						// TODO: Avoid duplicates
 						dependencies.push(id);
 
+						// TODO: Should we really do this?
 						// Remove import if not .js
 						if (!id.endsWith(".js") && path.extname(id).length) {
 							dir.remove();
@@ -100,16 +91,39 @@ export default class JSTransformer {
 			console.warn(error);
 			result = {
 				dependencies: [],
-				AST: []
+				AST: [],
 			};
 		}
 
 		return result;
 	}
 
-	async apply(asset) {
-		let { AST, dependencies } = await this._scan(asset.content);
-		this.js.content = await this._transpileCode(AST);
+	async apply(asset, options = {}) {
+		options = Object.assign(
+			{
+				babelTransformerOptions: {
+					presets: ["es2015-loose"],
+					compact: false,
+				},
+				babelParserOptions: {
+					allowImportExportEverywhere: true,
+					sourceType: "module",
+					errorRecovery: true,
+				},
+			},
+			options
+		);
+
+		let { AST, dependencies } = await this._scan(
+			asset.content,
+			options.babelParserOptions
+		);
+
+		this.js.content = await this._transpileCode(
+			AST,
+			options.babelTransformerOptions
+		);
+
 		this.js.AST = AST;
 		this.js.dependencies = dependencies;
 	}

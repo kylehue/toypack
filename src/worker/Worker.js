@@ -1,4 +1,7 @@
-import { transformFromAst as babelTransform } from "@babel/standalone";
+import {
+	transformFromAst as babelTransform,
+	availablePlugins,
+} from "@babel/standalone";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
 import postcss from "postcss";
@@ -52,6 +55,10 @@ addEventListener("message", (event) => {
 		let transpiledCode = "";
 
 		try {
+			data.options.plugins = data.options.plugins?.map((plugin) => {
+				return availablePlugins[plugin];
+			});
+
 			transpiledCode = babelTransform(data.AST, null, data.options).code;
 		} catch (error) {}
 
