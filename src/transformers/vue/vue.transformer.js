@@ -43,6 +43,8 @@ span {
 	color: $hello;
 }
 `);
+console.log(process.stdout);
+console.log(Sass.compile("sass/test.scss"));
 
 const COMP_NAME = "__sfc__";
 const SUPPORTED_SCRIPT_LANGS = [
@@ -71,6 +73,7 @@ const SUPPORTED_STYLE_LANGS = [
 	//test = assets.resolve();
 }) */
 
+
 export default class VueTransformer {
 	constructor() {
 		this.errors = [];
@@ -87,7 +90,7 @@ export default class VueTransformer {
 					this.errors.push(error);
 				}
 
-				const parsedStyle = await compileStyleAsync({
+				/* const parsedStyle = await compileStyleAsync({
 					filename: "/sass/test.scss",
 					source: style.content,
 					id: scopeId,
@@ -101,7 +104,7 @@ export default class VueTransformer {
 
 				console.log(Sass);
 				
-				console.log(parsedStyle);
+				console.log(parsedStyle); */
 
 				/* Sass.importer((test) => {
 					console.log(test);
@@ -109,7 +112,7 @@ export default class VueTransformer {
 					console.log(test);
 				}) */
 
-				Sass.compile(
+				/* Sass.compile(
 					parsedStyle.code,
 					{
 						indentedSyntax: true,
@@ -120,7 +123,7 @@ export default class VueTransformer {
 					(res) => {
 						console.log(res);
 					}
-				);
+				); */
 
 				/* styles.push({
 					content: parsedStyle.code,

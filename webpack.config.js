@@ -65,6 +65,11 @@ module.exports = {
 			path.resolve(__dirname, "./src"),
 			{}
 		),
+		new webpack.ContextReplacementPlugin(
+			/(.+)?node\-sass(.+)?/,
+			path.resolve(__dirname, "./src"),
+			{}
+		),
 	],
 	optimization:
 		process.env.NODE_ENV == "production"
