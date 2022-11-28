@@ -8,9 +8,9 @@ import {
 } from "@vue/compiler-sfc";
 import uuid from "../../core/utils/uuid";
 import JSTransformer from "../js/js.transformer";
-import postcssNested from "postcss-nested";
-import postcssVariables from "postcss-simple-vars";
-import postcssColors from "postcss-color-function";
+import postcssScss from "postcss-scss";
+import postcssSass from "postcss-sass";
+import Sass from "sass.js";
 let sample = `
 <template>
    <span>{{t}}</span>
@@ -20,20 +20,29 @@ import {ref} from "vue";
 let t = ref(0);
 let s:string = "test";
 </script>
-<style lang="scss" scoped>
-$v: color(green shade(20%));
-body {
-   background: $v;
-   span {
-		color: green;
-	}
-}
+<style lang="sass" scoped>
+@import "/sass/test.scss"
+$g: green
 
-@mixin flex {
-	display: flex;
-}
+body 
+  color: $g
+
 </style>
 `;
+
+/* Sass.importer((test) => {
+	console.log(test);
+}); */
+
+import fs from "fs";
+fs.mkdirSync("sass", {recursive: true});
+fs.writeFileSync("/sass/test.scss", `
+$hello: yellow;
+
+span {
+	color: $hello;
+}
+`);
 
 const COMP_NAME = "__sfc__";
 const SUPPORTED_SCRIPT_LANGS = [
@@ -47,15 +56,20 @@ const SUPPORTED_SCRIPT_LANGS = [
 const SUPPORTED_STYLE_LANGS = [
 	{
 		ext: "scss",
-		postCSSParserPlugin: "sass",
-		postCSSTransformerPlugin: "sass",
+		postCSSParserPlugin: postcssScss,
+		postCSSTransformerPlugin: "scss",
 	},
 	{
 		ext: "sass",
-		postCSSParserPlugin: "sass",
+		postCSSParserPlugin: postcssSass,
 		postCSSTransformerPlugin: "sass",
 	},
 ];
+//import assets from "../../core/AssetManager"
+/* Sass.importer((test) => {
+	console.log(test);
+	//test = assets.resolve();
+}) */
 
 export default class VueTransformer {
 	constructor() {
@@ -74,20 +88,43 @@ export default class VueTransformer {
 				}
 
 				const parsedStyle = await compileStyleAsync({
+					filename: "/sass/test.scss",
 					source: style.content,
 					id: scopeId,
 					scoped: style.scoped,
-					// TODO: Use CSSTransformer or .. ?
-					postcssPlugins: [
-						postcssNested,
-						postcssColors,
-						postcssVariables
-					]
+					postcssOptions: {
+						syntax: postcssScss,
+					},
 				});
 
-				styles.push({
+				console.log(fs.readFileSync("/sass/test.scss", "utf8"));
+
+				console.log(Sass);
+				
+				console.log(parsedStyle);
+
+				/* Sass.importer((test) => {
+					console.log(test);
+				}, (test) => {
+					console.log(test);
+				}) */
+
+				Sass.compile(
+					parsedStyle.code,
+					{
+						indentedSyntax: true,
+						importer: (test) => {
+							console.log(test);
+						},
+					},
+					(res) => {
+						console.log(res);
+					}
+				);
+
+				/* styles.push({
 					content: parsedStyle.code,
-				});
+				}); */
 			}
 
 			return styles;

@@ -35,6 +35,11 @@ module.exports = {
 			},
 		],
 	},
+	resolve: {
+		fallback: {
+			fs: require.resolve("memfs"),
+		},
+	},
 	output: {
 		path: path.resolve(__dirname, "./dist"),
 		filename: libraryName + ".[contenthash].js",

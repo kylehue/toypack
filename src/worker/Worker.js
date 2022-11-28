@@ -7,11 +7,18 @@ import traverseAST from "@babel/traverse";
 import postcss from "postcss";
 import valueParser from "postcss-value-parser";
 import autoprefixer from "autoprefixer";
-import {extname} from "path";
+import { extname } from "path";
 const URL_RE = /url\s*\("?(?![a-z]+:)/;
 addEventListener("message", (event) => {
 	let reqData = event.data;
 	let data = reqData.data;
+
+	function post(response) {
+		postMessage({
+			id: reqData.id,
+			data: response,
+		});
+	}
 
 	if (data.mode == "js:scan") {
 		const dependencies = [];
@@ -42,15 +49,10 @@ addEventListener("message", (event) => {
 			});
 		} catch (error) {}
 
-		let response = {
-			id: reqData.id,
-			data: {
-				AST,
-				dependencies,
-			},
-		};
-
-		postMessage(response);
+		post({
+			AST,
+			dependencies,
+		});
 	} else if (data.mode == "js:transpile") {
 		let transpiledCode = "";
 
@@ -62,12 +64,7 @@ addEventListener("message", (event) => {
 			transpiledCode = babelTransform(data.AST, null, data.options).code;
 		} catch (error) {}
 
-		let response = {
-			id: reqData.id,
-			data: transpiledCode,
-		};
-
-		postMessage(response);
+		post(transpiledCode);
 	} else if (data.mode == "css:scan") {
 		let dependencies = [];
 		let AST = postcss.parse(data.code);
@@ -108,22 +105,13 @@ addEventListener("message", (event) => {
 			}
 		});
 
-		let response = {
-			id: reqData.id,
-			data: {
-				AST,
-				dependencies,
-			},
-		};
-
-		postMessage(response);
+		post({
+			AST,
+			dependencies,
+		});
 	} else if (data.mode == "css:transpile") {
 		let transpilation = postcss([autoprefixer]).process(data.code).css;
-		let response = {
-			id: reqData.id,
-			data: transpilation,
-		};
 
-		postMessage(response);
+		post(transpilation);
 	}
 });
