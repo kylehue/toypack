@@ -9,11 +9,27 @@ module.exports = merge(common, {
 	output: {
 		chunkFilename: "[name].js",
 	},
+	module: {
+		rules: [
+			{
+				test: /\.tsx?$/,
+				use: [
+					{
+						loader: "ts-loader",
+						options: {
+							configFile: path.resolve(__dirname, "../tsconfig.build.json"),
+						},
+					},
+				],
+				exclude: /node_modules/,
+			},
+		],
+	},
 	optimization: {
 		minimize: true,
 		minimizer: [
 			new TerserPlugin({
-				test: /\.ts(\?.*)?$/i,
+				test: /\.js(\?.*)?$/i
 			}),
 		],
 	},

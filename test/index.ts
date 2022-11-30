@@ -1,11 +1,15 @@
-import * as Toypack from "../src/core/Toypack";
+import * as Toypack from "@toypack/core";
 import sampleCodes from "./sampleCodes";
+//import "./sourceMaps";
+//import "./resolve";
 console.log(Toypack);
 
 // Add assets
 for (let [src, content] of Object.entries(sampleCodes)) {
-	Toypack.addAsset(src, content, {
-		moduleName: "Wonder"
+	Toypack.addAsset({
+		moduleName: "Wonder",
+		source: src,
+		content: content
 	});
 }
 

@@ -15,11 +15,14 @@
 		"noImplicitReturns": false,
 		"skipLibCheck": true,
 		"baseUrl": ".",
+		"rootDir": ".",
 		"paths": {
-			"toypack/*": ["src/*"]
+			"@toypack/*": ["./src/*"]
 		},
-		"declaration": false,
-		"sourceMap": true
+		"sourceMap": true,
+		"outDir": "dist",
+		"declaration": true,
+		"declarationDir": "dist"
 	},
-	"include": ["./src/**/*", "./index.ts", "./test/**/*"]
+	"include": ["./src/**/*.ts", "./index.ts", "./test/**/*.ts"]
 }

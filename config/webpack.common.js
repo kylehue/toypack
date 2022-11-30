@@ -1,28 +1,18 @@
 const path = require("path");
 const webpack = require("webpack");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
-const CopyPlugin = require("copy-webpack-plugin");
+const TSCAlias = require("tsc-alias").replaceTscAliasPaths;
 const libraryName = "Toypack";
-
 module.exports = {
 	entry: {
 		index: path.resolve(__dirname, "../index.ts"),
 	},
-	module: {
-		rules: [
-			{
-				test: /\.tsx?$/,
-				use: "ts-loader",
-				exclude: /node_modules/,
-			},
-		],
-	},
 	resolve: {
 		alias: {
-			toypack: path.resolve(__dirname, "../src/"),
 			fs: require.resolve("memfs"),
+			"@toypack": path.resolve(__dirname, "../src/"),
 		},
-		extensions: [".tsx", ".ts", ".js"],
+		extensions: [".ts", ".tsx", ".js", ".json"],
 	},
 	output: {
 		path: path.resolve(__dirname, "../dist"),
@@ -36,29 +26,18 @@ module.exports = {
 		publicPath: "/",
 	},
 	plugins: [
-		new CopyPlugin({
-			patterns: [
-				{
-					from: path.resolve(__dirname, "../src/Toypack.d.ts"),
-					to: path.resolve(__dirname, "../dist/")
-				}
-			]
-		}),
+		{
+			apply: (compiler) => {
+				compiler.hooks.done.tap("TSCAlias", () => {
+					TSCAlias({
+						configFile: path.resolve(__dirname, "../tsconfig.json"),
+					});
+				});
+			},
+		},
 		new NodePolyfillPlugin(),
 		new webpack.ContextReplacementPlugin(
-			/(.+)?@babel(\\|\/)standalone(.+)?/,
-			path.resolve(__dirname, "../src"),
-			{}
-		),
-		new webpack.ContextReplacementPlugin(
-			/(.+)?@vue(\\|\/)compiler\-sfc(.+)?/,
-			path.resolve(__dirname, "../src"),
-			{}
-		),
-		new webpack.ContextReplacementPlugin(
-			/(.+)?node\-sass(.+)?/,
-			path.resolve(__dirname, "../src"),
-			{}
+			/(.+)?(@babel(\\|\/)standalone|@vue(\\|\/)compiler\-sfc|node\-sass)(.+)?/
 		),
 	],
 };

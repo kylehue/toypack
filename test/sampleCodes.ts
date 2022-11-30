@@ -1,5 +1,12 @@
 export default {
 	// prettier-ignore
+	"package.json":
+
+`{
+   "main": "src/index"
+}`,
+
+	// prettier-ignore
 	"src/index.js":
 
 `import { PI } from "../scripts/PI.js";
