@@ -34,6 +34,7 @@ e. bundle each entry point
 f. create an object url for each bundle
 g. change src attribute's value to the object url
 h. return array of rendered AST
+
 ```
 
 ### Final output can either be
