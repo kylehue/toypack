@@ -50,34 +50,31 @@ export function addAsset(options: Asset) {
 function bundleScript(scripts: Array<Asset>) {}
 
 interface BundleOptions {
-	entry: string
+	entry: string;
 	sourceMap?: boolean;
 	plugins?: Array<Function>;
 }
 
 const cache = new Map();
-
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
-import test from "../transformers/html/HTMLTransformer";
-export function bundle(options: BundleOptions) {
+
+export async function bundle(options: BundleOptions) {
 	let result = new Bundle();
 	let entry = options.entry;
 	let extname = path.extname(entry);
 	let type = extname.substr(1);
-	
-	// Get transformer 
-	/* import("../transformers/html/HTMLTransformer")
-		.catch((error) => {
-			console.warn(error);
-			
-		})
-		.then((mod) => {
-			console.log(mod);
-		}); */
-}
 
+	// Get transformer
+	/* let transformer;
+	if (true) {
+		await import(`../transformers/html/HTMLTransformer`);
+	} else {
+		await import(`../transformers/html/HTMLTransformer`);
+	}
+	console.log(transformer); */
+}
 
 /* type WatchCallback = (bundle: string) => void;
 

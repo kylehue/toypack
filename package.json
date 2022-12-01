@@ -2,16 +2,18 @@
 	"name": "toypack",
 	"version": "0.0.1",
 	"description": "A sandbox bundler for browsers.",
-	"main": "./dist/Toypack.js",
-	"typings": "./dist/src/core/Toypack.d.ts",
+	"main": "./dist/core/Toypack.js",
+	"typings": "./dist/core/Toypack.d.ts",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/kylehue/toypack.git"
 	},
 	"homepage": "https://github.com/kylehue/toypack#readme",
 	"scripts": {
-		"dev": "webpack --config ./config/webpack.dev.js --watch",
-		"build": "webpack --config ./config/webpack.prod.js",
+		"dev": "npm run build:js -- -w",
+		"build": "npm run build:types && npm run build:js",
+		"build:types": "tsc --emitDeclarationOnly && tsc-alias",
+		"build:js": "babel src --out-dir dist --extensions \".ts,.tsx\"",
 		"publish": "npm run build && npm publish"
 	},
 	"author": "kylehue",
@@ -30,11 +32,14 @@
 		"sandbox"
 	],
 	"devDependencies": {
-		"@babel/core": "^7.19.3",
+		"@babel/cli": "^7.19.3",
+		"@babel/core": "^7.20.5",
 		"@babel/plugin-transform-typescript": "^7.20.2",
 		"@babel/preset-env": "^7.19.3",
 		"@babel/preset-typescript": "^7.18.6",
 		"babel-loader": "^8.2.5",
+		"babel-plugin-dynamic-import-node": "^2.3.3",
+		"babel-plugin-module-resolver": "^4.1.0",
 		"compression-webpack-plugin": "^10.0.0",
 		"copy-webpack-plugin": "^11.0.0",
 		"css-loader": "^6.7.1",

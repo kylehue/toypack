@@ -15,7 +15,7 @@
 		"noImplicitReturns": false,
 		"skipLibCheck": true,
 		"baseUrl": ".",
-		"rootDir": ".",
+		"rootDir": "./src",
 		"paths": {
 			"@toypack/*": ["./src/*"]
 		},
@@ -24,5 +24,6 @@
 		"declaration": true,
 		"declarationDir": "dist"
 	},
-	"include": ["./src/**/*.ts", "./index.ts", "./test/**/*.ts"]
+	"include": ["./src/**/*.ts"],
+	"exclude": ["./test/**/*.ts"]
 }
