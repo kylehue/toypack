@@ -4,9 +4,7 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const TSCAlias = require("tsc-alias").replaceTscAliasPaths;
 const libraryName = "Toypack";
 module.exports = {
-	entry: {
-		index: path.resolve(__dirname, "../index.ts"),
-	},
+	entry: path.resolve(__dirname, "../index.ts"),
 	resolve: {
 		alias: {
 			fs: require.resolve("memfs"),
@@ -39,5 +37,5 @@ module.exports = {
 		new webpack.ContextReplacementPlugin(
 			/(.+)?(@babel(\\|\/)standalone|@vue(\\|\/)compiler\-sfc|node\-sass)(.+)?/
 		),
-	],
+	]
 };

@@ -3,7 +3,6 @@ import * as path from "path";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
 import { Bundle } from "magic-string";
 export { vol } from "memfs";
-
 /**
  *
  * @param {ToypackConfig} config Toypack configurations.
@@ -51,27 +50,32 @@ export function addAsset(options: Asset) {
 function bundleScript(scripts: Array<Asset>) {}
 
 interface BundleOptions {
-	entry: string | Array<string>;
+	entry: string
 	sourceMap?: boolean;
 	plugins?: Array<Function>;
 }
 
+const cache = new Map();
+
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
-
-export function bundle(options: BundleOptions): string {
+import test from "../transformers/html/HTMLTransformer";
+export function bundle(options: BundleOptions) {
 	let result = new Bundle();
-
-	/* if (options.entry == ".html") {
-		let scripts = getHTMLScripts();
-		for (let script of scripts) {
-		}
-	} else if (options.entry == ".js" || options.entry == ".ts") {
-		
-	} */
-
-	return "";
+	let entry = options.entry;
+	let extname = path.extname(entry);
+	let type = extname.substr(1);
+	
+	// Get transformer 
+	/* import("../transformers/html/HTMLTransformer")
+		.catch((error) => {
+			console.warn(error);
+			
+		})
+		.then((mod) => {
+			console.log(mod);
+		}); */
 }
 
 
