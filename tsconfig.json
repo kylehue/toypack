@@ -20,10 +20,10 @@
 			"@toypack/*": ["./src/*"]
 		},
 		"sourceMap": true,
-		"outDir": "dist",
+		"outDir": "lib",
 		"declaration": true,
-		"declarationDir": "dist"
+		"declarationDir": "lib"
 	},
 	"include": ["./src/**/*.ts"],
-	"exclude": ["./test/**/*.ts"]
+	"exclude": ["./src/test/**/*"]
 }

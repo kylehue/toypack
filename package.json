@@ -2,18 +2,18 @@
 	"name": "toypack",
 	"version": "0.0.1",
 	"description": "A sandbox bundler for browsers.",
-	"main": "./dist/core/Toypack.js",
-	"typings": "./dist/core/Toypack.d.ts",
+	"main": "./lib",
+	"typings": "./lib/core/Toypack.d.ts",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/kylehue/toypack.git"
 	},
 	"homepage": "https://github.com/kylehue/toypack#readme",
 	"scripts": {
-		"dev": "npm run build:js -- -w",
-		"build": "npm run build:types && npm run build:js",
+		"dev": "concurrently \"rimraf lib\" \"npm:build:types\" \"npm:build:js -- -w\"",
+		"build": "concurrently \"rimraf lib\" \"npm:build:types\" \"npm:build:js\"",
 		"build:types": "tsc --emitDeclarationOnly && tsc-alias",
-		"build:js": "babel src --out-dir dist --extensions \".ts,.tsx\"",
+		"build:js": "babel src --out-dir lib --extensions \".ts,.tsx\"",
 		"publish": "npm run build && npm publish"
 	},
 	"author": "kylehue",
@@ -22,7 +22,7 @@
 		"access": "public"
 	},
 	"files": [
-		"dist/"
+		"lib/"
 	],
 	"keywords": [
 		"build",
@@ -41,6 +41,7 @@
 		"babel-plugin-dynamic-import-node": "^2.3.3",
 		"babel-plugin-module-resolver": "^4.1.0",
 		"compression-webpack-plugin": "^10.0.0",
+		"concurrently": "^7.6.0",
 		"copy-webpack-plugin": "^11.0.0",
 		"css-loader": "^6.7.1",
 		"dts-alias": "^1.0.7",

@@ -2,6 +2,7 @@ import fs from "fs";
 import * as path from "path";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
 import { Bundle } from "magic-string";
+import { getParser } from "@toypack/utils";
 export { vol } from "memfs";
 /**
  *
@@ -49,31 +50,70 @@ export function addAsset(options: Asset) {
 
 function bundleScript(scripts: Array<Asset>) {}
 
+async function getDependencyGraph(entryId: string) {
+	const entryExtname = path.extname(entryId);
+	const entryType = entryExtname.substr(1);
+	// TODO: What if it's a vue or jsx file? How should we get the dependency graph?
+	if (entryType != "js") {
+		console.error("Entry must be a javascript file.");
+		return;
+	}
+
+	const graph: Array<string> = [];
+	try {
+		// Get entry contents
+		let entryContent = fs.readFileSync(entryId, "utf-8");
+		if (entryContent) {
+			// Parse
+			let parser = await getParser("js");
+		}
+	} catch (error) {
+		console.error(error);
+	}
+	// Get parser and get dependencies
+	// Add dependencies' dependencies to graph
+}
+
 interface BundleOptions {
 	entry: string;
 	sourceMap?: boolean;
 	plugins?: Array<Function>;
+	outdir?: string;
 }
 
 const cache = new Map();
+
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
 
 export async function bundle(options: BundleOptions) {
-	let result = new Bundle();
-	let entry = options.entry;
-	let extname = path.extname(entry);
-	let type = extname.substr(1);
+	const entryId = options.entry;
+	const entryExtname = path.extname(entryId);
+	const entryType = entryExtname.substr(1);
 
-	// Get transformer
-	/* let transformer;
-	if (true) {
-		await import(`../transformers/html/HTMLTransformer`);
-	} else {
-		await import(`../transformers/html/HTMLTransformer`);
+	try {
+		// If the entry is an html file, the script tags in it will serve as the entry points
+		if (entryType == "html") {
+			// Get file contents
+			let entryContent = fs.readFileSync(entryId, "utf-8");
+			if (entryContent) {
+				// Parse
+				let parser = await getParser(entryType);
+				let entryData = parser.parse(entryContent);
+
+				// Get dependency graph of each script
+				for (let script of entryData.scripts) {
+					let graph = getDependencyGraph(script);
+				}
+			}
+		} else if (entryType == "js") {
+			// If the entry is a js file, get its dependency graph
+			let graph = getDependencyGraph(entryId);
+		}
+	} catch (error) {
+		console.error(error);
 	}
-	console.log(transformer); */
 }
 
 /* type WatchCallback = (bundle: string) => void;

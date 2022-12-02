@@ -41,3 +41,14 @@ h. return array of rendered AST
 1. html text (for iframes)
 2. object with all of the bundled files (for production)
 3. object with all of the files + the bundler files (for further development outside the playground app)
+
+### Transformer roles
+1. Transpiling javascript codes
+2. Transpiling css codes
+
+### Loader roles
+1. Compiling .vue or .jsx files into a javascript code
+2. Compiling .scss or .less files into a css code
+
+### Parser roles
+1. Getting dependency graphs
