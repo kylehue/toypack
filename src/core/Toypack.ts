@@ -3,6 +3,7 @@ import * as path from "path";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
 import { Bundle } from "magic-string";
 import { getParser } from "@toypack/utils";
+import resolve from "resolve";
 export { vol } from "memfs";
 /**
  *
@@ -48,30 +49,66 @@ export function addAsset(options: Asset) {
 	fs.writeFileSync(assetID, options.content);
 }
 
-function bundleScript(scripts: Array<Asset>) {}
+const CACHED_FILES = new Map();
+export const FILE_PRIORITY = [".js", ".json", ".vue", ".jsx"];
+
+/**
+ * @param {string} entryId The entry point of the graph.
+ */
 
 async function getDependencyGraph(entryId: string) {
-	const entryExtname = path.extname(entryId);
-	const entryType = entryExtname.substr(1);
-	// TODO: What if it's a vue or jsx file? How should we get the dependency graph?
-	if (entryType != "js") {
-		console.error("Entry must be a javascript file.");
-		return;
-	}
+	let graph: Array<object> = [];
 
-	const graph: Array<string> = [];
-	try {
-		// Get entry contents
-		let entryContent = fs.readFileSync(entryId, "utf-8");
-		if (entryContent) {
-			// Parse
-			let parser = await getParser("js");
+	async function getFileData(moduleId: string) {
+		let moduleExtname = path.extname(moduleId);
+		let moduleType = moduleExtname.substr(1);
+
+		try {
+			// Get module contents
+			let moduleContent = fs.readFileSync(moduleId, "utf-8");
+			if (moduleContent) {
+				// Get parser
+				let parser = await getParser(moduleType);
+				if (parser) {
+					let moduleData = await parser.parse(moduleContent);
+
+					// Add to graph
+					graph.push({
+						id: moduleId,
+						data: moduleData,
+						content: moduleContent
+					});
+
+					for (let dependency of moduleData.dependencies) {
+						/* let dependencyAbsolutePath = resolve.sync(dependency, {
+							basedir: path.dirname(moduleId),
+							extensions: FILE_PRIORITY
+						});
+
+						console.log(dependencyAbsolutePath);
+						
+						await getFileData(dependencyAbsolutePath); */
+					}
+					/* // Add to cache
+				CACHED_FILES.set(moduleId, {
+					content: moduleContent,
+					data: moduleData
+				}); */
+				} else {
+					throw new Error(`${moduleExtname} files are not yet supported.`);
+				}
+			}
+		} catch (error) {
+			console.error(error);
 		}
-	} catch (error) {
-		console.error(error);
+		// Get parser and get dependencies
+		// Add dependencies' dependencies to graph
 	}
-	// Get parser and get dependencies
-	// Add dependencies' dependencies to graph
+	
+	await getFileData(entryId);
+
+	console.log(graph);
+	
 }
 
 interface BundleOptions {
@@ -88,9 +125,9 @@ const cache = new Map();
  */
 
 export async function bundle(options: BundleOptions) {
-	const entryId = options.entry;
-	const entryExtname = path.extname(entryId);
-	const entryType = entryExtname.substr(1);
+	let entryId = options.entry;
+	let entryExtname = path.extname(entryId);
+	let entryType = entryExtname.substr(1);
 
 	try {
 		// If the entry is an html file, the script tags in it will serve as the entry points
@@ -99,16 +136,16 @@ export async function bundle(options: BundleOptions) {
 			let entryContent = fs.readFileSync(entryId, "utf-8");
 			if (entryContent) {
 				// Parse
-				let parser = await getParser(entryType);
-				let entryData = parser.parse(entryContent);
-
-				// Get dependency graph of each script
-				for (let script of entryData.scripts) {
-					let graph = getDependencyGraph(script);
+				let parser = await getParser("html");
+				let entryData = await parser.parse(entryContent);
+				
+				// Get dependency graph of each dependency
+				for (let dependency of entryData.dependencies) {
+					let graph = getDependencyGraph(dependency);
 				}
 			}
-		} else if (entryType == "js") {
-			// If the entry is a js file, get its dependency graph
+		} else {
+			// If the entry is a script e.g. jsx or vue, get its dependency graph
 			let graph = getDependencyGraph(entryId);
 		}
 	} catch (error) {

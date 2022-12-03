@@ -1,4 +1,4 @@
-type Parser = "html" | "js";
+export type Parser = "html" | "js";
 
 type Parsers = {
 	[key in Parser]: () => Promise<any>;
@@ -13,8 +13,8 @@ const builtInParsers: Parsers = {
 	},
 };
 
-export default async function getParser(type: Parser) {
-	let Parser = builtInParsers[type];
+export default async function getParser(type: any) {
+	let Parser = builtInParsers[type as keyof Parsers];
 
 	if (typeof Parser == "function") {
 		return await Parser();

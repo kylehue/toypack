@@ -2,7 +2,7 @@
 	"name": "toypack",
 	"version": "0.0.1",
 	"description": "A sandbox bundler for browsers.",
-	"main": "./lib",
+	"main": "./lib/main.umd.js",
 	"typings": "./lib/core/Toypack.d.ts",
 	"repository": {
 		"type": "git",
@@ -14,6 +14,7 @@
 		"build": "concurrently \"rimraf lib\" \"npm:build:types\" \"npm:build:js\"",
 		"build:types": "tsc --emitDeclarationOnly && tsc-alias",
 		"build:js": "babel src --out-dir lib --extensions \".ts,.tsx\"",
+		"webpack": "webpack --config webpack/webpack.common.js",
 		"publish": "npm run build && npm publish"
 	},
 	"author": "kylehue",
@@ -43,6 +44,7 @@
 		"compression-webpack-plugin": "^10.0.0",
 		"concurrently": "^7.6.0",
 		"copy-webpack-plugin": "^11.0.0",
+		"cpy-cli": "^4.2.0",
 		"css-loader": "^6.7.1",
 		"dts-alias": "^1.0.7",
 		"dts-bundle": "^0.7.3",

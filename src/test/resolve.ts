@@ -1,11 +1,12 @@
 import resolve from "resolve";
 try {
+	console.log("Resolved file: ");
 	console.log(
-		resolve.sync("Wonder", {
-			basedir: "src/",
+		resolve.sync("./App", {
+			basedir: "src",
 			extensions: [".js", ".json", ".vue"],
 		})
 	);
 } catch (error) {
-	console.warn("resolve failed");
+	console.warn(error);
 }

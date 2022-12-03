@@ -2,10 +2,23 @@ import { parser as parseHTML } from "posthtml-parser";
 
 type WalkCallback = (node: any) => void;
 type ParsedHTML = {
-	scripts: Array<string>;
-	styles: Array<string>;
-	walk: (callback: WalkCallback) => void;
+	dependencies: Array<string>;
 	[key: string | number | symbol]: unknown;
+};
+
+function walk(AST: any, callback: WalkCallback) {
+	function traverse(_AST: any) {
+		for (let node of _AST) {
+			if (typeof node == "object" && !Array.isArray(node)) {
+				callback(node);
+				if (node.content?.length) {
+					traverse(node.content);
+				}
+			}
+		}
+	}
+
+	traverse(AST);
 };
 
 export function parse(content: string): ParsedHTML {
@@ -13,36 +26,23 @@ export function parse(content: string): ParsedHTML {
 
 	const result: ParsedHTML = {
 		AST,
-		walk: (callback: WalkCallback) => {
-			function traverse(_AST: any) {
-				for (let node of _AST) {
-					if (typeof node == "object" && !Array.isArray(node)) {
-						callback(node);
-						if (node.content?.length) {
-							traverse(node.content);
-						}
-					}
-				}
-			}
-
-			traverse(AST);
-		},
-		scripts: [],
-		styles: [],
+		dependencies: []
 	};
 
-   // Scan scripts
-	result.walk((node) => {
+   // Scan dependencies
+	walk(AST, (node) => {
+		// Scripts
 		if (node.tag == "script" && node.attrs?.src) {
-			result.scripts.push(node.attrs.src);
+			result.dependencies.push(node.attrs.src);
 		}
 
+		// Styles
 		if (
 			node.tag == "link" &&
 			node.attrs?.href &&
 			node.attrs?.rel == "stylesheet"
 		) {
-			result.styles.push(node.attrs.href);
+			result.dependencies.push(node.attrs.href);
 		}
 	});
 

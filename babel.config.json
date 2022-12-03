@@ -11,12 +11,12 @@
 				}
 			}
 		],
-      [
-         "dynamic-import-node",
-         {
-            "noInterop": true
-         }
-      ]
+		[
+			"dynamic-import-node",
+			{
+				"noInterop": true
+			}
+		]
 	],
 	"sourceMaps": "inline",
 	"ignore": ["./src/*.d.ts"]

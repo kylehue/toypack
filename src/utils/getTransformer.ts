@@ -13,8 +13,8 @@ const builtInTransformers: Transformers = {
 	},
 };
 
-export default async function getTransformer(type: Transformer) {
-	let transformer = builtInTransformers[type];
+export default async function getTransformer(type: any) {
+	let transformer = builtInTransformers[type as keyof Transformers];
 
 	if (typeof transformer == "function") {
 		return await transformer();
