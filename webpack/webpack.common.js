@@ -8,13 +8,11 @@ function resolve(dir) {
 }
 
 module.exports = {
-	mode: "production",
-   watch: true,
 	entry: resolve("../src/index.ts"),
 	module: {
 		rules: [
 			{
-				test: /\.tsx?$/,
+				test: /\.ts$/,
 				use: [
 					{
 						loader: "ts-loader",
@@ -23,9 +21,10 @@ module.exports = {
 						},
 					},
 				],
+				exclude: /node_modules/,
 			},
 		],
-   },
+	},
 	resolve: {
 		alias: {
 			fs: "memfs",
@@ -33,21 +32,16 @@ module.exports = {
 		},
 		extensions: [".ts", ".js", ".json"],
 	},
-	experiments: {
-		asyncWebAssembly: true,
-		outputModule: true,
-	},
 	output: {
 		path: resolve("../lib"),
-		filename: "[name].umd.js",
+		filename: "Toypack.umd.js",
 		chunkFilename: "[name].[chunkhash].js",
 		clean: true,
-		/* library: {
+		library: {
 			name: "Toypack",
 			type: "umd",
 			export: "default",
-		}, */
-		publicPath: "/",
+		},
 	},
 	plugins: [
 		{

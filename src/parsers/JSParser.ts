@@ -1,19 +1,15 @@
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
+import { ParsedAsset } from "./types";
 
-type ParsedJS = {
-	dependencies: Array<string>;
-	[key: string | number | symbol]: unknown;
-};
-
-export async function parse(content: string) {
+export function parse(content: string) {
 	const AST = getAST(content, {
 		allowImportExportEverywhere: true,
 		sourceType: "module",
 		errorRecovery: true,
 	});
 
-	const result: ParsedJS = {
+	const result: ParsedAsset = {
 		AST,
 		dependencies: [],
 	};

@@ -21,6 +21,8 @@ export const myPI = PI;`,
 	"scripts/Circle.js":
 
 `import { PI } from "./PI.js";
+import "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
+import "./Test.js"
 export class Circle {
    constructor() {
       this.PI = PI;
@@ -28,9 +30,16 @@ export class Circle {
 }`,
 
 	// prettier-ignore
+	"scripts/Test.js":
+
+`console.log("I'm a test!");`,
+
+	// prettier-ignore
 	"scripts/PI.js":
 
-`export const PI = 3.14;
+`
+import "./Test.js";
+export const PI = 3.14;
 import { Circle } from "./Circle.js";
 console.log(Circle);`,
 

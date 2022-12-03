@@ -19,11 +19,11 @@
 		"paths": {
 			"@toypack/*": ["./src/*"]
 		},
-		"sourceMap": true,
+		"sourceMap": false,
 		"outDir": "lib",
 		"declaration": true,
-		"declarationDir": "lib"
+		"declarationDir": "lib",
+		"noImplicitAny": false
 	},
-	"include": ["./src/**/*.ts"],
-	"exclude": ["./src/test/**/*"]
+	"include": ["./src/**/*.ts"]
 }

@@ -1,10 +1,7 @@
 import { parser as parseHTML } from "posthtml-parser";
+import { ParsedAsset } from "./types";
 
 type WalkCallback = (node: any) => void;
-type ParsedHTML = {
-	dependencies: Array<string>;
-	[key: string | number | symbol]: unknown;
-};
 
 function walk(AST: any, callback: WalkCallback) {
 	function traverse(_AST: any) {
@@ -21,10 +18,10 @@ function walk(AST: any, callback: WalkCallback) {
 	traverse(AST);
 };
 
-export function parse(content: string): ParsedHTML {
+export function parse(content: string): ParsedAsset {
 	const AST = parseHTML(content);
 
-	const result: ParsedHTML = {
+	const result: ParsedAsset = {
 		AST,
 		dependencies: []
 	};
