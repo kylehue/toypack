@@ -13,17 +13,23 @@ if (num1 == 12) {
 	),
 });
 
-bundle.addSource({
-	filename: "hello.js",
-	content: new MagicString(
-		// prettier-ignore
-		`
+let helloContent = new MagicString(
+	// prettier-ignore
+	`
 console.log(123);
 console.log(123);
 console.log(123);
 console.log(123);
 `
-	)
+);
+
+helloContent.append("\nconsole.log(888)");
+helloContent.append("\nconsole.log(888)");
+helloContent.append("\nconsole.log(888)");
+
+bundle.addSource({
+	filename: "hello.js",
+	content: helloContent,
 });
 // prettier-ignore
 

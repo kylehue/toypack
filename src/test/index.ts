@@ -2,7 +2,6 @@ import * as Toypack from "@toypack/core/Toypack";
 export * from "@toypack/core/Toypack";
 import sampleCodes from "./sampleCodes";
 console.log(Toypack);
-import resolve from "resolve";
 // Add assets
 for (let [source, content] of Object.entries(sampleCodes)) {
 	Toypack.addAsset({
@@ -11,7 +10,7 @@ for (let [source, content] of Object.entries(sampleCodes)) {
 	});
 }
 
-Toypack.bundle({ entry: "./src/index.js" });
+Toypack.bundle({ entry: "./index.html" });
 
 setTimeout(() => {
 	console.log(Toypack.vol.toJSON());

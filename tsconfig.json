@@ -1,9 +1,9 @@
 {
 	"compilerOptions": {
-		"target": "ESNext",
+		"target": "ES5",
 		"useDefineForClassFields": true,
 		"module": "ESNext",
-		"lib": ["ESNext", "DOM"],
+		"lib": ["ES5", "DOM"],
 		"moduleResolution": "Node",
 		"strict": true,
 		"resolveJsonModule": true,
@@ -19,11 +19,11 @@
 		"paths": {
 			"@toypack/*": ["./src/*"]
 		},
-		"sourceMap": false,
+		"sourceMap": true,
 		"outDir": "lib",
 		"declaration": true,
 		"declarationDir": "lib",
-		"noImplicitAny": false
+		"experimentalDecorators": false
 	},
 	"include": ["./src/**/*.ts"]
 }

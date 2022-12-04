@@ -11,7 +11,7 @@ export default {
 
 `import { PI } from "../scripts/PI.js";
 import { Circle } from "../scripts/Circle.js";
-import App from "./App.vue";
+//import App from "./App.vue";
 import "../styles/main.css";
 console.log(Circle);
 console.log("              ");
@@ -110,7 +110,7 @@ body {
    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
    <script type="text/javascript" src="src/index.js"></script>
    <link rel="stylesheet" href="styles/main.css"></link>
-   <title></title>
+   <title>cool website!!!!</title>
 </head>
 
 <body>

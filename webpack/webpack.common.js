@@ -2,13 +2,28 @@ const path = require("path");
 const webpack = require("webpack");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const TSCAlias = require("tsc-alias").replaceTscAliasPaths;
-
+const glob = require("glob");
 function resolve(dir) {
-   return path.resolve(__dirname, dir);
+	return path.resolve(__dirname, dir);
 }
 
+const LOADERS = glob
+	.sync("./loaders/*/index.ts", {
+		cwd: resolve("../src"),
+	})
+	.reduce((acc, current) => {
+		let parsedPath = path.parse(current);
+		let name = parsedPath.name;
+		let outdir = path.join(parsedPath.dir, name);
+		acc[outdir] = resolve("../src/" + current);
+		return acc;
+	}, {});
+
 module.exports = {
-	entry: resolve("../src/index.ts"),
+	entry: {
+		"core/Toypack": resolve("../src/index.ts"),
+		...LOADERS,
+	},
 	module: {
 		rules: [
 			{
@@ -34,14 +49,14 @@ module.exports = {
 	},
 	output: {
 		path: resolve("../lib"),
-		filename: "Toypack.umd.js",
+		filename: "[name].js",
 		chunkFilename: "[name].[chunkhash].js",
 		clean: true,
 		library: {
 			name: "Toypack",
-			type: "umd",
-			export: "default",
+			type: "commonjs",
 		},
+		publicPath: "auto",
 	},
 	plugins: [
 		{

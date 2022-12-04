@@ -42,13 +42,13 @@ h. return array of rendered AST
 2. object with all of the bundled files (for production)
 3. object with all of the files + the bundler files (for further development outside the playground app)
 
-### Transformer roles
+### Loader.transform
 1. Transpiling javascript codes
 2. Transpiling css codes
 
-### Loader roles
+### Loader.compile
 1. Compiling .vue or .jsx files into a javascript code
 2. Compiling .scss or .less files into a css code
 
-### Parser roles
+### Loader.parse
 1. Getting dependency graphs

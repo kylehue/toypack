@@ -1,17 +1,27 @@
 import fs from "fs";
 import * as path from "path";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
-import { Bundle } from "magic-string";
-import { HTMLParser, CSSParser, JSParser } from "@toypack/parsers";
+import MagicString, { Bundle } from "magic-string";
+import { HTMLLoader, CSSLoader, JSLoader } from "@toypack/loaders";
+import { Asset } from "@toypack/loaders/types";
 import { isURL } from "@toypack/utils";
 import resolve from "resolve";
 export { vol } from "memfs";
 
-const PARSERS: any = {
-	html: HTMLParser,
-	css: CSSParser,
-	js: JSParser,
-};
+const LOADERS: any = [
+	{
+		test: /\.html$/,
+		use: HTMLLoader,
+	},
+	{
+		test: /\.css$/,
+		use: CSSLoader,
+	},
+	{
+		test: /\.js$/,
+		use: JSLoader,
+	},
+];
 
 /**
  *
@@ -28,31 +38,48 @@ export function defineConfig(config: ToypackConfig) {
 	}
 }
 
-const CACHED_EXTERNALS = new Map();
+const CACHED_ASSETS = new Map();
 
-export interface Asset {
+export interface AssetOptions {
 	source: string;
 	content?: string;
 	moduleName?: string;
 }
 
+interface AssetData {
+	source: string;
+	content: string;
+}
+
 /**
- * @param {Asset} options Configurations for the asset.
+ * @param {AssetOptions} options Configurations for the asset.
  */
 
-export async function addAsset(options: Asset) {
+export async function addAsset(options: AssetOptions) {
+	let data: AssetData = {
+		source: "",
+		content: "",
+	};
+
+	// Check cache
+	let cached = CACHED_ASSETS.get(options.source);
+	if (cached && options.content == cached.content) {
+		data.source = cached.id;
+		data.content = cached.content;
+		return data;
+	}
+
 	let assetName = path.basename(options.source);
 	let targetDir = path.dirname(options.source);
-	let data: any = {};
 
 	// If options.source is an external URL, fetch the content then add
-	if (isURL(options.source) && !CACHED_EXTERNALS.get(options.source)) {
+	if (isURL(options.source) && !CACHED_ASSETS.get(options.source)) {
 		let fetchResponse = await fetch(options.source);
 
 		if (fetchResponse.ok) {
 			let content = await fetchResponse.text();
 
-			CACHED_EXTERNALS.set(options.source, content);
+			CACHED_ASSETS.set(options.source, content);
 
 			data.content = content;
 			data.source = options.source;
@@ -72,92 +99,104 @@ export async function addAsset(options: Asset) {
 		fs.mkdirSync(targetDir, { recursive: true });
 		fs.writeFileSync(assetID, options.content || "");
 
-		data.content = options.content;
+		data.content = options.content || "";
 		data.source = assetID;
+
+		CACHED_ASSETS.set(assetID, {
+			content: data.content,
+			data: [],
+			id: assetID,
+		});
 	}
 
 	return data;
 }
 
-const CACHED_ASSETS = new Map();
 export const RESOLVE_PRIORITY = [".js", ".ts", ".json", ".jsx", ".tsx", ".vue"];
 
 /**
  * @param {string} entryId The entry point of the graph.
  */
 
-function getDependencyGraph(entryId: string) {
-	let graph: Array<object> = [];
+async function getDependencyGraph(entryId: string) {
+	let graph: Array<Asset> = [];
 
-	function scanModule(moduleId: string) {
+	async function scanModule(moduleId: string) {
 		let moduleExtname = path.extname(moduleId);
-		let moduleType = moduleExtname.substr(1);
-		
+		let moduleContent: any = null;
+		let cached = CACHED_ASSETS.get(moduleId);
 		try {
-			// If module is external URL
+			// [1] - Get module contents
+			// If module id is an external URL, check cache
 			if (isURL(moduleId)) {
 				// Add to assets if not in cache
-				if (!CACHED_EXTERNALS.get(moduleId)) {
-					addAsset({
+				if (!cached) {
+					let asset = await addAsset({
 						source: moduleId,
-					}).then((asset) => {
-						graph.push({
-							id: asset.source,
-							content: asset.content,
-						});
 					});
+
+					moduleContent = asset.content;
 				} else {
-					graph.push({
-						id: moduleId,
-						content: CACHED_EXTERNALS.get(moduleId),
-					});
+					moduleContent = cached.content;
 				}
 			} else {
-				// Get module contents
-				let moduleContent = fs.readFileSync(moduleId, "utf-8");
-				if (moduleContent) {
-					// Get parser
-					let parser = PARSERS[moduleType];
-					if (parser) {
-						let moduleData = parser.parse(moduleContent);
+				moduleContent = fs.readFileSync(moduleId, "utf-8");
+			}
 
-						// Add to graph
-						graph.push({
-							id: moduleId,
-							data: moduleData,
-							content: moduleContent,
-						});
+			if (moduleContent) {
+				// [2] - Get loader and parse the module content so we can get its dependencies
+				const LOADER = LOADERS.find((ldr: any) => ldr.test.test(moduleId));
+				if (LOADER) {
+					let moduleData: any = null;
 
-						// Add to cache
-						// CACHED_ASSETS.set(moduleId, {
-						// 	content: moduleContent,
-						// 	data: moduleData,
-						// });
-
-						// Scan dependencies
-						for (let dependency of moduleData.dependencies) {
-							let dependencyAbsolutePath: any = undefined;
-
-							if (isURL(dependency)) {
-								dependencyAbsolutePath = dependency;
-							} else {
-								dependencyAbsolutePath = resolve.sync(dependency, {
-									basedir: path.dirname(moduleId),
-									extensions: RESOLVE_PRIORITY,
-								});
-							}
-
-							let isScanned = graph.some(
-								(p: any) => p.id == dependencyAbsolutePath
-							);
-
-							if (!isScanned) {
-								scanModule(dependencyAbsolutePath);
-							}
-						}
+					// Avoid parsing if the module content and the cached content is still equal
+					if (cached && cached.content == moduleContent) {
+						moduleData = cached.data;
 					} else {
-						throw new Error(`${moduleExtname} files are not yet supported.`);
+						moduleData = LOADER.use.parse(moduleContent);
 					}
+
+					// [3] - Add module to graph along with its parsed data
+					// Instantiate asset
+					const ASSET: Asset = {
+						id: moduleId,
+						data: moduleData,
+						content: moduleContent,
+						loader: LOADER.use,
+					};
+
+					// Add to graph
+					graph.push(ASSET);
+
+					// Add to cache
+					CACHED_ASSETS.set(moduleId, ASSET);
+
+					// [4] - Scan the module's dependencies
+					for (let dependency of moduleData.dependencies) {
+						let dependencyAbsolutePath: any = null;
+
+						// Only resolve if not a URL
+						if (!isURL(dependency)) {
+							dependencyAbsolutePath = resolve.sync(dependency, {
+								basedir: path.dirname(moduleId),
+								extensions: RESOLVE_PRIORITY,
+							});
+						} else {
+							dependencyAbsolutePath = dependency;
+						}
+
+						// Check if it exists in the graph already before scanning to avoid duplicates
+						// Scanning is also adding because we're in a recursive function
+						let isScanned = graph.some(
+							(p: any) => p.id == dependencyAbsolutePath
+						);
+
+						if (!isScanned) {
+							scanModule(dependencyAbsolutePath);
+						}
+					}
+				} else {
+					throw new Error(`${moduleExtname} files are not yet supported.`);
 				}
 			}
 		} catch (error) {
@@ -166,9 +205,18 @@ function getDependencyGraph(entryId: string) {
 	}
 
 	// Scan recursively for dependencies
-	scanModule(path.join("/", entryId));
+	await scanModule(path.join("/", entryId));
 
 	return graph;
+}
+
+interface Loader {
+	test: RegExp;
+	use: object;
+}
+
+export function addLoader(loader: Loader) {
+	LOADERS.push(loader);
 }
 
 interface BundleOptions {
@@ -186,23 +234,30 @@ export async function bundle(options: BundleOptions) {
 	let entryId = options.entry;
 	let entryExtname = path.extname(entryId);
 	let entryType = entryExtname.substr(1);
-	try {
-		// If the entry is an html file, the script tags in it will serve as the entry points
-		if (entryType == "html") {
-			// Get file contents
-			let entryContent = fs.readFileSync(entryId, "utf-8");
-			if (entryContent) {
-				// Parse
-				let entryData = HTMLParser.parse(entryContent);
+	let bundle = new Bundle();
 
-				// Get dependency graph of each dependency
-				for (let dependency of entryData.dependencies) {
-					let graph = getDependencyGraph(dependency);
+	try {
+		let hasLoader = LOADERS.some((ldr: any) => ldr.test.test(entryId));
+
+		if (hasLoader) {
+			let graph = await getDependencyGraph(entryId);
+			console.log(graph);
+
+			for (let asset of graph) {
+				if (/\.(css|html)$/.test(asset.id)) {
+					let originalContent = new MagicString(asset.content);
+					let compiledContent = asset.loader.compile(originalContent, asset);
+
+					bundle.addSource({
+						filename: asset.id,
+						content: compiledContent,
+					});
 				}
 			}
 		} else {
-			// If the entry is a script e.g. jsx or vue, get its dependency graph
-			let graph = getDependencyGraph(entryId);
+			throw new Error(
+				`${entryId} is not supported. You might want to add a loader for this file type.`
+			);
 		}
 	} catch (error) {
 		console.error(error);
