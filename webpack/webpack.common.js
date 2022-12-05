@@ -54,7 +54,7 @@ module.exports = {
 		clean: true,
 		library: {
 			name: "Toypack",
-			type: "commonjs",
+			type: "umd",
 		},
 		publicPath: "auto",
 	},

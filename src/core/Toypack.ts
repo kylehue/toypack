@@ -1,14 +1,17 @@
 import fs from "fs";
 import * as path from "path";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
-import MagicString, { Bundle } from "magic-string";
+import createDependencyGraph from "@toypack/core/dependencyGraph";
 import { HTMLLoader, CSSLoader, JSLoader } from "@toypack/loaders";
-import { Asset } from "@toypack/loaders/types";
+import MagicString, { Bundle } from "magic-string";
+import {
+	formatAsset as UMDChunk,
+	formatBundle as UMDBundle,
+} from "./moduleTemplates/UMD";
 import { isURL } from "@toypack/utils";
-import resolve from "resolve";
 export { vol } from "memfs";
 
-const LOADERS: any = [
+export const LOADERS: any = [
 	{
 		test: /\.html$/,
 		use: HTMLLoader,
@@ -38,7 +41,7 @@ export function defineConfig(config: ToypackConfig) {
 	}
 }
 
-const CACHED_ASSETS = new Map();
+export const CACHED_ASSETS = new Map();
 
 export interface AssetOptions {
 	source: string;
@@ -114,102 +117,6 @@ export async function addAsset(options: AssetOptions) {
 
 export const RESOLVE_PRIORITY = [".js", ".ts", ".json", ".jsx", ".tsx", ".vue"];
 
-/**
- * @param {string} entryId The entry point of the graph.
- */
-
-async function getDependencyGraph(entryId: string) {
-	let graph: Array<Asset> = [];
-
-	async function scanModule(moduleId: string) {
-		let moduleExtname = path.extname(moduleId);
-		let moduleContent: any = null;
-		let cached = CACHED_ASSETS.get(moduleId);
-		try {
-			// [1] - Get module contents
-			// If module id is an external URL, check cache
-			if (isURL(moduleId)) {
-				// Add to assets if not in cache
-				if (!cached) {
-					let asset = await addAsset({
-						source: moduleId,
-					});
-
-					moduleContent = asset.content;
-				} else {
-					moduleContent = cached.content;
-				}
-			} else {
-				moduleContent = fs.readFileSync(moduleId, "utf-8");
-			}
-
-			if (moduleContent) {
-				// [2] - Get loader and parse the module content so we can get its dependencies
-				const LOADER = LOADERS.find((ldr: any) => ldr.test.test(moduleId));
-				if (LOADER) {
-					let moduleData: any = null;
-
-					// Avoid parsing if the module content and the cached content is still equal
-					if (cached && cached.content == moduleContent) {
-						moduleData = cached.data;
-					} else {
-						moduleData = LOADER.use.parse(moduleContent);
-					}
-
-					// [3] - Add module to graph along with its parsed data
-					// Instantiate asset
-					const ASSET: Asset = {
-						id: moduleId,
-						data: moduleData,
-						content: moduleContent,
-						loader: LOADER.use,
-					};
-
-					// Add to graph
-					graph.push(ASSET);
-
-					// Add to cache
-					CACHED_ASSETS.set(moduleId, ASSET);
-
-					// [4] - Scan the module's dependencies
-					for (let dependency of moduleData.dependencies) {
-						let dependencyAbsolutePath: any = null;
-
-						// Only resolve if not a URL
-						if (!isURL(dependency)) {
-							dependencyAbsolutePath = resolve.sync(dependency, {
-								basedir: path.dirname(moduleId),
-								extensions: RESOLVE_PRIORITY,
-							});
-						} else {
-							dependencyAbsolutePath = dependency;
-						}
-
-						// Check if it exists in the graph already before scanning to avoid duplicates
-						// Scanning is also adding because we're in a recursive function
-						let isScanned = graph.some(
-							(p: any) => p.id == dependencyAbsolutePath
-						);
-
-						if (!isScanned) {
-							scanModule(dependencyAbsolutePath);
-						}
-					}
-				} else {
-					throw new Error(`${moduleExtname} files are not yet supported.`);
-				}
-			}
-		} catch (error) {
-			console.error(error);
-		}
-	}
-
-	// Scan recursively for dependencies
-	await scanModule(path.join("/", entryId));
-
-	return graph;
-}
-
 interface Loader {
 	test: RegExp;
 	use: object;
@@ -233,27 +140,34 @@ interface BundleOptions {
 export async function bundle(options: BundleOptions) {
 	let entryId = options.entry;
 	let entryExtname = path.extname(entryId);
-	let entryType = entryExtname.substr(1);
 	let bundle = new Bundle();
 
 	try {
 		let hasLoader = LOADERS.some((ldr: any) => ldr.test.test(entryId));
 
 		if (hasLoader) {
-			let graph = await getDependencyGraph(entryId);
+			let graph = await createDependencyGraph(entryId);
 			console.log(graph);
 
 			for (let asset of graph) {
 				if (/\.(css|html)$/.test(asset.id)) {
 					let originalContent = new MagicString(asset.content);
-					let compiledContent = asset.loader.compile(originalContent, asset);
+					let chunk: any = asset.loader.compile(originalContent, asset);
+					chunk = UMDChunk(chunk, asset);
+					
+					chunk.append("\n//# sourceMappingURL=" + chunk.generateMap().toUrl());
 
 					bundle.addSource({
 						filename: asset.id,
-						content: compiledContent,
+						content: chunk,
 					});
 				}
 			}
+
+			bundle = UMDBundle(bundle, entryId);
+			/* console.log(
+				bundle.toString()
+			); */
 		} else {
 			throw new Error(
 				`${entryId} is not supported. You might want to add a loader for this file type.`

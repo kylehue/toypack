@@ -13,7 +13,7 @@ if (num1 == 12) {
 	),
 });
 
-let helloContent = new MagicString(
+let ddd = new MagicString(
 	// prettier-ignore
 	`
 console.log(123);
@@ -23,14 +23,12 @@ console.log(123);
 `
 );
 
-helloContent.append("\nconsole.log(888)");
-helloContent.append("\nconsole.log(888)");
-helloContent.append("\nconsole.log(888)");
-
-bundle.addSource({
+let helloContent = bundle.addSource({
 	filename: "hello.js",
-	content: helloContent,
+	content: ddd,
 });
+
+ddd.update(0, ddd.length(), "console.log(444)");
 // prettier-ignore
 
 bundle.append("\n//# sourceMappingURL=" + bundle.generateMap().toUrl());

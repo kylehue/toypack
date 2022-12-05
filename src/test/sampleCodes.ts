@@ -111,6 +111,7 @@ body {
    <script type="text/javascript" src="src/index.js"></script>
    <link rel="stylesheet" href="styles/main.css"></link>
    <title>cool website!!!!</title>
+   <!-- <script>console.log(123);</script> -->
 </head>
 
 <body>

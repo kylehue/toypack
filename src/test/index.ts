@@ -17,5 +17,5 @@ setTimeout(() => {
 }, 1000);
 
 //import "./resolve";
-//import "./sourceMaps";
+import "./sourceMaps";
 

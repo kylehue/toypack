@@ -12,6 +12,7 @@ export type Asset = {
 	id: string;
 	loader: Loader;
 	content: string;
+	dependencyMap: any;
 };
 
 export type MagicString = {
