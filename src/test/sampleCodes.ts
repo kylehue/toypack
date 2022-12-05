@@ -12,16 +12,16 @@ export default {
 `import { PI } from "../scripts/PI.js";
 import { Circle } from "../scripts/Circle.js";
 //import App from "./App.vue";
-import "../styles/main.css";
+import mainCSS from "../styles/main.css";
 console.log(Circle);
-console.log("              ");
+console.log(mainCSS);
 export const myPI = PI;`,
 
 	// prettier-ignore
 	"scripts/Circle.js":
 
 `import { PI } from "./PI.js";
-import "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
+//import "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
 import "./Test.js"
 export class Circle {
    constructor() {
@@ -32,16 +32,36 @@ export class Circle {
 	// prettier-ignore
 	"scripts/Test.js":
 
-`console.log("I'm a test!");`,
+`
+
+
+const mainCSS = require("../styles/main.css");
+const PI = require("./PI.js");
+
+
+console.log(mainCSS);
+
+
+
+console.log(PI);
+
+
+
+
+console.log("I'm a test!");`,
 
 	// prettier-ignore
 	"scripts/PI.js":
 
 `
-import "./Test.js";
-export const PI = 3.14;
-import { Circle } from "./Circle.js";
-console.log(Circle);`,
+require("./Test.js");
+
+
+
+
+
+console.log("🥧🥧🥧🥧");
+exports.PI = 3.14;`,
 
 	// prettier-ignore
 	"src/App.vue":
@@ -114,7 +134,7 @@ body {
    <!-- <script>console.log(123);</script> -->
 </head>
 
-<body>
+<body class="theme-test">
    <div id="greet">Hello World!</div>
 </body>
 

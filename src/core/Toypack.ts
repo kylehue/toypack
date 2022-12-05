@@ -1,9 +1,13 @@
 import fs from "fs";
 import * as path from "path";
+import resolve from "resolve";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
 import createDependencyGraph from "@toypack/core/dependencyGraph";
 import { HTMLLoader, CSSLoader, JSLoader } from "@toypack/loaders";
 import MagicString, { Bundle } from "magic-string";
+import convertSourceMap from "convert-source-map";
+import combineSourceMap from "combine-source-map";
+import mergeSourceMap from "merge-source-map";
 import {
 	formatAsset as UMDChunk,
 	formatBundle as UMDBundle,
@@ -126,11 +130,36 @@ export function addLoader(loader: Loader) {
 	LOADERS.push(loader);
 }
 
+interface SourceMap {
+	/**
+	 * The filename where you plan to write the sourcemap.
+	 */
+	file?: string;
+	/**
+	 * The filename of the file containing the original source.
+	 */
+	source?: string;
+	/**
+	 * Whether to include the original content in the map's `sourcesContent` array.
+	 */
+	includeContent?: boolean;
+	/**
+	 * Whether the mapping should be high-resolution. Hi-res mappings map every single character, meaning (for example) your devtools will always be able to pinpoint the exact location of function calls and so on. With lo-res mappings, devtools may only be able to identify the correct line - but they're quicker to generate and less bulky.
+	 */
+	hires?: boolean;
+}
+
+interface OutputOptions {
+	path: string;
+	filename: string;
+	type?: "umd";
+	sourceMap?: SourceMap;
+}
+
 interface BundleOptions {
 	entry: string;
-	sourceMap?: boolean;
+	output: OutputOptions;
 	plugins?: Array<Function>;
-	outdir?: string;
 }
 
 /**
@@ -138,36 +167,69 @@ interface BundleOptions {
  */
 
 export async function bundle(options: BundleOptions) {
-	let entryId = options.entry;
-	let entryExtname = path.extname(entryId);
 	let bundle = new Bundle();
 
 	try {
+		let entryId = resolve.sync(options.entry, {
+			basedir: ".",
+			extensions: RESOLVE_PRIORITY,
+			includeCoreModules: false,
+		});
+
 		let hasLoader = LOADERS.some((ldr: any) => ldr.test.test(entryId));
 
 		if (hasLoader) {
 			let graph = await createDependencyGraph(entryId);
 			console.log(graph);
 
+			let outputPath = path.join(options.output.path, options.output.filename);
+			let remaps: any = {};
 			for (let asset of graph) {
-				if (/\.(css|html)$/.test(asset.id)) {
+				if (/\.(css|html|js)$/.test(asset.id)) {
 					let originalContent = new MagicString(asset.content);
 					let chunk: any = asset.loader.compile(originalContent, asset);
-					chunk = UMDChunk(chunk, asset);
-					
-					chunk.append("\n//# sourceMappingURL=" + chunk.generateMap().toUrl());
+					let processedChunk = UMDChunk(chunk, asset);
 
 					bundle.addSource({
 						filename: asset.id,
-						content: chunk,
+						content: processedChunk.content,
 					});
+
+					if (processedChunk.map) {
+						remaps[asset.id] = processedChunk.map;
+					}
 				}
 			}
-
+			
 			bundle = UMDBundle(bundle, entryId);
-			/* console.log(
-				bundle.toString()
-			); */
+
+			let map = bundle.generateMap({
+				file: outputPath,
+				includeContent: true,
+				hires: true,
+			});
+
+			// TODO: Merge source maps from babel-transpiled chunks
+
+			console.log(map);
+			
+
+			for (let remap of Object.values(remaps)) {
+				console.log(mergeSourceMap(map, remap));
+				
+			}
+
+			bundle.append("\n//# sourceMappingURL=" + map.toUrl());
+			
+			addAsset({
+				source: outputPath,
+				content: bundle.toString(),
+			});
+
+			console.log(fs.readFileSync(outputPath, "utf-8"));
+
+			console.log(remaps);
+			
 		} else {
 			throw new Error(
 				`${entryId} is not supported. You might want to add a loader for this file type.`

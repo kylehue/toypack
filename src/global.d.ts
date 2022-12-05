@@ -7,3 +7,6 @@ declare module "@toypack/resolve";
 declare module "postcss";
 declare module "postcss-value-parser";
 declare module "autoprefixer";
+declare module "convert-source-map";
+declare module "combine-source-map";
+declare module "merge-source-map";

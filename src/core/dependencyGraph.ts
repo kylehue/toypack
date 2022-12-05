@@ -25,15 +25,11 @@ export default async function createDependencyGraph(entryId: string) {
 			// If module id is an external URL, check cache
 			if (isURL(moduleId)) {
 				// Add to assets if not in cache
-				if (!cached) {
-					let asset = await addAsset({
-						source: moduleId,
-					});
+				let asset = await addAsset({
+					source: moduleId,
+				});
 
-					moduleContent = asset.content;
-				} else {
-					moduleContent = cached.content;
-				}
+				moduleContent = asset.content;
 			} else {
 				moduleContent = fs.readFileSync(moduleId, "utf-8");
 			}
@@ -90,7 +86,7 @@ export default async function createDependencyGraph(entryId: string) {
 						);
 
 						if (!isScanned) {
-							scanModule(dependencyAbsolutePath);
+							await scanModule(dependencyAbsolutePath);
 						}
 					}
 				} else {
@@ -103,7 +99,7 @@ export default async function createDependencyGraph(entryId: string) {
 	}
 
 	// Scan recursively for dependencies
-	await scanModule(path.join("/", entryId));
+	await scanModule(entryId);
 
 	return graph;
 }

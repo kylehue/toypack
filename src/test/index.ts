@@ -6,11 +6,17 @@ console.log(Toypack);
 for (let [source, content] of Object.entries(sampleCodes)) {
 	Toypack.addAsset({
 		source,
-		content
+		content,
 	});
 }
 
-Toypack.bundle({ entry: "./index.html" });
+Toypack.bundle({
+	entry: "./scripts/Test.js",
+	output: {
+		path: "./dist/",
+		filename: "test.js",
+	},
+});
 
 setTimeout(() => {
 	console.log(Toypack.vol.toJSON());
@@ -18,4 +24,3 @@ setTimeout(() => {
 
 //import "./resolve";
 import "./sourceMaps";
-

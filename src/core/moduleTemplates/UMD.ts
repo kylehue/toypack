@@ -3,19 +3,22 @@ import {
 	availablePlugins,
 } from "@babel/standalone";
 
+const SOURCE_MAP_RE = new RegExp("//[#@] (source(?:Mapping)?URL)=(.*)");
 export function formatAsset(chunk: any, asset: any) {
-   console.log(chunk);
-   
-   /* chunk.update(
-			0,
-      chunk.length(),
-         ""
-   ); */
-   /* chunk.append(
-      babelTransform(chunk.toString(), {
-         presets: ["es2015-loose"],
-         compact: false,
-      }).code); */
+	let transpilation = babelTransform(chunk.toString(), {
+		presets: ["es2015-loose"],
+		compact: true,
+		sourceMaps: true,
+		sourceFileName: asset.id,
+		sourceType: "module",
+	});
+
+	console.log(transpilation);
+
+	//chunk.prepend("/*\n").append("*/\n");
+	//chunk.append("eval(`");
+	//chunk.append(transpilation.code);
+	//chunk.append("`)");
 	chunk.indent();
 	chunk.prepend(`init: function(module, exports, require) {\n`);
 	chunk.prepend(`"${asset.id}": {\n`);
@@ -23,7 +26,10 @@ export function formatAsset(chunk: any, asset: any) {
 	chunk.append(`\nmap: ${JSON.stringify(asset.dependencyMap)}`);
 	chunk.append(`\n},`);
 
-	return chunk;
+	return {
+      content: chunk,
+      map: transpilation.map
+	};
 }
 
 export function formatBundle(bundle: any, entryId: any) {
