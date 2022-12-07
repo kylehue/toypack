@@ -81,6 +81,7 @@
 		"@babel/traverse": "^7.20.1",
 		"@csstools/postcss-sass": "^5.0.1",
 		"@freecodecamp/loop-protect": "^3.0.0",
+		"@jridgewell/sourcemap-codec": "^1.4.14",
 		"@vue/compiler-sfc": "^3.2.45",
 		"autoprefixer": "^10.4.13",
 		"browserify": "^17.0.0",
@@ -89,6 +90,7 @@
 		"html-parse-stringify": "^3.0.1",
 		"js-untar": "^2.0.0",
 		"magic-string": "^0.26.7",
+		"mapcat": "^0.4.0",
 		"memfs": "^3.4.12",
 		"merge-source-map": "^1.1.0",
 		"node-html-parser": "^6.1.4",
@@ -111,6 +113,7 @@
 		"sass-embedded": "^1.56.1",
 		"sass.js": "^0.11.1",
 		"sorcery": "^0.10.0",
+		"source-map": "^0.7.4",
 		"sugarss": "^4.0.1",
 		"vue": "^3.2.45",
 		"whatwg-fetch": "^3.6.2"

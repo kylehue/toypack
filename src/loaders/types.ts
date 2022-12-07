@@ -51,7 +51,13 @@ export type MagicString = {
 	[key: string | number | symbol]: unknown;
 };
 
-export type Loader = {
-	compile: (content: MagicString, asset: Asset) => void;
+type LoaderMethod = {
+	compile: (content: string, asset: Asset) => any;
 	parse: (content: string) => ParsedAsset;
+}
+
+export type Loader = {
+	name: string;
+	test: RegExp;
+	use: LoaderMethod;
 };

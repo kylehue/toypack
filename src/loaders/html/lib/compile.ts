@@ -1,33 +1,36 @@
-import { Asset, MagicString } from "@toypack/loaders/types";
+import { Asset } from "@toypack/loaders/types";
+import MagicString from "magic-string";
 
 const HTML_ELEMENT = 1;
-export default function compile(chunk: MagicString, asset: Asset) {
+export default async function compile(content: string, asset: Asset) {
+	let chunk = new MagicString(content);
+
 	chunk.replace(chunk.toString(), "");
 	// Transforms HTML AST into a javascript code and appends it to chunk
 	function transformAndAppend(node: any) {
 		if (node.nodeType == HTML_ELEMENT) {
 			// Instantiate
 			chunk.prepend(
-				`let ${node.varName} = document.createElement("${node.rawTagName}");\n`
+				`let ${node.id} = document.createElement("${node.rawTagName}");\n`
 			);
 
 			// Add attributes
 			for (let [key, value] of Object.entries(node.attrs)) {
-				chunk.append(`\n${node.varName}.setAttribute("${key}", "${value}");`);
+				chunk.append(`\n${node.id}.setAttribute("${key}", "${value}");`);
 			}
 
 			chunk.append(
-				`\n${node.parentNode.varName}.appendChild(${node.varName});`
+				`\n${node.parentNode.id}.appendChild(${node.id});`
 			);
 		} else {
 			if (!node.isWhitespace) {
 				// Instantiate text
 				chunk.prepend(
-					`let ${node.varName} = document.createTextNode(\`${node.rawText}\`);\n`
+					`let ${node.id} = document.createTextNode(\`${node.rawText}\`);\n`
 				);
 
 				chunk.append(
-					`\n${node.parentNode.varName}.appendChild(${node.varName});`
+					`\n${node.parentNode.id}.appendChild(${node.id});`
 				);
 			}
 		}
@@ -46,29 +49,37 @@ export default function compile(chunk: MagicString, asset: Asset) {
 		} else {
 			// Add body attributes
 			for (let [key, value] of Object.entries(node.attrs)) {
-				chunk.append(`\n${node.varName}.setAttribute("${key}", "${value}");`);
+				chunk.append(`\n${node.id}.setAttribute("${key}", "${value}");`);
 			}
 		}
 	});
 
 	// Add head and body element variables
 	chunk.prepend(
-		`let ${asset.data.body.varName} = document.body || document.getElementsByTagName("body")[0];\n`
+		`let ${asset.data.body.id} = document.body || document.getElementsByTagName("body")[0];\n`
 	);
 
 	chunk.prepend(
-		`let ${asset.data.head.varName} = document.head || document.getElementsByTagName("head")[0];\n`
+		`let ${asset.data.head.id} = document.head || document.getElementsByTagName("head")[0];\n`
 	);
 
 	// Imports
 	for (let dependency in asset.dependencyMap) {
-		chunk.prepend(`import "${dependency}";\n`);
+		chunk.prepend(`require("${dependency}");\n`);
 	}
-	
-	// Export
-	chunk.append(
-		`\nexport {${asset.data.head.varName} as head, ${asset.data.body.varName} as body};`
-	);
 
-	return chunk;
+	console.log(chunk.toString());
+	
+
+	// TODO: Source map support
+	return {
+		content: chunk.toString(),
+		// Temporarily add a poorly generated source map
+		map: chunk.generateMap({
+			file: asset.id,
+			includeContent: true,
+			source: asset.id,
+			hires: true,
+		}),
+	};
 }

@@ -1,3 +1,3 @@
-export * as HTMLLoader from "./html";
-export * as JSLoader from "./js";
-export * as CSSLoader from "./css";
+export { default as HTMLLoader } from "./html";
+export { default as BabelLoader } from "./js";
+export { default as CSSLoader } from "./css";

@@ -3,22 +3,11 @@ import {
 	availablePlugins,
 } from "@babel/standalone";
 
+import MagicString from "magic-string";
+
 const SOURCE_MAP_RE = new RegExp("//[#@] (source(?:Mapping)?URL)=(.*)");
-export function formatAsset(chunk: any, asset: any) {
-	let transpilation = babelTransform(chunk.toString(), {
-		presets: ["es2015-loose"],
-		compact: true,
-		sourceMaps: true,
-		sourceFileName: asset.id,
-		sourceType: "module",
-	});
-
-	console.log(transpilation);
-
-	//chunk.prepend("/*\n").append("*/\n");
-	//chunk.append("eval(`");
-	//chunk.append(transpilation.code);
-	//chunk.append("`)");
+export function formatAsset(content: string, asset: any) {
+   let chunk = new MagicString(content);
 	chunk.indent();
 	chunk.prepend(`init: function(module, exports, require) {\n`);
 	chunk.prepend(`"${asset.id}": {\n`);
@@ -27,13 +16,19 @@ export function formatAsset(chunk: any, asset: any) {
 	chunk.append(`\n},`);
 
 	return {
-      content: chunk,
-      map: transpilation.map
+		content: chunk.toString(),
+		map: chunk.generateMap({
+			file: asset.id,
+			includeContent: true,
+			source: asset.id,
+			hires: true,
+		}),
 	};
 }
 
-export function formatBundle(bundle: any, entryId: any) {
-	bundle.indent().prepend("{\n").append("\n}");
+export function formatBundle(content: any, entryId: any) {
+   let bundle = new MagicString(content);
+	bundle.indent("  ").prepend("{\n").append("\n}");
 	let name = "Sample";
 	bundle.prepend(`
 (function(root, factory) {
@@ -70,5 +65,13 @@ export function formatBundle(bundle: any, entryId: any) {
    return __require__("${entryId}");
 });
 `);
-	return bundle;
+	return {
+		content: bundle.toString(),
+		map: bundle.generateMap({
+			file: "bundle.js",
+			source: "bundle.js",
+			includeContent: true,
+			hires: true,
+		}),
+	};
 }

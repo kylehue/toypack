@@ -20,6 +20,7 @@ export default async function createDependencyGraph(entryId: string) {
 		let moduleExtname = path.extname(moduleId);
 		let moduleContent: any = null;
 		let cached = CACHED_ASSETS.get(moduleId);
+		
 		try {
 			// [1] - Get module contents
 			// If module id is an external URL, check cache
@@ -53,7 +54,7 @@ export default async function createDependencyGraph(entryId: string) {
 						id: moduleId,
 						data: moduleData,
 						content: moduleContent,
-                  loader: LOADER.use,
+                  loader: LOADER,
                   dependencyMap: {}
 					};
 

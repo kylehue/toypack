@@ -1,16 +1,23 @@
-import { Asset, MagicString } from "@toypack/loaders/types";
+import { Asset } from "@toypack/loaders/types";
+import MagicString from "magic-string";
 import autoprefixer from "autoprefixer";
 import postcss from "postcss";
-export default function compile(chunk: MagicString, asset: Asset) {
+export default async function compile(content: string, asset: Asset) {
 	let fromAST = asset.data.AST.toString();
-	let processedContent = postcss([autoprefixer]).process(fromAST).css;
+	let transpiled = await postcss([autoprefixer]).process(fromAST).css;
 
-	let e = "let __styleContent__ = \"\"";
-	for (let line of processedContent.split("\n")) {
-		e += `.concat("${line}")`;
+	let styleContent = "let __styleContent__ = \"\"";
+	for (let line of transpiled.split("\n")) {
+		// Escape quotes
+		line = line.replaceAll("\"", "\\\"");
+		styleContent += `.concat("${line}")`;
 	}
 
-	chunk.replace(chunk.toString(), e);
+	let chunk = new MagicString(content);
+
+	// For dummy source map
+	chunk.update(0, chunk.length(), styleContent);
+
 	chunk
 		.append(
 			`
@@ -35,11 +42,21 @@ if (__stylesheet__.styleSheet){
 
 	// Imports
 	for (let dependency in asset.dependencyMap) {
-		chunk.prepend(`require("${dependency}");\n`);
+		chunk.prepend(`import "${dependency}";\n`);
 	}
 
 	// Exports
-	chunk.append("exports.default = __stylesheet__;")
+	chunk.append("export {__stylesheet__};")
 
-	return chunk;
+	// TODO: Source map support
+	return {
+		content: chunk.toString(),
+		// Temporarily add a poorly generated source map
+		map: chunk.generateMap({
+			file: asset.id,
+			source: asset.id,
+			hires: true,
+			includeContent: true,
+		}),
+	};
 }

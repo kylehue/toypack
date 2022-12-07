@@ -10,3 +10,4 @@ declare module "autoprefixer";
 declare module "convert-source-map";
 declare module "combine-source-map";
 declare module "merge-source-map";
+declare module "@jridgewell/sourcemap-codec";

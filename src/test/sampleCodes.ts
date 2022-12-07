@@ -11,10 +11,9 @@ export default {
 
 `import { PI } from "../scripts/PI.js";
 import { Circle } from "../scripts/Circle.js";
+import "../styles/main.css";
 //import App from "./App.vue";
-import mainCSS from "../styles/main.css";
 console.log(Circle);
-console.log(mainCSS);
 export const myPI = PI;`,
 
 	// prettier-ignore
@@ -35,11 +34,8 @@ export class Circle {
 `
 
 
-const mainCSS = require("../styles/main.css");
-const PI = require("./PI.js");
-
-
-console.log(mainCSS);
+import "../styles/main.css";
+import {PI} from "./PI.js";
 
 
 
@@ -54,14 +50,14 @@ console.log("I'm a test!");`,
 	"scripts/PI.js":
 
 `
-require("./Test.js");
+import "./Test.js";
 
 
 
 
 
 console.log("🥧🥧🥧🥧");
-exports.PI = 3.14;`,
+export const PI = 3.14;`,
 
 	// prettier-ignore
 	"src/App.vue":
@@ -110,7 +106,7 @@ body {
 	"styles/main.css":
 
 `@import "./colors.css";
-body {
+body, html, #app {
    margin: 0;
    background: black;
    color: white;

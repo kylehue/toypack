@@ -3,11 +3,13 @@ import * as path from "path";
 import resolve from "resolve";
 import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
 import createDependencyGraph from "@toypack/core/dependencyGraph";
-import { HTMLLoader, CSSLoader, JSLoader } from "@toypack/loaders";
+import { HTMLLoader, CSSLoader, BabelLoader } from "@toypack/loaders";
+import { ALLOWED_ENTRY_POINTS_PATTERN } from "@toypack/core/globals";
+import { Loader } from "@toypack/loaders/types";
+import { generateFrom, merge } from "@toypack/core/SourceMap";
 import MagicString, { Bundle } from "magic-string";
-import convertSourceMap from "convert-source-map";
-import combineSourceMap from "combine-source-map";
-import mergeSourceMap from "merge-source-map";
+import combine from "combine-source-map";
+import convert from "convert-source-map";
 import {
 	formatAsset as UMDChunk,
 	formatBundle as UMDBundle,
@@ -15,20 +17,7 @@ import {
 import { isURL } from "@toypack/utils";
 export { vol } from "memfs";
 
-export const LOADERS: any = [
-	{
-		test: /\.html$/,
-		use: HTMLLoader,
-	},
-	{
-		test: /\.css$/,
-		use: CSSLoader,
-	},
-	{
-		test: /\.js$/,
-		use: JSLoader,
-	},
-];
+export const LOADERS: Loader[] = [BabelLoader, HTMLLoader, CSSLoader];
 
 /**
  *
@@ -121,11 +110,6 @@ export async function addAsset(options: AssetOptions) {
 
 export const RESOLVE_PRIORITY = [".js", ".ts", ".json", ".jsx", ".tsx", ".vue"];
 
-interface Loader {
-	test: RegExp;
-	use: object;
-}
-
 export function addLoader(loader: Loader) {
 	LOADERS.push(loader);
 }
@@ -162,14 +146,21 @@ interface BundleOptions {
 	plugins?: Array<Function>;
 }
 
+import {
+	transform as babelTransform,
+	availablePlugins,
+} from "@babel/standalone";
+
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
 
 export async function bundle(options: BundleOptions) {
-	let bundle = new Bundle();
-
 	try {
+		if (!ALLOWED_ENTRY_POINTS_PATTERN.test(options.entry)) {
+			throw new Error(`Invalid entry file: ${options.entry}.`);
+		}
+
 		let entryId = resolve.sync(options.entry, {
 			basedir: ".",
 			extensions: RESOLVE_PRIORITY,
@@ -177,59 +168,94 @@ export async function bundle(options: BundleOptions) {
 		});
 
 		let hasLoader = LOADERS.some((ldr: any) => ldr.test.test(entryId));
-
 		if (hasLoader) {
 			let graph = await createDependencyGraph(entryId);
-			console.log(graph);
-
 			let outputPath = path.join(options.output.path, options.output.filename);
-			let remaps: any = {};
+
+			let contentBundle = new Bundle();
+			let sourceMapBundle = combine.create("bundle.js");
+			let prevContentLine = 0;
+			// Possible problem #1 - sources don't match sometimes e.g. original source is /styles/main.css and the generated source is /main.css
 			for (let asset of graph) {
 				if (/\.(css|html|js)$/.test(asset.id)) {
-					let originalContent = new MagicString(asset.content);
-					let chunk: any = asset.loader.compile(originalContent, asset);
-					let processedChunk = UMDChunk(chunk, asset);
+					// [1] - Compile to JS using a loader 🎉
+					let compiled = await asset.loader.use.compile(asset.content, asset);
 
-					bundle.addSource({
-						filename: asset.id,
-						content: processedChunk.content,
-					});
+					// Initialize asset content and source map
+					let assetContent = compiled.content;
+					let assetSourceMap = generateFrom(compiled.map);
+					
+					// [2] - Transpile 🎉
+					// Ensure that the asset's loader is not BabelLoader
+					// so that we don't transpile assets twice
+					if (asset.loader.name != "BabelLoader") {
+						let transpiled = babelTransform(compiled.content, {
+							presets: ["es2015-loose"],
+							compact: true,
+							sourceMaps: true,
+							sourceFileName: asset.id,
+							sourceType: "module",
+						});
 
-					if (processedChunk.map) {
-						remaps[asset.id] = processedChunk.map;
+						// Update asset content
+						assetContent = transpiled.code;
+
+						// Merge transpiled source map to asset source map
+						assetSourceMap = merge(assetSourceMap, transpiled.map);
+
 					}
+
+					// [3] - Finalize asset chunk with module definitions 🎉
+					let moduleDefined = UMDChunk(assetContent, asset);
+
+					// Update asset content
+					assetContent = moduleDefined.content;
+
+					// Merge module defined source map to asset source map
+					assetSourceMap = merge(assetSourceMap, moduleDefined.map);
+
+
+					// [4] - Add to bundle 😩
+					// TODO: Find a better solution
+					//	Current solution: We had to clone the current source map and bring back its second source content (why second?) back to asset's original code to prevent to source map bundler from referencing the compiled code in browser's devtools.
+
+					// Clone
+					let originalMappings = generateFrom(assetSourceMap);
+
+					// Back to original contents
+					originalMappings.sourcesContent[1] = asset.content;
+					
+					// Add source map to bundle
+					sourceMapBundle.addFile(
+						{
+							source: originalMappings.toComment(),
+							sourceFile: asset.id,
+						},
+						{
+							line: prevContentLine,
+						}
+					);
+					
+					// Offset
+					prevContentLine += assetContent.split("\n").length;
+					
+					// Add contents to bundle
+					contentBundle.addSource({
+						filename: asset.id,
+						content: new MagicString(assetContent),
+					});
 				}
 			}
-			
-			bundle = UMDBundle(bundle, entryId);
 
-			let map = bundle.generateMap({
-				file: outputPath,
-				includeContent: true,
-				hires: true,
-			});
+			let finalBundle = UMDBundle(contentBundle.toString(), entryId);
 
-			// TODO: Merge source maps from babel-transpiled chunks
+			let finalSourceMap = merge(
+				convert.fromBase64(sourceMapBundle.base64()).toObject(),
+				finalBundle.map
+			);
 
-			console.log(map);
-			
-
-			for (let remap of Object.values(remaps)) {
-				console.log(mergeSourceMap(map, remap));
-				
-			}
-
-			bundle.append("\n//# sourceMappingURL=" + map.toUrl());
-			
-			addAsset({
-				source: outputPath,
-				content: bundle.toString(),
-			});
-
-			console.log(fs.readFileSync(outputPath, "utf-8"));
-
-			console.log(remaps);
-			
+			console.log(finalBundle.content + finalSourceMap.toComment());
+			console.log(finalSourceMap);
 		} else {
 			throw new Error(
 				`${entryId} is not supported. You might want to add a loader for this file type.`

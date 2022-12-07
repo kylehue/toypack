@@ -1,6 +1,20 @@
-import { Asset, MagicString } from "@toypack/loaders/types";
+import { Asset } from "@toypack/loaders/types";
+import {
+	transform as babelTransform,
+	availablePlugins,
+} from "@babel/standalone";
 
-export default function compile(content: MagicString, asset: Asset) {
-   // No need to compile .js files so we just return the content (?)
-	return content;
+export default async function compile(content: string, asset: Asset) {
+	let transpiled = babelTransform(content, {
+		presets: ["es2015-loose"],
+		compact: true,
+		sourceMaps: true,
+		sourceFileName: asset.id,
+		sourceType: "module",
+	});
+
+	return {
+      content: transpiled.code,
+      map: transpiled.map
+	};
 }

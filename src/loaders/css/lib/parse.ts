@@ -1,6 +1,7 @@
 import { ParsedAsset } from "@toypack/loaders/types";
 import { parse as parseCSS } from "postcss";
 import valueParser from "postcss-value-parser";
+import { isURL } from "@toypack/utils";
 const URL_RE = /url\s*\("?(?![a-z]+:)/;
 
 export default function parse(content: string): ParsedAsset {
@@ -11,49 +12,52 @@ export default function parse(content: string): ParsedAsset {
 		dependencies: [],
 	};
 
-	// Get dependencies that is using `@import`
-	AST.walkAtRules((node: any) => {
-		if (node.name == "import") {
+	let lastId = 0;
+	AST.walk((node: any) => {
+		if (node.type == "atrule" && node.name == "import") {
 			let parsedValue = valueParser(node.params);
 			parsedValue.walk((valueNode: any) => {
-				let id: any = null;
+				let dependencyId: any = null;
 				if (
 					valueNode.type == "function" &&
 					valueNode.value == "url" &&
 					valueNode.nodes.length
 				) {
-					id = valueNode.nodes[0]?.value;
+					dependencyId = valueNode.nodes[0]?.value;
 				} else if (valueNode.value && !valueNode.nodes?.length) {
-					id = valueNode.value;
+					dependencyId = valueNode.value;
 				}
 
-				if (id) {
-					result.dependencies.push(id);
+				if (dependencyId) {
+					result.dependencies.push(dependencyId);
 
 					// Remove from AST
 					node.remove();
 				}
 			});
+		} else if (node.type == "decl") {
+			const isURLFunction = URL_RE.test(node.value);
+			if (isURLFunction) {
+				let parsedValue = valueParser(node.value);
+				parsedValue.walk((valueNode: any) => {
+					if (
+						valueNode.type === "function" &&
+						valueNode.value === "url" &&
+						valueNode.nodes.length &&
+						!valueNode.nodes[0].value.startsWith("#")
+					) {
+						let assetId = valueNode.nodes[0]?.value;
+						// TODO: Add asset loader
+						if (!assetId.startsWith("data:")) {
+							result.dependencies.push(assetId);
+						}
+					}
+				});
+			}
 		}
-	});
 
-	// TODO: Add asset loader or create object url
-	// Get dependencies that is using `url()`
-	AST.walkDecls((node: any) => {
-		const isURL = URL_RE.test(node.value);
-		if (isURL) {
-			let parsedValue = valueParser(node.value);
-			parsedValue.walk((valueNode: any) => {
-				if (
-					valueNode.type === "function" &&
-					valueNode.value === "url" &&
-					valueNode.nodes.length &&
-					!valueNode.nodes[0].value.startsWith("#")
-				) {
-					result.dependencies.push(valueNode.nodes[0]?.value);
-				}
-			});
-		}
+		// Add unique id for each node (will be useful on compilation)
+		node.id = `__toypack_node_${++lastId}__`;
 	});
 
 	return result;

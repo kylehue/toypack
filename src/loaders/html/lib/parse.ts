@@ -57,6 +57,8 @@ export default function parse(content: string): ParsedAsset {
 			node.remove();
 		}
 
+		// TODO: <a> tag href dependencies?
+
 		// Get body tag
 		if (node.tagName == "BODY") {
 			result.body = node;
@@ -67,10 +69,8 @@ export default function parse(content: string): ParsedAsset {
 			result.head = node;
 		}
 
-		// Set a unique var name (will be used in compilation)
-		let id = ++_ID;
-		let varName = `__toypack_node_${id}__`;
-		node.varName = varName;
+		// Assign a unique id for each node (will be used in compilation)
+		node.id = `__toypack_node_${++_ID}__`;
 	});
 
 	return result;
