@@ -62,7 +62,7 @@ export default async function createDependencyGraph(entryId: string) {
 					graph.push(ASSET);
 
 					// Add to cache
-					CACHED_ASSETS.set(moduleId, ASSET);
+					CACHED_ASSETS.set(moduleId, cached ? Object.assign(cached, ASSET) : ASSET);
 
 					// [4] - Scan the module's dependencies
 					for (let dependency of moduleData.dependencies) {
@@ -91,7 +91,7 @@ export default async function createDependencyGraph(entryId: string) {
 						}
 					}
 				} else {
-					throw new Error(`${moduleExtname} files are not yet supported.`);
+					console.error(`Dependency Graph Error: ${moduleExtname} files are not yet supported.`);
 				}
 			}
 		} catch (error) {

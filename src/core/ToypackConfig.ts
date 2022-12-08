@@ -1,15 +1,12 @@
-import fs from "fs";
-
-export interface ToypackConfig {
-	/** The base name of the core modules directory.
-	 ** Default: `node_modules`
-	 */
-	coreModuleBase: string;
-	[key: string | number | symbol]: unknown;
-}
-
-const ToypackConfig: ToypackConfig = {
-   coreModuleBase: "node_modules"
+export const BUNDLE_DEFAULTS = {
+	entry: null,
+	mode: "production",
+	plugins: [],
+	output: {
+		path: "dist",
+		filename: null,
+		type: "umd",
+		sourceMap: true,
+		name: null
+	},
 };
-
-export default ToypackConfig;

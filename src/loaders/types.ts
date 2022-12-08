@@ -8,11 +8,12 @@ export type ParsedAsset = {
 };
 
 export type Asset = {
-	data: ParsedAsset;
 	id: string;
-	loader: Loader;
 	content: string;
-	dependencyMap: any;
+	data?: ParsedAsset;
+	loader?: Loader;
+	dependencyMap?: any;
+	contentURL?: string;
 };
 
 export type MagicString = {

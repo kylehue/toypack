@@ -11,10 +11,13 @@ for (let [source, content] of Object.entries(sampleCodes)) {
 }
 
 Toypack.bundle({
+	mode: "production",
 	entry: "/index.html",
 	output: {
 		path: "./dist/",
 		filename: "test.js",
+		sourceMap: true,
+		name: "MyLibrary"
 	},
 });
 
@@ -24,4 +27,4 @@ setTimeout(() => {
 
 //import "./resolve";
 //import "./sourceMaps";
-import "./sourceMapsMerge";
+//import "./sourceMapsMerge";

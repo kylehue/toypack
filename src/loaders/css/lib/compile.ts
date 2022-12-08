@@ -3,6 +3,11 @@ import MagicString from "magic-string";
 import autoprefixer from "autoprefixer";
 import postcss from "postcss";
 export default async function compile(content: string, asset: Asset) {
+	if (!asset.data) {
+		console.error("Compilation Error: Asset's data is empty. Make sure that you're returning a <ParsedAsset> data when parsing.");
+		return;
+	}
+
 	let fromAST = asset.data.AST.toString();
 	let transpiled = await postcss([autoprefixer]).process(fromAST).css;
 

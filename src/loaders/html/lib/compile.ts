@@ -3,6 +3,13 @@ import MagicString from "magic-string";
 
 const HTML_ELEMENT = 1;
 export default async function compile(content: string, asset: Asset) {
+	if (!asset.data) {
+		console.error(
+			"Compilation Error: Asset's data is empty. Make sure that you're returning a <ParsedAsset> data when parsing."
+		);
+		return;
+	}
+	
 	let chunk = new MagicString(content);
 
 	chunk.replace(chunk.toString(), "");
@@ -19,9 +26,7 @@ export default async function compile(content: string, asset: Asset) {
 				chunk.append(`\n${node.id}.setAttribute("${key}", "${value}");`);
 			}
 
-			chunk.append(
-				`\n${node.parentNode.id}.appendChild(${node.id});`
-			);
+			chunk.append(`\n${node.parentNode.id}.appendChild(${node.id});`);
 		} else {
 			if (!node.isWhitespace) {
 				// Instantiate text
@@ -29,22 +34,20 @@ export default async function compile(content: string, asset: Asset) {
 					`let ${node.id} = document.createTextNode(\`${node.rawText}\`);\n`
 				);
 
-				chunk.append(
-					`\n${node.parentNode.id}.appendChild(${node.id});`
-				);
+				chunk.append(`\n${node.parentNode.id}.appendChild(${node.id});`);
 			}
 		}
 	}
 
 	// Scan, transform, and append head AST and body AST
 	asset.data.walk(asset.data.head, (node: any) => {
-		if (node != asset.data.head) {
+		if (node != asset.data?.head) {
 			transformAndAppend(node);
 		}
 	});
 
 	asset.data.walk(asset.data.body, (node: any) => {
-		if (node != asset.data.body) {
+		if (node != asset.data?.body) {
 			transformAndAppend(node);
 		} else {
 			// Add body attributes
@@ -67,9 +70,6 @@ export default async function compile(content: string, asset: Asset) {
 	for (let dependency in asset.dependencyMap) {
 		chunk.prepend(`require("${dependency}");\n`);
 	}
-
-	console.log(chunk.toString());
-	
 
 	// TODO: Source map support
 	return {

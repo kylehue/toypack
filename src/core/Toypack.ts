@@ -1,40 +1,32 @@
 import fs from "fs";
 import * as path from "path";
 import resolve from "resolve";
-import toypack, { ToypackConfig } from "@toypack/core/ToypackConfig";
 import createDependencyGraph from "@toypack/core/dependencyGraph";
 import { HTMLLoader, CSSLoader, BabelLoader } from "@toypack/loaders";
-import { ALLOWED_ENTRY_POINTS_PATTERN } from "@toypack/core/globals";
-import { Loader } from "@toypack/loaders/types";
-import { generateFrom, merge } from "@toypack/core/SourceMap";
+import {
+	ALLOWED_ENTRY_POINTS_PATTERN,
+	MIME_TYPES,
+} from "@toypack/core/globals";
+import { Loader, Asset } from "@toypack/loaders/types";
+import { isURL } from "@toypack/utils";
+import {
+	generateFrom as createSourceMap,
+	merge as mergeSourceMap,
+} from "@toypack/core/SourceMap";
+import {
+	transformChunk as UMDChunk,
+	transformBundle as UMDBundle,
+} from "@toypack/core/moduleDefinitions/UMD";
 import MagicString, { Bundle } from "magic-string";
 import combine from "combine-source-map";
 import convert from "convert-source-map";
-import {
-	formatAsset as UMDChunk,
-	formatBundle as UMDBundle,
-} from "./moduleTemplates/UMD";
-import { isURL } from "@toypack/utils";
-export { vol } from "memfs";
+import { transform as babelTransform } from "@babel/standalone";
 
 export const LOADERS: Loader[] = [BabelLoader, HTMLLoader, CSSLoader];
 
-/**
- *
- * @param {ToypackConfig} config Toypack configurations.
- */
+export const CACHED_ASSETS: Map<string, Asset> = new Map();
 
-export function defineConfig(config: ToypackConfig) {
-	for (let [key, value] of Object.entries(config)) {
-		if (toypack[key]) {
-			toypack[key] = value;
-		} else {
-			console.warn(`Unknown config "${key}"`);
-		}
-	}
-}
-
-export const CACHED_ASSETS = new Map();
+(window as any).cache = CACHED_ASSETS;
 
 export interface AssetOptions {
 	source: string;
@@ -42,26 +34,21 @@ export interface AssetOptions {
 	moduleName?: string;
 }
 
-interface AssetData {
-	source: string;
-	content: string;
-}
-
 /**
  * @param {AssetOptions} options Configurations for the asset.
  */
 
 export async function addAsset(options: AssetOptions) {
-	let data: AssetData = {
-		source: "",
+	let data: Asset = {
+		id: "",
 		content: "",
+		contentURL: "",
 	};
 
 	// Check cache
 	let cached = CACHED_ASSETS.get(options.source);
 	if (cached && options.content == cached.content) {
-		data.source = cached.id;
-		data.content = cached.content;
+		data = Object.assign(data, cached);
 		return data;
 	}
 
@@ -74,17 +61,23 @@ export async function addAsset(options: AssetOptions) {
 
 		if (fetchResponse.ok) {
 			let content = await fetchResponse.text();
-
-			CACHED_ASSETS.set(options.source, content);
-
+			data.id = options.source;
 			data.content = content;
-			data.source = options.source;
+			data.contentURL = URL.createObjectURL(
+				new Blob([content], {
+					type: MIME_TYPES[path.extname(options.source)],
+				})
+			);
+
+			CACHED_ASSETS.set(options.source, data);
+		} else {
+			console.error("Add Asset Error: Failed to fetch " + options.source);
 		}
 	} else {
 		// If module name is indicated, put it inside `node_modules`
 		if (options?.moduleName) {
 			targetDir = path.join(
-				toypack.coreModuleBase,
+				"node_modules",
 				options.moduleName || "",
 				targetDir
 			);
@@ -95,14 +88,21 @@ export async function addAsset(options: AssetOptions) {
 		fs.mkdirSync(targetDir, { recursive: true });
 		fs.writeFileSync(assetID, options.content || "");
 
+		data.id = assetID;
 		data.content = options.content || "";
-		data.source = assetID;
 
-		CACHED_ASSETS.set(assetID, {
-			content: data.content,
-			data: [],
-			id: assetID,
-		});
+		// Revoke previous url if it exists
+		if (cached?.contentURL) {
+			URL.revokeObjectURL(cached.contentURL);
+		}
+
+		data.contentURL = URL.createObjectURL(
+			new Blob([data.content], {
+				type: MIME_TYPES[path.extname(options.source)],
+			})
+		);
+
+		CACHED_ASSETS.set(assetID, data);
 	}
 
 	return data;
@@ -114,48 +114,35 @@ export function addLoader(loader: Loader) {
 	LOADERS.push(loader);
 }
 
-interface SourceMap {
-	/**
-	 * The filename where you plan to write the sourcemap.
-	 */
-	file?: string;
-	/**
-	 * The filename of the file containing the original source.
-	 */
-	source?: string;
-	/**
-	 * Whether to include the original content in the map's `sourcesContent` array.
-	 */
-	includeContent?: boolean;
-	/**
-	 * Whether the mapping should be high-resolution. Hi-res mappings map every single character, meaning (for example) your devtools will always be able to pinpoint the exact location of function calls and so on. With lo-res mappings, devtools may only be able to identify the correct line - but they're quicker to generate and less bulky.
-	 */
-	hires?: boolean;
-}
-
 interface OutputOptions {
 	path: string;
 	filename: string;
 	type?: "umd";
-	sourceMap?: SourceMap;
+	sourceMap?: boolean | "inline";
+
+	/**
+	 * The name of your library.
+	 */
+	name?: string
 }
 
 interface BundleOptions {
+	mode?: "development" | "production";
 	entry: string;
 	output: OutputOptions;
 	plugins?: Array<Function>;
 }
 
-import {
-	transform as babelTransform,
-	availablePlugins,
-} from "@babel/standalone";
-
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
-
+import { vol } from "memfs";
+import { BUNDLE_DEFAULTS } from "@toypack/core/ToypackConfig";
+import babelMinify from "babel-minify";
 export async function bundle(options: BundleOptions) {
+	options = Object.assign(BUNDLE_DEFAULTS, options);
+	console.log(options);
+	
 	try {
 		if (!ALLOWED_ENTRY_POINTS_PATTERN.test(options.entry)) {
 			throw new Error(`Invalid entry file: ${options.entry}.`);
@@ -175,16 +162,20 @@ export async function bundle(options: BundleOptions) {
 			let contentBundle = new Bundle();
 			let sourceMapBundle = combine.create("bundle.js");
 			let prevContentLine = 0;
-			// Possible problem #1 - sources don't match sometimes e.g. original source is /styles/main.css and the generated source is /main.css
+
 			for (let asset of graph) {
-				if (/\.(css|html|js)$/.test(asset.id)) {
+				// Check if asset has a loader
+				if (asset.loader) {
 					// [1] - Compile to JS using a loader 🎉
 					let compiled = await asset.loader.use.compile(asset.content, asset);
 
 					// Initialize asset content and source map
 					let assetContent = compiled.content;
-					let assetSourceMap = generateFrom(compiled.map);
-					
+					let assetSourceMap: any = null;
+					if (options.output.sourceMap) {
+						assetSourceMap = createSourceMap(compiled.map);
+					}
+
 					// [2] - Transpile 🎉
 					// Ensure that the asset's loader is not BabelLoader
 					// so that we don't transpile assets twice
@@ -201,8 +192,9 @@ export async function bundle(options: BundleOptions) {
 						assetContent = transpiled.code;
 
 						// Merge transpiled source map to asset source map
-						assetSourceMap = merge(assetSourceMap, transpiled.map);
-
+						if (options.output.sourceMap) {
+							assetSourceMap.mergeTo(transpiled.map);
+						}
 					}
 
 					// [3] - Finalize asset chunk with module definitions 🎉
@@ -212,50 +204,99 @@ export async function bundle(options: BundleOptions) {
 					assetContent = moduleDefined.content;
 
 					// Merge module defined source map to asset source map
-					assetSourceMap = merge(assetSourceMap, moduleDefined.map);
+					if (options.output.sourceMap) {
+						assetSourceMap.mergeTo(moduleDefined.map);
+					}
 
-
-					// [4] - Add to bundle 😩
-					// TODO: Find a better solution
-					//	Current solution: We had to clone the current source map and bring back its second source content (why second?) back to asset's original code to prevent to source map bundler from referencing the compiled code in browser's devtools.
-
-					// Clone
-					let originalMappings = generateFrom(assetSourceMap);
-
-					// Back to original contents
-					originalMappings.sourcesContent[1] = asset.content;
-					
+					// [4] - Add to bundle 🎉
 					// Add source map to bundle
-					sourceMapBundle.addFile(
-						{
-							source: originalMappings.toComment(),
-							sourceFile: asset.id,
-						},
-						{
-							line: prevContentLine,
-						}
-					);
-					
-					// Offset
-					prevContentLine += assetContent.split("\n").length;
-					
+					if (options.output.sourceMap) {
+						//	We have to clone the current chunk's source map and bring back its second source content back to asset's original code to prevent the source map combiner from referencing the compiled code in browser's devtools.
+
+						// Clone
+						let originalMappings = createSourceMap(assetSourceMap);
+
+						// Back to original contents
+						originalMappings.sourcesContent[1] = asset.content;
+
+						// Add source map to bundle
+						sourceMapBundle.addFile(
+							{
+								source: originalMappings.toComment(),
+								sourceFile: asset.id,
+							},
+							{
+								line: prevContentLine,
+							}
+						);
+
+						// Offset source map
+						prevContentLine += assetContent.split("\n").length;
+					}
+
 					// Add contents to bundle
 					contentBundle.addSource({
 						filename: asset.id,
 						content: new MagicString(assetContent),
 					});
+				} else {
+					throw new Error(
+						`${asset.id} is not supported. You might want to add a loader for this file type.`
+					);
 				}
 			}
 
-			let finalBundle = UMDBundle(contentBundle.toString(), entryId);
+			// Finalize bundle
+			let finalBundle = UMDBundle(contentBundle.toString(), {
+				entry: entryId,
+				name: options.output.name
+			});
+			
+			let finalSourceMap = createSourceMap(convert.fromBase64(sourceMapBundle.base64()).toObject());
 
-			let finalSourceMap = merge(
-				convert.fromBase64(sourceMapBundle.base64()).toObject(),
-				finalBundle.map
-			);
+			finalSourceMap.mergeTo(finalBundle.map);
 
-			console.log(finalBundle.content + finalSourceMap.toComment());
-			console.log(finalSourceMap);
+			// Optimizations
+			if (options.mode == "production") {
+				let minified = babelMinify(finalBundle.content, {
+					mangle: {
+						topLevel: true,
+						keepClassName: true,
+					}
+				}, {
+					sourceMaps: options.output.sourceMap ? true : false
+				});
+
+				finalBundle.content = minified.code;
+
+				if (options.output.sourceMap) { 
+					finalSourceMap.mergeTo(minified.map);
+				}
+			}
+
+			// Source map type
+			if (options.output.sourceMap) {
+				if (options.output.sourceMap === "inline") {
+					// Inline source map
+					finalBundle.content += finalSourceMap.toComment();
+				} else {
+					// External source map
+					let sourceMapAsset = await addAsset({
+						source: outputPath + ".map",
+						content: finalSourceMap.toString(),
+					});
+
+					finalBundle.content += "\n//# sourceMappingURL=" + sourceMapAsset.id;
+				}
+			}
+
+			// Out bundle
+			await addAsset({
+				source: outputPath,
+				content: finalBundle.content,
+			});
+
+			console.log(vol.toJSON());
 		} else {
 			throw new Error(
 				`${entryId} is not supported. You might want to add a loader for this file type.`

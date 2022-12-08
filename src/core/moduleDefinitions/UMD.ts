@@ -1,13 +1,7 @@
-import {
-	transform as babelTransform,
-	availablePlugins,
-} from "@babel/standalone";
-
 import MagicString from "magic-string";
 
-const SOURCE_MAP_RE = new RegExp("//[#@] (source(?:Mapping)?URL)=(.*)");
-export function formatAsset(content: string, asset: any) {
-   let chunk = new MagicString(content);
+export function transformChunk(content: string, asset: any) {
+	let chunk = new MagicString(content);
 	chunk.indent();
 	chunk.prepend(`init: function(module, exports, require) {\n`);
 	chunk.prepend(`"${asset.id}": {\n`);
@@ -26,10 +20,12 @@ export function formatAsset(content: string, asset: any) {
 	};
 }
 
-export function formatBundle(content: any, entryId: any) {
-   let bundle = new MagicString(content);
-	bundle.indent("  ").prepend("{\n").append("\n}");
-	let name = "Sample";
+import { parse as parsePath } from "path";
+
+export function transformBundle(content: string, options: any) {
+	let bundle = new MagicString(content);
+	bundle.indent().prepend("{\n").append("\n}");
+	let name = options.name || parsePath(options.entry).name;
 	bundle.prepend(`
 (function(root, factory) {
    if (typeof exports === "object" && typeof module === "object") {
@@ -62,7 +58,7 @@ export function formatBundle(content: any, entryId: any) {
       return __module__.exports;
    }
    /* Start */
-   return __require__("${entryId}");
+   return __require__("${options.entry}");
 });
 `);
 	return {
