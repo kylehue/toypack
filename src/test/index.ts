@@ -11,12 +11,12 @@ for (let [source, content] of Object.entries(sampleCodes)) {
 }
 
 Toypack.bundle({
-	mode: "production",
+	mode: "development",
 	entry: "/index.html",
 	output: {
 		path: "./dist/",
 		filename: "test.js",
-		sourceMap: true,
+		sourceMap: "inline",
 		name: "MyLibrary"
 	},
 });

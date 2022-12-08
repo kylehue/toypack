@@ -42,7 +42,9 @@ export function transformBundle(content: string, options: any) {
    /* Require function */
    const __moduleCache__ = {};
    function __require__(modulePath) {
-      const { init, map } = __modules__[modulePath];
+      const __asset__ = __modules__[modulePath];
+      if (!__asset__) throw new Error("Could not resolve " + modulePath);
+      const { init, map } = __asset__;
       const __module__ = { exports: {} };
       __moduleCache__[modulePath] = __module__.exports;
       function localRequire(assetRelativePath) {

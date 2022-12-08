@@ -2,7 +2,13 @@ import fs from "fs";
 import * as path from "path";
 import resolve from "resolve";
 import createDependencyGraph from "@toypack/core/dependencyGraph";
-import { HTMLLoader, CSSLoader, BabelLoader } from "@toypack/loaders";
+import {
+	HTMLLoader,
+	CSSLoader,
+	BabelLoader,
+	JSONLoader,
+	VueLoader,
+} from "@toypack/loaders";
 import {
 	ALLOWED_ENTRY_POINTS_PATTERN,
 	MIME_TYPES,
@@ -22,7 +28,13 @@ import combine from "combine-source-map";
 import convert from "convert-source-map";
 import { transform as babelTransform } from "@babel/standalone";
 
-export const LOADERS: Loader[] = [BabelLoader, HTMLLoader, CSSLoader];
+export const LOADERS: Loader[] = [
+	BabelLoader,
+	HTMLLoader,
+	CSSLoader,
+	JSONLoader,
+	VueLoader,
+];
 
 export const CACHED_ASSETS: Map<string, Asset> = new Map();
 
@@ -114,6 +126,32 @@ export function addLoader(loader: Loader) {
 	LOADERS.push(loader);
 }
 
+import { getDependency } from "./npm";
+
+export async function addDependency(name: string, version = "latest") {
+	let dependency = await getDependency(name, version);
+	console.log(dependency);
+	if (!dependency) return;
+
+	for (let file of dependency.files) {
+		if (!file.name || !path.extname(file.name)) continue;
+
+		await addAsset({
+			moduleName: dependency.name,
+			source: file.name,
+			content: await file.blob.text(),
+		});
+	}
+
+	if (dependency.package.dependencies) {
+		for (let [pkgDependency, pkgDependencyVersion] of Object.entries(
+			dependency.package.dependencies
+		)) {
+			await addDependency(pkgDependency, pkgDependencyVersion as string);
+		}
+	}
+}
+
 interface OutputOptions {
 	path: string;
 	filename: string;
@@ -123,7 +161,7 @@ interface OutputOptions {
 	/**
 	 * The name of your library.
 	 */
-	name?: string
+	name?: string;
 }
 
 interface BundleOptions {
@@ -139,10 +177,20 @@ interface BundleOptions {
 import { vol } from "memfs";
 import { BUNDLE_DEFAULTS } from "@toypack/core/ToypackConfig";
 import babelMinify from "babel-minify";
+import polyfill, { POLYFILLS } from "@toypack/core/polyfill";
 export async function bundle(options: BundleOptions) {
 	options = Object.assign(BUNDLE_DEFAULTS, options);
-	console.log(options);
-	
+
+	// for (let poly of Object.values(POLYFILLS)) {
+	// 	if (typeof poly === "object") {
+	// 		await addDependency((poly as any).package);
+	// 	} else {
+	// 		await addDependency(poly as string);
+	// 	}
+	// }
+
+	await addDependency("canvas-confetti");
+	// await addDependency("uuid");
 	try {
 		if (!ALLOWED_ENTRY_POINTS_PATTERN.test(options.entry)) {
 			throw new Error(`Invalid entry file: ${options.entry}.`);
@@ -197,7 +245,12 @@ export async function bundle(options: BundleOptions) {
 						}
 					}
 
-					// [3] - Finalize asset chunk with module definitions 🎉
+					// [3] - Polyfills
+					let polyfilled = polyfill(assetContent, asset);
+					assetContent = polyfilled.content;
+					assetSourceMap.mergeTo(polyfilled.map);
+
+					// [4] - Finalize asset chunk with module definitions 🎉
 					let moduleDefined = UMDChunk(assetContent, asset);
 
 					// Update asset content
@@ -208,7 +261,7 @@ export async function bundle(options: BundleOptions) {
 						assetSourceMap.mergeTo(moduleDefined.map);
 					}
 
-					// [4] - Add to bundle 🎉
+					// [5] - Add to bundle 🎉
 					// Add source map to bundle
 					if (options.output.sourceMap) {
 						//	We have to clone the current chunk's source map and bring back its second source content back to asset's original code to prevent the source map combiner from referencing the compiled code in browser's devtools.
@@ -249,27 +302,33 @@ export async function bundle(options: BundleOptions) {
 			// Finalize bundle
 			let finalBundle = UMDBundle(contentBundle.toString(), {
 				entry: entryId,
-				name: options.output.name
+				name: options.output.name,
 			});
-			
-			let finalSourceMap = createSourceMap(convert.fromBase64(sourceMapBundle.base64()).toObject());
+
+			let finalSourceMap = createSourceMap(
+				convert.fromBase64(sourceMapBundle.base64()).toObject()
+			);
 
 			finalSourceMap.mergeTo(finalBundle.map);
 
 			// Optimizations
 			if (options.mode == "production") {
-				let minified = babelMinify(finalBundle.content, {
-					mangle: {
-						topLevel: true,
-						keepClassName: true,
+				let minified = babelMinify(
+					finalBundle.content,
+					{
+						mangle: {
+							topLevel: true,
+							keepClassName: true,
+						},
+					},
+					{
+						sourceMaps: options.output.sourceMap ? true : false,
 					}
-				}, {
-					sourceMaps: options.output.sourceMap ? true : false
-				});
+				);
 
 				finalBundle.content = minified.code;
 
-				if (options.output.sourceMap) { 
+				if (options.output.sourceMap) {
 					finalSourceMap.mergeTo(minified.map);
 				}
 			}

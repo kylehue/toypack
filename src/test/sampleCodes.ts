@@ -11,9 +11,19 @@ export default {
 
 `import { PI } from "../scripts/PI.js";
 import { Circle } from "../scripts/Circle.js";
+import confetti from "canvas-confetti";
+import * as uuid from "uuid";
 import "../styles/main.css";
 //import App from "./App.vue";
+import pkg from "../package";
 console.log(Circle);
+console.log(pkg);
+console.log(confetti);
+console.log(uuid);
+setTimeout(() => {
+   console.log("%c CONGRATS!!", "color: yellow;");
+   confetti();
+}, 1000);
 export const myPI = PI;`,
 
 	// prettier-ignore
@@ -36,15 +46,26 @@ export class Circle {
 
 import "../styles/main.css";
 import {PI} from "./PI.js";
+import {num} from "./samplets.ts";
 
 
-
-console.log(PI);
+console.log(PI, num);
 
 
 
 
 console.log("I'm a test!");`,
+
+	// prettier-ignore
+	"scripts/samplets.ts":
+
+`
+
+export const num: number = 127;
+
+
+
+console.log(num);`,
 
 	// prettier-ignore
 	"scripts/PI.js":

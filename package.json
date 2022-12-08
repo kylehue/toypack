@@ -113,6 +113,7 @@
 		"sass": "^1.56.1",
 		"sass-embedded": "^1.56.1",
 		"sass.js": "^0.11.1",
+		"semver": "^7.3.8",
 		"sorcery": "^0.10.0",
 		"source-map": "^0.7.4",
 		"sugarss": "^4.0.1",

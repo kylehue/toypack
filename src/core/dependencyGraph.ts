@@ -7,6 +7,7 @@ import {
 	addAsset,
 } from "@toypack/core/Toypack";
 import { isURL } from "@toypack/utils";
+import { POLYFILLS } from "@toypack/core/polyfill";
 import fs from "fs";
 import resolve from "resolve";
 
@@ -15,7 +16,7 @@ import resolve from "resolve";
  */
 export default async function createDependencyGraph(entryId: string) {
 	let graph: Array<Asset> = [];
-
+	
 	async function scanModule(moduleId: string) {
 		let moduleExtname = path.extname(moduleId);
 		let moduleContent: any = null;
@@ -45,7 +46,7 @@ export default async function createDependencyGraph(entryId: string) {
 					if (cached && cached.content == moduleContent) {
 						moduleData = cached.data;
 					} else {
-						moduleData = LOADER.use.parse(moduleContent);
+						moduleData = LOADER.use.parse(moduleContent, moduleId);
 					}
 
 					// [3] - Add module to graph along with its parsed data
@@ -70,6 +71,18 @@ export default async function createDependencyGraph(entryId: string) {
 
 						// Only resolve if not a URL
 						if (!isURL(dependency)) {
+							// Polyfill first
+							if (dependency in POLYFILLS) {
+								let poly = POLYFILLS[dependency];
+
+								if (typeof poly === "object") {
+									dependency = poly.alias;
+								} else {
+									dependency = poly;
+								}
+							}
+
+							// Then resolve
 							dependencyAbsolutePath = resolve.sync(dependency, {
 								basedir: path.dirname(moduleId),
 								extensions: RESOLVE_PRIORITY,

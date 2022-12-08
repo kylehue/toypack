@@ -1,3 +1,5 @@
+import { SourceMapData } from "@toypack/core/SourceMap";
+
 export type ParsedAsset = {
 	AST: any;
 	dependencies: Array<string>;
@@ -52,10 +54,15 @@ export type MagicString = {
 	[key: string | number | symbol]: unknown;
 };
 
+type CompiledAsset = {
+	content: string;
+	map: SourceMapData;
+};
+
 type LoaderMethod = {
-	compile: (content: string, asset: Asset) => any;
-	parse: (content: string) => ParsedAsset;
-}
+	compile: (content: string, asset: Asset) => Promise<CompiledAsset>;
+	parse: (content: string, source: string) => ParsedAsset;
+};
 
 export type Loader = {
 	name: string;

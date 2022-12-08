@@ -52,3 +52,5 @@ h. return array of rendered AST
 
 ### Loader.parse
 1. Getting dependency graphs
+
+# Instead of polyfilling to NPM packages, just polyfill to CDNs?

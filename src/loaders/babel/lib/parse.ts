@@ -3,21 +3,23 @@ import traverseAST from "@babel/traverse";
 import { ParsedAsset } from "@toypack/loaders/types";
 import { ALLOWED_MODULE_IMPORTS_PATTERN } from "@toypack/core/globals";
 import { extname } from "path";
-export default function parse(content: string) {
+export default function parse(content: string, source: string) {
 	const AST = getAST(content, {
-		sourceType: "unambiguous",
+		sourceType: "module",
 		errorRecovery: true,
-		plugins: [],
+		allowImportExportEverywhere: true,
+		sourceFilename: source,
+		plugins: ["typescript", "jsx"],
 	});
 
 	const result: ParsedAsset = {
 		AST,
 		dependencies: [],
 	};
-	
+
 	function addDependency(id: string) {
-		if (!ALLOWED_MODULE_IMPORTS_PATTERN.test(id)) {
-			console.error(`Import Error: Importing \`${extname(id)}\` files is not allowed.`);
+		if (!ALLOWED_MODULE_IMPORTS_PATTERN.test(id) && extname(id)) {
+			console.error(`Import Error: Importing \`${id}\` files is not allowed.`);
 			return;
 		}
 
@@ -26,7 +28,7 @@ export default function parse(content: string) {
 			result.dependencies.push(id);
 		}
 	}
-   
+
 	traverseAST(AST, {
 		ImportDeclaration: (dir: any) => {
 			let id = dir.node.source.value;

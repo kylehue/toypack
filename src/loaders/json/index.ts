@@ -3,8 +3,8 @@ import { default as compile } from "./lib/compile";
 import { Loader } from "../types";
 
 export default {
-	name: "VueLoader",
-	test: /\.vue$/,
+	name: "JSONLoader",
+	test: /\.json$/,
 	use: {
 		parse,
 		compile,

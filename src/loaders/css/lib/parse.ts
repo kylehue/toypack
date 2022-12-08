@@ -4,7 +4,7 @@ import valueParser from "postcss-value-parser";
 import { isURL } from "@toypack/utils";
 const URL_RE = /url\s*\("?(?![a-z]+:)/;
 
-export default function parse(content: string): ParsedAsset {
+export default function parse(content: string, source: string): ParsedAsset {
 	const AST = parseCSS(content);
 
 	const result: ParsedAsset = {

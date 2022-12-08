@@ -19,7 +19,7 @@ function walk(AST: any, callback: WalkCallback) {
 	traverse(AST.childNodes);
 }
 
-export default function parse(content: string): ParsedAsset {
+export default function parse(content: string, source: string): ParsedAsset {
 	const AST = parseHTML(content);
 
 	const result: ParsedAsset = {

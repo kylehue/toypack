@@ -13,10 +13,11 @@ export default async function compile(content: string, asset: Asset) {
 	}
 	
 	let transpiled = babelTransform(content, {
-		presets: ["es2015-loose"],
+		presets: ["es2015-loose", "typescript", "react"],
 		compact: true,
 		sourceMaps: true,
 		sourceFileName: asset.id,
+		filename: asset.id,
 		sourceType: "module",
 	});
 

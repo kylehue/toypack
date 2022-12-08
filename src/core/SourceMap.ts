@@ -1,6 +1,6 @@
 import mergeSourceMap from "merge-source-map";
 
-interface SourceMap {
+export type SourceMapData = {
 	version: number;
 	sources: string[];
 	names: string[];
@@ -8,19 +8,17 @@ interface SourceMap {
 	sourcesContent: string[];
 	sourceRoot: string;
 	file: string;
-	[key: string | number | symbol]: unknown;
+	[key: string | number | symbol]: any;
 }
 
-class SourceMap implements SourceMap {
-	constructor() {
-		this.version = 3;
-		this.sources = [];
-		this.names = [];
-		this.mappings = "";
-		this.sourcesContent = [];
-		this.sourceRoot = "";
-		this.file = "";
-	}
+class SourceMap implements SourceMapData {
+	public version: number = 3;
+	public sources: string[] = [];
+	public names: string[] = [];
+	public mappings: string = "";
+	public sourcesContent: string[] = [];
+	public sourceRoot: string = "";
+	public file: string = "";
 
 	toComment() {
 		return "\n//# sourceMappingURL=" + this.toURL();
@@ -44,8 +42,10 @@ class SourceMap implements SourceMap {
 		let merged = merge(this, generated);
 
 		for (let [key, value] of Object.entries(merged)) {
-			this[key as keyof SourceMap] = value;
+			(this as SourceMapData)[key] = value;
 		}
+
+		return this;
 	}
 }
 
@@ -53,7 +53,7 @@ export function generateFrom(sourceMap: any) {
 	let generated = new SourceMap();
 
 	for (let [key, value] of Object.entries(sourceMap)) {
-		generated[key as keyof SourceMap] = value;
+		(generated as SourceMapData)[key] = value;
 	}
 
 	return generated;
