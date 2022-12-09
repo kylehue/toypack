@@ -7,26 +7,24 @@ import {
 	compileStyleAsync,
 	rewriteDefault,
 	compileTemplate,
-	MagicString,
 	SFCDescriptor,
 	SFCTemplateCompileOptions,
 	SFCScriptCompileOptions,
 } from "@vue/compiler-sfc";
+import MagicString from "magic-string";
 import { uuid } from "@toypack/utils";
 import * as test from "@vue/compiler-sfc";
+import { generateFrom as createSourceMap } from "@toypack/core/SourceMap";
 const COMP_NAME = "__sfc__";
-function getScript(descriptor: SFCDescriptor, scopeId: string) {
-	let scriptDescriptor = descriptor.script
-		? descriptor.script
-		: descriptor.scriptSetup;
 
+function getScript(descriptor: SFCDescriptor, scopeId: string, source: string) {
 	const TEMPLATE_OPTIONS: SFCTemplateCompileOptions = {
 		filename: descriptor.filename,
 		id: scopeId,
 		source: descriptor.template?.content || "",
 		isProd: false,
 		slotted: descriptor.slotted,
-		scoped: descriptor.styles.some((s) => s.scoped),
+		scoped: descriptor.styles.some((s) => s.scoped)
 	};
 
 	const SCRIPT_OPTIONS: SFCScriptCompileOptions = {
@@ -41,14 +39,17 @@ function getScript(descriptor: SFCDescriptor, scopeId: string) {
 
 	// [1] - Compile script
 	let parsedScript = compileScript(descriptor, SCRIPT_OPTIONS);
+	//console.log("%c Parsed Script: ", "color: yellow;");
+	//console.log(parsedScript);
+	let sourceMap = createSourceMap(parsedScript.map);
 
 	// [2] - Instantiate the script code
-	let scriptCode = new MagicString("");
+	let scriptCode = new MagicString(parsedScript.content);
 
 	// Manage bindings
 	if (parsedScript.bindings) {
-		scriptCode.append(
-			`\n/* Analyzed bindings: ${JSON.stringify(
+		scriptCode.prepend(
+			`/* Analyzed bindings: ${JSON.stringify(
 				parsedScript.bindings,
 				null,
 				4
@@ -62,12 +63,17 @@ function getScript(descriptor: SFCDescriptor, scopeId: string) {
 	}
 
 	// [3] - Append the parsed script into script code
-	scriptCode.append("\n");
-	scriptCode.append(rewriteDefault(parsedScript.content, COMP_NAME));
+	scriptCode.update(
+		0,
+		scriptCode.length(),
+		rewriteDefault(parsedScript.content, COMP_NAME)
+	);
 
 	// Only compile template if there is no script setup
-	if (descriptor.template && !descriptor.scriptSetup) {
+	if (descriptor.template && descriptor.script && !descriptor.scriptSetup) {
 		const parsedTemplate = compileTemplate(TEMPLATE_OPTIONS);
+		//console.log("%c Parsed Template: ", "color: yellow;");
+		//console.log(parsedTemplate);
 
 		if (parsedTemplate.code) {
 			// ?[4] - Append parsed template script into script code
@@ -86,17 +92,39 @@ function getScript(descriptor: SFCDescriptor, scopeId: string) {
 	}
 
 	// [5] - Append scope id to SFC instance
-	scriptCode.append("\n");
-	scriptCode.append(`${COMP_NAME}.__scopeId = "data-v-${scopeId}";`);
+	scriptCode.append(`\n${COMP_NAME}.__scopeId = "data-v-${scopeId}";`);
+
+	// [5] - Append scope id to SFC instance
+	scriptCode.append(`\n${COMP_NAME}.__file = "${source}";`);
 
 	// [6] - Export the SFC instance
-	scriptCode.append("\n");
-	scriptCode.append(`export default ${COMP_NAME};`);
+	scriptCode.append(`\nexport default ${COMP_NAME};`);
 
+	//console.log("%c Output: ", "color: red;");
 	//console.log(scriptCode.toString());
+
+	let scriptContent = scriptCode.toString();
+	let scriptMap = scriptCode.generateMap({
+		file: source,
+		source: source,
+		hires: true,
+		includeContent: true,
+	});
+
+	return {
+		content: scriptContent,
+		map: sourceMap.mergeTo(scriptMap),
+	};
+}
+
+function getStyles(descriptor: SFCDescriptor, scopeId: string, source: string) {
+	for (let style of descriptor.styles) {
+		
+	}
 }
 
 export default function parse(content: string, source: string) {
+	console.log(`%c -------------- ${source} -------------`, "color: green;");
 	const SCOPE_ID = uuid();
 
 	const { descriptor, errors } = parseSFC(content, {
@@ -104,12 +132,19 @@ export default function parse(content: string, source: string) {
 		filename: source,
 	});
 
+	console.log(`%c Descriptor: `, "color: green;", descriptor);
+
 	if (errors.length) {
 		console.error(errors[0]);
 	}
 
 	// Get script
-	let script = getScript(descriptor, SCOPE_ID);
+	let script = getScript(descriptor, SCOPE_ID, source);
+
+	// Get styles
+	let styles = getStyles(descriptor, SCOPE_ID, source);
+
+
 
 	const AST = null;
 
@@ -118,11 +153,13 @@ export default function parse(content: string, source: string) {
 		dependencies: [],
 
 		// For compilation
-		data: {
-			content: "",
+		metadata: {
+			content: script,
 			styles: [],
 		},
 	};
+
+	console.log(`%c Result: `, "color: red;", result);
 
 	return result;
 }

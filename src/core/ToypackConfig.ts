@@ -1,15 +1,34 @@
 import { ParserOptions } from "@babel/parser";
 
-export const BUNDLE_DEFAULTS = {
-	entry: null,
+export interface OutputOptions {
+	path: string;
+	filename: string;
+	type?: "umd";
+	sourceMap?: boolean | "inline";
+
+	/**
+	 * The name of your library.
+	 */
+	name?: string;
+}
+
+export interface BundleOptions {
+	mode?: "development" | "production";
+	entry: string;
+	output: OutputOptions;
+	plugins?: Array<Function>;
+}
+
+export const BUNDLE_DEFAULTS: BundleOptions = {
+	entry: "",
 	mode: "production",
 	plugins: [],
 	output: {
 		path: "dist",
-		filename: null,
+		filename: "",
 		type: "umd",
 		sourceMap: true,
-		name: null,
+		name: "",
 	},
 };
 
@@ -19,5 +38,5 @@ export const BABEL_PARSE_DEFAULTS: ParserOptions = {
 	allowAwaitOutsideFunction: true,
 	allowSuperOutsideMethod: true,
 	allowUndeclaredExports: true,
-	attachComment: false,
+	attachComment: true,
 };

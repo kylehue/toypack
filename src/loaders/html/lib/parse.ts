@@ -3,7 +3,7 @@ import { isURL } from "@toypack/utils";
 import { join } from "path";
 import { parse as parseHTML } from "node-html-parser";
 type WalkCallback = (node: any) => void;
-function walk(AST: any, callback: WalkCallback) {
+export function walk(AST: any, callback: WalkCallback) {
 	function traverse(tree: any) {
 		for (let node of tree) {
 			if (typeof node == "object") {
@@ -25,7 +25,9 @@ export default function parse(content: string, source: string): ParsedAsset {
 	const result: ParsedAsset = {
 		AST,
 		dependencies: [],
-		walk,
+		metadata: {
+
+		}
 	};
 
 	function addToDependencies(id: string) {
@@ -40,7 +42,7 @@ export default function parse(content: string, source: string): ParsedAsset {
 
 	let _ID = 0;
 	// Scan dependencies
-	result.walk(AST, (node: any) => {
+	walk(AST, (node: any) => {
 		// Scripts
 		if (node.tagName == "SCRIPT" && node.attrs?.src) {
 			addToDependencies(node.attrs?.src);
@@ -61,12 +63,12 @@ export default function parse(content: string, source: string): ParsedAsset {
 
 		// Get body tag
 		if (node.tagName == "BODY") {
-			result.body = node;
+			result.metadata.body = node;
 		}
 
 		// Get head tag
 		if (node.tagName == "HEAD") {
-			result.head = node;
+			result.metadata.head = node;
 		}
 
 		// Assign a unique id for each node (will be used in compilation)

@@ -3,9 +3,9 @@ import { SourceMapData } from "@toypack/core/SourceMap";
 export type ParsedAsset = {
 	AST: any;
 	dependencies: Array<string>;
+	metadata?: any;
 	head?: any;
 	body?: any;
-	walk?: any;
 	[key: string | number | symbol]: unknown;
 };
 

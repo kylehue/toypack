@@ -12,15 +12,12 @@ import {
 } from "@toypack/loaders";
 import {
 	ALLOWED_ENTRY_POINTS_PATTERN,
-	CDN_HOST,
 	MIME_TYPES,
 } from "@toypack/core/globals";
-import { BUNDLE_DEFAULTS } from "@toypack/core/ToypackConfig";
+import { BUNDLE_DEFAULTS, BundleOptions } from "@toypack/core/ToypackConfig";
 import { Loader, Asset } from "@toypack/loaders/types";
 import { isURL } from "@toypack/utils";
-import {
-	generateFrom as createSourceMap
-} from "@toypack/core/SourceMap";
+import { generateFrom as createSourceMap } from "@toypack/core/SourceMap";
 import {
 	transformChunk as chunkUMD,
 	transformBundle as finalizeUMD,
@@ -28,8 +25,8 @@ import {
 import MagicString, { Bundle } from "magic-string";
 import combine from "combine-source-map";
 import convert from "convert-source-map";
-import { vol } from "memfs";
 import babelMinify from "babel-minify";
+import { vol } from "memfs";
 
 export const LOADERS: Loader[] = [
 	BabelLoader,
@@ -41,6 +38,7 @@ export const LOADERS: Loader[] = [
 
 export const CACHED_ASSETS: Map<string, Asset> = new Map();
 
+const skypackURL = "https://cdn.skypack.dev/";
 (window as any).cache = CACHED_ASSETS;
 
 export interface AssetOptions {
@@ -129,25 +127,6 @@ export function addLoader(loader: Loader) {
 	LOADERS.push(loader);
 }
 
-interface OutputOptions {
-	path: string;
-	filename: string;
-	type?: "umd";
-	sourceMap?: boolean | "inline";
-
-	/**
-	 * The name of your library.
-	 */
-	name?: string;
-}
-
-interface BundleOptions {
-	mode?: "development" | "production";
-	entry: string;
-	output: OutputOptions;
-	plugins?: Array<Function>;
-}
-
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
@@ -170,6 +149,11 @@ export async function bundle(options: BundleOptions) {
 		if (hasLoader) {
 			let graph = await createDependencyGraph(entryId);
 			let outputPath = path.join(options.output.path, options.output.filename);
+			let packageJSON: any = CACHED_ASSETS.get("/package.json") || {};
+
+			if (packageJSON) {
+				packageJSON = JSON.parse(packageJSON.content);
+			}
 
 			let contentBundle = new Bundle();
 			let sourceMapBundle = combine.create(options.output.filename);
@@ -190,10 +174,12 @@ export async function bundle(options: BundleOptions) {
 					}
 
 					// [2] - Transform 🎉
-					// Transformation handles the transpilation, polyfills, and core module resolution
+					// Transformation handles the transpilation, polyfills, and core module filtration
 					let transformed = transformAsset(assetContent, asset);
 					for (let dep of transformed.coreModules) {
-						let exists = coreModulesBundle.some((cm: any) => cm.imported === dep.imported)
+						let exists = coreModulesBundle.some(
+							(cm: any) => cm.imported === dep.imported
+						);
 						if (!exists) {
 							coreModulesBundle.push(dep);
 						}
@@ -256,8 +242,6 @@ export async function bundle(options: BundleOptions) {
 				}
 			}
 
-			console.log(coreModulesBundle);
-
 			// [5] - Finalize bundle
 			let UMDBundle = finalizeUMD(contentBundle.toString(), {
 				entry: entryId,
@@ -273,7 +257,15 @@ export async function bundle(options: BundleOptions) {
 			// Import the core modules that was extracted during transformation
 			let importsBundle = new MagicString(UMDBundle.content);
 			for (let coreModule of coreModulesBundle) {
-				let importCode = `import * as ${coreModule.localId} from" ${CDN_HOST + coreModule.imported}";\n`;
+				// Check package.json for version
+				let id = coreModule.imported.split("@")[0];
+				if (id in packageJSON.dependencies) {
+					coreModule.imported = `${id}@${packageJSON.dependencies[id]}`;
+				}
+
+				let importCode = `import * as ${coreModule.localId} from "${
+					skypackURL + coreModule.imported
+				}";\n`;
 
 				importsBundle.prepend(importCode);
 			}
@@ -286,7 +278,6 @@ export async function bundle(options: BundleOptions) {
 			);
 
 			let finalContent = importsBundle.toString();
-			
 
 			// Optimizations
 			if (options.mode == "production") {

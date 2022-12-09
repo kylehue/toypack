@@ -1,4 +1,5 @@
 import { Asset } from "@toypack/loaders/types";
+import { walk } from "./parse";
 import MagicString from "magic-string";
 
 const HTML_ELEMENT = 1;
@@ -30,8 +31,11 @@ export default async function compile(content: string, asset: Asset) {
 		} else {
 			if (!node.isWhitespace) {
 				// Instantiate text
+				let textNodeCode = `"".concat(\"${node.rawText
+					.split("\n")
+					.join('").concat("')}\")`;
 				chunk.prepend(
-					`let ${node.id} = document.createTextNode(\`${node.rawText}\`);\n`
+					`let ${node.id} = document.createTextNode(${textNodeCode});\n`
 				);
 
 				chunk.append(`\n${node.parentNode.id}.appendChild(${node.id});`);
@@ -40,14 +44,14 @@ export default async function compile(content: string, asset: Asset) {
 	}
 
 	// Scan, transform, and append head AST and body AST
-	asset.data.walk(asset.data.head, (node: any) => {
-		if (node != asset.data?.head) {
+	walk(asset.data.metadata.head, (node: any) => {
+		if (node != asset.data?.metadata.head) {
 			transformAndAppend(node);
 		}
 	});
 
-	asset.data.walk(asset.data.body, (node: any) => {
-		if (node != asset.data?.body) {
+	walk(asset.data.metadata.body, (node: any) => {
+		if (node != asset.data?.metadata.body) {
 			transformAndAppend(node);
 		} else {
 			// Add body attributes
@@ -59,11 +63,11 @@ export default async function compile(content: string, asset: Asset) {
 
 	// Add head and body element variables
 	chunk.prepend(
-		`let ${asset.data.body.id} = document.body || document.getElementsByTagName("body")[0];\n`
+		`let ${asset.data.metadata.body.id} = document.body || document.getElementsByTagName("body")[0];\n`
 	);
 
 	chunk.prepend(
-		`let ${asset.data.head.id} = document.head || document.getElementsByTagName("head")[0];\n`
+		`let ${asset.data.metadata.head.id} = document.head || document.getElementsByTagName("head")[0];\n`
 	);
 
 	// Imports
