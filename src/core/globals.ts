@@ -4,6 +4,8 @@ export const ALLOWED_ENTRY_POINTS_PATTERN = /\.(html|[jt]sx?|vue)$/;
 // js, jsx, ts, tsx, vue, css, sass, scss, less
 export const ALLOWED_MODULE_IMPORTS_PATTERN = /\.([jt]sx?|json|vue|s?[ac]ss|less)$/;
 
+export const CDN_HOST = "https://cdn.skypack.dev/";
+
 export const MIME_TYPES: any = {
 	".abs": "audio/x-mpeg",
 	".ai": "application/postscript",

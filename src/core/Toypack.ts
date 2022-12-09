@@ -2,6 +2,7 @@ import fs from "fs";
 import * as path from "path";
 import resolve from "resolve";
 import createDependencyGraph from "@toypack/core/dependencyGraph";
+import transformAsset from "@toypack/core/transformAsset";
 import {
 	HTMLLoader,
 	CSSLoader,
@@ -14,10 +15,9 @@ import {
 	MIME_TYPES,
 } from "@toypack/core/globals";
 import { Loader, Asset } from "@toypack/loaders/types";
-import { isURL } from "@toypack/utils";
+import { cleanStr, isLocal, isURL } from "@toypack/utils";
 import {
-	generateFrom as createSourceMap,
-	merge as mergeSourceMap,
+	generateFrom as createSourceMap
 } from "@toypack/core/SourceMap";
 import {
 	transformChunk as UMDChunk,
@@ -26,7 +26,6 @@ import {
 import MagicString, { Bundle } from "magic-string";
 import combine from "combine-source-map";
 import convert from "convert-source-map";
-import { transform as babelTransform } from "@babel/standalone";
 
 export const LOADERS: Loader[] = [
 	BabelLoader,
@@ -175,10 +174,15 @@ interface BundleOptions {
  * @param {BundleOptions} options Bundling configurations.
  */
 import { vol } from "memfs";
-import { BUNDLE_DEFAULTS } from "@toypack/core/ToypackConfig";
+import {
+	BABEL_PARSE_DEFAULTS,
+	BUNDLE_DEFAULTS,
+} from "@toypack/core/ToypackConfig";
 import babelMinify from "babel-minify";
 import polyfill, { POLYFILLS } from "@toypack/core/polyfill";
 export async function bundle(options: BundleOptions) {
+	console.clear();
+
 	options = Object.assign(BUNDLE_DEFAULTS, options);
 
 	// for (let poly of Object.values(POLYFILLS)) {
@@ -224,31 +228,17 @@ export async function bundle(options: BundleOptions) {
 						assetSourceMap = createSourceMap(compiled.map);
 					}
 
-					// [2] - Transpile 🎉
-					// Ensure that the asset's loader is not BabelLoader
-					// so that we don't transpile assets twice
-					if (asset.loader.name != "BabelLoader") {
-						let transpiled = babelTransform(compiled.content, {
-							presets: ["es2015-loose"],
-							compact: true,
-							sourceMaps: true,
-							sourceFileName: asset.id,
-							sourceType: "module",
-						});
+					// [2] - Transform 🎉
+					// Transformation handles the transpilation, polyfills, and core module resolution
+					let transformed = transformAsset(assetContent, asset);
 
-						// Update asset content
-						assetContent = transpiled.code;
+					// Update asset content
+					assetContent = transformed.content;
 
-						// Merge transpiled source map to asset source map
-						if (options.output.sourceMap) {
-							assetSourceMap.mergeTo(transpiled.map);
-						}
+					// Merge transpiled source map to asset source map
+					if (options.output.sourceMap) {
+						assetSourceMap.mergeTo(transformed.map);
 					}
-
-					// [3] - Polyfills
-					let polyfilled = polyfill(assetContent, asset);
-					assetContent = polyfilled.content;
-					assetSourceMap.mergeTo(polyfilled.map);
 
 					// [4] - Finalize asset chunk with module definitions 🎉
 					let moduleDefined = UMDChunk(assetContent, asset);

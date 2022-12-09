@@ -6,7 +6,7 @@ import {
 	RESOLVE_PRIORITY,
 	addAsset,
 } from "@toypack/core/Toypack";
-import { isURL } from "@toypack/utils";
+import { isLocal, isURL } from "@toypack/utils";
 import { POLYFILLS } from "@toypack/core/polyfill";
 import fs from "fs";
 import resolve from "resolve";
@@ -67,21 +67,13 @@ export default async function createDependencyGraph(entryId: string) {
 
 					// [4] - Scan the module's dependencies
 					for (let dependency of moduleData.dependencies) {
+						// Skip core modules
+						if (!isLocal(dependency)) continue;
+
 						let dependencyAbsolutePath: any = null;
 
 						// Only resolve if not a URL
 						if (!isURL(dependency)) {
-							// Polyfill first
-							if (dependency in POLYFILLS) {
-								let poly = POLYFILLS[dependency];
-
-								if (typeof poly === "object") {
-									dependency = poly.alias;
-								} else {
-									dependency = poly;
-								}
-							}
-
 							// Then resolve
 							dependencyAbsolutePath = resolve.sync(dependency, {
 								basedir: path.dirname(moduleId),

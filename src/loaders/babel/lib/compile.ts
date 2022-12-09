@@ -1,9 +1,6 @@
+import { SourceMapData } from "@toypack/core/SourceMap";
 import { Asset } from "@toypack/loaders/types";
-import {
-	transform as babelTransform,
-	availablePlugins,
-} from "@babel/standalone";
-
+import MagicString from "magic-string";
 export default async function compile(content: string, asset: Asset) {
 	if (!asset.data) {
 		console.error(
@@ -11,18 +8,16 @@ export default async function compile(content: string, asset: Asset) {
 		);
 		return;
 	}
-	
-	let transpiled = babelTransform(content, {
-		presets: ["es2015-loose", "typescript", "react"],
-		compact: true,
-		sourceMaps: true,
-		sourceFileName: asset.id,
-		filename: asset.id,
-		sourceType: "module",
-	});
+
+	let chunk = new MagicString(content);
 
 	return {
-      content: transpiled.code,
-      map: transpiled.map
+		content: chunk.toString(),
+		map: chunk.generateMap({
+			file: asset.id,
+			source: asset.id,
+			hires: true,
+			includeContent: true,
+		}),
 	};
 }

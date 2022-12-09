@@ -9,7 +9,7 @@ export default function parse(content: string, source: string): ParsedAsset {
 
 	const result: ParsedAsset = {
 		AST,
-		dependencies: [],
+		dependencies: []
 	};
 
 	let lastId = 0;
