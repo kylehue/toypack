@@ -3,6 +3,7 @@ import traverseAST from "@babel/traverse";
 import { ParsedAsset } from "@toypack/loaders/types";
 import { ALLOWED_MODULE_IMPORTS_PATTERN } from "@toypack/core/globals";
 import { extname } from "path";
+import { isLocal } from "@toypack/utils";
 export default function parse(content: string, source: string) {
 	const AST = getAST(content, {
 		sourceType: "module",
@@ -18,7 +19,7 @@ export default function parse(content: string, source: string) {
 	};
 
 	function addDependency(id: string) {
-		if (!ALLOWED_MODULE_IMPORTS_PATTERN.test(id) && extname(id)) {
+		if (!ALLOWED_MODULE_IMPORTS_PATTERN.test(id) && extname(id) && isLocal(id)) {
 			console.error(`Import Error: Importing \`${id}\` files is not allowed.`);
 			return;
 		}

@@ -12,20 +12,24 @@ import {
 } from "@toypack/loaders";
 import {
 	ALLOWED_ENTRY_POINTS_PATTERN,
+	CDN_HOST,
 	MIME_TYPES,
 } from "@toypack/core/globals";
+import { BUNDLE_DEFAULTS } from "@toypack/core/ToypackConfig";
 import { Loader, Asset } from "@toypack/loaders/types";
-import { cleanStr, isLocal, isURL } from "@toypack/utils";
+import { isURL } from "@toypack/utils";
 import {
 	generateFrom as createSourceMap
 } from "@toypack/core/SourceMap";
 import {
-	transformChunk as UMDChunk,
-	transformBundle as UMDBundle,
+	transformChunk as chunkUMD,
+	transformBundle as finalizeUMD,
 } from "@toypack/core/moduleDefinitions/UMD";
 import MagicString, { Bundle } from "magic-string";
 import combine from "combine-source-map";
 import convert from "convert-source-map";
+import { vol } from "memfs";
+import babelMinify from "babel-minify";
 
 export const LOADERS: Loader[] = [
 	BabelLoader,
@@ -125,32 +129,6 @@ export function addLoader(loader: Loader) {
 	LOADERS.push(loader);
 }
 
-import { getDependency } from "./npm";
-
-export async function addDependency(name: string, version = "latest") {
-	let dependency = await getDependency(name, version);
-	console.log(dependency);
-	if (!dependency) return;
-
-	for (let file of dependency.files) {
-		if (!file.name || !path.extname(file.name)) continue;
-
-		await addAsset({
-			moduleName: dependency.name,
-			source: file.name,
-			content: await file.blob.text(),
-		});
-	}
-
-	if (dependency.package.dependencies) {
-		for (let [pkgDependency, pkgDependencyVersion] of Object.entries(
-			dependency.package.dependencies
-		)) {
-			await addDependency(pkgDependency, pkgDependencyVersion as string);
-		}
-	}
-}
-
 interface OutputOptions {
 	path: string;
 	filename: string;
@@ -173,28 +151,10 @@ interface BundleOptions {
 /**
  * @param {BundleOptions} options Bundling configurations.
  */
-import { vol } from "memfs";
-import {
-	BABEL_PARSE_DEFAULTS,
-	BUNDLE_DEFAULTS,
-} from "@toypack/core/ToypackConfig";
-import babelMinify from "babel-minify";
-import polyfill, { POLYFILLS } from "@toypack/core/polyfill";
 export async function bundle(options: BundleOptions) {
 	console.clear();
-
 	options = Object.assign(BUNDLE_DEFAULTS, options);
 
-	// for (let poly of Object.values(POLYFILLS)) {
-	// 	if (typeof poly === "object") {
-	// 		await addDependency((poly as any).package);
-	// 	} else {
-	// 		await addDependency(poly as string);
-	// 	}
-	// }
-
-	await addDependency("canvas-confetti");
-	// await addDependency("uuid");
 	try {
 		if (!ALLOWED_ENTRY_POINTS_PATTERN.test(options.entry)) {
 			throw new Error(`Invalid entry file: ${options.entry}.`);
@@ -212,7 +172,8 @@ export async function bundle(options: BundleOptions) {
 			let outputPath = path.join(options.output.path, options.output.filename);
 
 			let contentBundle = new Bundle();
-			let sourceMapBundle = combine.create("bundle.js");
+			let sourceMapBundle = combine.create(options.output.filename);
+			let coreModulesBundle: any = [];
 			let prevContentLine = 0;
 
 			for (let asset of graph) {
@@ -231,6 +192,12 @@ export async function bundle(options: BundleOptions) {
 					// [2] - Transform 🎉
 					// Transformation handles the transpilation, polyfills, and core module resolution
 					let transformed = transformAsset(assetContent, asset);
+					for (let dep of transformed.coreModules) {
+						let exists = coreModulesBundle.some((cm: any) => cm.imported === dep.imported)
+						if (!exists) {
+							coreModulesBundle.push(dep);
+						}
+					}
 
 					// Update asset content
 					assetContent = transformed.content;
@@ -240,8 +207,8 @@ export async function bundle(options: BundleOptions) {
 						assetSourceMap.mergeTo(transformed.map);
 					}
 
-					// [4] - Finalize asset chunk with module definitions 🎉
-					let moduleDefined = UMDChunk(assetContent, asset);
+					// [3] - Finalize asset chunk with module definitions 🎉
+					let moduleDefined = chunkUMD(assetContent, asset);
 
 					// Update asset content
 					assetContent = moduleDefined.content;
@@ -251,7 +218,7 @@ export async function bundle(options: BundleOptions) {
 						assetSourceMap.mergeTo(moduleDefined.map);
 					}
 
-					// [5] - Add to bundle 🎉
+					// [4] - Add to bundle 🎉
 					// Add source map to bundle
 					if (options.output.sourceMap) {
 						//	We have to clone the current chunk's source map and bring back its second source content back to asset's original code to prevent the source map combiner from referencing the compiled code in browser's devtools.
@@ -289,8 +256,10 @@ export async function bundle(options: BundleOptions) {
 				}
 			}
 
-			// Finalize bundle
-			let finalBundle = UMDBundle(contentBundle.toString(), {
+			console.log(coreModulesBundle);
+
+			// [5] - Finalize bundle
+			let UMDBundle = finalizeUMD(contentBundle.toString(), {
 				entry: entryId,
 				name: options.output.name,
 			});
@@ -299,12 +268,30 @@ export async function bundle(options: BundleOptions) {
 				convert.fromBase64(sourceMapBundle.base64()).toObject()
 			);
 
-			finalSourceMap.mergeTo(finalBundle.map);
+			finalSourceMap.mergeTo(UMDBundle.map);
+
+			// Import the core modules that was extracted during transformation
+			let importsBundle = new MagicString(UMDBundle.content);
+			for (let coreModule of coreModulesBundle) {
+				let importCode = `import * as ${coreModule.localId} from" ${CDN_HOST + coreModule.imported}";\n`;
+
+				importsBundle.prepend(importCode);
+			}
+
+			finalSourceMap.mergeTo(
+				importsBundle.generateMap({
+					includeContent: true,
+					hires: true,
+				})
+			);
+
+			let finalContent = importsBundle.toString();
+			
 
 			// Optimizations
 			if (options.mode == "production") {
 				let minified = babelMinify(
-					finalBundle.content,
+					finalContent,
 					{
 						mangle: {
 							topLevel: true,
@@ -316,7 +303,7 @@ export async function bundle(options: BundleOptions) {
 					}
 				);
 
-				finalBundle.content = minified.code;
+				finalContent = minified.code;
 
 				if (options.output.sourceMap) {
 					finalSourceMap.mergeTo(minified.map);
@@ -327,7 +314,7 @@ export async function bundle(options: BundleOptions) {
 			if (options.output.sourceMap) {
 				if (options.output.sourceMap === "inline") {
 					// Inline source map
-					finalBundle.content += finalSourceMap.toComment();
+					finalContent += finalSourceMap.toComment();
 				} else {
 					// External source map
 					let sourceMapAsset = await addAsset({
@@ -335,14 +322,14 @@ export async function bundle(options: BundleOptions) {
 						content: finalSourceMap.toString(),
 					});
 
-					finalBundle.content += "\n//# sourceMappingURL=" + sourceMapAsset.id;
+					finalContent += "\n//# sourceMappingURL=" + sourceMapAsset.id;
 				}
 			}
 
 			// Out bundle
 			await addAsset({
 				source: outputPath,
-				content: finalBundle.content,
+				content: finalContent,
 			});
 
 			console.log(vol.toJSON());

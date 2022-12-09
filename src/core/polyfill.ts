@@ -10,16 +10,10 @@ export const POLYFILLS: any = {
 	events: "events/",
 	http: "stream-http",
 	https: "https-browserify",
-	os: {
-		package: "os-browserify",
-		alias: "os-browserify/browser",
-	},
+	os: "os-browserify/browser",
 	path: "path-browserify",
 	punycode: "punycode/",
-	process: {
-		package: "process",
-		alias: "process/browser",
-	},
+	process: "process/browser",
 	querystring: "querystring-es3",
 	stream: "stream-browserify",
 	string_decoder: "string_decoder/",

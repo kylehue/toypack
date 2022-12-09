@@ -13,13 +13,13 @@ import { isLocal, cleanStr } from "@toypack/utils";
 import { BABEL_PARSE_DEFAULTS } from "@toypack/core/ToypackConfig";
 import { POLYFILLS } from "@toypack/core/polyfill";
 export default function transformAsset(content: string, asset: Asset) {
-	console.log(`%c ${asset.id}`, "color: yellow;");
 	// [1] - Transpile
 	let transpiled = babelTransform(content, {
 		sourceType: "module",
 		sourceFileName: asset.id,
 		filename: asset.id,
 		sourceMaps: true,
+		compact: true,
 		presets: ["typescript", "react"],
 		plugins: [availablePlugins["transform-modules-commonjs"]],
 	});
@@ -84,9 +84,6 @@ export default function transformAsset(content: string, asset: Asset) {
 		map: chunkMap,
 		coreModules,
 	};
-
-	console.log(`%c Core Modules: `, "color: green;");
-	console.log(result);
 
 	return result;
 }

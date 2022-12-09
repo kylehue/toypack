@@ -14,16 +14,16 @@ import { Circle } from "../scripts/Circle.js";
 import pkg from "../package";
 // import "../styles/main.css";
 // //import App from "./App.vue";
-import vue1, {createApp, ref as createRef, reactive} from "vue";
-import * as vue2 from "vue";
-import vue3, * as vue4 from "vue";
-import { "reactive" as createReactive } from "vue";
-import { default as vue5 } from "vue";
-import vue6 from "vue";
-import "vue";
+import vue1, {createApp, ref as createRef, reactive} from "vue@3.1";
+import * as vue2 from "vue@3.1";
+import vue3, * as vue4 from "vue@3.1";
+import { "reactive" as createReactive } from "vue@3.1";
+import { default as vue5 } from "vue@3.1";
+import vue6 from "vue@3.1";
+import "vue@3.1";
 import * as path from "path";
 
-console.log(createRef, createApp, reactive, vue2, vue3, vue4, createReactive, vue5, vue6)
+console.log(createRef, createApp, reactive, vue2, vue3, vue4, createReactive, vue5, vue6, path)
 console.log(Circle);
 console.log(pkg);
 export const myPI = PI;`,
@@ -44,6 +44,7 @@ export class Circle {
 	"scripts/Test.js":
 
 `
+import * as os from "os";
 
 
 import "../styles/main.css";
