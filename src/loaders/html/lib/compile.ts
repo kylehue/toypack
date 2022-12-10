@@ -1,6 +1,7 @@
 import { Asset } from "@toypack/loaders/types";
 import { walk } from "./parse";
 import MagicString from "magic-string";
+import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
 
 const HTML_ELEMENT = 1;
 export default async function compile(content: string, asset: Asset) {
@@ -83,7 +84,7 @@ export default async function compile(content: string, asset: Asset) {
 			file: asset.id,
 			includeContent: true,
 			source: asset.id,
-			hires: true,
+			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
 		}),
 	};
 }

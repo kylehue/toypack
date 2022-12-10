@@ -1,4 +1,5 @@
 import { SourceMapData } from "@toypack/core/SourceMap";
+import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
 import { Asset } from "@toypack/loaders/types";
 import MagicString from "magic-string";
 export default async function compile(content: string, asset: Asset) {
@@ -16,7 +17,7 @@ export default async function compile(content: string, asset: Asset) {
 		map: chunk.generateMap({
 			file: asset.id,
 			source: asset.id,
-			hires: true,
+			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
 			includeContent: true,
 		}),
 	};

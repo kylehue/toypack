@@ -10,9 +10,9 @@ for (let [source, content] of Object.entries(sampleCodes)) {
 	});
 }
 
-Toypack.bundle({
+Toypack.defineBundleConfig({
 	mode: "development",
-	entry: "/index.html",
+	entry: "/",
 	output: {
 		path: "./dist/",
 		filename: "test.js",
@@ -21,9 +21,17 @@ Toypack.bundle({
 	},
 });
 
+Toypack.bundle();
+
 setTimeout(() => {
 	//console.log(Toypack.vol.toJSON());
 }, 1000);
+
+(window as any).testcode = (code: string) => {
+	let sandbox = document.createElement("iframe");
+	document.body.appendChild(sandbox);
+	sandbox.srcdoc = `<html><head><script type="module">${code}</script></head><body></body></html>`
+}
 
 //import "./resolve";
 //import "./sourceMaps";

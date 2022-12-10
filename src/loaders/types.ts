@@ -12,11 +12,13 @@ export type ParsedAsset = {
 export type Asset = {
 	id: string;
 	content: string;
+	type: "module" | "stylesheet";
 	data?: ParsedAsset;
 	loader?: Loader;
 	dependencyMap?: any;
 	contentURL?: string;
-	compilationData?: any
+	compilationData?: any;
+	skippable?: boolean;
 };
 
 export type MagicString = {

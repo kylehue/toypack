@@ -16,6 +16,6 @@ export default function parsePackageStr(str: string) {
    
    return {
       name: packageName,
-      version: packageVersion || "latest"
+      version: packageVersion || ""
    }
 }

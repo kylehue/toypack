@@ -3,7 +3,7 @@ export default {
 	"package.json":
 
 `{
-   "main": "src/index",
+   "main": "/",
    "dependencies": {
       "vue": "3.2.0"
    }
@@ -19,9 +19,7 @@ import "../styles/main.css";
 import App from "./App.vue";
 import Comp from "./Comp.vue";
 import {createApp} from "vue";
-import {parse} from "@babel/parser@^1.26.4";
 import * as path from "path";
-
 console.log(createApp, path)
 console.log(Circle);
 console.log(pkg);
@@ -31,7 +29,11 @@ export const myPI = PI;`,
 	"scripts/Circle.js":
 
 `import { PI } from "./PI.js";
-//import "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
+import confetti from "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
+setTimeout(() => {
+   console.log(confetti);
+   confetti();
+}, 1000);
 import "./Test.js"
 export class Circle {
    constructor() {
@@ -171,6 +173,7 @@ body, html, #app {
    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
    <script type="text/javascript" src="src/index.js"></script>
    <link rel="stylesheet" href="styles/main.css"></link>
+   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
    <title>cool website!!!!</title>
    <!-- <script>console.log(123);</script> -->
 </head>

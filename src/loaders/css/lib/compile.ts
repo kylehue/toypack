@@ -47,11 +47,11 @@ if (__stylesheet__.styleSheet){
 
 	// Imports
 	for (let dependency in asset.dependencyMap) {
-		chunk.prepend(`import "${dependency}";\n`);
+		chunk.prepend(`require("${dependency}");\n`);
 	}
 
 	// Exports
-	chunk.append("export {__stylesheet__};")
+	chunk.append("exports.default = __stylesheet__");
 
 	// TODO: Source map support
 	return {
@@ -60,8 +60,6 @@ if (__stylesheet__.styleSheet){
 		map: chunk.generateMap({
 			file: asset.id,
 			source: asset.id,
-			hires: true,
-			includeContent: true,
 		}),
 	};
 }

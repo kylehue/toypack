@@ -7,11 +7,12 @@ import babelTraverse from "@babel/traverse";
 import MagicString from "magic-string";
 import { Asset } from "@toypack/loaders/types";
 import {
-	generateFrom as createSourceMap
+	generateFrom as createSourceMap, SourceMapData
 } from "@toypack/core/SourceMap";
-import { isLocal, cleanStr, parsePackageStr } from "@toypack/utils";
+import { isLocal, cleanStr, parsePackageStr, uuid, isURL } from "@toypack/utils";
 import { BABEL_PARSE_DEFAULTS } from "@toypack/core/ToypackConfig";
 import { POLYFILLS } from "@toypack/core/polyfill";
+import { BUNDLE_CONFIG } from "./Toypack";
 export default function transformAsset(content: string, asset: Asset) {
 	// [1] - Transpile
 	let transpiled = babelTransform(content, {
@@ -19,15 +20,20 @@ export default function transformAsset(content: string, asset: Asset) {
 		sourceFileName: asset.id,
 		filename: asset.id,
 		sourceMaps: true,
-		compact: true,
+		compact: false,
 		presets: ["typescript", "react"],
-		plugins: [availablePlugins["transform-modules-commonjs"]],
+		plugins: [availablePlugins["transform-modules-commonjs"]]
 	});
 
 	// Instantiate content and source map
 	let chunkContent = transpiled.code;
+
 	let chunkMap = createSourceMap(transpiled.map);
 
+	let fixedChunk = new MagicString(chunkContent);
+	let coreModules: any = [];
+
+	// [2] - Replace requires & polyfills
 	// Parse
 	let AST = babelParse(chunkContent, {
 		sourceType: "script",
@@ -36,18 +42,24 @@ export default function transformAsset(content: string, asset: Asset) {
 		...BABEL_PARSE_DEFAULTS,
 	});
 
-	// [2] - Replace requires & polyfills
-	let fixedChunk = new MagicString(chunkContent);
-	let coreModules: any = [];
-
 	babelTraverse(AST, {
-		CallExpression: (dir: any) => {
-			let node = dir.node;
+		Identifier: ({node}:any) => {
+			// Replace identifiers that begins with `__toypack_` to something else to avoid collisions
+			if (node.name.startsWith("__toypack_")) {
+				fixedChunk.update(
+					node.start,
+					node.end,
+					node.name.replace("__toypack_", "__toypack_$_")
+				);
+			}
+		},
+		CallExpression: ({node}:any) => {
 			if (node.callee.name == "require" && node.arguments.length) {
 				let id = node.arguments[0].value;
 
 				if (
 					!isLocal(id) &&
+					!isURL(id) &&
 					!coreModules.some((cm: any) => cm.imported === id)
 				) {
 					let localId = `__toypack_dep_${cleanStr(id)}__`;
@@ -63,7 +75,7 @@ export default function transformAsset(content: string, asset: Asset) {
 					coreModules.push({
 						imported: id,
 						localId,
-						parsed: parsePackageStr(id)
+						parsed: parsePackageStr(id),
 					});
 				}
 			}
@@ -75,7 +87,7 @@ export default function transformAsset(content: string, asset: Asset) {
 		file: asset.id,
 		source: asset.id,
 		includeContent: true,
-		hires: true,
+		hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
 	});
 
 	chunkMap.mergeTo(fixedChunkMap);

@@ -1,5 +1,3 @@
-import MagicString from "magic-string";
-
 export const POLYFILLS: any = {
 	assert: "assert/",
 	buffer: "buffer/",
@@ -25,43 +23,3 @@ export const POLYFILLS: any = {
 	vm: "vm-browserify",
 	zlib: "browserify-zlib",
 };
-
-import { parse } from "@babel/parser";
-import { transformFromAst } from "@babel/standalone";
-import traverse from "@babel/traverse";
-
-export default function polyfill(content: string, asset: any) {
-	let AST = parse(content, {
-		errorRecovery: true,
-	});
-
-	traverse(AST, {
-		CallExpression: (dir: any) => {
-			if (dir.node.callee.name == "require" && dir.node.arguments.length) {
-				let id = dir.node.arguments[0].value;
-
-            if (id in POLYFILLS) {
-               let poly = POLYFILLS[id];
-
-               if (typeof poly === "object") {
-                  dir.node.arguments[0].value = poly.alias;
-               } else {
-                  dir.node.arguments[0].value = poly;
-               }
-				}
-			}
-		},
-	});
-
-	let back = transformFromAst(AST, content, {
-		sourceMaps: true,
-		sourceFileName: asset.id,
-		compact: false,
-		filename: asset.id,
-   });
-
-   return {
-      content: back.code,
-      map: back.map
-   }
-}

@@ -1,6 +1,7 @@
+import { Asset } from "@toypack/loaders/types";
 import MagicString from "magic-string";
 
-export function transformChunk(content: string, asset: any) {
+export function transformChunk(content: string, asset: Asset) {
 	let chunk = new MagicString(content);
 	chunk.indent();
 	chunk.prepend(`init: function(module, exports, require) {\n`);
@@ -13,14 +14,15 @@ export function transformChunk(content: string, asset: any) {
 		content: chunk.toString(),
 		map: chunk.generateMap({
 			file: asset.id,
-			includeContent: true,
 			source: asset.id,
-			hires: true,
+			includeContent: asset.type == "module",
+			hires: asset.type == "module",
 		}),
 	};
 }
 
 import { parse as parsePath } from "path";
+import { BUNDLE_CONFIG } from "../Toypack";
 
 export function transformBundle(content: string, options: any) {
 	let bundle = new MagicString(content);
@@ -69,7 +71,7 @@ export function transformBundle(content: string, options: any) {
 			file: "bundle.js",
 			source: "bundle.js",
 			includeContent: true,
-			hires: true,
+			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
 		}),
 	};
 }
