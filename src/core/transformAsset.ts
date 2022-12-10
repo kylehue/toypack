@@ -9,7 +9,7 @@ import { Asset } from "@toypack/loaders/types";
 import {
 	generateFrom as createSourceMap
 } from "@toypack/core/SourceMap";
-import { isLocal, cleanStr } from "@toypack/utils";
+import { isLocal, cleanStr, parsePackageStr } from "@toypack/utils";
 import { BABEL_PARSE_DEFAULTS } from "@toypack/core/ToypackConfig";
 import { POLYFILLS } from "@toypack/core/polyfill";
 export default function transformAsset(content: string, asset: Asset) {
@@ -63,6 +63,7 @@ export default function transformAsset(content: string, asset: Asset) {
 					coreModules.push({
 						imported: id,
 						localId,
+						parsed: parsePackageStr(id)
 					});
 				}
 			}

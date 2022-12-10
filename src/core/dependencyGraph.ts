@@ -83,10 +83,10 @@ export default async function createDependencyGraph(entryId: string) {
 							dependencyAbsolutePath = dependency;
                   }
                   
+						// Add to dependency map
                   ASSET.dependencyMap[dependency] = dependencyAbsolutePath;
 
 						// Check if it exists in the graph already before scanning to avoid duplicates
-						// Scanning is also adding because we're in a recursive function
 						let isScanned = graph.some(
 							(p: any) => p.id == dependencyAbsolutePath
 						);

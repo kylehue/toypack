@@ -19,6 +19,7 @@ import "../styles/main.css";
 import App from "./App.vue";
 import Comp from "./Comp.vue";
 import {createApp} from "vue";
+import {parse} from "@babel/parser@^1.26.4";
 import * as path from "path";
 
 console.log(createApp, path)

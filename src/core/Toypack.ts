@@ -16,7 +16,7 @@ import {
 } from "@toypack/core/globals";
 import { BUNDLE_DEFAULTS, BundleOptions } from "@toypack/core/ToypackConfig";
 import { Loader, Asset } from "@toypack/loaders/types";
-import { isURL } from "@toypack/utils";
+import { isURL, parsePackageStr } from "@toypack/utils";
 import { generateFrom as createSourceMap } from "@toypack/core/SourceMap";
 import {
 	transformChunk as chunkUMD,
@@ -115,7 +115,12 @@ export async function addAsset(options: AssetOptions) {
 			})
 		);
 
-		CACHED_ASSETS.set(assetID, data);
+		// If cached, merge cached and new data
+		if (cached) {
+			CACHED_ASSETS.set(assetID, Object.assign(cached, data));
+		} else { 
+			CACHED_ASSETS.set(assetID, data);
+		}
 	}
 
 	return data;
@@ -161,6 +166,48 @@ export async function bundle(options: BundleOptions) {
 			let prevContentLine = 0;
 
 			for (let asset of graph) {
+				// Check cache
+				let cached = CACHED_ASSETS.get(asset.id);
+
+				// If asset content didn't change
+				if (cached?.content === asset.content && cached.compilationData) {
+					let content = cached.compilationData.content;
+
+					// [2] - Core module filtration
+					for (let dep of cached.compilationData.coreModules) {
+						let exists = coreModulesBundle.some(
+							(cm: any) => cm.imported === dep.imported
+						);
+
+						if (!exists) {
+							coreModulesBundle.push(dep);
+						}
+					}
+
+					// [4] - Add source map to bundle
+					contentBundle.addSource({
+						filename: asset.id,
+						content: new MagicString(content),
+					});
+
+					sourceMapBundle.addFile(
+						{
+							source: cached.compilationData.map.toComment(),
+							sourceFile: asset.id,
+						},
+						{
+							line: prevContentLine,
+						}
+					);
+
+					// Offset source map
+					prevContentLine += content.split("\n").length;
+					console.log("cached!");
+
+					// Then skip
+					continue;
+				}
+
 				// Check if asset has a loader
 				if (asset.loader) {
 					// [1] - Compile to JS using a loader 🎉
@@ -206,11 +253,12 @@ export async function bundle(options: BundleOptions) {
 
 					// [4] - Add to bundle 🎉
 					// Add source map to bundle
+					let originalMappings: any = null;
 					if (options.output.sourceMap) {
 						//	We have to clone the current chunk's source map and bring back its second source content back to asset's original code to prevent the source map combiner from referencing the compiled code in browser's devtools.
 
 						// Clone
-						let originalMappings = createSourceMap(assetSourceMap);
+						originalMappings = createSourceMap(assetSourceMap);
 
 						// Back to original contents
 						originalMappings.sourcesContent[1] = asset.content;
@@ -231,10 +279,23 @@ export async function bundle(options: BundleOptions) {
 					}
 
 					// Add contents to bundle
-					contentBundle.addSource({
+					let assetData = {
 						filename: asset.id,
 						content: new MagicString(assetContent),
-					});
+					};
+
+					contentBundle.addSource(assetData);
+
+					// Cache
+					let cacheData = {
+						content: assetData.content.toString(),
+						map: originalMappings,
+						coreModules: transformed.coreModules,
+					};
+
+					if (cached) {
+						cached.compilationData = cacheData;
+					}
 				} else {
 					throw new Error(
 						`${asset.id} is not supported. You might want to add a loader for this file type.`
@@ -258,9 +319,14 @@ export async function bundle(options: BundleOptions) {
 			let importsBundle = new MagicString(UMDBundle.content);
 			for (let coreModule of coreModulesBundle) {
 				// Check package.json for version
-				let id = coreModule.imported.split("@")[0];
-				if (id in packageJSON.dependencies) {
-					coreModule.imported = `${id}@${packageJSON.dependencies[id]}`;
+				if (coreModule.parsed.name in packageJSON.dependencies) {
+					let versionFromPackageJSON = packageJSON.dependencies[coreModule.parsed.name];
+					coreModule.imported = coreModule.parsed.name.replace(
+						coreModule.parsed.name,
+						`${coreModule.parsed.name}@${versionFromPackageJSON}`
+					);
+
+					coreModule.usedVersion = versionFromPackageJSON;
 				}
 
 				let importCode = `import * as ${coreModule.localId} from "${
@@ -270,6 +336,25 @@ export async function bundle(options: BundleOptions) {
 				importsBundle.prepend(importCode);
 			}
 
+			// Update package.json
+			let coreModulesJSON = coreModulesBundle.reduce((acc: any, cur: any) => {
+				acc[cur.parsed.name] = cur.usedVersion || cur.parsed.version;
+				return acc;
+			}, {});
+
+			addAsset({
+				source: "/package.json",
+				content: JSON.stringify(
+					Object.assign(packageJSON, {
+						dependencies: {
+							...packageJSON.dependencies,
+							...coreModulesJSON,
+						},
+					})
+				),
+			});
+
+			// Finalize content
 			finalSourceMap.mergeTo(
 				importsBundle.generateMap({
 					includeContent: true,
@@ -333,6 +418,8 @@ export async function bundle(options: BundleOptions) {
 		console.error(error);
 	}
 }
+
+(window as any).bundle = bundle;
 
 /* type WatchCallback = (bundle: string) => void;
 

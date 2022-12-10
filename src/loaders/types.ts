@@ -16,6 +16,7 @@ export type Asset = {
 	loader?: Loader;
 	dependencyMap?: any;
 	contentURL?: string;
+	compilationData?: any
 };
 
 export type MagicString = {
