@@ -46,13 +46,13 @@ export class Circle {
 
 `
 import * as os from "os";
-
+import img from "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Image_created_with_a_mobile_phone.png/640px-Image_created_with_a_mobile_phone.png";
 
 import "../styles/main.css";
 import {PI} from "./PI.js";
 import {num} from "./samplets.ts";
 
-
+console.log(img);
 console.log(PI, num);
 
 
@@ -75,7 +75,7 @@ console.log(num);`,
 	"scripts/PI.js":
 
 `
-import "./Test.js";
+//import "./Test.js";
 
 
 
@@ -133,13 +133,13 @@ export default {
 </style>`,
 
 	// prettier-ignore
-	"styles/mixins.scss":
+	/* "styles/mixins.scss":
 
 `@mixin flex {
    display: flex;
    flex-direction: row;
    align-items: center;
-}`,
+}`, */
 
 	// prettier-ignore
 	"styles/colors.css":

@@ -14,7 +14,7 @@ import {
 import MagicString from "magic-string";
 import { uuid } from "@toypack/utils";
 import * as test from "@vue/compiler-sfc";
-import { generateFrom as createSourceMap } from "@toypack/core/SourceMap";
+import { createSourceMap as createSourceMap } from "@toypack/core/SourceMap";
 const COMP_NAME = "__sfc__";
 
 function getScript(descriptor: SFCDescriptor, scopeId: string, source: string) {
@@ -113,7 +113,7 @@ function getScript(descriptor: SFCDescriptor, scopeId: string, source: string) {
 
 	return {
 		content: scriptContent,
-		map: sourceMap.mergeTo(scriptMap),
+		map: sourceMap.mergeWith(scriptMap),
 	};
 }
 

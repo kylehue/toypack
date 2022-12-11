@@ -23,7 +23,7 @@
 		"outDir": "lib",
 		"declaration": true,
 		"declarationDir": "lib",
-		"experimentalDecorators": false
+		"noImplicitAny": false
 	},
 	"include": ["./src/**/*.ts"]
 }

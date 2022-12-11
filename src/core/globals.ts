@@ -4,7 +4,7 @@ export const ALLOWED_ENTRY_POINTS_PATTERN = /\.(html|[jt]sx?|vue)$/;
 // js, jsx, ts, tsx, vue, css, sass, scss, less
 export const ALLOWED_MODULE_IMPORTS_PATTERN = /\.([jt]sx?|json|vue|s?[ac]ss|less)$/;
 
-export const MIME_TYPES: any = {
+export const MIME_TYPES: object = {
 	".abs": "audio/x-mpeg",
 	".ai": "application/postscript",
 	".aif": "audio/x-aiff",
@@ -182,4 +182,11 @@ export const MIME_TYPES: any = {
 	".wspolicy": "application/wspolicy+xml",
 	".z": "application/x-compress",
 	".zip": "application/zip",
-};
+	".scss": "text/css",
+	".sass": "text/css",
+	".less": "text/css",
+	".vue": "application/javascript",
+	".ts": "application/javascript",
+	".tsx": "application/javascript",
+	".jsx": "application/javascript",
+} as const;

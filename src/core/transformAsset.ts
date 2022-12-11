@@ -7,18 +7,18 @@ import babelTraverse from "@babel/traverse";
 import MagicString from "magic-string";
 import { Asset } from "@toypack/loaders/types";
 import {
-	generateFrom as createSourceMap, SourceMapData
+	createSourceMap as createSourceMap, SourceMapData
 } from "@toypack/core/SourceMap";
 import { isLocal, cleanStr, parsePackageStr, uuid, isURL } from "@toypack/utils";
 import { BABEL_PARSE_DEFAULTS } from "@toypack/core/ToypackConfig";
 import { POLYFILLS } from "@toypack/core/polyfill";
 import { BUNDLE_CONFIG } from "./Toypack";
-export default function transformAsset(content: string, asset: Asset) {
+export default function transformAsset(content: string, source: string) {
 	// [1] - Transpile
 	let transpiled = babelTransform(content, {
 		sourceType: "module",
-		sourceFileName: asset.id,
-		filename: asset.id,
+		sourceFileName: source,
+		filename: source,
 		sourceMaps: true,
 		compact: false,
 		presets: ["typescript", "react"],
@@ -33,11 +33,11 @@ export default function transformAsset(content: string, asset: Asset) {
 	let fixedChunk = new MagicString(chunkContent);
 	let coreModules: any = [];
 
-	// [2] - Replace requires & polyfills
+	// [2] - Replace requires & do polyfills
 	// Parse
 	let AST = babelParse(chunkContent, {
 		sourceType: "script",
-		sourceFilename: asset.id,
+		sourceFilename: source,
 		plugins: ["typescript", "jsx"],
 		...BABEL_PARSE_DEFAULTS,
 	});
@@ -62,19 +62,19 @@ export default function transformAsset(content: string, asset: Asset) {
 					!isURL(id) &&
 					!coreModules.some((cm: any) => cm.imported === id)
 				) {
-					let localId = `__toypack_dep_${cleanStr(id)}__`;
+					let name = `__toypack_dep_${cleanStr(id)}__`;
 
 					if (id in POLYFILLS) {
 						id = POLYFILLS[id];
-						localId = `__toypack_dep_${cleanStr(id)}__`;
-						fixedChunk.update(node.start, node.end, localId);
+						name = `__toypack_dep_${cleanStr(id)}__`;
+						fixedChunk.update(node.start, node.end, name);
 					} else {
-						fixedChunk.update(node.start, node.end, localId);
+						fixedChunk.update(node.start, node.end, name);
 					}
 
 					coreModules.push({
 						imported: id,
-						localId,
+						name,
 						parsed: parsePackageStr(id),
 					});
 				}
@@ -84,13 +84,13 @@ export default function transformAsset(content: string, asset: Asset) {
 
 	chunkContent = fixedChunk.toString();
 	let fixedChunkMap = fixedChunk.generateMap({
-		file: asset.id,
-		source: asset.id,
+		file: source,
+		source: source,
 		includeContent: true,
 		hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
 	});
 
-	chunkMap.mergeTo(fixedChunkMap);
+	chunkMap.mergeWith(fixedChunkMap);
 
 	let result = {
 		content: chunkContent as string,

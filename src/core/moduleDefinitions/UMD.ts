@@ -5,7 +5,7 @@ export function transformChunk(content: string, asset: Asset) {
 	let chunk = new MagicString(content);
 	chunk.indent();
 	chunk.prepend(`init: function(module, exports, require) {\n`);
-	chunk.prepend(`"${asset.id}": {\n`);
+	chunk.prepend(`${asset.id}: {\n`);
 	chunk.append(`\n},`);
 	chunk.append(`\nmap: ${JSON.stringify(asset.dependencyMap)}`);
 	chunk.append(`\n},`);
@@ -13,10 +13,10 @@ export function transformChunk(content: string, asset: Asset) {
 	return {
 		content: chunk.toString(),
 		map: chunk.generateMap({
-			file: asset.id,
-			source: asset.id,
-			includeContent: asset.type == "module",
-			hires: asset.type == "module",
+			file: asset.source,
+			source: asset.source,
+			includeContent: true,
+			hires: true,
 		}),
 	};
 }
@@ -27,7 +27,7 @@ import { BUNDLE_CONFIG } from "../Toypack";
 export function transformBundle(content: string, options: any) {
 	let bundle = new MagicString(content);
 	bundle.indent().prepend("{\n").append("\n}");
-	let name = options.name || parsePath(options.entry).name;
+	let name = options.name || parsePath(options.entrySource).name;
 	bundle.prepend(`
 (function(root, factory) {
    if (typeof exports === "object" && typeof module === "object") {
@@ -43,12 +43,12 @@ export function transformBundle(content: string, options: any) {
    var __modules__ = `).append(`;
    /* Require function */
    const __moduleCache__ = {};
-   function __require__(modulePath) {
-      const __asset__ = __modules__[modulePath];
-      if (!__asset__) throw new Error("Could not resolve " + modulePath);
+   function __require__(assetId) {
+      const __asset__ = __modules__[assetId];
+      if (!__asset__) throw new Error("Could not resolve " + assetId);
       const { init, map } = __asset__;
       const __module__ = { exports: {} };
-      __moduleCache__[modulePath] = __module__.exports;
+      __moduleCache__[assetId] = __module__.exports;
       function localRequire(assetRelativePath) {
          if (!__moduleCache__[map[assetRelativePath]]) {
             __moduleCache__[map[assetRelativePath]] = __module__.exports;
@@ -62,7 +62,7 @@ export function transformBundle(content: string, options: any) {
       return __module__.exports;
    }
    /* Start */
-   return __require__("${options.entry}");
+   return __require__(${options.entryId});
 });
 `);
 	return {

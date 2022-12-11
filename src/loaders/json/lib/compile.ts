@@ -8,8 +8,8 @@ export default async function compile(content: string, asset: Asset) {
 
 	return {
 		map: chunk.generateMap({
-			file: asset.id,
-			source: asset.id,
+			file: asset.source,
+			source: asset.source,
 			includeContent: true,
 		}),
 		content: chunk.toString(),

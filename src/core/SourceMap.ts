@@ -38,7 +38,7 @@ class SourceMap implements SourceMapData {
 		return "data:application/json;charset=utf-8;base64," + base64;
 	}
 
-	mergeTo(generated: any) {
+	mergeWith(generated: any) {
 		let merged = merge(this, generated);
 
 		for (let [key, value] of Object.entries(merged)) {
@@ -49,7 +49,7 @@ class SourceMap implements SourceMapData {
 	}
 }
 
-export function generateFrom(sourceMap: any) {
+export function createSourceMap(sourceMap: any) {
 	let generated = new SourceMap();
 
 	for (let [key, value] of Object.entries(sourceMap)) {
@@ -60,10 +60,10 @@ export function generateFrom(sourceMap: any) {
 }
 
 export function merge(original: any, generated: any) {
-	original = generateFrom(original);
-	generated = generateFrom(generated);
+	original = createSourceMap(original);
+	generated = createSourceMap(generated);
 
 	let merged = mergeSourceMap(original, generated);
 
-	return generateFrom(merged);
+	return createSourceMap(merged);
 }

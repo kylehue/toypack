@@ -4,10 +4,7 @@ import sampleCodes from "./sampleCodes";
 //console.log(Toypack);
 // Add assets
 for (let [source, content] of Object.entries(sampleCodes)) {
-	Toypack.addAsset({
-		source,
-		content,
-	});
+	Toypack.addAsset(source, content);
 }
 
 Toypack.defineBundleConfig({

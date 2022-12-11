@@ -81,9 +81,9 @@ export default async function compile(content: string, asset: Asset) {
 		content: chunk.toString(),
 		// Temporarily add a poorly generated source map
 		map: chunk.generateMap({
-			file: asset.id,
+			file: asset.source,
 			includeContent: true,
-			source: asset.id,
+			source: asset.source,
 			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
 		}),
 	};

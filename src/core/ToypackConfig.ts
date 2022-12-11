@@ -53,7 +53,7 @@ export const BUNDLE_DEFAULTS: BundleConfig = {
 		sourceMap: true,
 		name: "",
 		contentURL: true,
-		optimizeSourceMap: false
+		optimizeSourceMap: false,
 	},
 };
 

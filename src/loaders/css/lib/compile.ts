@@ -3,18 +3,16 @@ import MagicString from "magic-string";
 import autoprefixer from "autoprefixer";
 import postcss from "postcss";
 export default async function compile(content: string, asset: Asset) {
-	if (!asset.data) {
-		console.error("Compilation Error: Asset's data is empty. Make sure that you're returning a <ParsedAsset> data when parsing.");
-		return;
+	let chunkContent = asset.data ? asset.data.AST.toString() : content;
+
+	if (asset.data) {
+		chunkContent = await postcss([autoprefixer]).process(chunkContent).css;
 	}
 
-	let fromAST = asset.data.AST.toString();
-	let transpiled = await postcss([autoprefixer]).process(fromAST).css;
-
 	let styleContent = "let __styleContent__ = \"\"";
-	for (let line of transpiled.split("\n")) {
+	for (let line of chunkContent.split("\n")) {
 		// Escape quotes
-		line = line.replaceAll("\"", "\\\"");
+		line = line.replaceAll('"', '\\"');
 		styleContent += `.concat("${line}")`;
 	}
 
@@ -28,7 +26,7 @@ export default async function compile(content: string, asset: Asset) {
 			`
 let __head__ = document.head || document.getElementsByTagName("head")[0];
 __stylesheet__ = document.createElement("style");
-__stylesheet__.dataset.toypackId = "${asset.id}";
+__stylesheet__.dataset.toypackId = "${asset.source}";
 __stylesheet__.setAttribute("type", "text/css");
 __head__.appendChild(__stylesheet__);
 
@@ -43,7 +41,7 @@ if (__stylesheet__.styleSheet){
 	// Avoid style duplicates
 	chunk.indent("\t").prepend(`if (!__stylesheet__) {\n`).append("\n}");
 	
-	chunk.prepend(`let __stylesheet__ = document.querySelector("[data-toypack-id~='${asset.id}']");`);
+	chunk.prepend(`let __stylesheet__ = document.querySelector("[data-toypack-id~='${asset.source}']");`);
 
 	// Imports
 	for (let dependency in asset.dependencyMap) {
@@ -58,8 +56,8 @@ if (__stylesheet__.styleSheet){
 		content: chunk.toString(),
 		// Temporarily add a poorly generated source map
 		map: chunk.generateMap({
-			file: asset.id,
-			source: asset.id,
+			file: asset.source,
+			source: asset.source,
 		}),
 	};
 }
