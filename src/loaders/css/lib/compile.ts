@@ -2,14 +2,21 @@ import { Asset } from "@toypack/loaders/types";
 import MagicString from "magic-string";
 import autoprefixer from "autoprefixer";
 import postcss from "postcss";
-export default async function compile(content: string, asset: Asset) {
+import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
+async function compile(content: string | Uint8Array, asset: Asset) {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "CSS Compile Error: ";
+		throw error;
+	}
+
 	let chunkContent = asset.data ? asset.data.AST.toString() : content;
 
 	if (asset.data) {
 		chunkContent = await postcss([autoprefixer]).process(chunkContent).css;
 	}
 
-	let styleContent = "let __styleContent__ = \"\"";
+	let styleContent = 'let __styleContent__ = ""';
 	for (let line of chunkContent.split("\n")) {
 		// Escape quotes
 		line = line.replaceAll('"', '\\"');
@@ -21,9 +28,8 @@ export default async function compile(content: string, asset: Asset) {
 	// For dummy source map
 	chunk.update(0, chunk.length(), styleContent);
 
-	chunk
-		.append(
-			`
+	chunk.append(
+		`
 let __head__ = document.head || document.getElementsByTagName("head")[0];
 __stylesheet__ = document.createElement("style");
 __stylesheet__.dataset.toypackId = "${asset.source}";
@@ -36,12 +42,14 @@ if (__stylesheet__.styleSheet){
   __stylesheet__.appendChild(document.createTextNode(__styleContent__));
 }
 `
-		);
+	);
 
 	// Avoid style duplicates
 	chunk.indent("\t").prepend(`if (!__stylesheet__) {\n`).append("\n}");
-	
-	chunk.prepend(`let __stylesheet__ = document.querySelector("[data-toypack-id~='${asset.source}']");`);
+
+	chunk.prepend(
+		`let __stylesheet__ = document.querySelector("[data-toypack-id~='${asset.source}']");`
+	);
 
 	// Imports
 	for (let dependency in asset.dependencyMap) {
@@ -49,15 +57,21 @@ if (__stylesheet__.styleSheet){
 	}
 
 	// Exports
-	chunk.append("exports.default = __stylesheet__");
+	chunk.append("module.exports = __stylesheet__");
 
 	// TODO: Source map support
 	return {
 		content: chunk.toString(),
 		// Temporarily add a poorly generated source map
-		map: chunk.generateMap({
-			file: asset.source,
-			source: asset.source,
-		}),
+		map: BUNDLE_CONFIG.output.sourceMap
+			? chunk.generateMap({
+					file: asset.source,
+					source: asset.source,
+					includeContent: false,
+					hires: false,
+			  })
+			: {},
 	};
 }
+
+export default compile;

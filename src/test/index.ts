@@ -13,7 +13,7 @@ Toypack.defineBundleConfig({
 	output: {
 		path: "./dist/",
 		filename: "test.js",
-		sourceMap: "inline",
+		sourceMap: true,
 		name: "MyLibrary"
 	},
 });

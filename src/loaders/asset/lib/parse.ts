@@ -1,6 +1,6 @@
 import { ParsedAsset } from "@toypack/loaders/types";
 
-export default function parse(content: string, source: string) {
+function parse(content: string | Uint8Array, source: string) {
 	const result: ParsedAsset = {
 		AST: [],
 		dependencies: [],
@@ -8,3 +8,5 @@ export default function parse(content: string, source: string) {
 
 	return result;
 }
+
+export default parse;

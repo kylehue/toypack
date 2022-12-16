@@ -19,15 +19,19 @@ export function walk(AST: any, callback: WalkCallback) {
 	traverse(AST.childNodes);
 }
 
-export default function parse(content: string, source: string): ParsedAsset {
+function parse(content: string | Uint8Array, source: string): ParsedAsset {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "HTML Parse Error: ";
+		throw error;
+	}
+
 	const AST = parseHTML(content);
 
 	const result: ParsedAsset = {
 		AST,
 		dependencies: [],
-		metadata: {
-
-		}
+		metadata: {},
 	};
 
 	function addToDependencies(id: string) {
@@ -77,3 +81,5 @@ export default function parse(content: string, source: string): ParsedAsset {
 
 	return result;
 }
+
+export default parse;

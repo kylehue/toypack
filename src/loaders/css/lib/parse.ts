@@ -4,12 +4,18 @@ import valueParser from "postcss-value-parser";
 import { isURL } from "@toypack/utils";
 const URL_RE = /url\s*\("?(?![a-z]+:)/;
 
-export default function parse(content: string, source: string): ParsedAsset {
+function parse(content: string | Uint8Array, source: string): ParsedAsset {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "CSS Parse Error: ";
+		throw error;
+	}
+
 	const AST = parseCSS(content);
 
 	const result: ParsedAsset = {
 		AST,
-		dependencies: []
+		dependencies: [],
 	};
 
 	let lastId = 0;
@@ -62,3 +68,5 @@ export default function parse(content: string, source: string): ParsedAsset {
 
 	return result;
 }
+
+export default parse;

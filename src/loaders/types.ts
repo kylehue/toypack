@@ -14,12 +14,12 @@ export type Asset = {
 	content: string | Uint8Array;
 	type: string;
 	loader: Loader;
+	blob: Blob;
 	data?: ParsedAsset;
 	dependencyMap?: any;
 	contentURL?: string;
 	compilationData?: any;
 	skippable?: boolean;
-	blob: Blob;
 };
 
 type CompiledAsset = {
@@ -28,7 +28,7 @@ type CompiledAsset = {
 };
 
 type LoaderMethod = {
-	compile: (content: string, asset: Asset) => Promise<CompiledAsset>;
+	compile: (content: string | Uint8Array, asset: Asset) => Promise<CompiledAsset>;
 	parse: (content: string, source: string) => ParsedAsset;
 };
 

@@ -4,12 +4,12 @@ import resolve from "resolve";
 import createDependencyGraph from "@toypack/core/dependencyGraph";
 import transformAsset from "@toypack/core/transformAsset";
 import {
+	AssetLoader,
 	HTMLLoader,
 	CSSLoader,
 	BabelLoader,
 	JSONLoader,
 	VueLoader,
-	AssetLoader,
 } from "@toypack/loaders";
 import {
 	ALLOWED_ENTRY_POINTS_PATTERN,
@@ -26,6 +26,11 @@ import {
 import MagicString, { Bundle } from "magic-string";
 import combine from "combine-source-map";
 import convert from "convert-source-map";
+import {
+	SourceMapGenerator,
+	SourceMapConsumer,
+	RawSourceMap,
+} from "source-map";
 import babelMinify from "babel-minify";
 import merge from "lodash.merge";
 import cloneDeep from "lodash.clonedeep";
@@ -73,8 +78,6 @@ export async function addAsset(source: string, content?: string | Uint8Array) {
 	// If cached asset and new content is the same, just return the cached asset
 	let cachedAsset = CACHED_ASSETS.get(assetSource);
 	if (cachedAsset && content == cachedAsset.content) {
-		console.log(cachedAsset);
-
 		return cachedAsset;
 	}
 
@@ -252,7 +255,270 @@ let prevContentDocURL: any;
  * Bundle your assets starting from the entry point.
  * @returns {BundleResult} A bundle result.
  */
-export async function bundle(): Promise<BundleResult> {
+export async function bundle() {
+	console.clear();
+	console.time("Total bundle time");
+	if (
+		!ALLOWED_ENTRY_POINTS_PATTERN.test(BUNDLE_CONFIG.entry) &&
+		path.extname(BUNDLE_CONFIG.entry)
+	) {
+		let error = new Error(`Invalid entry file ${BUNDLE_CONFIG.entry}.`);
+		error.stack = "Bundle Error: ";
+		throw error;
+	}
+
+	let bundleResult: BundleResult = {
+		content: "",
+		contentURL: null,
+		contentDocURL: null,
+	};
+
+	let entrySource = resolve.sync(BUNDLE_CONFIG.entry, {
+		basedir: ".",
+		extensions: RESOLVE_PRIORITY,
+		includeCoreModules: false,
+	});
+
+	let entryId = CACHED_ASSETS.get(entrySource)?.id;
+
+	let graph = await createDependencyGraph(entrySource);
+	let contentBundle = new Bundle();
+	let sourceMapBundle = combine.create(BUNDLE_CONFIG.output.filename);
+	let prevContentLines = 0;
+
+	let usedCoreModules: any = [];
+
+	const addCoreModules = (coreModules: any) => {
+		if (coreModules) {
+			for (let chunkCoreModule of coreModules) {
+				let isAdded = usedCoreModules.some(
+					(ucm: any) => ucm.imported === chunkCoreModule.imported
+				);
+				if (!isAdded) {
+					usedCoreModules.push(chunkCoreModule);
+				}
+			}
+		}
+	}
+
+	const addSourceMap = (sourceMap: SourceMapData | null, asset: Asset, offset: number = 0) => {
+		if (sourceMap) {
+			if (typeof asset.content == "string") {
+				// Back to original contents
+				sourceMap.sourcesContent[1] = asset.content;
+			}
+
+			// Add source map to bundle
+			sourceMapBundle.addFile(
+				{
+					source: sourceMap.toComment(),
+					sourceFile: asset.source,
+				},
+				{
+					line: prevContentLines,
+				}
+			);
+
+			// Offset source map
+			prevContentLines += offset;
+		}
+	}
+
+	for (let i = 0; i < graph.length; i++) {
+		let asset = graph[i];
+		// [0] - Check cache
+		let cached = BUNDLE_CACHE.get(asset.source);
+		// If asset and cached asset contents are the same, skip
+		if (asset.content == cached?.content) {
+			console.log("%c cached: ", "color: gold;", asset.source);
+			// Add contents to bundle
+			let chunkData = {
+				filename: asset.source,
+				content: new MagicString(asset.compilationData.content),
+			};
+
+			contentBundle.addSource(chunkData);
+			addSourceMap(
+				asset.compilationData.map,
+				asset,
+				asset.compilationData.content.split("\n").length
+			);
+			addCoreModules(asset.compilationData.coreModules);
+			continue;
+		} else {
+			BUNDLE_CACHE.set(asset.source, Object.assign({}, asset));
+		}
+
+		console.log("%c compiling: ", "color: red;", asset.source);
+		let isFirst = i === 0;
+		let isLast = i === graph.length - 1;
+
+		let chunkContent = "";
+		let chunkSourceMap: SourceMapData | null = null;
+
+		// [1] - Compile
+		let compiled = await asset.loader.use.compile(asset.content, asset);
+
+		// Update chunk
+		chunkContent = compiled.content;
+		if (BUNDLE_CONFIG.output.sourceMap) {
+			if (!compiled.map) {
+				chunkSourceMap = createSourceMap({
+					file: asset.source,
+					sources: [asset.source],
+					sourcesContent: [asset.content],
+				} as SourceMapData);
+			} else {
+				chunkSourceMap = createSourceMap(compiled.map);
+			}
+		}
+
+		// [2] - Transform
+		let transformed = transformAsset(chunkContent, asset, {
+			isFirst,
+			isLast,
+			entryId,
+		});
+
+		// Update chunk
+		chunkContent = transformed.content;
+
+		if (transformed.map) {
+			chunkSourceMap?.mergeWith(transformed.map);
+		}
+
+		addCoreModules(transformed.coreModules);
+
+		// [3] - Add to bundle
+		// Finalize chunk's source map
+		addSourceMap(chunkSourceMap, asset, chunkContent.split("\n").length);
+
+		// Add contents to bundle
+		let chunkData = {
+			filename: asset.source,
+			content: new MagicString(chunkContent),
+		};
+
+		contentBundle.addSource(chunkData);
+
+		// Add to compilation data for caching
+		asset.compilationData = {
+			content: chunkContent,
+			map: chunkSourceMap,
+			coreModules: transformed.coreModules
+		};
+	}
+
+	// [4] - Bundle
+	let finalSourceMap = BUNDLE_CONFIG.output.sourceMap
+		? createSourceMap(convert.fromBase64(sourceMapBundle.base64()).toObject())
+		: null;
+	let finalContent = contentBundle.toString() + finalSourceMap?.toComment();
+
+	// [5] - Import the core modules that was extracted during transformation
+	let packageJSON: any = CACHED_ASSETS.get("/package.json");
+
+	if (packageJSON?.content) {
+		packageJSON = JSON.parse(packageJSON.content);
+	}
+
+	for (let coreModule of usedCoreModules) {
+		// Check package.json for version
+		if (
+			packageJSON?.dependencies &&
+			coreModule.parsed.name in packageJSON.dependencies
+		) {
+			let packageJSONVersion = packageJSON.dependencies[coreModule.parsed.name];
+
+			// If version is empty, omit the @<version>
+			let newImport = !packageJSONVersion
+				? coreModule.parsed.name
+				: `${coreModule.parsed.name}@${packageJSONVersion}`;
+			coreModule.imported = coreModule.parsed.name.replace(
+				coreModule.parsed.name,
+				newImport
+			);
+
+			coreModule.usedVersion = packageJSONVersion;
+		}
+
+		let importCode = `import * as ${coreModule.name} from "${
+			skypackURL + coreModule.imported
+		}";`;
+
+		finalContent = importCode + finalContent;
+	}
+
+	// Update package.json
+	let coreModulesJSON = usedCoreModules.reduce((acc: any, cur: any) => {
+		acc[cur.parsed.name] = cur.usedVersion || cur.parsed.version;
+		return acc;
+	}, {});
+
+	addAsset(
+		"/package.json",
+		JSON.stringify(
+			Object.assign(packageJSON, {
+				dependencies: {
+					...packageJSON.dependencies,
+					...coreModulesJSON,
+				},
+			})
+		)
+	);
+
+	bundleResult.content = finalContent;
+
+	if (BUNDLE_CONFIG.output.contentURL) {
+		if (prevContentURL) {
+			URL.revokeObjectURL(prevContentURL);
+		}
+
+		let contentURL = URL.createObjectURL(
+			new Blob([finalContent], {
+				type: MIME_TYPES[".js"],
+			})
+		);
+
+		prevContentURL = contentURL;
+
+		// prettier-ignore
+		let contentDoc =
+			// prettier-ignore
+`<!DOCTYPE html>
+<html>
+	<head>
+		<script defer type="module" src="${contentURL}"></script>
+	</head>
+	<body>
+	</body>
+</html>
+`;
+		if (prevContentDocURL) {
+			URL.revokeObjectURL(prevContentDocURL);
+		}
+
+		let contentDocURL = URL.createObjectURL(
+			new Blob([contentDoc], {
+				type: MIME_TYPES[".html"],
+			})
+		);
+
+		prevContentDocURL = contentDocURL;
+
+		bundleResult.contentURL = contentURL;
+		bundleResult.contentDocURL = contentDocURL;
+	}
+
+	console.log(bundleResult);
+
+	console.timeEnd("Total bundle time");
+
+	return bundleResult;
+}
+
+
+/* export async function bundle(): Promise<BundleResult> {
 	console.clear();
 
 	if (
@@ -281,8 +547,10 @@ export async function bundle(): Promise<BundleResult> {
 	let sourceMapBundle = combine.create(BUNDLE_CONFIG.output.filename);
 	let usedCoreModules: any = [];
 	let prevContentLines = 0;
+	let counter = 0;
 
 	for (let asset of graph) {
+		counter++;
 		// [0] - Check cache
 		let cached = BUNDLE_CACHE.get(asset.source);
 
@@ -319,15 +587,17 @@ export async function bundle(): Promise<BundleResult> {
 				content: new MagicString(content),
 			});
 
-			sourceMapBundle.addFile(
-				{
-					source: cached.compilationData.map.toComment(),
-					sourceFile: asset.source,
-				},
-				{
-					line: prevContentLines,
-				}
-			);
+			if (cached.compilationData.map) {
+				sourceMapBundle.addFile(
+					{
+						source: cached.compilationData.map.toComment(),
+						sourceFile: asset.source,
+					},
+					{
+						line: prevContentLines,
+					}
+				);
+			}
 
 			// Offset source map
 			prevContentLines += content.split("\n").length;
@@ -378,7 +648,12 @@ export async function bundle(): Promise<BundleResult> {
 			chunkMap?.mergeWith(transformed.map);
 
 			// [3] - Module definition
-			let moduleDefined = chunkUMD(chunkContent, asset);
+			let moduleDefined = chunkUMD(chunkContent, asset, {
+				isFirst: counter === 1,
+				isLast: counter === graph.length,
+				entryId: CACHED_ASSETS.get(entryId)?.id,
+				name: BUNDLE_CONFIG.output.name,
+			});
 
 			// Update chunk
 			chunkContent = moduleDefined.content;
@@ -426,7 +701,7 @@ export async function bundle(): Promise<BundleResult> {
 
 			BUNDLE_CACHE.set(asset.source, Object.assign({}, asset));
 		} else if (isBlob || isExternalScript) {
-			// Technically the same procedure above but without source maps and transformations
+			// Technically the same procedure as above but without source maps and transformations
 			let compiled: any = null;
 
 			if (isExternalScript && typeof asset.content == "string") {
@@ -438,7 +713,12 @@ export async function bundle(): Promise<BundleResult> {
 			let chunkContent = compiled.content;
 
 			// [1] - Module definition
-			let moduleDefined = chunkUMD(chunkContent, asset);
+			let moduleDefined = chunkUMD(chunkContent, asset, {
+				isFirst: counter === 1,
+				isLast: counter === graph.length,
+				entryId: CACHED_ASSETS.get(entryId)?.id,
+				name: BUNDLE_CONFIG.output.name,
+			});
 
 			// Update chunk
 			chunkContent = moduleDefined.content;
@@ -473,18 +753,11 @@ export async function bundle(): Promise<BundleResult> {
 
 	// [5] - Finalize bundle
 	console.time("finalize");
-	let UMDBundle = finalizeUMD(bundle.toString(), {
-		entrySource: entryId,
-		entryId: CACHED_ASSETS.get(entryId)?.id,
-		name: BUNDLE_CONFIG.output.name,
-	});
-
-	let finalSourceMap = createSourceMap(
+	let finalContent = bundle.toString();
+	let finalSourceMap = BUNDLE_CONFIG.output.sourceMap ? createSourceMap(
 		convert.fromBase64(sourceMapBundle.base64()).toObject()
-	);
-
-	finalSourceMap.mergeWith(UMDBundle.map);
-
+	) : null;
+	
 	// Import the core modules that was extracted during transformation
 	let packageJSON: any = CACHED_ASSETS.get("/package.json");
 
@@ -492,7 +765,7 @@ export async function bundle(): Promise<BundleResult> {
 		packageJSON = JSON.parse(packageJSON.content);
 	}
 
-	let importsBundle = new MagicString(UMDBundle.content);
+	//let importsBundle = new MagicString(finalContent);
 	for (let coreModule of usedCoreModules) {
 		// Check package.json for version
 		if (
@@ -517,7 +790,8 @@ export async function bundle(): Promise<BundleResult> {
 			skypackURL + coreModule.imported
 		}";\n`;
 
-		importsBundle.prepend(importCode);
+		finalContent = importCode + finalContent;
+		//importsBundle.prepend(importCode);
 	}
 
 	// Update package.json
@@ -539,14 +813,14 @@ export async function bundle(): Promise<BundleResult> {
 	);
 
 	// Finalize content
-	finalSourceMap.mergeWith(
-		importsBundle.generateMap({
-			includeContent: true,
-			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
-		})
-	);
+	// finalSourceMap?.mergeWith(
+	// 	importsBundle.generateMap({
+	// 		includeContent: true,
+	// 		hires: true,
+	// 	})
+	// );
 
-	let finalContent = importsBundle.toString();
+	// finalContent = importsBundle.toString();
 
 	// Optimizations
 	if (BUNDLE_CONFIG.mode == "production") {
@@ -566,7 +840,7 @@ export async function bundle(): Promise<BundleResult> {
 		finalContent = minified.code;
 
 		if (BUNDLE_CONFIG.output.sourceMap) {
-			finalSourceMap.mergeWith(minified.map);
+			finalSourceMap?.mergeWith(minified.map);
 		}
 	}
 
@@ -577,14 +851,15 @@ export async function bundle(): Promise<BundleResult> {
 	);
 
 	if (BUNDLE_CONFIG.output.sourceMap) {
-		if (BUNDLE_CONFIG.output.sourceMap === "inline") {
+		if (BUNDLE_CONFIG.mode === "development") {
 			// Inline source map
-			finalContent += finalSourceMap.toComment();
+			finalContent += finalSourceMap?.toComment();
 		} else {
+			// TODO: can't write .map unless there's a loader
 			// External source map
 			let sourceMapAsset = await addAsset(
 				outputPath + ".map",
-				finalSourceMap.toString()
+				finalSourceMap?.toString()
 			);
 
 			finalContent += "\n//# sourceMappingURL=" + sourceMapAsset.source;
@@ -592,7 +867,10 @@ export async function bundle(): Promise<BundleResult> {
 	}
 
 	// Out bundle
-	await addAsset(outputPath, finalContent);
+	await addAsset(path.join(
+		BUNDLE_CONFIG.output.path,
+		BUNDLE_CONFIG.output.filename
+	), finalContent);
 
 	bundleResult.content = finalContent;
 
@@ -643,7 +921,7 @@ export async function bundle(): Promise<BundleResult> {
 	console.log(graph);
 
 	return bundleResult;
-}
+} */
 
 (window as any).bundle = bundle;
 

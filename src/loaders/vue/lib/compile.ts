@@ -1,8 +1,16 @@
 import { Asset } from "@toypack/loaders/types";
 
-export default async function compile(content: string, asset: Asset) {
-   return {
-      map: {},
-      content: ""
-   }
+async function compile(content: string | Uint8Array, asset: Asset) {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "Vue Compile Error: ";
+		throw error;
+	}
+
+	return {
+		map: {},
+		content: "",
+	};
 }
+
+export default compile;

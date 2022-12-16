@@ -45,13 +45,15 @@ export class Circle {
 	"scripts/Test.js":
 
 `
-import * as os from "os";
-import img from "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Image_created_with_a_mobile_phone.png/640px-Image_created_with_a_mobile_phone.png";
+import img from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg";
 
 import "../styles/main.css";
 import {PI} from "./PI.js";
 import {num} from "./samplets.ts";
 
+let domimg = document.createElement("img");
+domimg.src = img;
+document.body.appendChild(domimg);
 console.log(img);
 console.log(PI, num);
 

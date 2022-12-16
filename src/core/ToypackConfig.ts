@@ -10,25 +10,21 @@ export interface OutputOptions {
 	 */
 	filename: string;
 	/**
-	 * - Set to `true` to generate a sourcemap for the code and add it in the file system.
-	 * - Set to `inline` to generate a sourcemap and append it in the bundle content as a data URL.
+	 * - Set to `true` to generate a sourcemap and append it in the bundle content as a data URL.
 	 */
-	sourceMap?: boolean | "inline";
+	sourceMap?: boolean;
 	/**
 	 * Module definition.
 	 */
 	type?: "umd";
-
 	/**
 	 * The name of your library.
 	 */
 	name?: string;
-
 	/**
 	 * Whether to add object URLs in the bundle output or not. This is useful if you want to use the bundle in an <iframe>.
 	 */
 	contentURL?: boolean;
-	optimizeSourceMap?: boolean;
 }
 
 export interface BundleConfig {
@@ -43,17 +39,15 @@ export interface BundleConfig {
 }
 
 export const BUNDLE_DEFAULTS: BundleConfig = {
-	entry: "",
+	entry: "/",
 	mode: "production",
 	plugins: [],
 	output: {
-		path: "dist",
-		filename: "",
 		type: "umd",
+		filename: "bundle.js",
+		path: "dist",
 		sourceMap: true,
-		name: "",
 		contentURL: true,
-		optimizeSourceMap: false,
 	},
 };
 

@@ -4,14 +4,20 @@ import MagicString from "magic-string";
 import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
 
 const HTML_ELEMENT = 1;
-export default async function compile(content: string, asset: Asset) {
+async function compile(content: string | Uint8Array, asset: Asset) {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "HTML Compile Error: ";
+		throw error;
+	}
+
 	if (!asset.data) {
 		console.error(
 			"Compilation Error: Asset's data is empty. Make sure that you're returning a <ParsedAsset> data when parsing."
 		);
 		return;
 	}
-	
+
 	let chunk = new MagicString(content);
 
 	chunk.replace(chunk.toString(), "");
@@ -80,11 +86,15 @@ export default async function compile(content: string, asset: Asset) {
 	return {
 		content: chunk.toString(),
 		// Temporarily add a poorly generated source map
-		map: chunk.generateMap({
-			file: asset.source,
-			includeContent: true,
-			source: asset.source,
-			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
-		}),
+		map: BUNDLE_CONFIG.output.sourceMap
+			? chunk.generateMap({
+					file: asset.source,
+					source: asset.source,
+					includeContent: false,
+					hires: false,
+			  })
+			: {},
 	};
 }
+
+export default compile;

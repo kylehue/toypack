@@ -2,24 +2,17 @@ import { SourceMapData } from "@toypack/core/SourceMap";
 import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
 import { Asset } from "@toypack/loaders/types";
 import MagicString from "magic-string";
-export default async function compile(content: string, asset: Asset) {
-	let chunk = new MagicString(content);
-	console.log(
-		chunk.generateMap({
-			file: asset.source,
-			source: asset.source,
-			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
-			includeContent: true,
-		})
-	);
-	
+async function compile(content: string | Uint8Array, asset: Asset) {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "Babel Compile Error: ";
+		throw error;
+	}
+
 	return {
-		content: chunk.toString(),
-		map: chunk.generateMap({
-			file: asset.source,
-			source: asset.source,
-			hires: !BUNDLE_CONFIG.output.optimizeSourceMap,
-			includeContent: true,
-		}),
+		content: content,
+		map: {},
 	};
 }
+
+export default compile;

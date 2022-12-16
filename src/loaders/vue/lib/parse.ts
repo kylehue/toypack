@@ -123,7 +123,13 @@ function getStyles(descriptor: SFCDescriptor, scopeId: string, source: string) {
 	}
 }
 
-export default function parse(content: string, source: string) {
+function parse(content: string | Uint8Array, source: string) {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "Vue Parse Error: ";
+		throw error;
+	}
+
 	console.log(`%c -------------- ${source} -------------`, "color: green;");
 	const SCOPE_ID = uuid();
 
@@ -144,8 +150,6 @@ export default function parse(content: string, source: string) {
 	// Get styles
 	let styles = getStyles(descriptor, SCOPE_ID, source);
 
-
-
 	const AST = null;
 
 	const result: ParsedAsset = {
@@ -163,3 +167,5 @@ export default function parse(content: string, source: string) {
 
 	return result;
 }
+
+export default parse;

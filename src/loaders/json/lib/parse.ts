@@ -1,6 +1,12 @@
 import { ParsedAsset } from "@toypack/loaders/types";
 
-export default function parse(content: string, source: string) {
+function parse(content: string | Uint8Array, source: string) {
+	if (typeof content != "string") {
+		let error = new Error("Content must be string.");
+		error.stack = "JSON Parse Error: ";
+		throw error;
+	}
+
 	const result: ParsedAsset = {
 		AST: [],
 		dependencies: [],
@@ -8,3 +14,5 @@ export default function parse(content: string, source: string) {
 
 	return result;
 }
+
+export default parse;
