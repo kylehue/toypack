@@ -43,11 +43,13 @@ function parse(content: string | Uint8Array, source: string) {
 	traverseAST(AST, {
 		ImportDeclaration: (dir: any) => {
 			let id = dir.node.source.value;
+			
 			addDependency(id);
 		},
 		CallExpression: (dir: any) => {
 			if (dir.node.callee.name == "require" && dir.node.arguments.length) {
 				let id = dir.node.arguments[0].value;
+				
 				addDependency(id);
 			}
 		},

@@ -76,7 +76,7 @@ function parse(content: string | Uint8Array, source: string): ParsedAsset {
 		}
 
 		// Assign a unique id for each node (will be used in compilation)
-		node.id = `__toypack_node_${++_ID}__`;
+		node.id = `__node_${++_ID}__`;
 	});
 
 	return result;

@@ -20,6 +20,7 @@ import App from "./App.vue";
 import Comp from "./Comp.vue";
 import {createApp} from "vue";
 import * as path from "path";
+import "../styles/sasstest.scss";
 console.log(createApp, path)
 console.log(Circle);
 console.log(pkg);
@@ -49,13 +50,22 @@ import img from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_
 
 import "../styles/main.css";
 import {PI} from "./PI.js";
-import {num} from "./samplets.ts";
+import Sampletsx2 from "./sampletsx2.tsx";
+import React from "react";
+import ReactDOM from "react-dom";
+console.log(ReactDOM);
+ReactDOM.render(
+   <React.StrictMode>
+	<Sampletsx2></Sampletsx2>
+   </React.StrictMode>,
+   document.querySelector("body")
+);
 
 let domimg = document.createElement("img");
 domimg.src = img;
 document.body.appendChild(domimg);
 console.log(img);
-console.log(PI, num);
+console.log(PI);
 
 
 
@@ -63,15 +73,41 @@ console.log(PI, num);
 console.log("I'm a test!");`,
 
 	// prettier-ignore
-	"scripts/samplets.ts":
+	"scripts/sampletsx.tsx":
 
 `
-
+import React from "react";
+import {useState} from "react";
 export const num: number = 127;
+
+export default function Sampletsx() {
+   const greet: string = "hello!";
+   let [count, setCount] = useState(0);
+   return (
+      <div>
+         <span>{greet + " " + count}</span>
+         <button onClick={() => setCount(count + 1)}>click me!</button>
+      </div>
+   )
+}
 
 
 
 console.log(num);`,
+
+	// prettier-ignore
+	"scripts/sampletsx2.tsx":
+
+`
+import React from "react";
+import Sampletsx from "./sampletsx.tsx";
+
+export default function Sampletsx2() {
+   return (
+      <Sampletsx>
+      </Sampletsx>
+   )
+}`,
 
 	// prettier-ignore
 	"scripts/PI.js":
@@ -100,11 +136,11 @@ const test: number = 123;
 </script>
 
 <style lang="scss" scoped>
-@import "../styles/mixins.scss";
+//@import "../styles/mixins.scss";
 
 body {
    background-color: #333;
-   @include flex;
+   //@include flex;
 
    span {
       color: yellow;
@@ -135,13 +171,32 @@ export default {
 </style>`,
 
 	// prettier-ignore
-	/* "styles/mixins.scss":
+	"styles/sasstest.scss":
+
+`@import "./mixins.scss";
+
+body {
+   @include flex;
+   background-color: #333;
+
+   p {
+      color: yellow;
+      border: 3px solid black;
+   }
+}
+`,
+
+	// prettier-ignore
+	"styles/mixins.scss":
 
 `@mixin flex {
+   background: green !important;
    display: flex;
    flex-direction: row;
    align-items: center;
-}`, */
+}
+
+p { color: purple; }`,
 
 	// prettier-ignore
 	"styles/colors.css":
@@ -184,6 +239,9 @@ body, html, #app {
    <div id="greet">
       <p>Hello World!</p>
       <div>nested test!</div>
+   </div>
+   <div id="root">
+      
    </div>
 </body>
 

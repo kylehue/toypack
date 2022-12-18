@@ -24,12 +24,6 @@ setTimeout(() => {
 	//console.log(Toypack.vol.toJSON());
 }, 1000);
 
-(window as any).testcode = (code: string) => {
-	let sandbox = document.createElement("iframe");
-	document.body.appendChild(sandbox);
-	sandbox.srcdoc = `<html><head><script type="module">${code}</script></head><body></body></html>`
-}
-
 //import "./resolve";
 //import "./sourceMaps";
 //import "./sourceMapsMerge";

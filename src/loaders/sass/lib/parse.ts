@@ -7,6 +7,8 @@ export default function parse(content: string | Uint8Array, source: string) {
 		throw error;
 	}
 
+	/* No need to do anything here since the Sass compiler already packs the dependencies of a Sass file into one */
+	
 	const result: ParsedAsset = {
 		AST: [],
 		dependencies: [],

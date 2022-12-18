@@ -32,7 +32,7 @@ export default async function createDependencyGraph(
 			if (asset.content == cached?.content && cached?.data) {
 				parsedData = cached.data;
 			} else {
-				parsedData = asset.loader.use.parse(asset.content, source);
+				parsedData = await asset.loader.use.parse(asset.content, source);
 			}
 
 			// Update cache's data

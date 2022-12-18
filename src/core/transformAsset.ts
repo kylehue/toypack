@@ -142,7 +142,7 @@ export default function transformAsset(
 	transformed.content.append(`\n},`);
 
 	let name = BUNDLE_CONFIG.output.name || "__toypack_library__";
-	
+
 	if (options.isFirst) {
 		transformed.content.prepend(`
 (function(root, factory) {

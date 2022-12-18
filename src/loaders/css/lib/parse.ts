@@ -18,7 +18,6 @@ function parse(content: string | Uint8Array, source: string): ParsedAsset {
 		dependencies: [],
 	};
 
-	let lastId = 0;
 	AST.walk((node: any) => {
 		if (node.type == "atrule" && node.name == "import") {
 			let parsedValue = valueParser(node.params);
@@ -61,9 +60,6 @@ function parse(content: string | Uint8Array, source: string): ParsedAsset {
 				});
 			}
 		}
-
-		// Add unique id for each node (will be useful on compilation)
-		node.id = `__toypack_node_${++lastId}__`;
 	});
 
 	return result;

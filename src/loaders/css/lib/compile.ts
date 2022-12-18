@@ -10,7 +10,7 @@ async function compile(content: string | Uint8Array, asset: Asset) {
 		throw error;
 	}
 
-	let chunkContent = asset.data ? asset.data.AST.toString() : content;
+	let chunkContent = asset.data?.AST?.length ? asset.data.AST.toString() : content;
 
 	if (asset.data) {
 		chunkContent = await postcss([autoprefixer]).process(chunkContent).css;
