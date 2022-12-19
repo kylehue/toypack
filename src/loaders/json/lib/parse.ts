@@ -2,8 +2,7 @@ import { ParsedAsset } from "@toypack/loaders/types";
 
 function parse(content: string | Uint8Array, source: string) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "JSON Parse Error: ";
+		let error = new Error("JSON Parse Error: Content must be string.");
 		throw error;
 	}
 

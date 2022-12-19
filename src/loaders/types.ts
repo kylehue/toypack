@@ -22,14 +22,18 @@ export type Asset = {
 	skippable?: boolean;
 };
 
-type CompiledAsset = {
+export type CompiledAsset = {
 	content: string;
 	map: SourceMapData;
 };
 
 type LoaderMethod = {
-	compile: (content: string | Uint8Array, asset: Asset) => Promise<CompiledAsset>;
-	parse: (content: string, source: string) => ParsedAsset;
+	compile: (
+		content: string | Uint8Array,
+		asset: Asset,
+		options?: any
+	) => Promise<CompiledAsset>;
+	parse: (content: string, source: string, options?: any) => ParsedAsset;
 };
 
 export type Loader = {

@@ -4,8 +4,7 @@ import MagicString from "magic-string";
 
 async function compile(content: string | Uint8Array, asset: Asset) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "JSON Compile Error: ";
+		let error = new Error("JSON Compile Error: Content must be string.");
 		throw error;
 	}
 

@@ -6,16 +6,15 @@ import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
 const HTML_ELEMENT = 1;
 async function compile(content: string | Uint8Array, asset: Asset) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "HTML Compile Error: ";
+		let error = new Error("HTML Compile Error: Content must be string.");
 		throw error;
 	}
 
 	if (!asset.data) {
-		console.error(
-			"Compilation Error: Asset's data is empty. Make sure that you're returning a <ParsedAsset> data when parsing."
+		let error = new Error(
+			"HTML Compile Error: Asset's data is empty."
 		);
-		return;
+		throw error;
 	}
 
 	let chunk = new MagicString(content);

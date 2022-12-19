@@ -1,12 +1,11 @@
 {
 	"compilerOptions": {
-		"target": "ES5",
+		"target": "ES2017",
 		"useDefineForClassFields": true,
 		"module": "ESNext",
 		"lib": ["ES5", "DOM"],
 		"moduleResolution": "Node",
 		"strict": true,
-		"resolveJsonModule": true,
 		"isolatedModules": false,
 		"esModuleInterop": true,
 		"noEmit": false,

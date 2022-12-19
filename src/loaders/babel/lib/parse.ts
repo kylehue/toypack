@@ -6,8 +6,7 @@ import { extname } from "path";
 import { isLocal } from "@toypack/utils";
 function parse(content: string | Uint8Array, source: string) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "Babel Parse Error: ";
+		let error = new Error("Babel Parse Error: Content must be string.");
 		throw error;
 	}
 

@@ -4,14 +4,13 @@ import valueParser from "postcss-value-parser";
 import { isURL } from "@toypack/utils";
 const URL_RE = /url\s*\("?(?![a-z]+:)/;
 
-function parse(content: string | Uint8Array, source: string): ParsedAsset {
+function parse(content: string | Uint8Array, source: string, options?: any): ParsedAsset {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "CSS Parse Error: ";
+		let error = new Error("CSS Parse Error: Content must be string.");
 		throw error;
 	}
 
-	const AST = parseCSS(content);
+	const AST = parseCSS(content, options?.postCSSOptions);
 
 	const result: ParsedAsset = {
 		AST,
@@ -37,7 +36,11 @@ function parse(content: string | Uint8Array, source: string): ParsedAsset {
 					result.dependencies.push(dependencyId);
 
 					// Remove from AST
-					node.remove();
+					if (typeof options?.checkAtRules == "function") {
+						options.checkAtRules(node, dependencyId);
+					} else {
+						node.remove();
+					}
 				}
 			});
 		} else if (node.type == "decl") {

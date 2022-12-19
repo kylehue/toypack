@@ -173,11 +173,21 @@ export default {
 	// prettier-ignore
 	"styles/sasstest.scss":
 
-`@import "./mixins.scss";
+`@import "./mixins";
+@import "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css";
+
+@function pow($base, $exponent) {
+  $result: 1;
+  @for $_ from 1 through $exponent {
+    $result: $result * $base;
+  }
+  @return $result;
+}
 
 body {
    @include flex;
    background-color: #333;
+   margin-left: pow(4, 3) * 1px;
 
    p {
       color: yellow;
@@ -230,7 +240,6 @@ body, html, #app {
    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
    <script type="text/javascript" src="src/index.js"></script>
    <link rel="stylesheet" href="styles/main.css"></link>
-   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
    <title>cool website!!!!</title>
    <!-- <script>console.log(123);</script> -->
 </head>

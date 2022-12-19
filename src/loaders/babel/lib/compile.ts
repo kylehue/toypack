@@ -5,8 +5,7 @@ import traverseAST from "@babel/traverse";
 import MagicString from "magic-string";
 async function compile(content: string | Uint8Array, asset: Asset) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "Babel Compile Error: ";
+		let error = new Error("Babel Compile Error: Content must be string.");
 		throw error;
 	}
 

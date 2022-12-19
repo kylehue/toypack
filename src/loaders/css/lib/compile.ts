@@ -3,16 +3,19 @@ import MagicString from "magic-string";
 import autoprefixer from "autoprefixer";
 import postcss from "postcss";
 import { BUNDLE_CONFIG } from "@toypack/core/Toypack";
-async function compile(content: string | Uint8Array, asset: Asset) {
+import { isURL } from "@toypack/utils";
+async function compile(content: string | Uint8Array, asset: Asset, options?: any) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "CSS Compile Error: ";
+		let error = new Error("CSS Compile Error: Content must be string.");
 		throw error;
 	}
 
-	let chunkContent = asset.data?.AST?.length ? asset.data.AST.toString() : content;
+	let chunkContent =
+		options?.useContent || isURL(asset.source)
+			? content
+			: asset.data?.AST.toString();
 
-	if (asset.data) {
+	if (!isURL(asset.source)) {
 		chunkContent = await postcss([autoprefixer]).process(chunkContent).css;
 	}
 
@@ -32,7 +35,7 @@ async function compile(content: string | Uint8Array, asset: Asset) {
 		`
 let __head__ = document.head || document.getElementsByTagName("head")[0];
 __stylesheet__ = document.createElement("style");
-__stylesheet__.dataset.toypackId = "${asset.source}";
+__stylesheet__.dataset.toypackId = "asset-${asset.id}";
 __stylesheet__.setAttribute("type", "text/css");
 __head__.appendChild(__stylesheet__);
 
@@ -48,7 +51,7 @@ if (__stylesheet__.styleSheet){
 	chunk.indent("\t").prepend(`if (!__stylesheet__) {\n`).append("\n}");
 
 	chunk.prepend(
-		`let __stylesheet__ = document.querySelector("[data-toypack-id~='${asset.source}']");`
+		`let __stylesheet__ = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
 	);
 
 	// Imports

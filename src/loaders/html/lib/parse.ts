@@ -21,8 +21,7 @@ export function walk(AST: any, callback: WalkCallback) {
 
 function parse(content: string | Uint8Array, source: string): ParsedAsset {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "HTML Parse Error: ";
+		let error = new Error("HTML Parse Error: Content must be string.");
 		throw error;
 	}
 

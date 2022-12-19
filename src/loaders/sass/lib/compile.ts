@@ -1,18 +1,22 @@
 import { Asset } from "@toypack/loaders/types";
 import Sass from "sass.js";
-import { CACHED_ASSETS } from "@toypack/core/Toypack";
+import { CACHED_ASSETS, LOADERS } from "@toypack/core/Toypack";
 import resolve from "resolve";
 import { dirname } from "path";
-import compileCSS from "@toypack/loaders/css/lib/compile"
 import { createSourceMap } from "@toypack/core/SourceMap";
 export default async function compile(
 	content: string | Uint8Array,
 	asset: Asset
 ) {
 	if (typeof content != "string") {
-		let error = new Error("Content must be string.");
-		error.stack = "Sass Compile Error: ";
+		let error = new Error("Sass Compile Error: Content must be string.");
 		throw error;
+	}
+
+	let chunkContent = content;
+
+	if (typeof asset.data?.AST == "object") {
+		chunkContent = asset.data.AST.toString();
 	}
 
 	let CSSCompilation: any = await new Promise((fulfill) => {
@@ -30,21 +34,29 @@ export default async function compile(
 		});
 
 		Sass.compile(
-			content,
+			chunkContent,
 			{
-				indentedSyntax: /\.sass$/.test(asset.source)
+				indentedSyntax: /\.sass$/.test(asset.source),
 			},
 			(result) => {
-				// Make text result blank if it's null
-				// This will allow Sass files with no style declarations to be compiled
-				result.text = result.text || "";
-
 				fulfill(result);
 			}
 		);
 	});
 
-	let JSCompilation = await compileCSS(CSSCompilation.text, asset);
+	// Get CSS loader
+	let CSSLoader = LOADERS.find(ldr => ldr.name === "CSSLoader");
+	let JSCompilation;
+	if (CSSLoader) {
+		JSCompilation = await CSSLoader.use.compile(CSSCompilation.text, asset, {
+			useContent: true
+		});
+	} else {
+		let error = new Error("Sass Compile Error: CSS compiler is required to compile Sass files.");
+		throw error;
+	}
+
+	console.log(LOADERS.find((ldr) => ldr.name === "TestLoader"));
 
 	return {
 		map: createSourceMap(CSSCompilation.map).mergeWith(JSCompilation.map),

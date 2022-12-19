@@ -1,4 +1,7 @@
 import * as Toypack from "@toypack/core/Toypack";
+import { Asset, Loader, CompiledAsset, ParsedAsset } from "@toypack/loaders/types";
+console.log(Toypack);
+
 export * from "@toypack/core/Toypack";
 import sampleCodes from "./sampleCodes";
 //console.log(Toypack);
