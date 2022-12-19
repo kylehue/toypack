@@ -42,7 +42,6 @@ module.exports = {
 	},
 	resolve: {
 		alias: {
-			fs: "memfs",
 			"@toypack": resolve("../src/"),
 		},
 		extensions: [".ts", ".js", ".json"],
@@ -55,8 +54,8 @@ module.exports = {
 		library: {
 			name: "Toypack",
 			type: "umd",
-		},
-		publicPath: "auto",
+			export: "default"
+		}
 	},
 	plugins: [
 		{
@@ -69,8 +68,8 @@ module.exports = {
 			},
 		},
 		new NodePolyfillPlugin(),
-		new webpack.ContextReplacementPlugin(
-			/(.+)?(@babel(\\|\/)standalone|@vue(\\|\/)compiler\-sfc)(.+)?/
-		),
+		// new webpack.ContextReplacementPlugin(
+		// 	/(.+)?(@babel(\\|\/)standalone|@vue(\\|\/)compiler\-sfc)(.+)?/
+		// ),
 	],
 };
