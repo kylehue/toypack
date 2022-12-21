@@ -4,6 +4,7 @@ import {
 	AssetInterface,
 	Loader,
 	ParsedAsset,
+	CompiledAsset,
 } from "@toypack/core/types";
 import { BabelLoader, JSONLoader } from "@toypack/loaders";
 import { defaultOptions } from "@toypack/core/options";
@@ -12,7 +13,8 @@ import merge from "lodash.merge";
 import { isURL, getBtoa, isLocal } from "@toypack/utils";
 import * as path from "path";
 import mime from "mime-types";
-import { SourceMapData } from "./SourceMap";
+import { createSourceMap, SourceMap, SourceMapData } from "./SourceMap";
+import MagicString from "magic-string";
 
 const styleExtensions = [".css", ".sass", ".scss", ".less"];
 const appExtensions = [".js", ".json", ".jsx", ".ts", ".tsx", ".html", ".vue"];
@@ -68,14 +70,14 @@ export default class Toypack {
 			loader,
 			loaderData: {
 				parse: {
-					dependencies: []
+					dependencies: [],
 				},
 				compile: {
 					content: "",
-					map: {} as SourceMapData
-				}
+					map: {} as SourceMapData,
+				},
 			},
-			dependencyMap: {}
+			dependencyMap: {},
 		};
 
 		return asset;
@@ -188,7 +190,6 @@ export default class Toypack {
 					return asset.source;
 				}
 			}
-				
 
 			return false;
 		};
@@ -218,79 +219,78 @@ export default class Toypack {
 		let isExternal = isURL(source);
 		source = isExternal ? source : path.join("/", source);
 		let asset = this.assets.get(source);
-		let cached = this._graphCache.get(source);
 
-		if (asset) {
-			if (isExternal || typeof asset.content != "string") {
-				graph.push(asset);
+		if (!asset) {
+			throw new Error(`Graph Error: Cannot find asset ${source}.`);
+		}
+
+		if (
+			isExternal ||
+			typeof asset.content != "string" ||
+			typeof asset.loader.parse != "function"
+		) {
+			graph.push(asset);
+		} else {
+			let cached = this._graphCache.get(source);
+			let parseData: ParsedAsset;
+
+			// Reuse the old parse data if content didn't change
+			if (asset.content == cached?.content && cached?.loaderData.parse) {
+				parseData = cached.loaderData.parse;
 			} else {
-				if (typeof asset.loader.parse != "function") {
-					graph.push(asset);
-					return;
-				}
+				parseData = await asset.loader.parse(asset, this);
+			}
 
-				let parseData: ParsedAsset;
+			// Update asset's loader data
+			asset.loaderData.parse = parseData;
+			asset.dependencyMap = {};
 
-				// Reuse the old parse data if content didn't change
-				if (asset.content == cached?.content && cached?.loaderData.parse) {
-					parseData = cached.loaderData.parse;
+			// Add to graph
+			graph.push(asset);
+
+			// Cache
+			this._graphCache.set(asset.source, Object.assign({}, asset));
+
+			// Scan asset's dependencies
+			for (let dependency of parseData.dependencies) {
+				// Skip core modules
+				let isCoreModule = !isLocal(dependency) && !isURL(dependency);
+				if (isCoreModule) continue;
+
+				let dependencyAbsolutePath: string = dependency;
+
+				// If not a url, resolve
+				if (!isURL(dependency)) {
+					let resolved = this.resolve(dependency, {
+						baseDir: path.dirname(source),
+						extensions: textExtensions,
+						includeCoreModules: false,
+					});
+
+					if (resolved) {
+						dependencyAbsolutePath = resolved;
+					}
 				} else {
-					parseData = await asset.loader.parse(asset, this);
+					// If a URL and not in cache, add to assets
+					if (!this._graphCache.get(dependency)) {
+						await this.addAsset(dependency);
+					}
 				}
 
-				// Update asset's loader data
-				asset.loaderData.parse = parseData;
-				asset.dependencyMap = {};
+				// Add to dependency mapping
+				asset.dependencyMap[dependency] = this.assets.get(
+					dependencyAbsolutePath
+				)?.id;
 
-				// Add to graph
-				graph.push(asset);
+				// Scan
+				let isAdded = graph.some(
+					(asset) => asset.source == dependencyAbsolutePath
+				);
 
-				// Cache
-				this._graphCache.set(asset.source, Object.assign({}, asset));
-
-				// Scan asset's dependencies
-				for (let dependency of parseData.dependencies) {
-					// Skip core modules
-					let isCoreModule = !isLocal(dependency) && !isURL(dependency);
-					if (isCoreModule) continue;
-
-					let dependencyAbsolutePath: string = dependency;
-
-					// If not a url, resolve
-					if (!isURL(dependency)) {
-						let resolved = this.resolve(dependency, {
-							baseDir: path.dirname(source),
-							extensions: textExtensions,
-							includeCoreModules: false
-						});
-
-						if (resolved) {
-							dependencyAbsolutePath = resolved;
-						}
-					} else {
-						// If a URL and not in cache, add to assets
-						if (!this._graphCache.get(dependency)) {
-							await this.addAsset(dependency);
-						}
-					}
-
-					// Add to dependency mapping
-					asset.dependencyMap[dependency] = this.assets.get(
-						dependencyAbsolutePath
-					)?.id;
-
-					// Scan
-					let isAdded = graph.some(
-						(asset) => asset.source == dependencyAbsolutePath
-					);
-
-					if (!isAdded) {
-						await this._createGraph(dependencyAbsolutePath, graph);
-					}
+				if (!isAdded) {
+					await this._createGraph(dependencyAbsolutePath, graph);
 				}
 			}
-		} else {
-			throw new Error(`Graph Error: Cannot find asset ${source}.`);
 		}
 
 		return graph;
@@ -302,10 +302,53 @@ export default class Toypack {
 		);
 
 		if (!entrySource) {
-			return;
+			throw new Error(`Bundle Error: Entry point not found.`);
 		}
 
 		let graph = await this._createGraph(entrySource);
 		console.log(graph);
+
+		for (let i = 0; i < graph.length; i++) {
+			const asset = graph[i];
+			const isFirst = i === 0;
+			const isLast = i === graph.length - 1;
+
+			let chunkContent = "";
+			let chunkSourceMap: SourceMap | null = null;
+
+			// [1.1] - Compile
+			let compiled: CompiledAsset;
+			if (typeof asset.loader.compile == "function") {
+				compiled = asset.loader.compile(asset, this);
+			} else {
+				let content = typeof asset.content == "string" ? asset.content : "";
+				let map: SourceMapData = {} as SourceMapData;
+
+				if (this.options.bundleOptions.output.sourceMap) {
+					map = new MagicString(content).generateMap({
+						file: asset.source,
+						source: asset.source,
+						includeContent: true,
+						hires: true,
+					});
+				}
+
+				compiled = {
+					content,
+					map,
+				};
+			}
+
+			// [1.2] - Update chunk
+			chunkContent = compiled.content;
+			chunkSourceMap = this.options.bundleOptions.output.sourceMap
+				? createSourceMap(compiled.map)
+				: null;
+			
+			// [2.1] - Transform
+			
+			
+			console.log(compiled);
+		}
 	}
 }

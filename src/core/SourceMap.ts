@@ -12,7 +12,7 @@ export type SourceMapData = {
 	[key: string | number | symbol]: any;
 };
 
-class SourceMap implements SourceMapData {
+export class SourceMap implements SourceMapData {
 	public version: number = 3;
 	public sources: string[] = [];
 	public names: string[] = [];
