@@ -12,7 +12,15 @@ module.exports = {
 			},
 		],
 	},
-   moduleNameMapper: {
-      "^@toypack(.*)$": "<rootDir>/src$1"
-   },
+	globals: {
+		"ts-jest": {
+			diagnostics: {
+				exclude: ["**"]
+			}
+		}
+	},
+	moduleNameMapper: {
+		"^@toypack(.*)$": "<rootDir>/src$1",
+	},
+	roots: ["<rootDir>/src", "<rootDir>/test"],
 };

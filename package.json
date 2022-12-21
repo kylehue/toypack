@@ -10,9 +10,10 @@
 	},
 	"homepage": "https://github.com/kylehue/toypack#readme",
 	"scripts": {
-		"dev": "webpack --config webpack/webpack.dev.js",
+		"dev": "concurrently --kill-others \"webpack --config webpack/webpack.dev.js\" \"npm run test-watch\"",
 		"build": "webpack --config webpack/webpack.prod.js",
 		"publish": "npm run build && npm publish",
+		"test-watch": "jest --watchAll",
 		"test": "jest"
 	},
 	"author": "kylehue",
@@ -45,6 +46,7 @@
 		"@types/jest": "^29.2.4",
 		"@types/lodash.clonedeep": "^4.5.7",
 		"@types/lodash.merge": "^4.6.7",
+		"concurrently": "^7.6.0",
 		"glob": "^8.0.3",
 		"html-webpack-plugin": "^5.5.0",
 		"jest": "^29.3.1",
@@ -75,6 +77,7 @@
 		"magic-string": "^0.26.7",
 		"memfs": "^3.4.12",
 		"merge-source-map": "^1.1.0",
+		"mime-types": "^2.1.35",
 		"node-html-parser": "^6.1.4",
 		"postcss": "^8.4.19",
 		"postcss-sass": "^0.5.0",

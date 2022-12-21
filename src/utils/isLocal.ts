@@ -1,5 +1,7 @@
 import isURL from "./isURL";
 
-export default function isLocal(moduleId: string) {
-	return /^\.*\/.*/.test(moduleId) && !isURL(moduleId);
+export default function isLocal(pathStr: string) {
+	return (
+		/^(?:\.\.?(?:\/|$)|\/|([A-Za-z]:)?[/\\])/.test(pathStr) && !isURL(pathStr)
+	);
 }

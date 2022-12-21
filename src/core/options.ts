@@ -1,4 +1,4 @@
-import { BundleOptions } from "@toypack/core/types";
+import { BundleOptions, ToypackOptions } from "@toypack/core/types";
 
 export const bundleOptions: BundleOptions = {
    mode: "development",
@@ -11,3 +11,7 @@ export const bundleOptions: BundleOptions = {
       sourceMap: true
    }
 }
+
+export const defaultOptions: ToypackOptions = {
+   bundleOptions
+};

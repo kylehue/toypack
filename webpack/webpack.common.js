@@ -54,8 +54,8 @@ module.exports = {
 		library: {
 			name: "Toypack",
 			type: "umd",
-			export: "default"
-		}
+			export: "default",
+		},
 	},
 	plugins: [
 		{
@@ -69,7 +69,7 @@ module.exports = {
 		},
 		new NodePolyfillPlugin(),
 		// new webpack.ContextReplacementPlugin(
-		// 	/(.+)?(@babel(\\|\/)standalone|@vue(\\|\/)compiler\-sfc)(.+)?/
+		// 	/(.+)?(@babel(\\|\/)standalone|@babel(\\|\/)parser|@vue(\\|\/)compiler\-sfc)(.+)?/
 		// ),
 	],
 };
