@@ -8,8 +8,9 @@ function resolve(dir) {
 }
 
 const LOADERS = glob
-	.sync("./loaders/*/index.ts", {
+	.sync("./loaders/*.ts", {
 		cwd: resolve("../src"),
+		ignore: ["./loaders/index.ts", "./loaders/LoaderTemplate.ts"],
 	})
 	.reduce((acc, current) => {
 		let parsedPath = path.parse(current);
@@ -21,8 +22,8 @@ const LOADERS = glob
 
 module.exports = {
 	entry: {
-		"core/Toypack": resolve("../src/index.ts"),
 		...LOADERS,
+		"core/Toypack": resolve("../src/index.ts"),
 	},
 	module: {
 		rules: [
@@ -45,14 +46,13 @@ module.exports = {
 			"@toypack": resolve("../src/"),
 		},
 		fallback: {
-			fs: false
+			fs: false,
 		},
 		extensions: [".ts", ".js", ".json"],
 	},
 	output: {
 		path: resolve("../lib"),
 		filename: "[name].js",
-		chunkFilename: "[name].[chunkhash].js",
 		clean: true,
 		library: {
 			name: "Toypack",

@@ -491,7 +491,7 @@ export default class Toypack {
 
 			prevLine += chunkContent.toString().split("\n").length;
 		}
-
+		
 		//
 		let finalContent = bundle.toString();
 		if (sourceMap) {

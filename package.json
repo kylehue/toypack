@@ -10,9 +10,10 @@
 	},
 	"homepage": "https://github.com/kylehue/toypack#readme",
 	"scripts": {
-		"dev": "webpack --config webpack/webpack.dev.js",
+		"dev": "concurrently \"webpack --config webpack/webpack.dev.js\" \"webpack serve --config webpack/webpack.dev.js\"",
 		"build": "webpack --config webpack/webpack.prod.js",
 		"publish": "npm run build && npm publish",
+		"dev-test": "concurrently --kill-others \"npm run dev\" \"jest --watchAll\"",
 		"test": "jest"
 	},
 	"author": "kylehue",

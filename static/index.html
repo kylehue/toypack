@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+	</head>
+	<body>
+		<script type="module">
+			let toypack = new Toypack.default({
+				bundleOptions: {
+					mode: "production",
+					entry: "src",
+					output: {
+						path: "lib",
+						filename: "path/to/[base]",
+						assetFilename: "my/cool/assets/[dir][base]",
+						name: "CoolLibrary",
+						asset: "external",
+						sourceMap: "inline-cheap-sources",
+					},
+				},
+			});
+
+			(async () => {
+				let sampleSimpleAssets = {
+					"src/index.js": `import { PI } from "../scripts/PI";
+import pkg from "../package";
+import { dirname } from "path";
+import "../styles/main";
+import confetti from "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
+import coolImg from "../assets/sample.jpg";
+import logo from "../public/logo.svg";
+console.log(coolImg, logo);
+console.log(confetti);
+console.log(dirname("path/to/some/file.txt"));
+console.log(pkg);
+console.log(PI);`,
+
+					"scripts/PI.js": `import Circle from "./Circle";
+import coolImage from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg";
+console.log(coolImage);
+export const PI = 3.14;`,
+
+					"scripts/Circle.js": `export default class Circle {}`,
+
+					"styles/colors.css": `:root {
+	--accent: yellow;
+	--bg: black;
+}`,
+
+					"styles/main.css": `@import "./colors";
+
+body {
+	background-image: url("https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg");
+	color: var(--accent);
+}
+
+div {
+	background-image: url("../assets/sample.jpg");
+}`,
+
+					"package.json": JSON.stringify({
+						main: "src/index.js",
+						author: "jeff",
+					}),
+
+					"assets/sample.jpg": await (
+						await fetch(
+							"https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg"
+						)
+					).arrayBuffer(),
+
+					"public/logo.svg": "",
+				};
+
+				for (let [source, content] of Object.entries(sampleSimpleAssets)) {
+					await toypack.addAsset(source, content);
+				}
+
+				await toypack.bundle();
+			})();
+
+			window.toypack = toypack;
+			console.log(toypack);
+		</script>
+	</body>
+</html>
