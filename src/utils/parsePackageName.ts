@@ -1,4 +1,9 @@
-export default function parsePackageStr(str: string) {
+export interface ParsedPackage {
+	name: string;
+	version: string;
+}
+
+export default function parsePackageName(str: string) {
 	// Get core module name (no versions)
 	let split = str.split("@");
 	let isScoped = str.startsWith("@");
@@ -14,8 +19,10 @@ export default function parsePackageStr(str: string) {
 		packageVersion = split[1];
 	}
 
-	return {
+	let result: ParsedPackage = {
 		name: packageName,
 		version: packageVersion || "",
 	};
+
+	return result;
 }

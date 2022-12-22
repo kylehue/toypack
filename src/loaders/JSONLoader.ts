@@ -1,4 +1,3 @@
-import { createSourceMap, SourceMapData } from "@toypack/core/SourceMap";
 import Toypack from "@toypack/core/Toypack";
 import {
 	AssetInterface,
@@ -21,21 +20,10 @@ export default class JSONLoader implements Loader {
 		}
 
       let chunk = new MagicString(asset.content);
-      chunk.prepend("module.exports = ");
-
-      let map: SourceMapData = {} as SourceMapData;
-		if (bundler.options.bundleOptions.output.sourceMap) {
-			map = chunk.generateMap({
-				file: asset.source,
-				source: asset.source,
-				includeContent: true,
-				hires: true,
-			});
-		}
+		chunk.prepend("module.exports = ");
 
 		let result: CompiledAsset = {
-			content: chunk.toString(),
-			map,
+			content: chunk,
 		};
 
 		return result;

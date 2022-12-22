@@ -1,4 +1,6 @@
-import { SourceMapData } from "./SourceMap";
+import MagicString from "magic-string";
+import { AcceptedPlugin, ProcessOptions } from "postcss";
+import { SourceMap } from "./SourceMap";
 import Toypack from "./Toypack";
 
 export interface ResolveOptions {
@@ -24,10 +26,8 @@ export interface OutputOptions {
 	 * The name of your library.
 	 */
 	name?: string;
-	/**
-	 * Whether to add object URLs in the bundle output or not. This is useful if you want to use the bundle in an <iframe>.
-	 */
-	contentURL?: boolean;
+	asset: "inline" | "external";
+	assetFilename: string;
 }
 
 export interface BundleOptions {
@@ -36,8 +36,14 @@ export interface BundleOptions {
 	output: OutputOptions;
 }
 
+export interface PostCSSOptions {
+	plugins: AcceptedPlugin[];
+	options: ProcessOptions;
+}
+
 export interface ToypackOptions {
 	bundleOptions: BundleOptions;
+	postCSSOptions: PostCSSOptions;
 }
 
 interface LoaderData {
@@ -47,6 +53,7 @@ interface LoaderData {
 
 export interface AssetInterface {
 	id: number;
+	name: string;
 	source: string;
 	content: string | ArrayBuffer;
 	type: string;
@@ -54,8 +61,8 @@ export interface AssetInterface {
 	loader: Loader;
 	loaderData: LoaderData;
 	dependencyMap: Object;
-	contentURL?: string;
-	blob?: Blob;
+	contentURL: string;
+	blob: Blob;
 }
 
 export interface ParsedAsset {
@@ -64,8 +71,8 @@ export interface ParsedAsset {
 }
 
 export interface CompiledAsset {
-	content: string;
-	map: SourceMapData;
+	content: MagicString;
+	map?: SourceMap;
 	metadata?: any;
 }
 
@@ -73,9 +80,20 @@ export interface Loader {
 	bundler?: Toypack;
 	name: string;
 	test: RegExp;
-	parse?: (asset: AssetInterface, bundler: Toypack) => ParsedAsset;
+	parse?: (
+		asset: AssetInterface,
+		bundler: Toypack,
+		options?: any
+	) => ParsedAsset | Promise<ParsedAsset>;
 	compile?: (
 		asset: AssetInterface,
-		bundler: Toypack
-	) => CompiledAsset;
+		bundler: Toypack,
+		options?: any
+	) => CompiledAsset | Promise<CompiledAsset>;
+}
+
+export interface BundleResult {
+	content: string;
+	contentURL: string | null;
+	contentDocURL: string | null;
 }

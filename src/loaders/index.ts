@@ -1,3 +1,5 @@
 import BabelLoader from "./BabelLoader";
 import JSONLoader from "./JSONLoader";
-export { BabelLoader, JSONLoader };
+import AssetLoader from "./AssetLoader";
+import CSSLoader from "./CSSLoader";
+export { BabelLoader, JSONLoader, CSSLoader, AssetLoader };

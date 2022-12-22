@@ -1,6 +1,6 @@
-import { createSourceMap } from "@toypack/core/SourceMap";
 import Toypack from "@toypack/core/Toypack";
 import { AssetInterface, CompiledAsset, Loader, ParsedAsset } from "@toypack/core/types";
+import MagicString from "magic-string";
 
 export default class LoaderTemplate implements Loader {
 	public name = "LoaderTemplate";
@@ -16,8 +16,7 @@ export default class LoaderTemplate implements Loader {
 
 	public compile(asset: AssetInterface, bundler: Toypack) {
 		let result: CompiledAsset = {
-			content: "",
-			map: createSourceMap({}),
+			content: {} as MagicString,
 		};
 
 		return result;

@@ -6,6 +6,7 @@ describe("Resolve", () => {
 	beforeEach(() => {
 		window.URL.createObjectURL = jest.fn();
 		toypack.addAsset("src/main.js");
+		toypack.addAsset("assets/image.jpg");
 		toypack.addAsset("someFile.js");
 		toypack.addAsset("someFolder/file.js");
 		toypack.addAsset("someFolder/package.json", JSON.stringify({
@@ -37,19 +38,17 @@ describe("Resolve", () => {
 	});
 
 	test("Resolve with baseDir", () => {
-		let res = toypack.resolve("./main.js", {
-			baseDir: "src",
+		let res = toypack.resolve("../assets/image.jpg", {
+			baseDir: path.dirname("src/main.js")
 		});
 
-		let expected = path.join("/", "src", "main.js");
-
-		expect(res).toBe(expected);
+		expect(res).toBe(path.join("/", "assets", "image.jpg"));
 
 		let res2 = toypack.resolve("./src/main.js", {
 			baseDir: "src",
 		});
 
-		expect(res2).not.toBe(expected);
+		expect(res2).not.toBe(path.join("/", "src", "main.js"));
 	});
 
 	test("Resolve directory", () => {

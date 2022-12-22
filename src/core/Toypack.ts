@@ -5,35 +5,54 @@ import {
 	Loader,
 	ParsedAsset,
 	CompiledAsset,
+	BundleResult,
 } from "@toypack/core/types";
-import { BabelLoader, JSONLoader } from "@toypack/loaders";
+import {
+	BabelLoader,
+	JSONLoader,
+	AssetLoader,
+	CSSLoader,
+} from "@toypack/loaders";
 import { defaultOptions } from "@toypack/core/options";
+import applyUMD from "@toypack/formats/umd";
 
-import merge from "lodash.merge";
-import { isURL, getBtoa, isLocal } from "@toypack/utils";
+import mergeObjects from "lodash.merge";
+import { isURL, getBtoa, isLocal, formatPath } from "@toypack/utils";
 import * as path from "path";
 import mime from "mime-types";
-import { createSourceMap, SourceMap, SourceMapData } from "./SourceMap";
-import MagicString from "magic-string";
+import MagicString, { Bundle } from "magic-string";
+import { createSourceMap, SourceMap } from "./SourceMap";
+import transform, { ImportedModule } from "./transform";
+
+import MapCombiner from "combine-source-map";
+import Combiner from "combine-source-map";
 
 const styleExtensions = [".css", ".sass", ".scss", ".less"];
 const appExtensions = [".js", ".json", ".jsx", ".ts", ".tsx", ".html", ".vue"];
+// prettier-ignore
+const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".tiff",".tif",".woff",".woff2",".ttf",".eot",".otf",".webp",".mp3",".mp4",".wav",".mkv",".m4v",".mov",".avi",".flv",".webm",".flac",".mka",".m4a",".aac",".ogg"];
 const textExtensions = [...appExtensions, ...styleExtensions];
+const skypackURL = "https://cdn.skypack.dev/";
 
 export default class Toypack {
 	public assets: Map<string, AssetInterface> = new Map();
 	public options: ToypackOptions = defaultOptions;
 	public loaders: Loader[] = [];
+	public outputSource: string = "";
 	private _lastId: number = 0;
+	private _prevContentURL;
+	private _prevContentDocURL;
 	private _graphCache: Map<string, AssetInterface> = new Map();
 
 	constructor(options?: ToypackOptions) {
 		if (options) {
-			merge(this.options, options);
+			mergeObjects(this.options, options);
 		}
 
 		this.addLoader(new BabelLoader());
 		this.addLoader(new JSONLoader());
+		this.addLoader(new CSSLoader());
+		this.addLoader(new AssetLoader());
 	}
 
 	public addLoader(loader: Loader) {
@@ -49,7 +68,10 @@ export default class Toypack {
 	}
 
 	private _createAsset(source: string, content: string | ArrayBuffer) {
-		let id = ++this._lastId;
+		let isExternal = isURL(source);
+		source = isExternal ? source : path.join("/", source);
+		let cached = this.assets.get(source);
+		let id = cached ? cached.id : ++this._lastId;
 		let type = mime.lookup(source) || "";
 		let extension = path.extname(source);
 
@@ -61,8 +83,11 @@ export default class Toypack {
 			);
 		}
 
+		let name = "asset-" + id + extension;
+
 		let asset: AssetInterface = {
 			id,
+			name,
 			source,
 			content,
 			type,
@@ -73,36 +98,51 @@ export default class Toypack {
 					dependencies: [],
 				},
 				compile: {
-					content: "",
-					map: {} as SourceMapData,
+					content: {} as MagicString,
 				},
 			},
 			dependencyMap: {},
+			contentURL: "",
+			blob: {} as Blob,
 		};
 
 		return asset;
 	}
 
-	private async _createURL(blob: Blob, content?: string | ArrayBuffer) {
+	private _createURL(asset: AssetInterface) {
 		let url: string = "";
 		if (this.options.bundleOptions.mode == "production") {
-			content = content ? content : await blob.text();
-			let base64 = getBtoa(content);
-			url = `data:${blob.type};base64,${base64}`;
+			if (isURL(asset.source)) {
+				url = asset.source;
+			} else {
+				if (this.options.bundleOptions.output.asset == "inline") {
+					let base64 = getBtoa(asset.content);
+					url = `data:${asset.type};base64,${base64}`;
+				} else {
+					url = asset.name;
+				}
+			}
 		} else {
-			url = URL.createObjectURL(blob);
+			// Revoke previous URL
+			if (asset?.contentURL?.startsWith("blob:")) {
+				URL.revokeObjectURL(asset?.contentURL);
+			}
+
+			url = URL.createObjectURL(asset.blob);
 		}
 
 		return url;
 	}
 
 	public async addAsset(source: string, content: string | ArrayBuffer = "") {
-		let cached = this.assets.get(source);
 		let isExternal = isURL(source);
 		source = isExternal ? source : path.join("/", source);
 
-		if (cached?.content === content) {
-			return cached;
+		let cached = this.assets.get(source);
+		if (cached) {
+			if (cached.content === content || isURL(cached.source)) {
+				return cached;
+			}
 		}
 
 		let asset: AssetInterface = this._createAsset(source, content);
@@ -117,20 +157,14 @@ export default class Toypack {
 			}
 		}
 
-		// Create blob and content URLs if needed
-		if (this.options.bundleOptions.output.contentURL) {
-			asset.blob = new Blob([asset.content], {
-				type: asset.type,
-			});
+		// Create blob and content URLs
+		asset.blob = new Blob([asset.content], {
+			type: asset.type,
+		});
 
-			// Revoke previous URL
-			if (cached?.contentURL?.startsWith("blob:")) {
-				URL.revokeObjectURL(cached?.contentURL);
-			}
+		asset.contentURL = this._createURL(asset);
 
-			asset.contentURL = await this._createURL(asset.blob, asset.content);
-		}
-
+		// Out
 		this.assets.set(source, asset);
 
 		return asset;
@@ -143,7 +177,7 @@ export default class Toypack {
 
 		const opts = Object.assign(
 			{
-				extensions: textExtensions,
+				extensions: [...textExtensions, ...resourceExtensions],
 				baseDir: ".",
 				includeCoreModules: true,
 			},
@@ -191,7 +225,7 @@ export default class Toypack {
 				}
 			}
 
-			return false;
+			return "";
 		};
 
 		const loadIndex = (x: string) => {
@@ -263,7 +297,6 @@ export default class Toypack {
 				if (!isURL(dependency)) {
 					let resolved = this.resolve(dependency, {
 						baseDir: path.dirname(source),
-						extensions: textExtensions,
 						includeCoreModules: false,
 					});
 
@@ -297,6 +330,7 @@ export default class Toypack {
 	}
 
 	public async bundle() {
+		console.time("Total Bundle Time");
 		let entrySource = this.resolve(
 			path.join("/", this.options.bundleOptions.entry)
 		);
@@ -305,50 +339,270 @@ export default class Toypack {
 			throw new Error(`Bundle Error: Entry point not found.`);
 		}
 
+		this.outputSource = formatPath(
+			entrySource,
+			this.options.bundleOptions.output.filename
+		);
+
 		let graph = await this._createGraph(entrySource);
 		console.log(graph);
+		let importedCoreModules: ImportedModule[] = [];
+		let bundle = new Bundle();
+		let sourceMap: Combiner | null = null;
+
+		if (this.options.bundleOptions.output.sourceMap) {
+			sourceMap = MapCombiner.create(this.outputSource + ".map");
+		}
+
+		let prevLine = 0;
 
 		for (let i = 0; i < graph.length; i++) {
 			const asset = graph[i];
 			const isFirst = i === 0;
 			const isLast = i === graph.length - 1;
 
-			let chunkContent = "";
-			let chunkSourceMap: SourceMap | null = null;
+			let chunkContent = {} as MagicString;
+			let chunkSourceMap: SourceMap = {} as SourceMap;
 
-			// [1.1] - Compile
-			let compiled: CompiledAsset;
+			const addToChunkMap = (map) => {
+				if (map && this.options.bundleOptions.output.sourceMap) {
+					let chunkSourceMapIsEmpty = !chunkSourceMap.version;
+					if (!chunkSourceMapIsEmpty) {
+						chunkSourceMap.mergeWith(map);
+					} else {
+						chunkSourceMap = createSourceMap(map);
+					}
+				}
+			};
+
+			// [1] - Compile
+			let compiled: CompiledAsset = {} as CompiledAsset;
 			if (typeof asset.loader.compile == "function") {
-				compiled = asset.loader.compile(asset, this);
+				compiled = await asset.loader.compile(asset, this);
 			} else {
 				let content = typeof asset.content == "string" ? asset.content : "";
-				let map: SourceMapData = {} as SourceMapData;
+				compiled.content = new MagicString(content);
+			}
 
-				if (this.options.bundleOptions.output.sourceMap) {
-					map = new MagicString(content).generateMap({
-						file: asset.source,
+			// Save to loader data
+			asset.loaderData.compile = compiled;
+
+			// Update chunk
+			chunkContent = compiled.content;
+			addToChunkMap(compiled.map);
+
+			// [2] - Transform
+			let transformed: CompiledAsset = {} as CompiledAsset;
+
+			// Only transform if asset didn't come from an external URL
+			let isObscure =
+				!textExtensions.includes(asset.extension) || isURL(asset.source);
+
+			if (!isObscure) {
+				transformed = transform(chunkContent, asset, this);
+			} else {
+				transformed.content = chunkContent;
+				if (chunkSourceMap) {
+					transformed.map = chunkSourceMap;
+				}
+			}
+
+			// Update imported core modules
+			if (transformed.metadata?.coreModules?.length) {
+				for (let coreModule of transformed.metadata.coreModules) {
+					let isAdded = importedCoreModules.some(
+						(cm: ImportedModule) => cm.imported === coreModule.imported
+					);
+
+					if (!isAdded) {
+						importedCoreModules.push(coreModule);
+					}
+				}
+			}
+
+			// Update chunk
+			chunkContent = transformed.content;
+			addToChunkMap(transformed.map);
+
+			// [3] - Format
+			let formatted = applyUMD(chunkContent, asset, this, {
+				entryId: this.assets.get(entrySource)?.id,
+				isFirst,
+				isLast,
+			});
+
+			// Update chunk
+			chunkContent = formatted.content;
+			addToChunkMap(formatted.map);
+
+			// [4] - Add to bundle
+			bundle.addSource({
+				filename: asset.source,
+				content: chunkContent,
+			});
+
+			if (
+				chunkSourceMap &&
+				sourceMap &&
+				textExtensions.includes(asset.extension) &&
+				typeof asset.content == "string"
+			) {
+				chunkSourceMap.mergeWith(
+					chunkContent.generateMap({
 						source: asset.source,
 						includeContent: true,
 						hires: true,
-					});
-				}
+					})
+				);
 
-				compiled = {
-					content,
-					map,
-				};
+				// Back to original contents
+				chunkSourceMap.sourcesContent[0] = asset.content;
+
+				sourceMap.addFile(
+					{
+						sourceFile: asset.source,
+						source: chunkSourceMap.toComment(),
+					},
+					{
+						line: prevLine,
+					}
+				);
 			}
 
-			// [1.2] - Update chunk
-			chunkContent = compiled.content;
-			chunkSourceMap = this.options.bundleOptions.output.sourceMap
-				? createSourceMap(compiled.map)
-				: null;
-			
-			// [2.1] - Transform
-			
-			
-			console.log(compiled);
+			prevLine += chunkContent.toString().split("\n").length;
 		}
+
+		//
+		let finalContent = bundle.toString();
+		if (sourceMap) {
+			finalContent += sourceMap?.comment();
+		}
+
+		// [5] - Add core module imports
+		let packageJSON = this.assets.get("/package.json");
+		let pkg;
+		if (packageJSON?.content && typeof packageJSON.content == "string") {
+			pkg = JSON.parse(packageJSON.content);
+		}
+
+		for (let coreModule of importedCoreModules) {
+			// Check package.json for version
+			if (pkg?.dependencies && coreModule.parsed.name in pkg.dependencies) {
+				let pkgVersion = pkg.dependencies[coreModule.parsed.name];
+
+				// If version is empty, omit the @<version>
+				let newImport = !pkgVersion
+					? coreModule.parsed.name
+					: `${coreModule.parsed.name}@${pkgVersion}`;
+				coreModule.imported = coreModule.parsed.name.replace(
+					coreModule.parsed.name,
+					newImport
+				);
+
+				coreModule.usedVersion = pkgVersion;
+			}
+
+			let importCode = `import * as ${coreModule.name} from "${
+				skypackURL + coreModule.imported
+			}";`;
+
+			finalContent = importCode + finalContent;
+		}
+
+		// Update package.json
+		let coreModulesJSON = importedCoreModules.reduce((acc: any, cur: any) => {
+			acc[cur.parsed.name] = cur.usedVersion || cur.parsed.version;
+			return acc;
+		}, {});
+
+		await this.addAsset(
+			"/package.json",
+			JSON.stringify(
+				Object.assign(pkg, {
+					dependencies: {
+						...pkg.dependencies,
+						...coreModulesJSON,
+					},
+				})
+			)
+		);
+
+		let bundleResult: BundleResult = {
+			content: finalContent,
+			contentURL: null,
+			contentDocURL: null,
+		};
+
+		if (this._prevContentURL?.startsWith("blob:")) {
+			URL.revokeObjectURL(this._prevContentURL);
+		}
+
+		let contentURL = URL.createObjectURL(
+			new Blob([finalContent], {
+				type: "application/javascript",
+			})
+		);
+
+		this._prevContentURL = contentURL;
+
+		// prettier-ignore
+		let contentDoc =
+			// prettier-ignore
+`<!DOCTYPE html>
+<html>
+	<head>
+		<script defer type="module" src="${contentURL}"></script>
+	</head>
+	<body>
+	</body>
+</html>
+`;
+		if (this._prevContentDocURL?.startsWith("blob:")) {
+			URL.revokeObjectURL(this._prevContentDocURL);
+		}
+
+		let contentDocURL = URL.createObjectURL(
+			new Blob([contentDoc], {
+				type: "text/html",
+			})
+		);
+
+		this._prevContentDocURL = contentDocURL;
+
+		bundleResult.contentURL = contentURL;
+		bundleResult.contentDocURL = contentDocURL;
+
+		// Out
+		if (this.options.bundleOptions.mode == "production") {
+			let entryOutputPath = path.join(
+				this.options.bundleOptions.output.path,
+				this.outputSource
+			);
+
+			this.addAsset(entryOutputPath, bundleResult.content);
+
+			if (this.options.bundleOptions.output.asset == "external") {
+				for (let asset of graph) {
+					if (!(asset.loader instanceof AssetLoader) || isURL(asset.source))
+						continue;
+					let assetOutputFilename = formatPath(
+						asset.source,
+						this.options.bundleOptions.output.assetFilename
+					);
+					let assetOutputPath = path.join(
+						this.options.bundleOptions.output.path,
+						assetOutputFilename
+					);
+
+					this.addAsset(assetOutputPath, bundleResult.content);
+				}
+			}
+		}
+
+		console.log(bundleResult);
+
+		console.timeEnd("Total Bundle Time");
+
+		return bundleResult;
 	}
 }

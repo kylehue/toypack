@@ -9,15 +9,11 @@ module.exports = {
 					target: "esnext",
 					sourceMap: true,
 				},
+				diagnostics: {
+					exclude: ["**"],
+				},
 			},
 		],
-	},
-	globals: {
-		"ts-jest": {
-			diagnostics: {
-				exclude: ["**"]
-			}
-		}
 	},
 	moduleNameMapper: {
 		"^@toypack(.*)$": "<rootDir>/src$1",

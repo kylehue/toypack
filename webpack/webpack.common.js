@@ -44,6 +44,9 @@ module.exports = {
 		alias: {
 			"@toypack": resolve("../src/"),
 		},
+		fallback: {
+			fs: false
+		},
 		extensions: [".ts", ".js", ".json"],
 	},
 	output: {
@@ -68,8 +71,8 @@ module.exports = {
 			},
 		},
 		new NodePolyfillPlugin(),
-		// new webpack.ContextReplacementPlugin(
-		// 	/(.+)?(@babel(\\|\/)standalone|@babel(\\|\/)parser|@vue(\\|\/)compiler\-sfc)(.+)?/
-		// ),
+		new webpack.ContextReplacementPlugin(
+			/(.+)?(@babel(\\|\/)standalone|@vue(\\|\/)compiler\-sfc)(.+)?/
+		),
 	],
 };

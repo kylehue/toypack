@@ -1,7 +1,7 @@
 import { getBtoa } from "@toypack/utils";
 import mergeSourceMap from "merge-source-map";
 
-export type SourceMapData = {
+type SourceMapData = {
 	version: number;
 	sources: string[];
 	names: string[];
