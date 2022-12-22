@@ -31,21 +31,25 @@ export default class BabelLoader implements Loader {
 		};
 
 		function addDependency(id: string) {
-			let isAdded = result.dependencies.some((dep) => dep === id);
-			if (!isAdded) {
-				result.dependencies.push(id);
-			}
+			if (!id) return;
+			if (result.dependencies.some((dep) => dep === id)) return;
+			result.dependencies.push(id);
 		}
 
 		traverseAST(AST, {
-			ImportDeclaration: (dir: any) => {
-				let id = dir.node.source.value;
+			ImportDeclaration: ({node}: any) => {
+				let id = node.source.value;
 
 				addDependency(id);
 			},
-			CallExpression: (dir: any) => {
-				if (dir.node.callee.name == "require" && dir.node.arguments.length) {
-					let id = dir.node.arguments[0].value;
+			ExportDeclaration: ({node}: any) => {
+				let id = node.source?.value;
+
+				addDependency(id);
+			},
+			CallExpression: ({node}: any) => {
+				if (node.callee.name == "require" && node.arguments.length) {
+					let id = node.arguments[0].value;
 
 					addDependency(id);
 				}

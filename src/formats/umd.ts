@@ -8,7 +8,7 @@ export default function format(
 	bundler: Toypack,
 	{ entryId, isFirst, isLast }
 ) {
-	let name = bundler.options.bundleOptions.output.name || "__toypack_library__";
+	let name = bundler.options.bundleOptions?.output?.name || "__toypack_library__";
 
 	let result: CompiledAsset = {
 		content: {} as MagicString,
@@ -35,7 +35,9 @@ export default function format(
    }
 })(self, function() {
    var __modules__ = {`);
-	} else if (isLast) {
+   }
+   
+   if (isLast) {
 		chunk.append(`};
    /* Require function */
    var __moduleCache__ = {};

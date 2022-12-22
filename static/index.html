@@ -10,7 +10,7 @@
 		<script type="module">
 			let toypack = new Toypack.default({
 				bundleOptions: {
-					mode: "production",
+					mode: "development",
 					entry: "src",
 					output: {
 						path: "lib",
@@ -22,6 +22,8 @@
 					},
 				},
 			});
+
+         toypack.addDependency("vue");
 
 			(async () => {
 				let sampleSimpleAssets = {

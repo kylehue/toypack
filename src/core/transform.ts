@@ -36,7 +36,7 @@ export default function transform(
 		sourceType: "module",
 		sourceFileName: asset.source,
 		filename: asset.source,
-		sourceMaps: !!bundler.options.bundleOptions.output.sourceMap,
+		sourceMaps: !!bundler.options.bundleOptions?.output?.sourceMap,
 		compact: false,
 		presets: ["typescript", "react"],
 		plugins: [availablePlugins["transform-modules-commonjs"]],

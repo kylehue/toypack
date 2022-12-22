@@ -23,7 +23,7 @@ export default class CSSLoader implements Loader {
 			throw error;
 		}
 
-		const AST = parseCSS(asset.content, bundler.options.postCSSOptions.options);
+		const AST = parseCSS(asset.content, bundler.options.postCSSOptions?.options);
 
 		const result: ParsedAsset = {
 			dependencies: [],
@@ -106,8 +106,8 @@ export default class CSSLoader implements Loader {
 
 		// Process
 		if (!isURL(asset.source)) {
-			const plugins = bundler.options.postCSSOptions.plugins;
-			const options = bundler.options.postCSSOptions.options;
+			const plugins = bundler.options.postCSSOptions?.plugins;
+			const options = bundler.options.postCSSOptions?.options;
 			processedContent = postcss(plugins).process(
 				processedContent,
 				options

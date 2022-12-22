@@ -19,12 +19,12 @@ export interface OutputOptions {
 	 * Default: `dist`
 	 * - The output directory of the bundle.
 	 */
-	path: string;
+	path?: string;
 	/**
 	 * Default: `[name][ext]`
 	 * - The filename of the bundle.
 	 */
-	filename: string;
+	filename?: string;
 	/**
 	 * Default: `inline-cheap-sources`
 	 * - `inline-*-*` - Appended directly to the code as a data URL, allowing the source map to be accessed without an additional file.
@@ -45,12 +45,12 @@ export interface OutputOptions {
 	 * - Set to `inline` to append directly to the code as a data URL.
 	 * - Set to `external` to save as an external resource.
 	 */
-	asset: "inline" | "external";
+	asset?: "inline" | "external";
 	/**
 	 * Default: `[name][ext]`
 	 * - The filename of the assets.
 	 */
-	assetFilename: string;
+	assetFilename?: string;
 }
 
 export interface BundleOptions {
@@ -64,11 +64,11 @@ export interface BundleOptions {
 	 * Default: `/`
 	 * - The starting point of the bundle.
 	 */
-	entry: string;
+	entry?: string;
 	/**
 	 * Output options.
 	 */
-	output: OutputOptions;
+	output?: OutputOptions;
 }
 
 export interface PostCSSOptions {
@@ -76,22 +76,22 @@ export interface PostCSSOptions {
 	 * Default: `[autoprefixer]`
 	 * - PostCSS plugins.
 	 */
-	plugins: AcceptedPlugin[];
+	plugins?: AcceptedPlugin[];
 	/**
 	 * - PostCSS processing options.
 	 */
-	options: ProcessOptions;
+	options?: ProcessOptions;
 }
 
 export interface ToypackOptions {
 	/**
 	 * Bundle options.
 	 */
-	bundleOptions: BundleOptions;
+	bundleOptions?: BundleOptions;
 	/**
 	 * PostCSS options.
 	 */
-	postCSSOptions: PostCSSOptions;
+	postCSSOptions?: PostCSSOptions;
 }
 
 interface LoaderData {

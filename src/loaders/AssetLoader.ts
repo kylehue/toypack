@@ -13,15 +13,15 @@ export default class AssetLoader implements Loader {
 		let target = asset.contentURL;
 
 		if (
-			bundler.options.bundleOptions.mode == "production" &&
-			bundler.options.bundleOptions.output.asset == "external" &&
+			bundler.options.bundleOptions?.mode == "production" &&
+			bundler.options.bundleOptions?.output?.asset == "external" &&
 			!isURL(asset.source)
 		) {
 			let dir = dirname(bundler.outputSource);
 
 			let assetOutputFilename = formatPath(
 				asset.source,
-				bundler.options.bundleOptions.output.assetFilename
+				bundler.options.bundleOptions?.output?.assetFilename || ""
 			);
          
          target = relative(dir, assetOutputFilename);

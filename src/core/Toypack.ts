@@ -36,11 +36,13 @@ const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".tiff","
 const textExtensions = [...appExtensions, ...styleExtensions];
 const skypackURL = "https://cdn.skypack.dev/";
 
+import packageManager from "./PackageManager";
 export default class Toypack {
 	public assets: Map<string, AssetInterface> = new Map();
 	public options: ToypackOptions = defaultOptions;
 	public loaders: Loader[] = [];
 	public outputSource: string = "";
+	public dependencies = {};
 	public _sourceMapConfig;
 	private _lastId: number = 0;
 	private _prevContentURL;
@@ -49,11 +51,11 @@ export default class Toypack {
 
 	constructor(options?: ToypackOptions) {
 		if (options) {
-			mergeObjects(this.options, options);
+			this.defineOptions(options);
 		}
 
 		this._sourceMapConfig = [];
-		let sourceMapConfig = this.options.bundleOptions.output.sourceMap;
+		let sourceMapConfig = this.options.bundleOptions?.output?.sourceMap;
 		if (typeof sourceMapConfig == "string") {
 			this._sourceMapConfig = sourceMapConfig.split("-");
 		}
@@ -62,8 +64,8 @@ export default class Toypack {
 		this.addLoader(new JSONLoader());
 		this.addLoader(new CSSLoader());
 		this.addLoader(new AssetLoader());
-		
-		this.options.postCSSOptions.plugins.push(autoprefixer);
+
+		this.options.postCSSOptions?.plugins?.push(autoprefixer);
 	}
 
 	public addLoader(loader: Loader) {
@@ -76,6 +78,15 @@ export default class Toypack {
 				return loader;
 			}
 		}
+	}
+
+	public defineOptions(options: ToypackOptions) {
+		mergeObjects(this.options, options);
+	}
+
+	public async addDependency(name: string, version = "") {
+		this.dependencies[name] = version;
+		return await packageManager.get(name, version);
 	}
 
 	private _createAsset(source: string, content: string | ArrayBuffer) {
@@ -122,11 +133,11 @@ export default class Toypack {
 
 	private _createURL(asset: AssetInterface) {
 		let url: string = "";
-		if (this.options.bundleOptions.mode == "production") {
+		if (this.options.bundleOptions?.mode == "production") {
 			if (isURL(asset.source)) {
 				url = asset.source;
 			} else {
-				if (this.options.bundleOptions.output.asset == "inline") {
+				if (this.options.bundleOptions?.output?.asset == "inline") {
 					let base64 = getBtoa(asset.content);
 					url = `data:${asset.type};base64,${base64}`;
 				} else {
@@ -343,7 +354,7 @@ export default class Toypack {
 	public async bundle() {
 		console.time("Total Bundle Time");
 		let entrySource = this.resolve(
-			path.join("/", this.options.bundleOptions.entry)
+			path.join("/", this.options.bundleOptions?.entry || "")
 		);
 
 		if (!entrySource) {
@@ -352,12 +363,11 @@ export default class Toypack {
 
 		this.outputSource = formatPath(
 			entrySource,
-			this.options.bundleOptions.output.filename
+			this.options.bundleOptions?.output?.filename || ""
 		);
 
-
 		let entryOutputPath = path.join(
-			this.options.bundleOptions.output.path,
+			this.options.bundleOptions?.output?.path || "",
 			this.outputSource
 		);
 
@@ -368,7 +378,7 @@ export default class Toypack {
 		let bundle = new Bundle();
 		let sourceMap: MapCombiner | null = null;
 
-		if (this.options.bundleOptions.output.sourceMap) {
+		if (this.options.bundleOptions?.output?.sourceMap) {
 			sourceMap = MapCombiner.create(sourceMapOutputSource);
 		}
 
@@ -377,13 +387,13 @@ export default class Toypack {
 		for (let i = 0; i < graph.length; i++) {
 			const asset = graph[i];
 			const isFirst = i === 0;
-			const isLast = i === graph.length - 1;
+			const isLast = i === graph.length - 1 || graph.length == 1;
 
 			let chunkContent = {} as MagicString;
 			let chunkSourceMap: SourceMap = {} as SourceMap;
 
 			const addToChunkMap = (map) => {
-				if (map && this.options.bundleOptions.output.sourceMap) {
+				if (map && this.options.bundleOptions?.output?.sourceMap) {
 					let chunkSourceMapIsEmpty = !chunkSourceMap.version;
 					if (!chunkSourceMapIsEmpty) {
 						chunkSourceMap.mergeWith(map);
@@ -491,7 +501,7 @@ export default class Toypack {
 
 			prevLine += chunkContent.toString().split("\n").length;
 		}
-		
+
 		//
 		let finalContent = bundle.toString();
 		if (sourceMap) {
@@ -504,7 +514,7 @@ export default class Toypack {
 			}
 
 			if (
-				this.options.bundleOptions.mode == "development" ||
+				this.options.bundleOptions?.mode == "development" ||
 				this._sourceMapConfig[0] == "inline"
 			) {
 				finalContent += MapConverter.fromObject(sourceMapObject).toComment();
@@ -555,17 +565,19 @@ export default class Toypack {
 			return acc;
 		}, {});
 
-		await this.addAsset(
-			"/package.json",
-			JSON.stringify(
-				Object.assign(pkg, {
-					dependencies: {
-						...pkg.dependencies,
-						...coreModulesJSON,
-					},
-				})
-			)
-		);
+		if (pkg) {
+			await this.addAsset(
+				"/package.json",
+				JSON.stringify(
+					Object.assign(pkg, {
+						dependencies: {
+							...pkg.dependencies,
+							...coreModulesJSON,
+						},
+					})
+				)
+			);
+		}
 
 		let bundleResult: BundleResult = {
 			content: finalContent,
@@ -612,12 +624,12 @@ export default class Toypack {
 		bundleResult.contentDocURL = contentDocURL;
 
 		// Out
-		if (this.options.bundleOptions.mode == "production") {
+		if (this.options.bundleOptions?.mode == "production") {
 			// Out bundle
 			this.addAsset(entryOutputPath, bundleResult.content);
 
 			// Out resources
-			if (this.options.bundleOptions.output.asset == "external") {
+			if (this.options.bundleOptions?.output?.asset == "external") {
 				for (let asset of graph) {
 					// Skip if not a local resource
 					if (!(asset.loader instanceof AssetLoader) || isURL(asset.source))
@@ -625,10 +637,10 @@ export default class Toypack {
 					let resource = asset;
 					let resourceOutputFilename = formatPath(
 						resource.source,
-						this.options.bundleOptions.output.assetFilename
+						this.options.bundleOptions?.output?.assetFilename || ""
 					);
 					let resourceOutputPath = path.join(
-						this.options.bundleOptions.output.path,
+						this.options.bundleOptions?.output?.path || "",
 						resourceOutputFilename
 					);
 
