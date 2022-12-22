@@ -5,7 +5,7 @@ import {
 	Loader,
 	ParsedAsset,
 } from "@toypack/core/types";
-import { isURL } from "@toypack/utils";
+import { cleanStr, isURL } from "@toypack/utils";
 import MagicString from "magic-string";
 import postcss from "postcss";
 import valueParser from "postcss-value-parser";
@@ -70,10 +70,17 @@ export default class CSSLoader implements Loader {
 							let source = valueNode.nodes[0]?.value;
 							if (!source.startsWith("data:")) {
 								result.dependencies.push(source);
-								result.metadata.URLDependencies.push({
-									current: node.value,
-									source,
+
+                        // Require asset
+								let dependencyAbsolutePath = bundler.resolve(source, {
+									baseDir: dirname(asset.source),
 								});
+
+								let cached = bundler.assets.get(dependencyAbsolutePath);
+
+                        if (cached) {
+                           node.value = `url("\${${cleanStr(source)}}")`;
+								}
 							}
 						}
 					});
@@ -113,28 +120,6 @@ export default class CSSLoader implements Loader {
 			styleContent += `.concat(\`${line}\`)`;
 		}
 
-		// Replace url() dependencies with content URLs
-		if (asset.loaderData.parse.metadata?.URLDependencies?.length) {
-			for (let URLDependency of asset.loaderData.parse.metadata
-				.URLDependencies) {
-            let dependencyabsolutePath = bundler.resolve(URLDependency.source, {
-               baseDir: dirname(asset.source)
-            });
-
-				let cached = bundler.assets.get(dependencyabsolutePath);
-
-            if (cached) {
-               let fromStr = URLDependency.current
-									.replace(/\(/g, "\\(")
-									.replace(/\)/g, "\\)");
-					let from = new RegExp(fromStr, "g");
-					let to = `url("\${require("${URLDependency.source}")}")`;
-
-					styleContent = styleContent.replace(from, to);
-				}
-			}
-      }
-      
 		let chunk = new MagicString(asset.content);
 
 		// For dummy source map
@@ -164,7 +149,7 @@ if (__stylesheet__.styleSheet){
 
 		// Imports
 		for (let dependency in asset.dependencyMap) {
-			chunk.prepend(`require("${dependency}");\n`);
+			chunk.prepend(`var ${cleanStr(dependency)} = require("${dependency}");\n`);
 		}
 
 		result.content = chunk;

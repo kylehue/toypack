@@ -36,7 +36,7 @@ export default function transform(
 		sourceType: "module",
 		sourceFileName: asset.source,
 		filename: asset.source,
-		sourceMaps: bundler.options.bundleOptions.output.sourceMap,
+		sourceMaps: !!bundler.options.bundleOptions.output.sourceMap,
 		compact: false,
 		presets: ["typescript", "react"],
 		plugins: [availablePlugins["transform-modules-commonjs"]],
@@ -51,12 +51,11 @@ export default function transform(
 	// Instantiate content and source map
 	let chunkContent = new MagicString(transpiled.code);
 	let chunkSourceMap = {} as SourceMap;
-
 	if (transpiled.map) {
 		let origSourceMap = chunk.generateMap({
 			source: asset.source,
-			includeContent: true,
-			hires: true,
+			includeContent: false,
+			hires: bundler._sourceMapConfig[1] == "original",
 		});
 
 		let generatedSourceMap = transpiled.map;
@@ -97,7 +96,7 @@ export default function transform(
 				if (isCoreModule && !isAdded) {
 					let name = `__toypack_dep_${cleanStr(id)}__`;
 
-               if (id in polyfills) {
+					if (id in polyfills) {
 						id = polyfills[id];
 						name = `__toypack_dep_${cleanStr(id)}__`;
 						chunkContent.update(node.start, node.end, name);
@@ -109,8 +108,8 @@ export default function transform(
 						imported: id,
 						name,
 						parsed: parsePackageName(id),
-               };
-               
+					};
+
 					coreModules.push(importedModule);
 				}
 			}

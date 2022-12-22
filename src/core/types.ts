@@ -9,40 +9,88 @@ export interface ResolveOptions {
 	extensions?: string[];
 }
 
+type SourceMapOptionsOutput = "inline" | "external";
+type SourceMapOptionsQuality = "cheap" | "original";
+type SourceMapOptionsSources = "nosources" | "sources";
+type SourceMapOptions = `${SourceMapOptionsOutput}-${SourceMapOptionsQuality}-${SourceMapOptionsSources}` | false;
+
 export interface OutputOptions {
 	/**
-	 * The output directory of the bundle.
+	 * Default: `dist`
+	 * - The output directory of the bundle.
 	 */
 	path: string;
 	/**
-	 * The output filename of the bundle.
+	 * Default: `[name][ext]`
+	 * - The filename of the bundle.
 	 */
 	filename: string;
 	/**
-	 * - Set to `true` to generate a sourcemap and append it in the bundle content as a data URL.
+	 * Default: `inline-cheap-sources`
+	 * - `inline-*-*` - Appended directly to the code as a data URL, allowing the source map to be accessed without an additional file.
+	 * - `external-*-*` - Stored in a separate file and referenced by the compiled code.
+	 * - `*-cheap-*` - Only map the lines of code, rather than the specific columns, resulting in a smaller and less detailed source map.
+	 * - `*-original-*` - Map both lines and columns of code, providing a more detailed and accurate representation of the original source code.
+	 * - `*-*-nosources` - No source code is included. This results in a smaller source map file, but may make debugging more difficult.
+	 * - `*-*-sources` - Opposite of `*-*-nosources`.
+	 * - Set to `false` to disable.
 	 */
-	sourceMap?: boolean;
+	sourceMap?: SourceMapOptions;
 	/**
-	 * The name of your library.
+	 * - The name of your library.
 	 */
 	name?: string;
+	/**
+	 * Default: `external`
+	 * - Set to `inline` to append directly to the code as a data URL.
+	 * - Set to `external` to save as an external resource.
+	 */
 	asset: "inline" | "external";
+	/**
+	 * Default: `[name][ext]`
+	 * - The filename of the assets.
+	 */
 	assetFilename: string;
 }
 
 export interface BundleOptions {
+	/**
+	 * Default: `development`
+	 * - `development` - Optimized for a fast and flexible workflow during the development process.
+	 * - `production` - Optimized for performance and efficiency in a live production environment.
+	 */
 	mode?: "development" | "production";
+	/**
+	 * Default: `/`
+	 * - The starting point of the bundle.
+	 */
 	entry: string;
+	/**
+	 * Output options.
+	 */
 	output: OutputOptions;
 }
 
 export interface PostCSSOptions {
+	/**
+	 * Default: `[autoprefixer]`
+	 * - PostCSS plugins.
+	 */
 	plugins: AcceptedPlugin[];
+	/**
+	 * - PostCSS processing options.
+	 */
 	options: ProcessOptions;
 }
 
 export interface ToypackOptions {
+	/**
+	 * Bundle options.
+	 */
 	bundleOptions: BundleOptions;
+	/**
+	 * PostCSS options.
+	 */
 	postCSSOptions: PostCSSOptions;
 }
 

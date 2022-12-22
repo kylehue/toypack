@@ -25,12 +25,14 @@ import { createSourceMap, SourceMap } from "./SourceMap";
 import transform, { ImportedModule } from "./transform";
 
 import MapCombiner from "combine-source-map";
-import Combiner from "combine-source-map";
+import MapConverter from "convert-source-map";
+
+import autoprefixer from "autoprefixer";
 
 const styleExtensions = [".css", ".sass", ".scss", ".less"];
 const appExtensions = [".js", ".json", ".jsx", ".ts", ".tsx", ".html", ".vue"];
 // prettier-ignore
-const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".tiff",".tif",".woff",".woff2",".ttf",".eot",".otf",".webp",".mp3",".mp4",".wav",".mkv",".m4v",".mov",".avi",".flv",".webm",".flac",".mka",".m4a",".aac",".ogg"];
+const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".tiff",".tif",".woff",".woff2",".ttf",".eot",".otf",".webp",".mp3",".mp4",".wav",".mkv",".m4v",".mov",".avi",".flv",".webm",".flac",".mka",".m4a",".aac",".ogg", ".map"];
 const textExtensions = [...appExtensions, ...styleExtensions];
 const skypackURL = "https://cdn.skypack.dev/";
 
@@ -39,6 +41,7 @@ export default class Toypack {
 	public options: ToypackOptions = defaultOptions;
 	public loaders: Loader[] = [];
 	public outputSource: string = "";
+	public _sourceMapConfig;
 	private _lastId: number = 0;
 	private _prevContentURL;
 	private _prevContentDocURL;
@@ -49,10 +52,18 @@ export default class Toypack {
 			mergeObjects(this.options, options);
 		}
 
+		this._sourceMapConfig = [];
+		let sourceMapConfig = this.options.bundleOptions.output.sourceMap;
+		if (typeof sourceMapConfig == "string") {
+			this._sourceMapConfig = sourceMapConfig.split("-");
+		}
+
 		this.addLoader(new BabelLoader());
 		this.addLoader(new JSONLoader());
 		this.addLoader(new CSSLoader());
 		this.addLoader(new AssetLoader());
+		
+		this.options.postCSSOptions.plugins.push(autoprefixer);
 	}
 
 	public addLoader(loader: Loader) {
@@ -344,14 +355,21 @@ export default class Toypack {
 			this.options.bundleOptions.output.filename
 		);
 
+
+		let entryOutputPath = path.join(
+			this.options.bundleOptions.output.path,
+			this.outputSource
+		);
+
+		let sourceMapOutputSource = entryOutputPath + ".map";
+
 		let graph = await this._createGraph(entrySource);
-		console.log(graph);
 		let importedCoreModules: ImportedModule[] = [];
 		let bundle = new Bundle();
-		let sourceMap: Combiner | null = null;
+		let sourceMap: MapCombiner | null = null;
 
 		if (this.options.bundleOptions.output.sourceMap) {
-			sourceMap = MapCombiner.create(this.outputSource + ".map");
+			sourceMap = MapCombiner.create(sourceMapOutputSource);
 		}
 
 		let prevLine = 0;
@@ -450,13 +468,15 @@ export default class Toypack {
 				chunkSourceMap.mergeWith(
 					chunkContent.generateMap({
 						source: asset.source,
-						includeContent: true,
-						hires: true,
+						includeContent: false,
+						hires: this._sourceMapConfig[1] == "original",
 					})
 				);
 
-				// Back to original contents
-				chunkSourceMap.sourcesContent[0] = asset.content;
+				// Add sources content
+				if (this._sourceMapConfig[2] == "sources") {
+					chunkSourceMap.sourcesContent[0] = asset.content;
+				}
 
 				sourceMap.addFile(
 					{
@@ -475,7 +495,27 @@ export default class Toypack {
 		//
 		let finalContent = bundle.toString();
 		if (sourceMap) {
-			finalContent += sourceMap?.comment();
+			let sourceMapObject = MapConverter.fromBase64(
+				sourceMap?.base64()
+			).toObject();
+
+			if (this._sourceMapConfig[2] == "nosources") {
+				sourceMapObject.sourcesContent = [];
+			}
+
+			if (
+				this.options.bundleOptions.mode == "development" ||
+				this._sourceMapConfig[0] == "inline"
+			) {
+				finalContent += MapConverter.fromObject(sourceMapObject).toComment();
+			} else {
+				// Out source map
+				this.addAsset(sourceMapOutputSource, JSON.stringify(sourceMapObject));
+
+				let sourceMapBasename = path.basename(sourceMapOutputSource);
+
+				finalContent += `\n//# sourceMappingURL=${sourceMapBasename}`;
+			}
 		}
 
 		// [5] - Add core module imports
@@ -568,33 +608,31 @@ export default class Toypack {
 		);
 
 		this._prevContentDocURL = contentDocURL;
-
 		bundleResult.contentURL = contentURL;
 		bundleResult.contentDocURL = contentDocURL;
 
 		// Out
 		if (this.options.bundleOptions.mode == "production") {
-			let entryOutputPath = path.join(
-				this.options.bundleOptions.output.path,
-				this.outputSource
-			);
-
+			// Out bundle
 			this.addAsset(entryOutputPath, bundleResult.content);
 
+			// Out resources
 			if (this.options.bundleOptions.output.asset == "external") {
 				for (let asset of graph) {
+					// Skip if not a local resource
 					if (!(asset.loader instanceof AssetLoader) || isURL(asset.source))
 						continue;
-					let assetOutputFilename = formatPath(
-						asset.source,
+					let resource = asset;
+					let resourceOutputFilename = formatPath(
+						resource.source,
 						this.options.bundleOptions.output.assetFilename
 					);
-					let assetOutputPath = path.join(
+					let resourceOutputPath = path.join(
 						this.options.bundleOptions.output.path,
-						assetOutputFilename
+						resourceOutputFilename
 					);
 
-					this.addAsset(assetOutputPath, bundleResult.content);
+					this.addAsset(resourceOutputPath, bundleResult.content);
 				}
 			}
 		}

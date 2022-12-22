@@ -1,5 +1,4 @@
 import { BundleOptions, PostCSSOptions, ToypackOptions } from "@toypack/core/types";
-import autoprefixer from "autoprefixer";
 
 export const bundleOptions: BundleOptions = {
    mode: "development",
@@ -8,14 +7,14 @@ export const bundleOptions: BundleOptions = {
       path: "dist",
       filename: "[name][ext]",
       name: "",
-      sourceMap: true,
+      sourceMap: "inline-cheap-sources",
       asset: "external",
       assetFilename: "[name][ext]"
    }
 }
 
 export const postCSSOptions: PostCSSOptions = {
-	plugins: [autoprefixer],
+	plugins: [],
 	options: {},
 };
 

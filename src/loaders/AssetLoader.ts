@@ -7,7 +7,7 @@ import { relative, dirname, join } from "path";
 export default class AssetLoader implements Loader {
 	public name = "AssetLoader";
 	public test =
-		/\.(png|jpe?g|gif|svg|bmp|tiff?|woff|woff2|ttf|eot|otf|webp|mp[34]|wav|mkv|wmv|m4v|mov|avi|flv|webm|flac|mka|m4a|aac|ogg)(\?.*)?$/;
+		/\.(png|jpe?g|gif|svg|bmp|tiff?|woff|woff2|ttf|eot|otf|webp|mp[34]|wav|mkv|wmv|m4v|mov|avi|flv|webm|flac|mka|m4a|aac|ogg|map)(\?.*)?$/;
 
 	public compile(asset: AssetInterface, bundler: Toypack) {
 		let target = asset.contentURL;
