@@ -1,7 +1,7 @@
 const skypackURL = "https://cdn.skypack.dev/";
 import { parse as getAST } from "@babel/parser";
 import traverseAST, { NodePath, VisitNode } from "@babel/traverse";
-import { cleanStr } from "@toypack/utils";
+import { cleanStr, parsePackageName } from "@toypack/utils";
 import Toypack from "./Toypack";
 import path from "path";
 import MagicString from "magic-string";
@@ -93,7 +93,7 @@ export default class PackageManager {
 	public async get(
 		name: string,
 		version: string = ""
-   ): Promise<InstallationResult> {
+	): Promise<InstallationResult> {
       let polyfilledName = "";
 
       if (name in polyfills) {
@@ -115,14 +115,14 @@ export default class PackageManager {
 				mode: "development",
 				output: {
                sourceMap: false,
-               name: name
+               name: parsePackageName(name).name
 				},
 			},
       });
       
 		// Get graph and add assets to bundle
       let polyfilledTarget = polyfilledName ? polyfilledName + atVersion : targetPackage;
-		let graph = await this._createGraph(`${polyfilledTarget}?min`);
+		let graph = await this._createGraph(`${polyfilledTarget}`);
 		graph[0].source += ".js";
 
 		for (let asset of graph) {

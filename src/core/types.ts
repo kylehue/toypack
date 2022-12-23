@@ -92,7 +92,11 @@ export interface ToypackOptions {
 	 * PostCSS options.
 	 */
 	postCSSOptions?: PostCSSOptions;
-	autoInstallDeps?: boolean;
+	/**
+	 * Default: `false`
+	 * - Set to `true` to automatically add any dependencies that are imported in the project.
+	 */
+	autoAddDependencies?: boolean;
 }
 
 interface LoaderData {

@@ -18,7 +18,7 @@ import applyUMD from "@toypack/formats/umd";
 
 import mergeObjects from "lodash.merge";
 import cloneObject from "lodash.clonedeep";
-import { isURL, getBtoa, isLocal, formatPath } from "@toypack/utils";
+import { isURL, getBtoa, isLocal, formatPath, parsePackageName } from "@toypack/utils";
 import * as path from "path";
 import mime from "mime-types";
 import MagicString, { Bundle } from "magic-string";
@@ -88,8 +88,15 @@ export default class Toypack {
 
 	public async addDependency(
 		name: string,
-		version = ""
+		version = "",
+		warn: boolean = true
 	): Promise<InstallationResult> {
+		if (this.options.autoAddDependencies && warn) {
+			console.warn(
+				"Add Dependency Warning: Auto install dependencies is turned on. It is not recommended to manually add dependencies while this option is enabled. Set `options.autoAddDependencies` to `false` when adding dependencies manually."
+			);
+		}
+
 		let packageJSON = this.assets.get("/package.json");
 		let pkg = JSON.parse((packageJSON?.content as string) || "{}");
 
@@ -97,7 +104,7 @@ export default class Toypack {
 		const dep = await this.packageManager.get(name, version);
 
 		// Update dependencies
-		this.dependencies[dep.name] = dep.version;
+		this.dependencies[parsePackageName(dep.name).name] = dep.version;
 
 		// Add to assets
 		let source = path.join("node_modules", name, "index.js");
@@ -339,25 +346,14 @@ export default class Toypack {
 				let isCoreModule = !isLocal(dependency) && !isExternal;
 				let baseDir = path.dirname(source);
 
-				// Auto install
-				if (isCoreModule && this.options.autoInstallDeps) {
-					let pkg = await this.addDependency(dependency);
-					let pkgSource = this.resolve(pkg.name, {
-						baseDir
-					});
-					let pkgAsset = this.assets.get(pkgSource);
-
-					if (pkgAsset) {
-						let isAdded = graph.some((asset) => asset.source == pkgSource);
-
-						if (!isAdded) {
-							graph.push(pkgAsset);
-						}
-					}
-				}
-
 				// If not a url, resolve
 				if (!isExternal) {
+					// Auto install
+					if (this.options.autoAddDependencies && isCoreModule) {
+						await this.addDependency(dependency, "", false);
+					}
+
+					//
 					let resolved = this.resolve(dependency, {
 						baseDir,
 					});
@@ -382,9 +378,15 @@ export default class Toypack {
 					(asset) => asset.source == dependencyAbsolutePath
 				);
 
-				// Note: Core modules should be ignored because they're already compiled
-				if (!isAdded && !isCoreModule) {
-					await this._createGraph(dependencyAbsolutePath, graph);
+				if (!isAdded) {
+					if (isCoreModule) {
+						let pkgAsset = this.assets.get(dependencyAbsolutePath);
+						if (pkgAsset) {
+							graph.push(pkgAsset);
+						}
+					} else {
+						await this._createGraph(dependencyAbsolutePath, graph);
+					}
 				}
 			}
 		}
@@ -393,7 +395,10 @@ export default class Toypack {
 	}
 
 	public async bundle() {
-		console.time("Total Bundle Time");
+		if (this === (window as any).toypack) {
+			console.time("Total Bundle Time");
+		}
+		
 		let entrySource = this.resolve(
 			path.join("/", this.options.bundleOptions?.entry || "")
 		);
@@ -428,7 +433,7 @@ export default class Toypack {
 			const asset = graph[i];
 			const isFirst = i === 0;
 			const isLast = i === graph.length - 1 || graph.length == 1;
-			const isCoreModule = !isLocal(asset.source) && !isURL(asset.source);
+			const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
 
 			let chunkContent = {} as MagicString;
 			let chunkSourceMap: SourceMap = {} as SourceMap;
@@ -630,9 +635,10 @@ export default class Toypack {
 			}
 		}
 
-		console.log(bundleResult);
-
-		console.timeEnd("Total Bundle Time");
+		if (this === (window as any).toypack) {
+			console.log(bundleResult);
+			console.timeEnd("Total Bundle Time");
+		}
 
 		return bundleResult;
 	}

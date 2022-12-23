@@ -11,7 +11,7 @@ export default class BabelLoader implements Loader {
 	public name = "BabelLoader";
 	public test = /\.([jt]sx?)$/;
 
-	public parse(asset: AssetInterface) {
+	public parse(asset: AssetInterface, bundler) {
 		if (typeof asset.content != "string") {
 			let error = new Error("Babel Parse Error: Asset content must be string.");
 			throw error;

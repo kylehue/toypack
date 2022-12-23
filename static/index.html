@@ -21,21 +21,25 @@
 						sourceMap: "inline-cheap-sources",
 					},
 				},
-            autoInstallDeps: false
+            autoAddDependencies: true
 			});
 
 			(async () => {
 				let sampleSimpleAssets = {
 					"src/index.js": `import { PI } from "../scripts/PI";
 import pkg from "../package";
-import path, { dirname } from "path";
 import "../styles/main";
 import confetti from "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
 import coolImg from "../assets/sample.jpg";
 import logo from "../public/logo.svg";
-let vue = require("vue");
-console.log(vue);
+import path, { dirname } from "path";
+import { createApp } from "vue@v3.2.23";
+import { v4 } from "uuid";
+import { parse } from "@babel/parser";
 console.log(path);
+console.log(createApp);
+console.log(v4());
+console.log(parse);
 console.log(coolImg, logo);
 console.log(confetti);
 console.log(dirname("path/to/some/file.txt"));
@@ -82,9 +86,6 @@ div {
 				for (let [source, content] of Object.entries(sampleSimpleAssets)) {
 					await toypack.addAsset(source, content);
 				}
-
-            await toypack.addDependency("vue", "v3.2.23");
-            await toypack.addDependency("path");
 
 				await toypack.bundle();
 			})();
