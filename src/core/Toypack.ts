@@ -18,8 +18,14 @@ import applyUMD from "@toypack/formats/umd";
 
 import mergeObjects from "lodash.merge";
 import cloneObject from "lodash.clonedeep";
-import { isURL, getBtoa, isLocal, formatPath, parsePackageName } from "@toypack/utils";
-import * as path from "path";
+import {
+	isURL,
+	getBtoa,
+	isLocal,
+	formatPath,
+	parsePackageName,
+} from "@toypack/utils";
+import * as path from "path-browserify";
 import mime from "mime-types";
 import MagicString, { Bundle } from "magic-string";
 import { createSourceMap, SourceMap } from "./SourceMap";
@@ -91,7 +97,7 @@ export default class Toypack {
 		version = "",
 		warn: boolean = true
 	): Promise<InstallationResult> {
-		if (this.options.autoAddDependencies && warn) {
+		if (this.options.bundleOptions?.autoAddDependencies && warn) {
 			console.warn(
 				"Add Dependency Warning: Auto install dependencies is turned on. It is not recommended to manually add dependencies while this option is enabled. Set `options.autoAddDependencies` to `false` when adding dependencies manually."
 			);
@@ -104,7 +110,10 @@ export default class Toypack {
 		const dep = await this.packageManager.get(name, version);
 
 		// Update dependencies
-		this.dependencies[parsePackageName(dep.name).name] = dep.version;
+		this.dependencies[parsePackageName(dep.name).name] = dep.version.replace(
+			"v",
+			"^"
+		);
 
 		// Add to assets
 		let source = path.join("node_modules", name, "index.js");
@@ -236,6 +245,29 @@ export default class Toypack {
 			options
 		);
 
+		// Resolve.alias
+		let aliasData = this._getAliasData(x);
+		if (aliasData) {
+			let aliasRegex = new RegExp(`^${aliasData.alias}`);
+			if (aliasRegex.test(x)) {
+				let aliasIsCoreModule =
+					!isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
+				if (aliasIsCoreModule) {
+					x = aliasData.replacement;
+				} else {
+					let target = path.join(
+						aliasData.replacement,
+						x.replace(aliasRegex, "")
+					);
+
+					target = path.join("/", target);
+					let resolvedAlias = path.relative(opts.baseDir, target);
+
+					x = resolvedAlias;
+				}
+			}
+		}
+
 		const loadAsDirectory = (x: string) => {
 			let pkg = this.assets.get(path.join(x, "package.json"));
 
@@ -301,6 +333,20 @@ export default class Toypack {
 		}
 	}
 
+	private _getAliasData(str: string) {
+		let aliases = this.options.bundleOptions?.resolve?.alias;
+		if (aliases) {
+			for (let [alias, replacement] of Object.entries(aliases)) {
+				if (str.startsWith(alias)) {
+					return {
+						alias,
+						replacement,
+					};
+				}
+			}
+		}
+	}
+
 	private async _createGraph(source: string, graph: AssetInterface[] = []) {
 		let isExternal = isURL(source);
 		source = isExternal ? source : path.join("/", source);
@@ -332,7 +378,6 @@ export default class Toypack {
 			asset.loaderData.parse = parseData;
 			asset.dependencyMap = {};
 
-			// TODO: core modules not getting imported when installed manually
 			// Add to graph
 			graph.push(asset);
 
@@ -342,18 +387,29 @@ export default class Toypack {
 			// Scan asset's dependencies
 			for (let dependency of parseData.dependencies) {
 				let dependencyAbsolutePath: string = dependency;
+				let baseDir = path.dirname(source);
 				let isExternal = isURL(dependency);
 				let isCoreModule = !isLocal(dependency) && !isExternal;
-				let baseDir = path.dirname(source);
+
+				// Check if aliased
+				let aliasData = this._getAliasData(dependency);
+				if (aliasData) {
+					isCoreModule =
+						!isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
+				}
 
 				// If not a url, resolve
 				if (!isExternal) {
 					// Auto install
-					if (this.options.autoAddDependencies && isCoreModule) {
-						await this.addDependency(dependency, "", false);
+					if (this.options.bundleOptions?.autoAddDependencies && isCoreModule) {
+						await this.addDependency(
+							aliasData ? aliasData.replacement : dependency,
+							"",
+							false
+						);
 					}
 
-					//
+					// Resolve
 					let resolved = this.resolve(dependency, {
 						baseDir,
 					});
@@ -368,25 +424,28 @@ export default class Toypack {
 					}
 				}
 
-				// Add to dependency mapping
-				asset.dependencyMap[dependency] = this.assets.get(
-					dependencyAbsolutePath
-				)?.id;
+				let dependencyAsset = this.assets.get(dependencyAbsolutePath);
 
-				// Scan
-				let isAdded = graph.some(
-					(asset) => asset.source == dependencyAbsolutePath
-				);
+				if (dependencyAsset) {
+					// Add to dependency mapping
+					asset.dependencyMap[dependency] = dependencyAsset.id;
 
-				if (!isAdded) {
-					if (isCoreModule) {
-						let pkgAsset = this.assets.get(dependencyAbsolutePath);
-						if (pkgAsset) {
-							graph.push(pkgAsset);
+					// Scan
+					let isAdded = graph.some(
+						(asset) => asset.source == dependencyAbsolutePath
+					);
+
+					if (!isAdded) {
+						if (isCoreModule) {
+							graph.push(dependencyAsset);
+						} else {
+							await this._createGraph(dependencyAbsolutePath, graph);
 						}
-					} else {
-						await this._createGraph(dependencyAbsolutePath, graph);
 					}
+				} else {
+					throw new Error(
+						`Graph Error: Could not resolve "${dependencyAbsolutePath}" at "${source}".`
+					);
 				}
 			}
 		}
@@ -398,7 +457,7 @@ export default class Toypack {
 		if (this === (window as any).toypack) {
 			console.time("Total Bundle Time");
 		}
-		
+
 		let entrySource = this.resolve(
 			path.join("/", this.options.bundleOptions?.entry || "")
 		);
