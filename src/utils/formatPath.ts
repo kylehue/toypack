@@ -1,4 +1,4 @@
-import { parse, join, sep } from "path";
+import { parse, join } from "path-browserify";
 
 export default function formatPath(from: string, to: string) {
 	let parsed = parse(from);
@@ -9,10 +9,10 @@ export default function formatPath(from: string, to: string) {
 		let propertyRegex = new RegExp(propertyStr, "g");
 
 		if (property == "root" || property == "dir") {
-			value = `${sep}${value}${sep}`;
+			value = `/${value}/`;
 		}
 
-		result = result.replace(propertyRegex, value);
+		result = result.replace(propertyRegex, (value as any));
 	}
 
 	result = join(result);

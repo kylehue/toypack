@@ -2,7 +2,7 @@ import Toypack from "@toypack/core/Toypack";
 import { AssetInterface, CompiledAsset, Loader } from "@toypack/core/types";
 import { formatPath, isLocal, isURL } from "@toypack/utils";
 import MagicString from "magic-string";
-import { relative, dirname, join } from "path";
+import { relative, dirname, join } from "path-browserify";
 
 export default class AssetLoader implements Loader {
 	public name = "AssetLoader";

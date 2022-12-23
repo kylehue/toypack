@@ -3,7 +3,7 @@ import { parse as getAST } from "@babel/parser";
 import traverseAST, { NodePath, VisitNode } from "@babel/traverse";
 import { cleanStr, parsePackageName } from "@toypack/utils";
 import Toypack from "./Toypack";
-import path from "path";
+import path from "path-browserify";
 import MagicString from "magic-string";
 import { polyfills } from "./polyfills";
 
@@ -94,10 +94,13 @@ export default class PackageManager {
 		name: string,
 		version: string = ""
 	): Promise<InstallationResult> {
-      let polyfilledName = "";
+		let polyfilledName = "";
+		
+		console.log(name);
+		
 
       if (name in polyfills) {
-         polyfilledName = polyfills[name];
+         //polyfilledName = polyfills[name];
       }
 
 		let atVersion = version ? "@" + version : version;
@@ -116,7 +119,7 @@ export default class PackageManager {
 				output: {
                sourceMap: false,
                name: parsePackageName(name).name
-				},
+				}
 			},
       });
       

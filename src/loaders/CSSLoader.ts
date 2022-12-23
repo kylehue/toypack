@@ -10,7 +10,7 @@ import MagicString from "magic-string";
 import postcss from "postcss";
 import valueParser from "postcss-value-parser";
 import { parse as parseCSS } from "postcss";
-import { dirname } from "path";
+import { dirname } from "path-browserify";
 
 const URLFunctionRegex = /url\s*\("?(?![a-z]+:)/;
 export default class CSSLoader implements Loader {

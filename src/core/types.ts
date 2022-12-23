@@ -66,9 +66,64 @@ export interface BundleOptions {
 	 */
 	entry?: string;
 	/**
-	 * Output options.
+	 * @desc Output options.
 	 */
 	output?: OutputOptions;
+	/**
+	 * @default false
+	 * @desc Set to `true` to automatically add any dependencies that are imported in the project.
+	 */
+	autoAddDependencies?: boolean;
+	/**
+	 * @todo Remove option because we can do this in resolve.alias
+	 * @default true
+	 * @desc Include polyfills for Node.js core modules in the project. This option is necessary because the polyfills provided by Skypack CDN are different from those provided by Browserify.
+	 * - Set to `true` to use Browserify polyfills and `false` to use Skypack CDN polyfills.
+	 * - Can also be set to an object to use specific polyfills.
+	 *
+	 * @example
+	 *
+	 * {
+	 * 	nodePolyfills: {
+	 * 		path: "path-browserify"
+	 * 	}
+	 * }
+	 */
+	nodePolyfills?: boolean | Object;
+	/**
+	 * @desc Configure how modules are resolved.
+	 */
+	resolve?: ModuleResolveOptions;
+}
+
+export interface ModuleResolveOptions {
+	/**
+	 * @desc Create aliases to `import` or `require` certain modules more easily.
+	 * @example
+	 * {
+	 * 	alias: {
+	 * 		"@classes": "src/classes/"
+	 * 	}
+	 * }
+	 * 
+	 * // Now instead of importing modules like this:
+	 * import Book from "../classes/Book.js";
+	 * 
+	 * // You can import modules like this:
+	 * import Book from "@classes/Book.js";
+	 */
+	alias?: Object;
+	/**
+	 * @desc Redirect module requests when normal resolving fails.
+	 */
+	fallback?: Object;
+	/**
+	 * @default
+	 * [".js", ".json"]
+	 *
+	 * @desc Attempt to resolve the extensions provided in order.
+	 */
+	extensions?: string[];
 }
 
 export interface PostCSSOptions {
@@ -92,11 +147,6 @@ export interface ToypackOptions {
 	 * PostCSS options.
 	 */
 	postCSSOptions?: PostCSSOptions;
-	/**
-	 * Default: `false`
-	 * - Set to `true` to automatically add any dependencies that are imported in the project.
-	 */
-	autoAddDependencies?: boolean;
 }
 
 interface LoaderData {
