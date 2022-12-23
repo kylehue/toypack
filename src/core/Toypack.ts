@@ -17,12 +17,13 @@ import { defaultOptions } from "@toypack/core/options";
 import applyUMD from "@toypack/formats/umd";
 
 import mergeObjects from "lodash.merge";
+import cloneObject from "lodash.clonedeep";
 import { isURL, getBtoa, isLocal, formatPath } from "@toypack/utils";
 import * as path from "path";
 import mime from "mime-types";
 import MagicString, { Bundle } from "magic-string";
 import { createSourceMap, SourceMap } from "./SourceMap";
-import transform, { ImportedModule } from "./transform";
+import transform from "./transform";
 
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
@@ -36,13 +37,14 @@ const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".tiff","
 const textExtensions = [...appExtensions, ...styleExtensions];
 const skypackURL = "https://cdn.skypack.dev/";
 
-import packageManager from "./PackageManager";
+import PackageManager, { InstallationResult } from "./PackageManager";
 export default class Toypack {
 	public assets: Map<string, AssetInterface> = new Map();
-	public options: ToypackOptions = defaultOptions;
+	public options: ToypackOptions = cloneObject(defaultOptions);
 	public loaders: Loader[] = [];
 	public outputSource: string = "";
 	public dependencies = {};
+	public packageManager = new PackageManager();
 	public _sourceMapConfig;
 	private _lastId: number = 0;
 	private _prevContentURL;
@@ -84,9 +86,30 @@ export default class Toypack {
 		mergeObjects(this.options, options);
 	}
 
-	public async addDependency(name: string, version = "") {
-		this.dependencies[name] = version;
-		return await packageManager.get(name, version);
+	public async addDependency(
+		name: string,
+		version = ""
+	): Promise<InstallationResult> {
+		let packageJSON = this.assets.get("/package.json");
+		let pkg = JSON.parse((packageJSON?.content as string) || "{}");
+
+		// Fetch dependency
+		const dep = await this.packageManager.get(name, version);
+
+		// Update dependencies
+		this.dependencies[dep.name] = dep.version;
+
+		// Add to assets
+		let source = path.join("node_modules", name, "index.js");
+		await this.addAsset(source, dep.content);
+
+		// Update the package.json's dependencies
+		if (packageJSON) {
+			pkg.dependencies = this.dependencies;
+			packageJSON.content = JSON.stringify(pkg);
+		}
+
+		return dep;
 	}
 
 	private _createAsset(source: string, content: string | ArrayBuffer) {
@@ -274,10 +297,11 @@ export default class Toypack {
 	private async _createGraph(source: string, graph: AssetInterface[] = []) {
 		let isExternal = isURL(source);
 		source = isExternal ? source : path.join("/", source);
+
 		let asset = this.assets.get(source);
 
 		if (!asset) {
-			throw new Error(`Graph Error: Cannot find asset ${source}.`);
+			throw new Error(`Graph Error: Cannot find asset ${source}`);
 		}
 
 		if (
@@ -288,7 +312,7 @@ export default class Toypack {
 			graph.push(asset);
 		} else {
 			let cached = this._graphCache.get(source);
-			let parseData: ParsedAsset;
+			let parseData: ParsedAsset = { dependencies: [] };
 
 			// Reuse the old parse data if content didn't change
 			if (asset.content == cached?.content && cached?.loaderData.parse) {
@@ -301,6 +325,7 @@ export default class Toypack {
 			asset.loaderData.parse = parseData;
 			asset.dependencyMap = {};
 
+			// TODO: core modules not getting imported when installed manually
 			// Add to graph
 			graph.push(asset);
 
@@ -309,17 +334,32 @@ export default class Toypack {
 
 			// Scan asset's dependencies
 			for (let dependency of parseData.dependencies) {
-				// Skip core modules
-				let isCoreModule = !isLocal(dependency) && !isURL(dependency);
-				if (isCoreModule) continue;
-
 				let dependencyAbsolutePath: string = dependency;
+				let isExternal = isURL(dependency);
+				let isCoreModule = !isLocal(dependency) && !isExternal;
+				let baseDir = path.dirname(source);
+
+				// Auto install
+				if (isCoreModule && this.options.autoInstallDeps) {
+					let pkg = await this.addDependency(dependency);
+					let pkgSource = this.resolve(pkg.name, {
+						baseDir
+					});
+					let pkgAsset = this.assets.get(pkgSource);
+
+					if (pkgAsset) {
+						let isAdded = graph.some((asset) => asset.source == pkgSource);
+
+						if (!isAdded) {
+							graph.push(pkgAsset);
+						}
+					}
+				}
 
 				// If not a url, resolve
-				if (!isURL(dependency)) {
+				if (!isExternal) {
 					let resolved = this.resolve(dependency, {
-						baseDir: path.dirname(source),
-						includeCoreModules: false,
+						baseDir,
 					});
 
 					if (resolved) {
@@ -342,7 +382,8 @@ export default class Toypack {
 					(asset) => asset.source == dependencyAbsolutePath
 				);
 
-				if (!isAdded) {
+				// Note: Core modules should be ignored because they're already compiled
+				if (!isAdded && !isCoreModule) {
 					await this._createGraph(dependencyAbsolutePath, graph);
 				}
 			}
@@ -374,7 +415,6 @@ export default class Toypack {
 		let sourceMapOutputSource = entryOutputPath + ".map";
 
 		let graph = await this._createGraph(entrySource);
-		let importedCoreModules: ImportedModule[] = [];
 		let bundle = new Bundle();
 		let sourceMap: MapCombiner | null = null;
 
@@ -388,6 +428,7 @@ export default class Toypack {
 			const asset = graph[i];
 			const isFirst = i === 0;
 			const isLast = i === graph.length - 1 || graph.length == 1;
+			const isCoreModule = !isLocal(asset.source) && !isURL(asset.source);
 
 			let chunkContent = {} as MagicString;
 			let chunkSourceMap: SourceMap = {} as SourceMap;
@@ -405,7 +446,7 @@ export default class Toypack {
 
 			// [1] - Compile
 			let compiled: CompiledAsset = {} as CompiledAsset;
-			if (typeof asset.loader.compile == "function") {
+			if (typeof asset.loader.compile == "function" && !isCoreModule) {
 				compiled = await asset.loader.compile(asset, this);
 			} else {
 				let content = typeof asset.content == "string" ? asset.content : "";
@@ -426,25 +467,12 @@ export default class Toypack {
 			let isObscure =
 				!textExtensions.includes(asset.extension) || isURL(asset.source);
 
-			if (!isObscure) {
+			if (!isObscure && !isCoreModule) {
 				transformed = transform(chunkContent, asset, this);
 			} else {
 				transformed.content = chunkContent;
 				if (chunkSourceMap) {
 					transformed.map = chunkSourceMap;
-				}
-			}
-
-			// Update imported core modules
-			if (transformed.metadata?.coreModules?.length) {
-				for (let coreModule of transformed.metadata.coreModules) {
-					let isAdded = importedCoreModules.some(
-						(cm: ImportedModule) => cm.imported === coreModule.imported
-					);
-
-					if (!isAdded) {
-						importedCoreModules.push(coreModule);
-					}
 				}
 			}
 
@@ -473,7 +501,8 @@ export default class Toypack {
 				chunkSourceMap &&
 				sourceMap &&
 				textExtensions.includes(asset.extension) &&
-				typeof asset.content == "string"
+				typeof asset.content == "string" &&
+				!isCoreModule
 			) {
 				chunkSourceMap.mergeWith(
 					chunkContent.generateMap({
@@ -520,63 +549,15 @@ export default class Toypack {
 				finalContent += MapConverter.fromObject(sourceMapObject).toComment();
 			} else {
 				// Out source map
-				this.addAsset(sourceMapOutputSource, JSON.stringify(sourceMapObject));
+				await this.addAsset(
+					sourceMapOutputSource,
+					JSON.stringify(sourceMapObject)
+				);
 
 				let sourceMapBasename = path.basename(sourceMapOutputSource);
 
 				finalContent += `\n//# sourceMappingURL=${sourceMapBasename}`;
 			}
-		}
-
-		// [5] - Add core module imports
-		let packageJSON = this.assets.get("/package.json");
-		let pkg;
-		if (packageJSON?.content && typeof packageJSON.content == "string") {
-			pkg = JSON.parse(packageJSON.content);
-		}
-
-		for (let coreModule of importedCoreModules) {
-			// Check package.json for version
-			if (pkg?.dependencies && coreModule.parsed.name in pkg.dependencies) {
-				let pkgVersion = pkg.dependencies[coreModule.parsed.name];
-
-				// If version is empty, omit the @<version>
-				let newImport = !pkgVersion
-					? coreModule.parsed.name
-					: `${coreModule.parsed.name}@${pkgVersion}`;
-				coreModule.imported = coreModule.parsed.name.replace(
-					coreModule.parsed.name,
-					newImport
-				);
-
-				coreModule.usedVersion = pkgVersion;
-			}
-
-			let importCode = `import * as ${coreModule.name} from "${
-				skypackURL + coreModule.imported
-			}";`;
-
-			finalContent = importCode + finalContent;
-		}
-
-		// Update package.json
-		let coreModulesJSON = importedCoreModules.reduce((acc: any, cur: any) => {
-			acc[cur.parsed.name] = cur.usedVersion || cur.parsed.version;
-			return acc;
-		}, {});
-
-		if (pkg) {
-			await this.addAsset(
-				"/package.json",
-				JSON.stringify(
-					Object.assign(pkg, {
-						dependencies: {
-							...pkg.dependencies,
-							...coreModulesJSON,
-						},
-					})
-				)
-			);
 		}
 
 		let bundleResult: BundleResult = {
@@ -626,7 +607,7 @@ export default class Toypack {
 		// Out
 		if (this.options.bundleOptions?.mode == "production") {
 			// Out bundle
-			this.addAsset(entryOutputPath, bundleResult.content);
+			await this.addAsset(entryOutputPath, bundleResult.content);
 
 			// Out resources
 			if (this.options.bundleOptions?.output?.asset == "external") {
@@ -644,7 +625,7 @@ export default class Toypack {
 						resourceOutputFilename
 					);
 
-					this.addAsset(resourceOutputPath, bundleResult.content);
+					await this.addAsset(resourceOutputPath, bundleResult.content);
 				}
 			}
 		}

@@ -92,6 +92,7 @@ export interface ToypackOptions {
 	 * PostCSS options.
 	 */
 	postCSSOptions?: PostCSSOptions;
+	autoInstallDeps?: boolean;
 }
 
 interface LoaderData {

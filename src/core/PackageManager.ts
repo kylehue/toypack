@@ -6,23 +6,32 @@ import Toypack from "./Toypack";
 import path from "path";
 import MagicString from "magic-string";
 import { polyfills } from "./polyfills";
-class PackageManager {
+
+export interface InstallationResult {
+	name: string;
+	version: string;
+	content: string;
+}
+
+const versionRegex = /@v[0-9]+\.[0-9]+\.[0-9]+/;
+
+export default class PackageManager {
 	private _cache = new Map();
 
 	private async _load(url: string) {
-		// Instantiate sandbox
-		// const sandbox = document.createElement("iframe");
-		// const code = `<html><script type="module">import * as _ from "${url}"; console.log(_);</script></html>`;
-		// sandbox.srcdoc = code;
-		// // Load
-		// sandbox.style.display = "none";
-		// document.body.appendChild(sandbox);
-		// await new Promise((resolve) => {
-		// 	sandbox.addEventListener("load", () => {
-		// 		sandbox.remove();
-		// 		resolve(1);
-		// 	});
-		// });
+		/* Instantiate sandbox
+		const sandbox = document.createElement("iframe");
+		const code = `<html><script type="module">import * as _ from "${url}"; console.log(_);</script></html>`;
+		sandbox.srcdoc = code;
+		// Load
+		sandbox.style.display = "none";
+		document.body.appendChild(sandbox);
+		await new Promise((resolve) => {
+			sandbox.addEventListener("load", () => {
+				sandbox.remove();
+				resolve(1);
+			});
+		}); */
 	}
 
 	private _cleanPath(id: string) {
@@ -33,7 +42,8 @@ class PackageManager {
 
 	private async _createGraph(entrySource: string, graph: any[] = []) {
 		let url = `${skypackURL}${entrySource}`;
-		let code = await (await fetch(url)).text();
+		let fetchResponse = await fetch(url);
+		let code = await fetchResponse.text();
 		let codeAST = getAST(code, {
 			sourceType: "module",
 		});
@@ -58,10 +68,18 @@ class PackageManager {
 			ImportDeclaration: scanDeclaration,
 		});
 
+		let fetchedVersion: any = versionRegex.exec(code);
+		if (fetchedVersion) {
+			fetchedVersion = (fetchedVersion[0] as string).substring(1);
+		} else {
+			fetchedVersion = "";
+		}
+
 		graph.push({
 			code: chunk.toString(),
 			source: this._cleanPath(entrySource),
 			origSource: entrySource,
+			fetchedVersion,
 		});
 
 		for (let exported of exports) {
@@ -70,9 +88,18 @@ class PackageManager {
 		}
 
 		return graph;
-   }
+	}
 
-   public async get(name: string, version: string = "") {
+	public async get(
+		name: string,
+		version: string = ""
+   ): Promise<InstallationResult> {
+      let polyfilledName = "";
+
+      if (name in polyfills) {
+         polyfilledName = polyfills[name];
+      }
+
 		let atVersion = version ? "@" + version : version;
 		let targetPackage = name + atVersion;
 
@@ -80,42 +107,46 @@ class PackageManager {
 		let cached = this._cache.get(targetPackage);
 		if (cached) {
 			return cached;
-      }
-      
-      // Instantiate bundler
+		}
+
+		// Instantiate bundler
 		const bundler = new Toypack({
 			bundleOptions: {
 				mode: "development",
 				output: {
-					sourceMap: false,
+               sourceMap: false,
+               name: name
 				},
 			},
-		});
-
-		// Get graph and add assets to bundle
-      let graph = await this._createGraph(`${targetPackage}?min`);
-      graph[0].source += ".js";
+      });
       
+		// Get graph and add assets to bundle
+      let polyfilledTarget = polyfilledName ? polyfilledName + atVersion : targetPackage;
+		let graph = await this._createGraph(`${polyfilledTarget}?min`);
+		graph[0].source += ".js";
+
 		for (let asset of graph) {
-			bundler.addAsset(asset.source, asset.code);
-      }
+			await bundler.addAsset(asset.source, asset.code);
+		}
 
 		// Bundle
 		bundler.defineOptions({
 			bundleOptions: {
 				entry: graph[0].source,
 			},
-      });
-      
+		});
+
 		let bundle = await bundler.bundle();
 
-		// Cache
-		this._cache.set(targetPackage, bundle);
+		let result: InstallationResult = {
+			name,
+			version: graph[0].fetchedVersion,
+			content: bundle.content,
+		};
 
-		return bundle;
+		// Cache
+		this._cache.set(targetPackage, result);
+
+		return result;
 	}
 }
-
-const packageManager = new PackageManager();
-
-export default packageManager;

@@ -64,6 +64,6 @@ export default function format(
 `);
 	}
 
-	result.content = chunk;
+	result.content = chunk.trim();
 	return result;
 }

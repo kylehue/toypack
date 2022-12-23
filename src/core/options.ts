@@ -20,5 +20,6 @@ export const postCSSOptions: PostCSSOptions = {
 
 export const defaultOptions: ToypackOptions = {
    bundleOptions,
-   postCSSOptions
+   postCSSOptions,
+   autoInstallDeps: true
 };
