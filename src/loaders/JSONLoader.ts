@@ -2,12 +2,12 @@ import Toypack from "@toypack/core/Toypack";
 import {
 	AssetInterface,
 	CompiledAsset,
-	Loader,
+	ToypackLoader,
 	ParsedAsset,
 } from "@toypack/core/types";
 import MagicString from "magic-string";
 
-export default class JSONLoader implements Loader {
+export default class JSONLoader implements ToypackLoader {
 	public name = "JSONLoader";
 	public test = /\.json$/;
 

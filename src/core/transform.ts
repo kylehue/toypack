@@ -28,8 +28,7 @@ export default function transform(
 		compact: false,
 		presets: ["typescript", "react"],
 		plugins: [availablePlugins["transform-modules-commonjs"]],
-		comments: false,
-		
+		comments: false
 	});
 
 	// If transpile result is empty, return

@@ -75,21 +75,9 @@ export interface BundleOptions {
 	 */
 	autoAddDependencies?: boolean;
 	/**
-	 * @todo Remove option because we can do this in resolve.alias
-	 * @default true
-	 * @desc Include polyfills for Node.js core modules in the project. This option is necessary because the polyfills provided by Skypack CDN are different from those provided by Browserify.
-	 * - Set to `true` to use Browserify polyfills and `false` to use Skypack CDN polyfills.
-	 * - Can also be set to an object to use specific polyfills.
-	 *
-	 * @example
-	 *
-	 * {
-	 * 	nodePolyfills: {
-	 * 		path: "path-browserify"
-	 * 	}
-	 * }
+	 * @desc Toypack plugins.
 	 */
-	nodePolyfills?: boolean | Object;
+	plugins?: ToypackPlugin[];
 	/**
 	 * @desc Configure how modules are resolved.
 	 */
@@ -161,7 +149,7 @@ export interface AssetInterface {
 	content: string | ArrayBuffer;
 	type: string;
 	extension: string;
-	loader: Loader;
+	loader: ToypackLoader;
 	loaderData: LoaderData;
 	dependencyMap: Object;
 	contentURL: string;
@@ -179,7 +167,7 @@ export interface CompiledAsset {
 	metadata?: any;
 }
 
-export interface Loader {
+export interface ToypackLoader {
 	bundler?: Toypack;
 	name: string;
 	test: RegExp;
@@ -193,6 +181,11 @@ export interface Loader {
 		bundler: Toypack,
 		options?: any
 	) => CompiledAsset | Promise<CompiledAsset>;
+}
+
+export interface ToypackPlugin {
+	options?: Object;
+	apply: (compiler: Toypack) => void | Promise<void>;
 }
 
 export interface BundleResult {

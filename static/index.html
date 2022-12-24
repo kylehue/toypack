@@ -23,15 +23,20 @@
 					resolve: {
 						alias: {
 							"@scripts": "./scripts/",
-							path: "path-browserify",
 							"@stuff": "./cool/stuff/"
+						},
+						fallback: {
+							crypto: "crypto"
 						}
 					},
-            	autoAddDependencies: true
+            	autoAddDependencies: false
 				}
 			});
 
 			(async () => {
+				await toypack.addDependency("vue", "v3.2.23");
+				await toypack.addDependency("uuid");
+
 				let sampleSimpleAssets = {
 					"src/index.js": `import { PI } from "@scripts/PI";
 import pkg from "../package";
@@ -41,9 +46,10 @@ import confetti from "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6
 import coolImg from "../assets/sample.jpg";
 import logo from "../public/logo.svg";
 import path, { dirname } from "path";
-import { createApp } from "vue@v3.2.23";
+import { createApp } from "vue";
 import { v4 } from "uuid";
-console.log(path);
+import * as crypto from "crypto";
+console.log(path, crypto);
 console.log(createApp);
 console.log(v4());
 console.log(coolImg, logo);

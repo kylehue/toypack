@@ -1,11 +1,10 @@
 const skypackURL = "https://cdn.skypack.dev/";
 import { parse as getAST } from "@babel/parser";
 import traverseAST, { NodePath, VisitNode } from "@babel/traverse";
-import { cleanStr, parsePackageName } from "@toypack/utils";
+import { cleanStr, isLocal, parsePackageName } from "@toypack/utils";
 import Toypack from "./Toypack";
 import path from "path-browserify";
 import MagicString from "magic-string";
-import { polyfills } from "./polyfills";
 
 export interface InstallationResult {
 	name: string;
@@ -13,26 +12,11 @@ export interface InstallationResult {
 	content: string;
 }
 
-const versionRegex = /@v[0-9]+\.[0-9]+\.[0-9]+/;
+const versionRegexString = "@v?[0-9]+\\.[0-9]+\\.[0-9]+";
+const versionRegex = new RegExp(versionRegexString);
 
 export default class PackageManager {
 	private _cache = new Map();
-
-	private async _load(url: string) {
-		/* Instantiate sandbox
-		const sandbox = document.createElement("iframe");
-		const code = `<html><script type="module">import * as _ from "${url}"; console.log(_);</script></html>`;
-		sandbox.srcdoc = code;
-		// Load
-		sandbox.style.display = "none";
-		document.body.appendChild(sandbox);
-		await new Promise((resolve) => {
-			sandbox.addEventListener("load", () => {
-				sandbox.remove();
-				resolve(1);
-			});
-		}); */
-	}
 
 	private _cleanPath(id: string) {
 		let extension = path.extname(id);
@@ -40,9 +24,38 @@ export default class PackageManager {
 		return name + extension;
 	}
 
-	private async _createGraph(entrySource: string, graph: any[] = []) {
+	private async _createGraph(entrySource: string, graph: any[] = [], parentSource?: string) {
 		let url = `${skypackURL}${entrySource}`;
+		console.log(graph[graph.length - 1]);
+
+		if (isLocal(entrySource) && !entrySource.startsWith("/-/") && parentSource) {
+			let t = entrySource.replace(/^(?:\.\.?(?:\/|$))+/, "");
+			let b = /^(\/-\/).*,mode=imports\//.exec(parentSource)?.[0];
+			url = `${skypackURL}${b + t}`;
+			// TODO:
+			// becomes ../unoptimized/encrypter.js
+			// should be /-/browserify-aes@v1.2.0-VHxtXJZIpdtZxuAwVrkN/dist=es2019,mode=imports/
+			console.log(parentSource);
+			console.log(url);
+			console.log(parentSource);
+			console.log(entrySource);
+		}
+
+		let extension = path.extname(entrySource);
+		if (!extension || graph.length == 0) {
+			extension = ".js";
+		}
+		
 		let fetchResponse = await fetch(url);
+		let cdnError = /^\/error\//.test(entrySource) && graph.length == 0;
+		if (!fetchResponse.ok || cdnError || extension != ".js") {
+			if (!fetchResponse.ok || cdnError) {
+				console.warn(`Failed to fetch ${fetchResponse.url}`);
+			}
+
+			return graph;
+		}
+
 		let code = await fetchResponse.text();
 		let codeAST = getAST(code, {
 			sourceType: "module",
@@ -68,23 +81,18 @@ export default class PackageManager {
 			ImportDeclaration: scanDeclaration,
 		});
 
-		let fetchedVersion: any = versionRegex.exec(code);
-		if (fetchedVersion) {
-			fetchedVersion = (fetchedVersion[0] as string).substring(1);
-		} else {
-			fetchedVersion = "";
-		}
-
 		graph.push({
+			origCode: code,
 			code: chunk.toString(),
-			source: this._cleanPath(entrySource),
+			source: !/\.js$/.test(entrySource)
+				? this._cleanPath(entrySource) + extension
+				: this._cleanPath(entrySource),
 			origSource: entrySource,
-			fetchedVersion,
 		});
 
 		for (let exported of exports) {
 			if (graph.some((dep) => dep.origSource == exported)) continue;
-			await this._createGraph(exported, graph);
+			await this._createGraph(exported, graph, entrySource);
 		}
 
 		return graph;
@@ -94,17 +102,9 @@ export default class PackageManager {
 		name: string,
 		version: string = ""
 	): Promise<InstallationResult> {
-		let polyfilledName = "";
-		
-		console.log(name);
-		
-
-      if (name in polyfills) {
-         //polyfilledName = polyfills[name];
-      }
-
 		let atVersion = version ? "@" + version : version;
 		let targetPackage = name + atVersion;
+		let packageName = parsePackageName(name).name;
 
 		// Check cache
 		let cached = this._cache.get(targetPackage);
@@ -117,16 +117,16 @@ export default class PackageManager {
 			bundleOptions: {
 				mode: "development",
 				output: {
-               sourceMap: false,
-               name: parsePackageName(name).name
-				}
+					sourceMap: false,
+					name: packageName,
+				},
 			},
-      });
+		});
       
 		// Get graph and add assets to bundle
-      let polyfilledTarget = polyfilledName ? polyfilledName + atVersion : targetPackage;
-		let graph = await this._createGraph(`${polyfilledTarget}`);
-		graph[0].source += ".js";
+		let graph = await this._createGraph(`${targetPackage}?dist=es2017`);
+		console.log(graph);
+		
 
 		for (let asset of graph) {
 			await bundler.addAsset(asset.source, asset.code);
@@ -141,9 +141,17 @@ export default class PackageManager {
 
 		let bundle = await bundler.bundle();
 
+		let fetchedVersion: any = new RegExp(packageName + versionRegexString).exec(
+			graph[0].code
+		);
+
+		if (fetchedVersion) {
+			fetchedVersion = versionRegex.exec(fetchedVersion[0])?.[0].substring(1);
+		}
+
 		let result: InstallationResult = {
-			name,
-			version: graph[0].fetchedVersion,
+			name: packageName,
+			version: fetchedVersion,
 			content: bundle.content,
 		};
 

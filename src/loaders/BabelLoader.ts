@@ -1,13 +1,13 @@
 import {
 	AssetInterface,
-	Loader,
+	ToypackLoader,
 	ParsedAsset,
 } from "@toypack/core/types";
 
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
 
-export default class BabelLoader implements Loader {
+export default class BabelLoader implements ToypackLoader {
 	public name = "BabelLoader";
 	public test = /\.([jt]sx?)$/;
 

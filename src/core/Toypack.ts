@@ -2,7 +2,8 @@ import {
 	ResolveOptions,
 	ToypackOptions,
 	AssetInterface,
-	Loader,
+	ToypackLoader,
+	ToypackPlugin,
 	ParsedAsset,
 	CompiledAsset,
 	BundleResult,
@@ -13,6 +14,7 @@ import {
 	AssetLoader,
 	CSSLoader,
 } from "@toypack/loaders";
+import { NodePolyfillPlugin } from "@toypack/plugins";
 import { defaultOptions } from "@toypack/core/options";
 import applyUMD from "@toypack/formats/umd";
 
@@ -43,11 +45,18 @@ const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".tiff","
 const textExtensions = [...appExtensions, ...styleExtensions];
 const skypackURL = "https://cdn.skypack.dev/";
 
+
+interface Hooks {
+	done: (fn: Function) => void;
+	failedResolve: (fn: Function) => void;
+}
+
 import PackageManager, { InstallationResult } from "./PackageManager";
 export default class Toypack {
 	public assets: Map<string, AssetInterface> = new Map();
 	public options: ToypackOptions = cloneObject(defaultOptions);
-	public loaders: Loader[] = [];
+	public loaders: ToypackLoader[] = [];
+	public plugins: ToypackPlugin[] = [];
 	public outputSource: string = "";
 	public dependencies = {};
 	public packageManager = new PackageManager();
@@ -56,7 +65,6 @@ export default class Toypack {
 	private _prevContentURL;
 	private _prevContentDocURL;
 	private _graphCache: Map<string, AssetInterface> = new Map();
-
 	constructor(options?: ToypackOptions) {
 		if (options) {
 			this.defineOptions(options);
@@ -68,16 +76,51 @@ export default class Toypack {
 			this._sourceMapConfig = sourceMapConfig.split("-");
 		}
 
+		/* Default loaders */
 		this.addLoader(new BabelLoader());
 		this.addLoader(new JSONLoader());
 		this.addLoader(new CSSLoader());
 		this.addLoader(new AssetLoader());
 
+		/* Default plugins */
+		this.addPlugin(new NodePolyfillPlugin());
 		this.options.postCSSOptions?.plugins?.push(autoprefixer);
 	}
 
-	public addLoader(loader: Loader) {
+	public hooks: Hooks = {
+		done: this._tapHook.bind([this, "done"]),
+		failedResolve: this._tapHook.bind([this, "failedResolve"]),
+	};
+
+	private _taps: any = {};
+
+	public _tapHook(fn: Function) {
+		let compiler = this[0];
+		let hookName = this[1];
+		if (typeof fn == "function") {
+			if (!compiler._taps[hookName]) {
+				compiler._taps[hookName] = [];
+			}
+
+			compiler._taps[hookName].push(fn);
+		}
+	}
+
+	private async _initHooks(hookName: string, ...args) {
+		let hooks = this._taps[hookName];
+		if (hooks) {
+			for (let fn of hooks) {
+				await fn(...args);
+			}
+		}
+	}
+
+	public addLoader(loader: ToypackLoader) {
 		this.loaders.push(loader);
+	}
+
+	public addPlugin(plugin: ToypackPlugin) {
+		this.plugins.push(plugin);
 	}
 
 	private _getLoader(source: string) {
@@ -110,10 +153,7 @@ export default class Toypack {
 		const dep = await this.packageManager.get(name, version);
 
 		// Update dependencies
-		this.dependencies[parsePackageName(dep.name).name] = dep.version.replace(
-			"v",
-			"^"
-		);
+		this.dependencies[dep.name] = "^" + dep.version;
 
 		// Add to assets
 		let source = path.join("node_modules", name, "index.js");
@@ -121,8 +161,20 @@ export default class Toypack {
 
 		// Update the package.json's dependencies
 		if (packageJSON) {
-			pkg.dependencies = this.dependencies;
+			if (pkg.dependencies) {
+				pkg.dependencies = Object.assign(pkg.dependencies, this.dependencies);
+			} else {
+				pkg.dependencies = this.dependencies;
+			}
+			
 			packageJSON.content = JSON.stringify(pkg);
+		} else {
+			await this.addAsset(
+				"/package.json",
+				JSON.stringify({
+					dependencies: this.dependencies,
+				})
+			);
 		}
 
 		return dep;
@@ -236,9 +288,26 @@ export default class Toypack {
 			throw new TypeError("Path must be a string.");
 		}
 
+		let result = "";
+		let orig = x;
+
+		// Resolve.extensions
+		let extensions = [...textExtensions, ...resourceExtensions];
+		let priorityExtensions = this.options.bundleOptions?.resolve?.extensions;
+		if (priorityExtensions) {
+			for (let priorityExtension of priorityExtensions) {
+				let index = extensions.indexOf(priorityExtension);
+				if (index >= 0) {
+					extensions.splice(index, 1);
+				}
+			}
+
+			extensions = [...priorityExtensions, ...extensions];
+		}
+
 		const opts = Object.assign(
 			{
-				extensions: [...textExtensions, ...resourceExtensions],
+				extensions,
 				baseDir: ".",
 				includeCoreModules: true,
 			},
@@ -246,7 +315,7 @@ export default class Toypack {
 		);
 
 		// Resolve.alias
-		let aliasData = this._getAliasData(x);
+		let aliasData = this._getResolveAliasData(x);
 		if (aliasData) {
 			let aliasRegex = new RegExp(`^${aliasData.alias}`);
 			if (aliasRegex.test(x)) {
@@ -317,23 +386,51 @@ export default class Toypack {
 			return loadAsFile(resolvedIndex);
 		};
 
-		if (opts.includeCoreModules && !isLocal(x) && !isURL(x)) {
-			let resolved = path.join("/", "node_modules", x);
-			return loadAsDirectory(resolved);
-		} else if (isURL(x)) {
-			return x;
-		} else {
-			let resolved = path.join("/", opts.baseDir, x);
-			let file = loadAsFile(resolved);
-			if (file) {
-				return file;
-			} else {
+		const resolve = (x: string) => {
+			if (opts.includeCoreModules && !isLocal(x) && !isURL(x)) {
+				let resolved = path.join("/", "node_modules", x);
 				return loadAsDirectory(resolved);
+			} else if (isURL(x)) {
+				return x;
+			} else {
+				let resolved = path.join("/", opts.baseDir, x);
+				let file = loadAsFile(resolved);
+				if (file) {
+					return file;
+				} else {
+					return loadAsDirectory(resolved);
+				}
+			}
+		};
+
+		result = resolve(x);
+
+		// Resolve.fallback
+		if (!result) {
+			let fallbackData = this._getResolveFallbackData(orig);
+			if (fallbackData) {
+				result = resolve(fallbackData?.fallback);
+			}
+		}
+
+		return result;
+	}
+
+	private _getResolveFallbackData(str: string) {
+		let fallbacks = this.options.bundleOptions?.resolve?.fallback;
+		if (fallbacks) {
+			for (let [id, fallback] of Object.entries(fallbacks)) {
+				if (str.startsWith(id)) {
+					return {
+						id,
+						fallback,
+					};
+				}
 			}
 		}
 	}
 
-	private _getAliasData(str: string) {
+	private _getResolveAliasData(str: string) {
 		let aliases = this.options.bundleOptions?.resolve?.alias;
 		if (aliases) {
 			for (let [alias, replacement] of Object.entries(aliases)) {
@@ -392,7 +489,7 @@ export default class Toypack {
 				let isCoreModule = !isLocal(dependency) && !isExternal;
 
 				// Check if aliased
-				let aliasData = this._getAliasData(dependency);
+				let aliasData = this._getResolveAliasData(dependency);
 				if (aliasData) {
 					isCoreModule =
 						!isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
@@ -413,6 +510,13 @@ export default class Toypack {
 					let resolved = this.resolve(dependency, {
 						baseDir,
 					});
+
+					if (!resolved) {
+						await this._initHooks("failedResolve", dependency);
+						resolved = this.resolve(dependency, {
+							baseDir,
+						});
+					}
 
 					if (resolved) {
 						dependencyAbsolutePath = resolved;
@@ -456,6 +560,10 @@ export default class Toypack {
 	public async bundle() {
 		if (this === (window as any).toypack) {
 			console.time("Total Bundle Time");
+		}
+
+		for (let plugin of this.plugins) {
+			await plugin.apply(this);
 		}
 
 		let entrySource = this.resolve(
@@ -698,6 +806,8 @@ export default class Toypack {
 			console.log(bundleResult);
 			console.timeEnd("Total Bundle Time");
 		}
+
+		await this._initHooks("done");
 
 		return bundleResult;
 	}

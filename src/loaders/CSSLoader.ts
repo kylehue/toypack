@@ -2,7 +2,7 @@ import Toypack from "@toypack/core/Toypack";
 import {
 	AssetInterface,
 	CompiledAsset,
-	Loader,
+	ToypackLoader,
 	ParsedAsset,
 } from "@toypack/core/types";
 import { cleanStr, isURL } from "@toypack/utils";
@@ -13,7 +13,7 @@ import { parse as parseCSS } from "postcss";
 import { dirname } from "path-browserify";
 
 const URLFunctionRegex = /url\s*\("?(?![a-z]+:)/;
-export default class CSSLoader implements Loader {
+export default class CSSLoader implements ToypackLoader {
 	public name = "CSSLoader";
 	public test = /\.css$/;
 

@@ -12,10 +12,10 @@ export const bundleOptions: BundleOptions = {
 		assetFilename: "[name][ext]",
 	},
    autoAddDependencies: false,
-   nodePolyfills: true,
    resolve: {
       extensions: [".js", ".json"]
-   }
+   },
+   plugins: []
 };
 
 export const postCSSOptions: PostCSSOptions = {

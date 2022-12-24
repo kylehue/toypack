@@ -1,4 +1,7 @@
-export const polyfills = {
+import Toypack from "@toypack/core/Toypack";
+import { ToypackPlugin } from "@toypack/core/types";
+
+const polyfills = {
 	assert: "assert/",
 	buffer: "buffer/",
 	console: "console-browserify",
@@ -28,3 +31,24 @@ export const polyfills = {
 	vm: "vm-browserify",
 	zlib: "browserify-zlib",
 };
+
+export default class NodePolyfillPlugin implements ToypackPlugin {
+	async apply(bundler: Toypack) {
+		// Only add dependency if it's required
+		bundler.hooks.failedResolve(async (failedPath: string) => {
+			bundler.defineOptions({
+				bundleOptions: {
+					resolve: {
+                  fallback: {
+                     [failedPath]: polyfills[failedPath]
+                  },
+					},
+				},
+         });
+         
+			if (failedPath in polyfills) {
+				await bundler.addDependency(polyfills[failedPath]);
+			}
+		});
+	}
+}
