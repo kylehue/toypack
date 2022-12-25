@@ -18,19 +18,13 @@ import { NodePolyfillPlugin } from "@toypack/plugins";
 import { defaultOptions } from "@toypack/core/options";
 import applyUMD from "@toypack/formats/umd";
 
-import mergeObjects from "lodash.merge";
-import cloneObject from "lodash.clonedeep";
-import {
-	isURL,
-	getBtoa,
-	isLocal,
-	formatPath,
-} from "@toypack/utils";
+import { merge as mergeObjects, cloneDeep as cloneObject } from "lodash";
+import { isURL, getBtoa, isLocal, formatPath } from "@toypack/utils";
 import * as path from "path-browserify";
 import mime from "mime-types";
 import MagicString, { Bundle } from "magic-string";
 import SourceMap from "./SourceMap";
-import transform from "./transform";
+import babelMinify from "babel-minify";
 
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
@@ -47,6 +41,8 @@ interface Hooks {
 	done: (fn: Function) => void;
 	failedResolve: (fn: Function) => void;
 }
+
+(window as any).path = path;
 
 import PackageManager, { InstallationResult } from "./PackageManager";
 export default class Toypack {
@@ -146,7 +142,7 @@ export default class Toypack {
 		const dep = await this.packageManager.get(name, version);
 
 		// Add to assets
-		let depSource = path.join("node_modules", dep.name);
+		let depSource = path.join("node_modules", dep.name, dep.path);
 		for (let asset of dep.graph) {
 			let assetSource = path.join(depSource, asset.source);
 			await this.addAsset(assetSource, asset.content);
@@ -528,7 +524,7 @@ export default class Toypack {
 				}
 
 				let dependencyAsset = this.assets.get(dependencyAbsolutePath);
-				
+
 				if (dependencyAsset) {
 					// Add to dependency mapping
 					asset.dependencyMap[dependency] = dependencyAsset.id;
@@ -585,7 +581,10 @@ export default class Toypack {
 		let bundle = new Bundle();
 		let sourceMap: MapCombiner | null = null;
 
-		if (this.options.bundleOptions?.output?.sourceMap) {
+		if (
+			this.options.bundleOptions?.output?.sourceMap &&
+			this.options.bundleOptions?.mode == "development"
+		) {
 			sourceMap = MapCombiner.create(sourceMapOutputSource);
 		}
 
@@ -617,16 +616,26 @@ export default class Toypack {
 			// Update chunk
 			chunkContent = compiled.content;
 			chunkSourceMap.mergeWith(compiled.map);
-			
+
 			// [2] - Transform
-			let transformed: CompiledAsset = {} as CompiledAsset;
+			/* let transformed: CompiledAsset = {} as CompiledAsset;
 
 			// Only transform if asset didn't come from an external URL
 			let isObscure =
 				!textExtensions.includes(asset.extension) || isURL(asset.source);
 
-			if (!isObscure && compiled.options?.transform && !isCoreModule) {
-				transformed = transform(chunkContent.clone(), asset, this);
+			if (!isObscure && compiled.babelTransform && !isCoreModule) {
+				let babelTransformOptions = {};
+				if (typeof compiled.babelTransform == "object") {
+					babelTransformOptions = compiled.babelTransform;
+				}
+
+				transformed = transform(
+					chunkContent.clone(),
+					asset,
+					this,
+					babelTransformOptions
+				);
 			}
 
 			if (!transformed.content) {
@@ -635,7 +644,7 @@ export default class Toypack {
 
 			// Update chunk
 			chunkContent = transformed.content;
-			chunkSourceMap.mergeWith(transformed.map);
+			chunkSourceMap.mergeWith(transformed.map); */
 
 			// [3] - Format
 			let formatted = applyUMD(chunkContent.clone(), asset, this, {
@@ -668,7 +677,7 @@ export default class Toypack {
 						hires: this._sourceMapConfig[1] == "original",
 					})
 				);
-				
+
 				// Add sources content
 				if (this._sourceMapConfig[2] == "sources") {
 					chunkSourceMap.sourcesContent[0] = asset.content;
@@ -690,6 +699,7 @@ export default class Toypack {
 
 		//
 		let finalContent = bundle.toString();
+
 		if (sourceMap) {
 			let sourceMapObject = MapConverter.fromBase64(
 				sourceMap?.base64()

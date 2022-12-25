@@ -17,6 +17,7 @@ export interface InstallationResult {
 	name: string;
 	version: string;
 	graph: Asset[];
+	path: string;
 }
 
 const versionRegexString = "@v?[0-9]+\\.[0-9]+\\.[0-9]+";
@@ -31,12 +32,17 @@ export default class PackageManager {
 	constructor(public bundler: Toypack) {}
 
 	private async _createGraph(targetSource: string, graph: any[] = []) {
-		let url = `${skypackURL}${targetSource.replace(/^\//, "")}`;
-		let dirname = path.dirname(targetSource);
-
 		// Entries will be considered as a javascript file
 		let isEntry = graph.length == 0;
 
+		// Get dirname
+		let dirname = path.dirname(targetSource);
+
+		// Replace "|" with "/"
+		targetSource = targetSource.replace(/\|/g, "/");
+
+		// Fetch
+		let url = `${skypackURL}${targetSource.replace(/^\//, "")}`;
 		let fetchResponse = await fetch(url);
 		let content = await fetchResponse.text();
 
@@ -113,6 +119,7 @@ export default class PackageManager {
 		let result: InstallationResult = {
 			name: "",
 			version: "",
+			path: "",
 			graph: [],
 		};
 
@@ -120,9 +127,14 @@ export default class PackageManager {
 		let parsedPackageName = parsePackageName(name);
 		name = parsedPackageName.name;
 		version = parsedPackageName.version;
-		result.name = name + parsedPackageName.path;
+		result.name = name;
+		result.path = parsedPackageName.path;
 		
-		let target = `${name}@${version}${parsedPackageName.path}`;
+		// Temporarily replace "/" with "|" so the we can properly get the dirname
+		let target = `${name}@${version}${parsedPackageName.path}`.replace(
+			/\//g,
+			"|"
+		);
 
 		// Check cache
 		let cached = this._cache.get(target);
@@ -147,7 +159,7 @@ export default class PackageManager {
 				.replace("v", "");
 		}
 
-		result.version = fetchedVersion;
+		result.version = fetchedVersion || version;
 
 		// Cache
 		this._cache.set(target, result);

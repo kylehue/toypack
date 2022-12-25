@@ -98,7 +98,7 @@ export default class CSSLoader implements ToypackLoader {
 		}
 
 		const result: CompiledAsset = {
-			content: {} as MagicString,
+			content: {} as MagicString
 		};
 
 		let processedContent =

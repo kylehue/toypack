@@ -55,8 +55,13 @@ export default class SourceMap implements SourceMapData {
 			merged = mergeSourceMap(this, generated);
 		}
 
+		this.mappings = merged.mappings;
+		this.sources = [...merged.sources];
+		this.sourcesContent = [...merged.sourcesContent];
+		this.names = [...merged.names];
+
 		for (let [key, value] of Object.entries(merged)) {
-			(this as SourceMapData)[key] = value;
+			//(this as SourceMapData)[key] = value;
 		}
 		
 		return this;

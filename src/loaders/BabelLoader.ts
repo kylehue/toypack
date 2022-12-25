@@ -53,7 +53,8 @@ export default class BabelLoader implements ToypackLoader {
 			compact: false,
 			presets: ["typescript", "react"],
 			plugins: [availablePlugins["transform-modules-commonjs"]],
-			comments: false,
+			comments: bundler.options.bundleOptions?.mode == "development",
+			minified: bundler.options.bundleOptions?.mode == "production",
 		});
 
 		let result: ParsedAsset = {

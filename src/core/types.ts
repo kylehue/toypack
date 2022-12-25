@@ -2,6 +2,7 @@ import MagicString from "magic-string";
 import { AcceptedPlugin, ProcessOptions } from "postcss";
 import SourceMap from "./SourceMap";
 import Toypack from "./Toypack";
+import { TransformOptions } from "@babel/core";
 
 export interface ResolveOptions {
 	baseDir?: string;
@@ -12,7 +13,9 @@ export interface ResolveOptions {
 type SourceMapOptionsOutput = "inline" | "external";
 type SourceMapOptionsQuality = "cheap" | "original";
 type SourceMapOptionsSources = "nosources" | "sources";
-type SourceMapOptions = `${SourceMapOptionsOutput}-${SourceMapOptionsQuality}-${SourceMapOptionsSources}` | false;
+type SourceMapOptions =
+	| `${SourceMapOptionsOutput}-${SourceMapOptionsQuality}-${SourceMapOptionsSources}`
+	| false;
 
 export interface OutputOptions {
 	/**
@@ -93,10 +96,10 @@ export interface ModuleResolveOptions {
 	 * 		"@classes": "src/classes/"
 	 * 	}
 	 * }
-	 * 
+	 *
 	 * // Now instead of importing modules like this:
 	 * import Book from "../classes/Book.js";
-	 * 
+	 *
 	 * // You can import modules like this:
 	 * import Book from "@classes/Book.js";
 	 */
@@ -165,9 +168,6 @@ export interface CompiledAsset {
 	content: MagicString;
 	map?: SourceMap;
 	metadata?: any;
-	options?: {
-		transform: boolean
-	}
 }
 
 export interface ToypackLoader {

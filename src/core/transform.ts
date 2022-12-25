@@ -1,16 +1,18 @@
 import {
 	transform as babelTransform,
-	availablePlugins,
 } from "@babel/standalone";
 import MagicString from "magic-string";
 import SourceMap, { SourceMapData } from "./SourceMap";
 import Toypack from "./Toypack";
 import { AssetInterface, CompiledAsset } from "./types";
-
+import { TransformOptions } from "@babel/core";
+import { isURL } from "@toypack/utils";
+import mergeSourceMap from "merge-source-map";
 export default function transform(
 	chunk: MagicString,
 	asset: AssetInterface,
 	bundler: Toypack,
+	transformOptions: TransformOptions = {}
 ) {
 	let result: CompiledAsset = {
 		content: {} as MagicString,
@@ -21,18 +23,24 @@ export default function transform(
 
 	const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
 
+	transformOptions = Object.assign(
+		{
+			sourceFileName: asset.source,
+			filename: asset.source,
+			compact: false,
+			comments: false,
+		},
+		transformOptions
+	);
+	
+	// Make SourceMap option immutable
+	transformOptions.sourceMaps =
+		!!bundler.options.bundleOptions?.output?.sourceMap &&
+		!isCoreModule &&
+		!isURL(asset.source);
+
 	// [1] - Transpile
-	let transpiled = babelTransform(chunk.toString(), {
-		sourceType: "module",
-		sourceFileName: asset.source,
-		filename: asset.source,
-		sourceMaps:
-			!!bundler.options.bundleOptions?.output?.sourceMap && !isCoreModule,
-		compact: false,
-		presets: ["typescript", "react"],
-		plugins: [availablePlugins["transform-modules-commonjs"]],
-		comments: false,
-	});
+	let transpiled = babelTransform(chunk.toString(), transformOptions);
 
 	// If transpile result is empty, return
 	if (!transpiled.code) {
@@ -50,11 +58,8 @@ export default function transform(
 			hires: bundler._sourceMapConfig[1] == "original",
 		});
 
-		console.log("Mapped:");
-		console.log(asset.source);
-
 		let generatedSourceMap = transpiled.map;
-		chunkSourceMap = new SourceMap(origSourceMap).mergeWith(generatedSourceMap);
+		chunkSourceMap = new SourceMap(origSourceMap).mergeWith(generatedSourceMap); 
 	}
 
 	result.content = chunkContent;
