@@ -24,19 +24,18 @@
 						alias: {
 							"@scripts": "./scripts/",
 							"@stuff": "./cool/stuff/"
-						},
-						fallback: {
-							crypto: "crypto"
 						}
-					},
-            	autoAddDependencies: false
+					}
 				}
 			});
 
 			(async () => {
-				await toypack.addDependency("vue", "v3.2.23");
-				await toypack.addDependency("uuid");
 
+				await toypack.addDependency("vue@3.2.23");
+				await toypack.addDependency("uuid");
+				await toypack.addDependency("bootstrap");
+				await toypack.addDependency("bootstrap@5.2.3/dist/css/bootstrap.min.css");
+				
 				let sampleSimpleAssets = {
 					"src/index.js": `import { PI } from "@scripts/PI";
 import pkg from "../package";
@@ -48,13 +47,12 @@ import logo from "../public/logo.svg";
 import path, { dirname } from "path";
 import { createApp } from "vue";
 import { v4 } from "uuid";
-import * as crypto from "crypto";
-console.log(path, crypto);
+import "bootstrap/dist/css/bootstrap.min.css";
+console.log(path, dirname("path/to/some/file.txt"));
 console.log(createApp);
 console.log(v4());
 console.log(coolImg, logo);
 console.log(confetti);
-console.log(dirname("path/to/some/file.txt"));
 console.log(pkg);
 console.log(PI, stuff);`,
 

@@ -3,14 +3,14 @@ import {
 	availablePlugins,
 } from "@babel/standalone";
 import MagicString from "magic-string";
-import { createSourceMap, merge, SourceMap } from "./SourceMap";
+import SourceMap, { SourceMapData } from "./SourceMap";
 import Toypack from "./Toypack";
 import { AssetInterface, CompiledAsset } from "./types";
 
 export default function transform(
 	chunk: MagicString,
 	asset: AssetInterface,
-	bundler: Toypack
+	bundler: Toypack,
 ) {
 	let result: CompiledAsset = {
 		content: {} as MagicString,
@@ -19,16 +19,19 @@ export default function transform(
 		},
 	};
 
+	const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
+
 	// [1] - Transpile
 	let transpiled = babelTransform(chunk.toString(), {
 		sourceType: "module",
 		sourceFileName: asset.source,
 		filename: asset.source,
-		sourceMaps: !!bundler.options.bundleOptions?.output?.sourceMap,
+		sourceMaps:
+			!!bundler.options.bundleOptions?.output?.sourceMap && !isCoreModule,
 		compact: false,
 		presets: ["typescript", "react"],
 		plugins: [availablePlugins["transform-modules-commonjs"]],
-		comments: false
+		comments: false,
 	});
 
 	// If transpile result is empty, return
@@ -47,10 +50,11 @@ export default function transform(
 			hires: bundler._sourceMapConfig[1] == "original",
 		});
 
-		let generatedSourceMap = transpiled.map;
+		console.log("Mapped:");
+		console.log(asset.source);
 
-		chunkSourceMap =
-			createSourceMap(origSourceMap).mergeWith(generatedSourceMap);
+		let generatedSourceMap = transpiled.map;
+		chunkSourceMap = new SourceMap(origSourceMap).mergeWith(generatedSourceMap);
 	}
 
 	result.content = chunkContent;

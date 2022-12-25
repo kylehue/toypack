@@ -1,6 +1,6 @@
 import MagicString from "magic-string";
 import { AcceptedPlugin, ProcessOptions } from "postcss";
-import { SourceMap } from "./SourceMap";
+import SourceMap from "./SourceMap";
 import Toypack from "./Toypack";
 
 export interface ResolveOptions {
@@ -165,6 +165,9 @@ export interface CompiledAsset {
 	content: MagicString;
 	map?: SourceMap;
 	metadata?: any;
+	options?: {
+		transform: boolean
+	}
 }
 
 export interface ToypackLoader {

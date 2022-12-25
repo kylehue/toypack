@@ -21,7 +21,7 @@ export default function parsePackageName(str: string) {
 
 	let result: ParsedPackage = {
 		name: packageName,
-		version: packageVersion || "",
+		version: packageVersion?.replace("v", "") || "",
 	};
 
 	return result;

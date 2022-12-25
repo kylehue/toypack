@@ -36,17 +36,17 @@ export default class NodePolyfillPlugin implements ToypackPlugin {
 	async apply(bundler: Toypack) {
 		// Only add dependency if it's required
 		bundler.hooks.failedResolve(async (failedPath: string) => {
-			bundler.defineOptions({
-				bundleOptions: {
-					resolve: {
-                  fallback: {
-                     [failedPath]: polyfills[failedPath]
-                  },
-					},
-				},
-         });
-         
 			if (failedPath in polyfills) {
+				bundler.defineOptions({
+					bundleOptions: {
+						resolve: {
+							fallback: {
+								[failedPath]: polyfills[failedPath],
+							},
+						},
+					},
+				});
+
 				await bundler.addDependency(polyfills[failedPath]);
 			}
 		});

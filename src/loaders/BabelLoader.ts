@@ -2,59 +2,101 @@ import {
 	AssetInterface,
 	ToypackLoader,
 	ParsedAsset,
+	CompiledAsset,
 } from "@toypack/core/types";
 
+import path from "path-browserify";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
+import { availablePlugins, transform } from "@babel/standalone";
+import Toypack from "@toypack/core/Toypack";
+import MagicString from "magic-string";
 
 export default class BabelLoader implements ToypackLoader {
 	public name = "BabelLoader";
 	public test = /\.([jt]sx?)$/;
 
-	public parse(asset: AssetInterface, bundler) {
+	public compile(asset: AssetInterface) {
+		if (typeof asset.content != "string") {
+			let error = new Error("Babel Compile Error: Asset content must be string.");
+			throw error;
+		}
+
+		let result: CompiledAsset = {} as CompiledAsset;
+
+		let parseMetadata = asset.loaderData.parse?.metadata;
+		if (parseMetadata?.compilation) {
+			result.content = parseMetadata.compilation;
+		}
+
+		if (parseMetadata?.map) {
+			result.map = parseMetadata.map;
+		}
+
+		return result;
+	}
+
+	public parse(asset: AssetInterface, bundler: Toypack) {
 		if (typeof asset.content != "string") {
 			let error = new Error("Babel Parse Error: Asset content must be string.");
 			throw error;
 		}
 
-		const AST = getAST(asset.content, {
+		const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
+
+		const transpiled = transform(asset.content, {
 			sourceType: "module",
-			errorRecovery: true,
-			allowImportExportEverywhere: true,
-			sourceFilename: asset.source,
-			plugins: ["typescript", "jsx"],
+			sourceFileName: asset.source,
+			filename: asset.source,
+			sourceMaps:
+				!!bundler.options.bundleOptions?.output?.sourceMap && !isCoreModule,
+			compact: false,
+			presets: ["typescript", "react"],
+			plugins: [availablePlugins["transform-modules-commonjs"]],
+			comments: false,
 		});
 
 		let result: ParsedAsset = {
 			dependencies: [],
-			metadata: { AST },
+			metadata: {
+				depNodes: []
+			},
 		};
 
-		function addDependency(id: string) {
-			if (!id) return;
-			if (result.dependencies.some((dep) => dep === id)) return;
-			result.dependencies.push(id);
+		if (transpiled.code) {
+			let chunk = new MagicString(transpiled.code);
+
+			const AST = getAST(transpiled.code, {
+				sourceType: "module",
+				errorRecovery: true,
+				sourceFilename: asset.source,
+			});
+
+			traverseAST(AST, {
+				CallExpression: ({ node }) => {
+					let argNode = node.arguments[0];
+					let callee = node.callee;
+					if (
+						callee.type === "Identifier" &&
+						callee.name == "require" &&
+						argNode.type == "StringLiteral"
+					) {
+						let id = argNode.value;
+						if (!id) return;
+						if (result.dependencies.some((dep) => dep === id)) return;
+
+						result.dependencies.push(id);
+						result.metadata.depNodes.push(node);
+					}
+				},
+			});
+
+			result.metadata.compilation = chunk;
+
+			if (transpiled.map) {
+				result.metadata.map = transpiled.map;
+			}
 		}
-
-		traverseAST(AST, {
-			ImportDeclaration: ({node}: any) => {
-				let id = node.source.value;
-
-				addDependency(id);
-			},
-			ExportDeclaration: ({node}: any) => {
-				let id = node.source?.value;
-
-				addDependency(id);
-			},
-			CallExpression: ({node}: any) => {
-				if (node.callee.name == "require" && node.arguments.length) {
-					let id = node.arguments[0].value;
-
-					addDependency(id);
-				}
-			},
-		});
 
 		return result;
 	}

@@ -1,7 +1,8 @@
 import { getBtoa } from "@toypack/utils";
 import mergeSourceMap from "merge-source-map";
+import cloneDeep = require("lodash.clonedeep");
 
-type SourceMapData = {
+export interface SourceMapData {
 	version: number;
 	sources: string[];
 	names: string[];
@@ -9,10 +10,9 @@ type SourceMapData = {
 	sourcesContent: string[];
 	sourceRoot: string;
 	file: string;
-	[key: string | number | symbol]: any;
 };
 
-export class SourceMap implements SourceMapData {
+export default class SourceMap implements SourceMapData {
 	public version: number = 3;
 	public sources: string[] = [];
 	public names: string[] = [];
@@ -20,6 +20,12 @@ export class SourceMap implements SourceMapData {
 	public sourcesContent: string[] = [];
 	public sourceRoot: string = "";
 	public file: string = "";
+
+	constructor(sourceMapData: Object = {}) {
+		for (let [key, value] of Object.entries(sourceMapData)) {
+			this[key] = value;
+		}
+	}
 
 	toComment() {
 		return "\n//# sourceMappingURL=" + this.toURL();
@@ -39,31 +45,20 @@ export class SourceMap implements SourceMapData {
 	}
 
 	mergeWith(generated: any) {
-		let merged = merge(this, generated);
+		if (!generated) return this;
+		if (this.mappings === generated.mappings) return this;
+		
+		let merged;
+		if (!this.mappings) {
+			merged = generated;
+		} else {
+			merged = mergeSourceMap(this, generated);
+		}
 
 		for (let [key, value] of Object.entries(merged)) {
 			(this as SourceMapData)[key] = value;
 		}
-
+		
 		return this;
 	}
-}
-
-export function createSourceMap(sourceMap: any) {
-	let generated = new SourceMap();
-
-	for (let [key, value] of Object.entries(sourceMap)) {
-		(generated as SourceMapData)[key] = value;
-	}
-
-	return generated;
-}
-
-export function merge(original: any, generated: any) {
-	original = createSourceMap(original);
-	generated = createSourceMap(generated);
-
-	let merged = mergeSourceMap(original, generated);
-
-	return createSourceMap(merged);
 }

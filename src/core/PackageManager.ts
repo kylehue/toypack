@@ -1,98 +1,106 @@
 const skypackURL = "https://cdn.skypack.dev/";
 import { parse as getAST } from "@babel/parser";
 import traverseAST, { NodePath, VisitNode } from "@babel/traverse";
-import { cleanStr, isLocal, parsePackageName } from "@toypack/utils";
 import Toypack from "./Toypack";
 import path from "path-browserify";
 import MagicString from "magic-string";
+import { BabelLoader, CSSLoader } from "@toypack/loaders";
+import { AssetInterface } from "./types";
+import { parse as parsePackageName } from "parse-package-name";
+
+interface Asset {
+	content: string;
+	source: string;
+}
 
 export interface InstallationResult {
 	name: string;
 	version: string;
-	content: string;
+	graph: Asset[];
 }
 
 const versionRegexString = "@v?[0-9]+\\.[0-9]+\\.[0-9]+";
 const versionRegex = new RegExp(versionRegexString);
 
+let babelLoader = new BabelLoader();
+let cssLoader = new CSSLoader();
+
 export default class PackageManager {
 	private _cache = new Map();
 
-	private _cleanPath(id: string) {
-		let extension = path.extname(id);
-		let name = cleanStr(id);
-		return name + extension;
-	}
+	constructor(public bundler: Toypack) {}
 
-	private async _createGraph(entrySource: string, graph: any[] = [], parentSource?: string) {
-		let url = `${skypackURL}${entrySource}`;
-		console.log(graph[graph.length - 1]);
+	private async _createGraph(targetSource: string, graph: any[] = []) {
+		let url = `${skypackURL}${targetSource.replace(/^\//, "")}`;
+		let dirname = path.dirname(targetSource);
 
-		if (isLocal(entrySource) && !entrySource.startsWith("/-/") && parentSource) {
-			let t = entrySource.replace(/^(?:\.\.?(?:\/|$))+/, "");
-			let b = /^(\/-\/).*,mode=imports\//.exec(parentSource)?.[0];
-			url = `${skypackURL}${b + t}`;
-			// TODO:
-			// becomes ../unoptimized/encrypter.js
-			// should be /-/browserify-aes@v1.2.0-VHxtXJZIpdtZxuAwVrkN/dist=es2019,mode=imports/
-			console.log(parentSource);
-			console.log(url);
-			console.log(parentSource);
-			console.log(entrySource);
-		}
+		// Entries will be considered as a javascript file
+		let isEntry = graph.length == 0;
 
-		let extension = path.extname(entrySource);
-		if (!extension || graph.length == 0) {
-			extension = ".js";
-		}
-		
 		let fetchResponse = await fetch(url);
-		let cdnError = /^\/error\//.test(entrySource) && graph.length == 0;
-		if (!fetchResponse.ok || cdnError || extension != ".js") {
-			if (!fetchResponse.ok || cdnError) {
-				console.warn(`Failed to fetch ${fetchResponse.url}`);
+		let content = await fetchResponse.text();
+
+		let dependencies: string[] = [];
+		let chunk = new MagicString(content);
+		let errorRegex = /^\/error\//;
+
+		let facadeAsset = {
+			id: ++this.bundler._lastId,
+			source: targetSource,
+			content,
+		} as AssetInterface;
+
+		let facadeBundler = {
+			options: {},
+		} as Toypack;
+
+		// Load
+		if (cssLoader.test.test(targetSource)) {
+			let compiled = cssLoader.compile(facadeAsset, facadeBundler);
+			facadeAsset.content = compiled.content.toString();
+		} else if (babelLoader.test.test(targetSource) || isEntry) {
+			// Transform to cjs
+			let parsed = babelLoader.parse(facadeAsset, facadeBundler);
+
+			chunk = parsed.metadata.compilation;
+
+			for (let node of parsed.metadata.depNodes) {
+				let argNode = node.arguments[0];
+				let id = argNode.value;
+				if (dependencies.some((ex) => ex == id)) continue;
+				dependencies.push(id);
+
+				if (errorRegex.test(id)) {
+					// Remove import if error
+					chunk.update(node.start, node.end, "");
+				} else {
+					// Make path relative
+					let relative = path.relative(dirname, id);
+					chunk.update(argNode.start, argNode.end, `"./${relative}"`);
+				}
 			}
 
-			return graph;
+			facadeAsset.content = chunk.toString();
 		}
 
-		let code = await fetchResponse.text();
-		let codeAST = getAST(code, {
-			sourceType: "module",
-		});
+		graph.push(facadeAsset);
 
-		let chunk = new MagicString(code);
+		// Scan dependencies
+		for (let dep of dependencies) {
+			let depAbsolutePath = path.resolve(dirname, dep);
 
-		let exports: string[] = [];
+			// Skip if it is in the graph already
+			if (graph.some((d) => d.source == depAbsolutePath)) {
+				continue;
+			}
 
-		const scanDeclaration = ({ node }: any) => {
-			let id = node.source?.value;
-			if (!id) return;
+			// Skip if error
+			if (errorRegex.test(dep) || errorRegex.test(fetchResponse.url)) {
+				console.warn(`Failed to fetch ${depAbsolutePath}`);
+				continue;
+			}
 
-			let base = this._cleanPath(id);
-			chunk.update(node.source.start, node.source.end, `"./${base}"`);
-
-			if (exports.some((ex) => ex == id)) return;
-			exports.push(id);
-		};
-
-		traverseAST(codeAST, {
-			ExportDeclaration: scanDeclaration,
-			ImportDeclaration: scanDeclaration,
-		});
-
-		graph.push({
-			origCode: code,
-			code: chunk.toString(),
-			source: !/\.js$/.test(entrySource)
-				? this._cleanPath(entrySource) + extension
-				: this._cleanPath(entrySource),
-			origSource: entrySource,
-		});
-
-		for (let exported of exports) {
-			if (graph.some((dep) => dep.origSource == exported)) continue;
-			await this._createGraph(exported, graph, entrySource);
+			await this._createGraph(depAbsolutePath, graph);
 		}
 
 		return graph;
@@ -102,61 +110,47 @@ export default class PackageManager {
 		name: string,
 		version: string = ""
 	): Promise<InstallationResult> {
-		let atVersion = version ? "@" + version : version;
-		let targetPackage = name + atVersion;
-		let packageName = parsePackageName(name).name;
+		let result: InstallationResult = {
+			name: "",
+			version: "",
+			graph: [],
+		};
+
+		// Get proper package name and version
+		let parsedPackageName = parsePackageName(name);
+		name = parsedPackageName.name;
+		version = parsedPackageName.version;
+		result.name = name + parsedPackageName.path;
+		
+		let target = `${name}@${version}${parsedPackageName.path}`;
 
 		// Check cache
-		let cached = this._cache.get(targetPackage);
+		let cached = this._cache.get(target);
 		if (cached) {
 			return cached;
 		}
 
-		// Instantiate bundler
-		const bundler = new Toypack({
-			bundleOptions: {
-				mode: "development",
-				output: {
-					sourceMap: false,
-					name: packageName,
-				},
-			},
-		});
-      
-		// Get graph and add assets to bundle
-		let graph = await this._createGraph(`${targetPackage}?dist=es2017`);
-		console.log(graph);
-		
+		// Get graph
+		let graph = await this._createGraph(target);
+		graph[0].source = "index" + ".js";
+		result.graph = graph;
 
-		for (let asset of graph) {
-			await bundler.addAsset(asset.source, asset.code);
-		}
-
-		// Bundle
-		bundler.defineOptions({
-			bundleOptions: {
-				entry: graph[0].source,
-			},
-		});
-
-		let bundle = await bundler.bundle();
-
-		let fetchedVersion: any = new RegExp(packageName + versionRegexString).exec(
-			graph[0].code
+		// Get version
+		let fetchedVersion: any = new RegExp(name + versionRegexString).exec(
+			graph[0].content
 		);
 
 		if (fetchedVersion) {
-			fetchedVersion = versionRegex.exec(fetchedVersion[0])?.[0].substring(1);
+			fetchedVersion = versionRegex
+				.exec(fetchedVersion[0])?.[0]
+				.substring(1)
+				.replace("v", "");
 		}
 
-		let result: InstallationResult = {
-			name: packageName,
-			version: fetchedVersion,
-			content: bundle.content,
-		};
+		result.version = fetchedVersion;
 
 		// Cache
-		this._cache.set(targetPackage, result);
+		this._cache.set(target, result);
 
 		return result;
 	}

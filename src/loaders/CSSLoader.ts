@@ -17,7 +17,7 @@ export default class CSSLoader implements ToypackLoader {
 	public name = "CSSLoader";
 	public test = /\.css$/;
 
-	public parse(asset: AssetInterface, bundler: Toypack, options) {
+	public parse(asset: AssetInterface, bundler: Toypack, options?) {
 		if (typeof asset.content != "string") {
 			let error = new Error("CSS Parse Error: Content must be string.");
 			throw error;
@@ -102,12 +102,12 @@ export default class CSSLoader implements ToypackLoader {
 		};
 
 		let processedContent =
-			asset.loaderData.parse.metadata?.AST?.toString() || asset.content;
+			asset.loaderData?.parse?.metadata?.AST?.toString() || asset.content;
 
 		// Process
 		if (!isURL(asset.source)) {
-			const plugins = bundler.options.postCSSOptions?.plugins;
-			const options = bundler.options.postCSSOptions?.options;
+			const plugins = bundler.options.postCSSOptions?.plugins || [];
+			const options = bundler.options.postCSSOptions?.options || {};
 			processedContent = postcss(plugins).process(
 				processedContent,
 				options
@@ -127,7 +127,7 @@ export default class CSSLoader implements ToypackLoader {
 
 		chunk.append(
 			`
-let __head__ = document.head || document.getElementsByTagName("head")[0];
+var __head__ = document.head || document.getElementsByTagName("head")[0];
 __stylesheet__ = document.createElement("style");
 __stylesheet__.dataset.toypackId = "asset-${asset.id}";
 __stylesheet__.setAttribute("type", "text/css");
@@ -144,7 +144,7 @@ if (__stylesheet__.styleSheet){
 		chunk.indent("\t").prepend(`if (!__stylesheet__) {\n`).append("\n}");
 
 		chunk.prepend(
-			`let __stylesheet__ = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
+			`var __stylesheet__ = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
 		);
 
 		// Imports
