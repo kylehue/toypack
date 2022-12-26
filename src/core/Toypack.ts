@@ -29,7 +29,8 @@ import babelMinify from "babel-minify";
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 
-import autoprefixer from "autoprefixer";
+import PackageManager, { InstallationResult } from "./PackageManager";
+import { transform } from "@babel/standalone";
 
 const styleExtensions = [".css", ".sass", ".scss", ".less"];
 const appExtensions = [".js", ".json", ".jsx", ".ts", ".tsx", ".html", ".vue"];
@@ -44,7 +45,6 @@ interface Hooks {
 
 (window as any).path = path;
 
-import PackageManager, { InstallationResult } from "./PackageManager";
 export default class Toypack {
 	public assets: Map<string, AssetInterface> = new Map();
 	public options: ToypackOptions = cloneObject(defaultOptions);
@@ -58,6 +58,7 @@ export default class Toypack {
 	private _prevContentURL;
 	private _prevContentDocURL;
 	private _graphCache: Map<string, AssetInterface> = new Map();
+	private _bundleCache: Map<string, AssetInterface> = new Map();
 	constructor(options?: ToypackOptions) {
 		if (options) {
 			this.defineOptions(options);
@@ -77,7 +78,6 @@ export default class Toypack {
 
 		/* Default plugins */
 		this.addPlugin(new NodePolyfillPlugin());
-		this.options.postCSSOptions?.plugins?.push(autoprefixer);
 	}
 
 	public hooks: Hooks = {
@@ -130,14 +130,8 @@ export default class Toypack {
 
 	public async addDependency(
 		name: string,
-		version = "",
-		warn: boolean = true
+		version = ""
 	): Promise<InstallationResult> {
-		if (this.options.bundleOptions?.autoAddDependencies && warn) {
-			console.warn(
-				"Add Dependency Warning: Auto install dependencies is turned on. It is not recommended to manually add dependencies while this option is enabled. Set `options.autoAddDependencies` to `false` when adding dependencies manually."
-			);
-		}
 		// Fetch dependency
 		const dep = await this.packageManager.get(name, version);
 
@@ -210,6 +204,8 @@ export default class Toypack {
 				},
 			},
 			dependencyMap: {},
+			isObscure: !textExtensions.includes(extension) || isURL(source),
+			isModified: true,
 			contentURL: "",
 			blob: {} as Blob,
 		};
@@ -443,7 +439,7 @@ export default class Toypack {
 		let isExternal = isURL(source);
 		source = isExternal ? source : path.join("/", source);
 
-		let asset = this.assets.get(source);
+		const asset = this.assets.get(source);
 
 		if (!asset) {
 			throw new Error(`Graph Error: Cannot find asset ${source}`);
@@ -456,12 +452,12 @@ export default class Toypack {
 		) {
 			graph.push(asset);
 		} else {
-			let cached = this._graphCache.get(source);
 			let parseData: ParsedAsset = { dependencies: [] };
-
+			let cached = this._graphCache.get(source);
+			asset.isModified = asset.content !== cached?.content;
 			// Reuse the old parse data if content didn't change
-			if (asset.content == cached?.content && cached?.loaderData.parse) {
-				parseData = cached.loaderData.parse;
+			if (!asset.isModified && asset?.loaderData.parse) {
+				parseData = asset.loaderData.parse;
 			} else {
 				parseData = await asset.loader.parse(asset, this);
 			}
@@ -492,15 +488,6 @@ export default class Toypack {
 
 				// If not a url, resolve
 				if (!isExternal) {
-					// Auto install
-					if (this.options.bundleOptions?.autoAddDependencies && isCoreModule) {
-						await this.addDependency(
-							aliasData ? aliasData.replacement : dependency,
-							"",
-							false
-						);
-					}
-
 					// Resolve
 					let resolved = this.resolve(dependency, {
 						baseDir,
@@ -549,20 +536,19 @@ export default class Toypack {
 	}
 
 	public async bundle() {
-		if (this === (window as any).toypack) {
-			console.time("Total Bundle Time");
-		}
-
-		for (let plugin of this.plugins) {
-			await plugin.apply(this);
-		}
-
 		let entrySource = this.resolve(
 			path.join("/", this.options.bundleOptions?.entry || "")
 		);
 
 		if (!entrySource) {
 			throw new Error(`Bundle Error: Entry point not found.`);
+		}
+		
+		for (let plugin of this.plugins) {
+			if (!plugin._applied) {
+				await plugin.apply(this);
+				plugin._applied = true;
+			}
 		}
 
 		this.outputSource = formatPath(
@@ -576,10 +562,14 @@ export default class Toypack {
 		);
 
 		let sourceMapOutputSource = entryOutputPath + ".map";
-
+			
+		console.time("Total Graph Time");
 		let graph = await this._createGraph(entrySource);
+		console.timeEnd("Total Graph Time");
 		let bundle = new Bundle();
 		let sourceMap: MapCombiner | null = null;
+		
+		console.time("Total Bundle Time");
 
 		if (
 			this.options.bundleOptions?.output?.sourceMap &&
@@ -592,22 +582,51 @@ export default class Toypack {
 
 		for (let i = 0; i < graph.length; i++) {
 			const asset = graph[i];
-			const isFirst = i === 0;
-			const isLast = i === graph.length - 1 || graph.length == 1;
-			const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
+			const cached = this._bundleCache.get(asset.source);
+			asset.isModified = asset.content !== cached?.content;
+
+			if (!asset.isModified && asset.compilationData) {
+				bundle.addSource({
+					filename: asset.source,
+					content: asset.compilationData.content,
+				});
+
+				if (asset.compilationData.isMapped) {
+					sourceMap?.addFile(
+						{
+							sourceFile: asset.source,
+							source: asset.compilationData.map.toComment(),
+						},
+						{
+							line: prevLine,
+						}
+					);
+				}
+
+				prevLine += asset.compilationData.offset;
+				console.log("%c Cached: ", "color: gold;", asset.source);
+				continue;
+			}
 
 			let chunkContent = {} as MagicString;
 			let chunkSourceMap: SourceMap = new SourceMap();
 
+			const isFirst = i === 0;
+			const isLast = i === graph.length - 1 || graph.length == 1;
+			const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
+
 			// [1] - Compile
 			let compiled: CompiledAsset = {} as CompiledAsset;
-			if (typeof asset.loader.compile == "function") {
+			if (typeof asset.loader.compile == "function" && !isCoreModule) {
 				compiled = await asset.loader.compile(asset, this);
+				console.log("%c Compiled: ", "color: red;", asset.source);
 			}
 
-			if (!compiled.content && !isCoreModule) {
-				let content = typeof asset.content == "string" ? asset.content : "";
-				compiled.content = new MagicString(content);
+			// If compiler didn't return any content, use asset's raw content
+			// This is for assets that don't need compilation
+			if (!compiled.content) {
+				let rawContent = typeof asset.content == "string" ? asset.content : "";
+				compiled.content = new MagicString(rawContent);
 			}
 
 			// Save to loader data
@@ -616,35 +635,6 @@ export default class Toypack {
 			// Update chunk
 			chunkContent = compiled.content;
 			chunkSourceMap.mergeWith(compiled.map);
-
-			// [2] - Transform
-			/* let transformed: CompiledAsset = {} as CompiledAsset;
-
-			// Only transform if asset didn't come from an external URL
-			let isObscure =
-				!textExtensions.includes(asset.extension) || isURL(asset.source);
-
-			if (!isObscure && compiled.babelTransform && !isCoreModule) {
-				let babelTransformOptions = {};
-				if (typeof compiled.babelTransform == "object") {
-					babelTransformOptions = compiled.babelTransform;
-				}
-
-				transformed = transform(
-					chunkContent.clone(),
-					asset,
-					this,
-					babelTransformOptions
-				);
-			}
-
-			if (!transformed.content) {
-				transformed.content = chunkContent;
-			}
-
-			// Update chunk
-			chunkContent = transformed.content;
-			chunkSourceMap.mergeWith(transformed.map); */
 
 			// [3] - Format
 			let formatted = applyUMD(chunkContent.clone(), asset, this, {
@@ -663,13 +653,14 @@ export default class Toypack {
 				content: chunkContent,
 			});
 
-			if (
-				sourceMap &&
-				chunkSourceMap &&
+			let isMapped =
+				!!sourceMap &&
+				!!chunkSourceMap &&
 				textExtensions.includes(asset.extension) &&
 				typeof asset.content == "string" &&
-				!isCoreModule
-			) {
+				!isCoreModule;
+
+			if (isMapped) {
 				chunkSourceMap.mergeWith(
 					chunkContent.generateMap({
 						source: asset.source,
@@ -679,11 +670,14 @@ export default class Toypack {
 				);
 
 				// Add sources content
-				if (this._sourceMapConfig[2] == "sources") {
+				if (
+					this._sourceMapConfig[2] == "sources" &&
+					typeof asset.content == "string"
+				) {
 					chunkSourceMap.sourcesContent[0] = asset.content;
 				}
 
-				sourceMap.addFile(
+				sourceMap?.addFile(
 					{
 						sourceFile: asset.source,
 						source: chunkSourceMap.toComment(),
@@ -694,11 +688,44 @@ export default class Toypack {
 				);
 			}
 
-			prevLine += chunkContent.toString().split("\n").length;
+			// Offset source map
+			let offset = 0;
+			if (sourceMap) {
+				offset = chunkContent.toString().split("\n").length;
+				prevLine += offset;
+			}
+
+			// Cache
+			if (asset.isModified) {
+				asset.compilationData = {
+					content: chunkContent,
+					map: chunkSourceMap,
+					offset,
+					isMapped,
+				};
+
+				this._bundleCache.set(asset.source, Object.assign({}, asset));
+			}
 		}
 
 		//
 		let finalContent = bundle.toString();
+
+		// Minify if in production mode
+		if (this.options.bundleOptions?.mode == "production") {
+			let transpiled = transform(finalContent, {
+				presets: ["es2015-loose"],
+			});
+
+			let minified = babelMinify(transpiled.code, {
+				mangle: {
+					topLevel: true,
+					keepClassName: true,
+				},
+			});
+
+			finalContent = minified.code;
+		}
 
 		if (sourceMap) {
 			let sourceMapObject = MapConverter.fromBase64(
@@ -745,13 +772,10 @@ export default class Toypack {
 
 		this._prevContentURL = contentURL;
 
-		// prettier-ignore
-		let contentDoc =
-			// prettier-ignore
-`<!DOCTYPE html>
+		let contentDoc = `<!DOCTYPE html>
 <html>
 	<head>
-		<script defer type="module" src="${contentURL}"></script>
+		<script defer src="${contentURL}"></script>
 	</head>
 	<body>
 	</body>
@@ -796,11 +820,8 @@ export default class Toypack {
 				}
 			}
 		}
-
-		if (this === (window as any).toypack) {
-			console.log(bundleResult);
-			console.timeEnd("Total Bundle Time");
-		}
+		console.log(bundleResult);
+		console.timeEnd("Total Bundle Time");
 
 		await this._initHooks("done");
 

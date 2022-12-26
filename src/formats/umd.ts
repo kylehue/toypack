@@ -1,13 +1,10 @@
 import Toypack from "@toypack/core/Toypack";
 import { AssetInterface, CompiledAsset } from "@toypack/core/types";
 import MagicString from "magic-string";
-
-function minimize(str: string) {
-	return str.replace(/[\n\t]/g, "").replace(/\s+/g, " ");
-}
+import { minimizeStr } from "@toypack/utils";
 
 function getTopUMD(name: string) {
-	return minimize(
+	return minimizeStr(
 		`(function UMD(root, factory) {
    if (typeof exports === "object" && typeof module === "object") {
       module.exports = factory();
@@ -24,7 +21,7 @@ function getTopUMD(name: string) {
 }
 
 function getBottomUMD(entryId: string) {
-	return minimize(`};
+	return minimizeStr(`};
    /* Require function */
    var __moduleCache__ = {};
    function __require__(assetId) {
@@ -62,7 +59,6 @@ export default function format(
 		content: {} as MagicString,
 	};
 
-	chunk.indent();
 	chunk.prepend(`init: function(module, exports, require) {`);
 	chunk.prepend(`${asset.id}: {`);
 	chunk.append(`},`);

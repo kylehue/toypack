@@ -18,7 +18,9 @@ export default class BabelLoader implements ToypackLoader {
 
 	public compile(asset: AssetInterface) {
 		if (typeof asset.content != "string") {
-			let error = new Error("Babel Compile Error: Asset content must be string.");
+			let error = new Error(
+				"Babel Compile Error: Asset content must be string."
+			);
 			throw error;
 		}
 
@@ -44,58 +46,60 @@ export default class BabelLoader implements ToypackLoader {
 
 		const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
 
-		const transpiled = transform(asset.content, {
-			sourceType: "module",
-			sourceFileName: asset.source,
-			filename: asset.source,
-			sourceMaps:
-				!!bundler.options.bundleOptions?.output?.sourceMap && !isCoreModule,
-			compact: false,
-			presets: ["typescript", "react"],
-			plugins: [availablePlugins["transform-modules-commonjs"]],
-			comments: bundler.options.bundleOptions?.mode == "development",
-			minified: bundler.options.bundleOptions?.mode == "production",
-		});
-
 		let result: ParsedAsset = {
 			dependencies: [],
 			metadata: {
-				depNodes: []
+				depNodes: [],
 			},
 		};
 
-		if (transpiled.code) {
-			let chunk = new MagicString(transpiled.code);
-
-			const AST = getAST(transpiled.code, {
+		if (!asset.isObscure) {
+			const transpiled = transform(asset.content, {
 				sourceType: "module",
-				errorRecovery: true,
-				sourceFilename: asset.source,
+				sourceFileName: asset.source,
+				filename: asset.source,
+				sourceMaps:
+					bundler.options.bundleOptions?.mode == "development" &&
+					!!bundler.options.bundleOptions?.output?.sourceMap &&
+					!isCoreModule,
+				compact: false,
+				presets: ["typescript", "react"],
+				plugins: [availablePlugins["transform-modules-commonjs"]],
 			});
 
-			traverseAST(AST, {
-				CallExpression: ({ node }) => {
-					let argNode = node.arguments[0];
-					let callee = node.callee;
-					if (
-						callee.type === "Identifier" &&
-						callee.name == "require" &&
-						argNode.type == "StringLiteral"
-					) {
-						let id = argNode.value;
-						if (!id) return;
-						if (result.dependencies.some((dep) => dep === id)) return;
+			if (transpiled.code) {
+				let chunk = new MagicString(transpiled.code);
 
-						result.dependencies.push(id);
-						result.metadata.depNodes.push(node);
-					}
-				},
-			});
+				const AST = getAST(transpiled.code, {
+					sourceType: "module",
+					errorRecovery: true,
+					sourceFilename: asset.source,
+				});
 
-			result.metadata.compilation = chunk;
+				traverseAST(AST, {
+					CallExpression: ({ node }) => {
+						let argNode = node.arguments[0];
+						let callee = node.callee;
+						if (
+							callee.type === "Identifier" &&
+							callee.name == "require" &&
+							argNode.type == "StringLiteral"
+						) {
+							let id = argNode.value;
+							if (!id) return;
+							if (result.dependencies.some((dep) => dep === id)) return;
 
-			if (transpiled.map) {
-				result.metadata.map = transpiled.map;
+							result.dependencies.push(id);
+							result.metadata.depNodes.push(node);
+						}
+					},
+				});
+
+				result.metadata.compilation = chunk;
+
+				if (transpiled.map) {
+					result.metadata.map = transpiled.map;
+				}
 			}
 		}
 

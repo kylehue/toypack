@@ -19,17 +19,19 @@ type SourceMapOptions =
 
 export interface OutputOptions {
 	/**
-	 * Default: `dist`
-	 * - The output directory of the bundle.
+	 * @default `dist`
+	 * @desc The output directory of the bundle.
 	 */
 	path?: string;
 	/**
-	 * Default: `[name][ext]`
-	 * - The filename of the bundle.
+	 * @default `[name][ext]`
+	 * @desc The filename of the bundle.
 	 */
 	filename?: string;
 	/**
-	 * Default: `inline-cheap-sources`
+	 * @default `inline-cheap-sources`
+	 *
+	 * @desc
 	 * - `inline-*-*` - Appended directly to the code as a data URL, allowing the source map to be accessed without an additional file.
 	 * - `external-*-*` - Stored in a separate file and referenced by the compiled code.
 	 * - `*-cheap-*` - Only map the lines of code, rather than the specific columns, resulting in a smaller and less detailed source map.
@@ -37,46 +39,47 @@ export interface OutputOptions {
 	 * - `*-*-nosources` - No source code is included. This results in a smaller source map file, but may make debugging more difficult.
 	 * - `*-*-sources` - Opposite of `*-*-nosources`.
 	 * - Set to `false` to disable.
+	 *
+	 * **Note:** Becomes `false` when in production mode.
 	 */
 	sourceMap?: SourceMapOptions;
 	/**
-	 * - The name of your library.
+	 * @desc The name of your library.
 	 */
 	name?: string;
 	/**
-	 * Default: `external`
+	 * @default `external`
+	 * @desc
 	 * - Set to `inline` to append directly to the code as a data URL.
 	 * - Set to `external` to save as an external resource.
 	 */
 	asset?: "inline" | "external";
 	/**
-	 * Default: `[name][ext]`
-	 * - The filename of the assets.
+	 * @default `[name][ext]`
+	 * @desc The filename of the assets.
 	 */
 	assetFilename?: string;
 }
 
 export interface BundleOptions {
 	/**
-	 * Default: `development`
+	 * @default `development`
+	 * 
+	 * @desc
 	 * - `development` - Optimized for a fast and flexible workflow during the development process.
+	 * 
 	 * - `production` - Optimized for performance and efficiency in a live production environment.
 	 */
 	mode?: "development" | "production";
 	/**
-	 * Default: `/`
-	 * - The starting point of the bundle.
+	 * @default `/`
+	 * @desc The starting point of the bundle.
 	 */
 	entry?: string;
 	/**
 	 * @desc Output options.
 	 */
 	output?: OutputOptions;
-	/**
-	 * @default false
-	 * @desc Set to `true` to automatically add any dependencies that are imported in the project.
-	 */
-	autoAddDependencies?: boolean;
 	/**
 	 * @desc Toypack plugins.
 	 */
@@ -89,7 +92,7 @@ export interface BundleOptions {
 
 export interface ModuleResolveOptions {
 	/**
-	 * @desc Create aliases to `import` or `require` certain modules more easily.
+	 * @desc Create aliases to import or require certain modules more easily.
 	 * @example
 	 * {
 	 * 	alias: {
@@ -119,12 +122,11 @@ export interface ModuleResolveOptions {
 
 export interface PostCSSOptions {
 	/**
-	 * Default: `[autoprefixer]`
-	 * - PostCSS plugins.
+	 * @desc PostCSS plugins.
 	 */
 	plugins?: AcceptedPlugin[];
 	/**
-	 * - PostCSS processing options.
+	 * @desc PostCSS processing options.
 	 */
 	options?: ProcessOptions;
 }
@@ -141,8 +143,8 @@ export interface ToypackOptions {
 }
 
 interface LoaderData {
-	compile: CompiledAsset;
-	parse: ParsedAsset;
+	compile: CompiledAsset | null;
+	parse: ParsedAsset | null;
 }
 
 export interface AssetInterface {
@@ -154,8 +156,16 @@ export interface AssetInterface {
 	extension: string;
 	loader: ToypackLoader;
 	loaderData: LoaderData;
+	compilationData?: {
+		map: SourceMap;
+		content: MagicString;
+		offset: number;
+		isMapped: boolean;
+	};
 	dependencyMap: Object;
 	contentURL: string;
+	isObscure: boolean;
+	isModified: boolean;
 	blob: Blob;
 }
 
@@ -188,6 +198,7 @@ export interface ToypackLoader {
 
 export interface ToypackPlugin {
 	options?: Object;
+	_applied?: boolean;
 	apply: (compiler: Toypack) => void | Promise<void>;
 }
 

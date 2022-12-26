@@ -11,7 +11,6 @@ export const bundleOptions: BundleOptions = {
 		asset: "external",
 		assetFilename: "[name][ext]",
 	},
-   autoAddDependencies: false,
    resolve: {
       extensions: [".js", ".json"]
    },

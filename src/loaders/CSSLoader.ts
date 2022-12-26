@@ -11,8 +11,24 @@ import postcss from "postcss";
 import valueParser from "postcss-value-parser";
 import { parse as parseCSS } from "postcss";
 import { dirname } from "path-browserify";
-
+import { minimizeStr } from "@toypack/utils";
 const URLFunctionRegex = /url\s*\("?(?![a-z]+:)/;
+
+function getTemplate(id: string | number) {
+	return minimizeStr(`
+var _head = document.head || document.getElementsByTagName("head")[0];
+_style = document.createElement("style");
+_style.dataset.toypackId = "asset-${id}";
+_style.setAttribute("type", "text/css");
+_head.appendChild(_style);
+if (_style.styleSheet){
+  _style.styleSheet.cssText = __styleContent__;
+} else {
+  _style.appendChild(document.createTextNode(__styleContent__));
+}
+`);
+}
+
 export default class CSSLoader implements ToypackLoader {
 	public name = "CSSLoader";
 	public test = /\.css$/;
@@ -23,7 +39,10 @@ export default class CSSLoader implements ToypackLoader {
 			throw error;
 		}
 
-		const AST = parseCSS(asset.content, bundler.options.postCSSOptions?.options);
+		const AST = parseCSS(
+			asset.content,
+			bundler.options.postCSSOptions?.options
+		);
 
 		const result: ParsedAsset = {
 			dependencies: [],
@@ -71,15 +90,15 @@ export default class CSSLoader implements ToypackLoader {
 							if (!source.startsWith("data:")) {
 								result.dependencies.push(source);
 
-                        // Require asset
+								// Require asset
 								let dependencyAbsolutePath = bundler.resolve(source, {
 									baseDir: dirname(asset.source),
 								});
 
 								let cached = bundler.assets.get(dependencyAbsolutePath);
 
-                        if (cached) {
-                           node.value = `url("\${${cleanStr(source)}}")`;
+								if (cached) {
+									node.value = `url("\${${cleanStr(source)}}")`;
 								}
 							}
 						}
@@ -98,7 +117,7 @@ export default class CSSLoader implements ToypackLoader {
 		}
 
 		const result: CompiledAsset = {
-			content: {} as MagicString
+			content: {} as MagicString,
 		};
 
 		let processedContent =
@@ -114,42 +133,31 @@ export default class CSSLoader implements ToypackLoader {
 			).css;
 		}
 
-		let styleContent = 'let __styleContent__ = ("")';
+		let styleContent = 'var __styleContent__ = ("")';
 		for (let line of processedContent.split("\n")) {
 			line = line.replaceAll("`", "\\`");
 			styleContent += `.concat(\`${line}\`)`;
 		}
 
+		styleContent += ";";
+
 		let chunk = new MagicString(asset.content);
 
 		// For dummy source map
 		chunk.update(0, chunk.length(), styleContent);
-
-		chunk.append(
-			`
-var __head__ = document.head || document.getElementsByTagName("head")[0];
-__stylesheet__ = document.createElement("style");
-__stylesheet__.dataset.toypackId = "asset-${asset.id}";
-__stylesheet__.setAttribute("type", "text/css");
-__head__.appendChild(__stylesheet__);
-if (__stylesheet__.styleSheet){
-  __stylesheet__.styleSheet.cssText = __styleContent__;
-} else {
-  __stylesheet__.appendChild(document.createTextNode(__styleContent__));
-}
-`
-		);
+		chunk.append(getTemplate(asset.id));
 
 		// Avoid style duplicates
-		chunk.indent("\t").prepend(`if (!__stylesheet__) {\n`).append("\n}");
-
+		chunk.prepend(`if (!_style) {`).append("}");
 		chunk.prepend(
-			`var __stylesheet__ = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
+			`var _style = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
 		);
 
 		// Imports
 		for (let dependency in asset.dependencyMap) {
-			chunk.prepend(`var ${cleanStr(dependency)} = require("${dependency}");\n`);
+			chunk.prepend(
+				`var ${cleanStr(dependency)} = require("${dependency}");`
+			);
 		}
 
 		result.content = chunk;

@@ -6,11 +6,13 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Document</title>
 	</head>
-	<body>
+	<body style="margin:0; padding:0; width: 100vw; height: 100vh;">
+		<button id="bundle" style="position: absolute;">Bundle</button>
+		<iframe id="sandbox" style="width: 100%; height: 100%;"></iframe>
 		<script type="module">
 			let toypack = new Toypack.default({
 				bundleOptions: {
-					mode: "production",
+					mode: "development",
 					entry: "src",
 					output: {
 						path: "lib",
@@ -103,7 +105,15 @@ div {
 				}
 
 				await toypack.bundle();
+
 			})();
+			let button = document.getElementById("bundle");
+			let sandbox = document.getElementById("sandbox");
+
+			button.onclick = async () => {
+				let bundle = await toypack.bundle();
+				sandbox.src = bundle.contentDocURL;
+			}
 
 			window.toypack = toypack;
 			console.log(toypack);
