@@ -16,7 +16,8 @@ module.exports = {
 		],
 	},
 	moduleNameMapper: {
-		"^@toypack(.*)$": "<rootDir>/src$1"
+		"^@toypack(.*)$": "<rootDir>/src$1",
 	},
 	roots: ["<rootDir>/src", "<rootDir>/test"],
+	setupFiles: ["<rootDir>/test/jest.stub.js"],
 };

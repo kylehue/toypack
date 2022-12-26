@@ -26,12 +26,17 @@ function getBottomUMD(entryId: string) {
    var __moduleCache__ = {};
    function __require__(assetId) {
       var __asset__ = __modules__[assetId];
-      var { init, map } = __asset__;
+      var init = __asset__.init;
+      var map = __asset__.map;
       var __module__ = { exports: {} };
       __moduleCache__[assetId] = __module__.exports;
       function localRequire(assetRelativePath) {
          if (!__moduleCache__[map[assetRelativePath]]) {
             __moduleCache__[map[assetRelativePath]] = __module__.exports;
+            if (!map[assetRelativePath]) {
+               throw new Error("Could not resolve " + assetRelativePath);
+            }
+            
             var __exports__ = __require__(map[assetRelativePath]);
             __moduleCache__[map[assetRelativePath]] = __exports__;
             return __exports__;

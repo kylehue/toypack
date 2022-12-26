@@ -8,40 +8,35 @@ toypack.defineOptions({
 	},
 });
 
-beforeAll(async () => {
-	window.URL.createObjectURL = jest.fn();
-	await toypack.addAsset("src/main.js");
-	await toypack.addAsset("assets/image.jpg");
-	await toypack.addAsset("someFile.js");
-	await toypack.addAsset("someFolder/file.js");
-	await toypack.addAsset(
-		"someFolder/package.json",
-		JSON.stringify({
-			main: "file.js",
-		})
-	);
-	await toypack.addAsset("anotherFolder/index.js");
-	await toypack.addAsset("node_modules/hello/index.js");
-	toypack.defineOptions({
-		bundleOptions: {
-			resolve: {
-				alias: {
-					"@utils": "/test/utils/",
+describe("Resolve", () => {
+	beforeAll(async () => {
+		await toypack.addAsset("src/main.js");
+		await toypack.addAsset("assets/image.jpg");
+		await toypack.addAsset("someFile.js");
+		await toypack.addAsset("someFolder/file.js");
+		await toypack.addAsset(
+			"someFolder/package.json",
+			JSON.stringify({
+				main: "file.js",
+			})
+		);
+		await toypack.addAsset("anotherFolder/index.js");
+		await toypack.addAsset("node_modules/hello/index.js");
+		toypack.defineOptions({
+			bundleOptions: {
+				resolve: {
+					alias: {
+						"@utils": "/test/utils/",
+					},
 				},
 			},
-		},
+		});
+
+		await toypack.addAsset("test/utils/tester/index.js");
+		await toypack.addAsset("test/utils/tester/stuff.js");
+		await toypack.addAsset("test/utils/foo/bar.js");
 	});
 
-	await toypack.addAsset("test/utils/tester/index.js");
-	await toypack.addAsset("test/utils/tester/stuff.js");
-	await toypack.addAsset("test/utils/foo/bar.js");
-});
-
-afterAll(() => {
-	window.URL.createObjectURL.mockReset();
-});
-
-describe("Resolve", () => {
 	test("Simple", () => {
 		let res = toypack.resolve("./src/main.js", {
 			baseDir: ".",

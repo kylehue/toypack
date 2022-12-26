@@ -7,6 +7,7 @@ import {
 	ParsedAsset,
 	CompiledAsset,
 	BundleResult,
+	BundleOptions,
 } from "@toypack/core/types";
 import {
 	BabelLoader,
@@ -18,7 +19,11 @@ import { NodePolyfillPlugin } from "@toypack/plugins";
 import { defaultOptions } from "@toypack/core/options";
 import applyUMD from "@toypack/formats/umd";
 
-import { merge as mergeObjects, cloneDeep as cloneObject } from "lodash";
+import {
+	merge as mergeObjects,
+	cloneDeep as cloneObject,
+	cloneDeep,
+} from "lodash";
 import { isURL, getBtoa, isLocal, formatPath } from "@toypack/utils";
 import * as path from "path-browserify";
 import mime from "mime-types";
@@ -78,6 +83,9 @@ export default class Toypack {
 
 		/* Default plugins */
 		this.addPlugin(new NodePolyfillPlugin());
+
+		/*  */
+		this.addAsset("/node_modules/toypack/empty/index.js", "module.exports = {};");
 	}
 
 	public hooks: Hooks = {
@@ -227,7 +235,7 @@ export default class Toypack {
 				}
 			}
 		} else {
-			// Revoke previous URL
+			// Revoke previous URL if there's one
 			if (asset?.contentURL?.startsWith("blob:")) {
 				URL.revokeObjectURL(asset?.contentURL);
 			}
@@ -400,7 +408,11 @@ export default class Toypack {
 		if (!result) {
 			let fallbackData = this._getResolveFallbackData(orig);
 			if (fallbackData) {
-				result = resolve(fallbackData?.fallback);
+				if (typeof fallbackData.fallback == "boolean") {
+					result = "/node_modules/toypack/empty/index.js";
+				} else if (typeof fallbackData.fallback == "string") {
+					result = resolve(fallbackData.fallback);
+				}
 			}
 		}
 
@@ -535,15 +547,22 @@ export default class Toypack {
 		return graph;
 	}
 
-	public async bundle() {
-		let entrySource = this.resolve(
-			path.join("/", this.options.bundleOptions?.entry || "")
-		);
+	public async bundle(options?: BundleOptions) {
+		if (options) {
+			options = mergeObjects(
+				cloneDeep(this.options.bundleOptions || {}),
+				options
+			);
+		} else {
+			options = this.options.bundleOptions;
+		}
+
+		let entrySource = this.resolve(path.join("/", options?.entry || ""));
 
 		if (!entrySource) {
 			throw new Error(`Bundle Error: Entry point not found.`);
 		}
-		
+
 		for (let plugin of this.plugins) {
 			if (!plugin._applied) {
 				await plugin.apply(this);
@@ -553,28 +572,25 @@ export default class Toypack {
 
 		this.outputSource = formatPath(
 			entrySource,
-			this.options.bundleOptions?.output?.filename || ""
+			options?.output?.filename || ""
 		);
 
 		let entryOutputPath = path.join(
-			this.options.bundleOptions?.output?.path || "",
+			options?.output?.path || "",
 			this.outputSource
 		);
 
 		let sourceMapOutputSource = entryOutputPath + ".map";
-			
+
 		console.time("Total Graph Time");
 		let graph = await this._createGraph(entrySource);
 		console.timeEnd("Total Graph Time");
 		let bundle = new Bundle();
 		let sourceMap: MapCombiner | null = null;
-		
+
 		console.time("Total Bundle Time");
 
-		if (
-			this.options.bundleOptions?.output?.sourceMap &&
-			this.options.bundleOptions?.mode == "development"
-		) {
+		if (options?.output?.sourceMap && options?.mode == "development") {
 			sourceMap = MapCombiner.create(sourceMapOutputSource);
 		}
 
@@ -613,11 +629,11 @@ export default class Toypack {
 
 			const isFirst = i === 0;
 			const isLast = i === graph.length - 1 || graph.length == 1;
-			const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
+			const isCoreModule = /^\/node_modules\//.test(asset.source);
 
 			// [1] - Compile
 			let compiled: CompiledAsset = {} as CompiledAsset;
-			if (typeof asset.loader.compile == "function" && !isCoreModule) {
+			if (typeof asset.loader.compile == "function") {
 				compiled = await asset.loader.compile(asset, this);
 				console.log("%c Compiled: ", "color: red;", asset.source);
 			}
@@ -712,7 +728,7 @@ export default class Toypack {
 		let finalContent = bundle.toString();
 
 		// Minify if in production mode
-		if (this.options.bundleOptions?.mode == "production") {
+		if (options?.mode == "production") {
 			let transpiled = transform(finalContent, {
 				presets: ["es2015-loose"],
 			});
@@ -737,7 +753,7 @@ export default class Toypack {
 			}
 
 			if (
-				this.options.bundleOptions?.mode == "development" ||
+				options?.mode == "development" ||
 				this._sourceMapConfig[0] == "inline"
 			) {
 				finalContent += MapConverter.fromObject(sourceMapObject).toComment();
@@ -796,12 +812,12 @@ export default class Toypack {
 		bundleResult.contentDocURL = contentDocURL;
 
 		// Out
-		if (this.options.bundleOptions?.mode == "production") {
+		if (options?.mode == "production") {
 			// Out bundle
 			await this.addAsset(entryOutputPath, bundleResult.content);
 
 			// Out resources
-			if (this.options.bundleOptions?.output?.asset == "external") {
+			if (options?.output?.asset == "external") {
 				for (let asset of graph) {
 					// Skip if not a local resource
 					if (!(asset.loader instanceof AssetLoader) || isURL(asset.source))
@@ -809,10 +825,10 @@ export default class Toypack {
 					let resource = asset;
 					let resourceOutputFilename = formatPath(
 						resource.source,
-						this.options.bundleOptions?.output?.assetFilename || ""
+						options?.output?.assetFilename || ""
 					);
 					let resourceOutputPath = path.join(
-						this.options.bundleOptions?.output?.path || "",
+						options?.output?.path || "",
 						resourceOutputFilename
 					);
 

@@ -5,7 +5,6 @@ import {
 	CompiledAsset,
 } from "@toypack/core/types";
 
-import path from "path-browserify";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
 import { availablePlugins, transform } from "@babel/standalone";
@@ -63,8 +62,8 @@ export default class BabelLoader implements ToypackLoader {
 					!!bundler.options.bundleOptions?.output?.sourceMap &&
 					!isCoreModule,
 				compact: false,
-				presets: ["typescript", "react"],
-				plugins: [availablePlugins["transform-modules-commonjs"]],
+				presets: ["typescript", "react", "es2015-loose"],
+				//plugins: [availablePlugins["transform-modules-commonjs"]],
 			});
 
 			if (transpiled.code) {

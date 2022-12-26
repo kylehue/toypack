@@ -1,12 +1,13 @@
 const skypackURL = "https://cdn.skypack.dev/";
-import { parse as getAST } from "@babel/parser";
-import traverseAST, { NodePath, VisitNode } from "@babel/traverse";
 import Toypack from "./Toypack";
 import path from "path-browserify";
 import MagicString from "magic-string";
 import { BabelLoader, CSSLoader } from "@toypack/loaders";
 import { AssetInterface } from "./types";
 import { parse as parsePackageName } from "parse-package-name";
+import { transform } from "@babel/standalone";
+import { parse as getAST } from "@babel/parser";
+import traverseAST from "@babel/traverse";
 
 interface Asset {
 	content: string;
@@ -66,7 +67,73 @@ export default class PackageManager {
 			facadeAsset.content = compiled.content.toString();
 		} else if (babelLoader.test.test(targetSource) || isEntry) {
 			// Transform to cjs
-			let parsed = babelLoader.parse(facadeAsset, facadeBundler);
+			/* const transpiled = transform(facadeAsset.content as string, {
+				sourceType: "module",
+				sourceFileName: facadeAsset.source,
+				filename: facadeAsset.source,
+				sourceMaps: false,
+				compact: false,
+				presets: ["es2015-loose"],
+			}); */
+
+			let transpiled = {
+				code: content
+			}
+
+			if (transpiled.code) {
+				chunk = new MagicString(transpiled.code);
+
+				const AST = getAST(transpiled.code, {
+					sourceType: "module",
+					sourceFilename: facadeAsset.source,
+				});
+
+				let imported: any = [];
+
+				function addImported(id, start, end) {
+					imported.push({
+						id, start, end
+					});
+				}
+
+				traverseAST(AST, {
+					ImportDeclaration({ node }) {
+						addImported(node.source.value, node.source.start, node.source.end);
+					},
+					ExportAllDeclaration({ node }) {
+						addImported(node.source.value, node.source.start, node.source.end);
+					},
+					ExportNamedDeclaration({node}) {
+						if (node.source) {
+							addImported(
+								node.source.value,
+								node.source.start,
+								node.source.end
+							);
+						}
+					}
+				});
+
+				for (let node of imported) {
+					let id = node.id;
+					
+					if (!dependencies.some((ex) => ex == id)) {
+						dependencies.push(id);
+					}
+
+					if (errorRegex.test(id)) {
+						// Remove import if error
+						chunk.update(node.start, node.end, "");
+					} else {
+						// Make path relative
+						let relative = path.relative(dirname, id);
+						chunk.update(node.start, node.end, `"./${relative}"`);
+					}
+				}
+			}
+
+			facadeAsset.content = chunk.toString();
+			/* let parsed = babelLoader.parse(facadeAsset, facadeBundler);
 
 			chunk = parsed.metadata.compilation;
 
@@ -86,7 +153,7 @@ export default class PackageManager {
 				}
 			}
 
-			facadeAsset.content = chunk.toString();
+			facadeAsset.content = chunk.toString(); */
 		}
 
 		graph.push(facadeAsset);
@@ -130,7 +197,7 @@ export default class PackageManager {
 		result.name = name;
 		result.path = parsedPackageName.path;
 		
-		// Temporarily replace "/" with "|" so the we can properly get the dirname
+		// Temporarily replace "/" with "|" so we can properly get the dirname
 		let target = `${name}@${version}${parsedPackageName.path}`.replace(
 			/\//g,
 			"|"

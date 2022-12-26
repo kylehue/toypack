@@ -26,6 +26,9 @@
 						alias: {
 							"@scripts": "./scripts/",
 							"@stuff": "./cool/stuff/"
+						},
+						fallback: {
+							fs: false
 						}
 					}
 				}
@@ -35,6 +38,9 @@
 
 				await toypack.addDependency("vue@3.2.23");
 				await toypack.addDependency("uuid");
+				await toypack.addDependency("react");
+				await toypack.addDependency("react-dom");
+				await toypack.addDependency("use-state-in-custom-properties");
 				//await toypack.addDependency("bootstrap");
 				//await toypack.addDependency("bootstrap@5.2.3/dist/css/bootstrap.min.css");
 				
@@ -49,9 +55,10 @@ import logo from "../public/logo.svg";
 import path, { dirname } from "path";
 import { createApp } from "vue";
 import { v4 } from "uuid";
-import process from "process";
+import fs from "fs";
+import "../react/main.jsx";
+console.log(fs);
 //import "bootstrap/dist/css/bootstrap.min.css";
-console.log(process);
 console.log(path, dirname("path/to/some/file.txt"));
 console.log(createApp);
 console.log(v4());
@@ -72,10 +79,13 @@ export const PI = 3.14;`,
 	--bg: black;
 }`,
 
-					"cool/stuff/here/TheStuff.js": `import { PI } from "@scripts/PI";
-export const stuff = PI + 20;`,
+"cool/stuff/here/TheStuff.js": 
+`
+import { PI } from "@scripts/PI";
+export const stuff = PI + 20;
+`,
 
-					"styles/main.css": `@import "./colors";
+"styles/main.css": `@import "./colors";
 
 body {
 	background-image: url("https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg");
@@ -85,6 +95,42 @@ body {
 div {
 	background-image: url("../assets/sample.jpg");
 }`,
+
+"react/main.jsx": `
+import React, { useState } from "react";
+import ReactDOM from "react-dom";
+import useStateInCustomProperties from "use-state-in-custom-properties";
+
+const App = () => {
+  const [activeColor, setActiveColor] = useState("red");
+  const CustomPropertiesWrapper = useStateInCustomProperties("box", {
+    activeColor
+  });
+  return (
+    <CustomPropertiesWrapper>
+      <h1 class="is-size-4">Active Color: {activeColor}</h1>
+      <button onClick={() => setActiveColor("red")}>Change to red</button>{" "}
+      <button onClick={() => setActiveColor("blue")}>Change to blue</button>
+    </CustomPropertiesWrapper>
+  );
+};
+
+ReactDOM.render(<App />, document.body);
+`,
+
+"react/components/sampleComponent.jsx": `
+import React, { useState } from "react";
+export default function SampleComponent() {
+   const greet = "hello!";
+   let [count, setCount] = useState(0);
+   return (
+      <div>
+         <span>{ greet + " " + count }</span>
+         <button onClick={() => setCount(count + 1)}>click me!</button>
+      </div>
+   )
+}
+`,
 
 					"package.json": JSON.stringify({
 						main: "src/index.js",
