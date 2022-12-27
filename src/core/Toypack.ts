@@ -34,7 +34,7 @@ import babelMinify from "babel-minify";
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 
-import PackageManager, { InstallationResult } from "./PackageManager";
+import PackageManager from "./PackageManager";
 import { transform } from "@babel/standalone";
 
 const styleExtensions = [".css", ".sass", ".scss", ".less"];
@@ -134,47 +134,6 @@ export default class Toypack {
 
 	public defineOptions(options: ToypackOptions) {
 		mergeObjects(this.options, options);
-	}
-
-	public async addDependency(
-		name: string,
-		version = ""
-	): Promise<InstallationResult> {
-		// Fetch dependency
-		const dep = await this.packageManager.get(name, version);
-
-		// Add to assets
-		let depSource = path.join("node_modules", dep.name, dep.path);
-		for (let asset of dep.graph) {
-			let assetSource = path.join(depSource, asset.source);
-			await this.addAsset(assetSource, asset.content);
-		}
-
-		// Update dependencies
-		this.dependencies[dep.name] = "^" + dep.version;
-
-		// Update the package.json's dependencies
-		let packageJSON = this.assets.get("/package.json");
-		let pkg = JSON.parse((packageJSON?.content as string) || "{}");
-
-		if (packageJSON) {
-			if (pkg.dependencies) {
-				pkg.dependencies = Object.assign(pkg.dependencies, this.dependencies);
-			} else {
-				pkg.dependencies = this.dependencies;
-			}
-
-			packageJSON.content = JSON.stringify(pkg);
-		} else {
-			await this.addAsset(
-				"/package.json",
-				JSON.stringify({
-					dependencies: this.dependencies,
-				})
-			);
-		}
-
-		return dep;
 	}
 
 	public createAsset(source: string, content: string | ArrayBuffer) {

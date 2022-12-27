@@ -47,7 +47,7 @@ export default class NodePolyfillPlugin implements ToypackPlugin {
 					},
 				});
 
-				await bundler.addDependency(polyfills[failedPath]);
+				await bundler.packageManager.install(polyfills[failedPath]);
 			}
 		});
 	}

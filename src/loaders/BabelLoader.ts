@@ -62,8 +62,8 @@ export default class BabelLoader implements ToypackLoader {
 					!!bundler.options.bundleOptions?.output?.sourceMap &&
 					!isCoreModule,
 				compact: false,
-				presets: ["typescript", "react", "es2015-loose"],
-				//plugins: [availablePlugins["transform-modules-commonjs"]],
+				presets: ["typescript", "react"],
+				plugins: [availablePlugins["transform-modules-commonjs"]],
 			});
 
 			if (transpiled.code) {
@@ -93,6 +93,13 @@ export default class BabelLoader implements ToypackLoader {
 						}
 					},
 				});
+
+				if (/\.[tj]sx$/.test(asset.source)) {
+					chunk.prepend(`var React = require("react");\n`);
+					if (!result.dependencies.some((v) => v === "react")) {
+						result.dependencies.push("react");
+					}
+				}
 
 				result.metadata.compilation = chunk;
 

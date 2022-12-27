@@ -23,6 +23,7 @@ export const postCSSOptions: PostCSSOptions = {
 };
 
 export const defaultOptions: ToypackOptions = {
-   bundleOptions,
-   postCSSOptions
+	bundleOptions,
+	postCSSOptions,
+	packageProvider: "esm.sh",
 };

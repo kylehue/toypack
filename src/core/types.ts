@@ -3,6 +3,7 @@ import { AcceptedPlugin, ProcessOptions } from "postcss";
 import SourceMap from "./SourceMap";
 import Toypack from "./Toypack";
 import { TransformOptions } from "@babel/core";
+import { PackageProvider } from "./PackageManager";
 
 export interface ResolveOptions {
 	baseDir?: string;
@@ -140,6 +141,11 @@ export interface ToypackOptions {
 	 * PostCSS options.
 	 */
 	postCSSOptions?: PostCSSOptions;
+	/**
+	 * @default `esm.sh`
+	 * @desc The package provider.
+	 */
+	packageProvider?: PackageProvider;
 }
 
 interface LoaderData {

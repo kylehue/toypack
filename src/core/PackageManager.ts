@@ -1,236 +1,160 @@
-const skypackURL = "https://cdn.skypack.dev/";
 import Toypack from "./Toypack";
 import path from "path-browserify";
 import MagicString from "magic-string";
-import { BabelLoader, CSSLoader } from "@toypack/loaders";
-import { AssetInterface } from "./types";
 import { parse as parsePackageName } from "parse-package-name";
-import { transform } from "@babel/standalone";
-import { parse as getAST } from "@babel/parser";
+import { parse as getAST, ParseResult } from "@babel/parser";
 import traverseAST from "@babel/traverse";
 
-interface Asset {
+const versionRegexString = "@v?[0-9]+\\.[0-9]+\\.[0-9]+";
+
+const packageProviders = {
+	"esm.sh": "https://esm.sh/",
+	skypack: "https://cdn.skypack.dev/",
+};
+export type PackageProvider = keyof typeof packageProviders;
+
+interface Dependency {
 	content: string;
 	source: string;
 }
 
-export interface InstallationResult {
-	name: string;
-	version: string;
-	graph: Asset[];
-	path: string;
+interface ImportedInfo {
+	id: string;
+	start: number;
+	end: number;
 }
 
-const versionRegexString = "@v?[0-9]+\\.[0-9]+\\.[0-9]+";
-const versionRegex = new RegExp(versionRegexString);
-
-let babelLoader = new BabelLoader();
-let cssLoader = new CSSLoader();
-
 export default class PackageManager {
-	private _cache = new Map();
+	public provider: string;
+	public providerRegex: RegExp;
+	constructor(public bundler: Toypack) {
+		this.provider = packageProviders[bundler.options.packageProvider as string];
 
-	constructor(public bundler: Toypack) {}
+		this.providerRegex = new RegExp(this.provider.replace(/\./g, "\\."));
+	}
 
-	private async _createGraph(targetSource: string, graph: any[] = []) {
-		// Entries will be considered as a javascript file
-		let isEntry = graph.length == 0;
-
-		// Get dirname
-		let dirname = path.dirname(targetSource);
-
-		// Replace "|" with "/"
-		targetSource = targetSource.replace(/\|/g, "/");
-
+	private async _createGraph(source: string, graph: Dependency[] = []) {
 		// Fetch
-		let url = `${skypackURL}${targetSource.replace(/^\//, "")}`;
-		let fetchResponse = await fetch(url);
-		let content = await fetchResponse.text();
-
-		let dependencies: string[] = [];
-		let chunk = new MagicString(content);
-		let errorRegex = /^\/error\//;
-
-		let facadeAsset = {
-			id: ++this.bundler._lastId,
-			source: targetSource,
-			content,
-		} as AssetInterface;
-
-		let facadeBundler = {
-			options: {},
-		} as Toypack;
-
-		// Load
-		if (cssLoader.test.test(targetSource)) {
-			let compiled = cssLoader.compile(facadeAsset, facadeBundler);
-			facadeAsset.content = compiled.content.toString();
-		} else if (babelLoader.test.test(targetSource) || isEntry) {
-			// Transform to cjs
-			/* const transpiled = transform(facadeAsset.content as string, {
-				sourceType: "module",
-				sourceFileName: facadeAsset.source,
-				filename: facadeAsset.source,
-				sourceMaps: false,
-				compact: false,
-				presets: ["es2015-loose"],
-			}); */
-
-			let transpiled = {
-				code: content
-			}
-
-			if (transpiled.code) {
-				chunk = new MagicString(transpiled.code);
-
-				const AST = getAST(transpiled.code, {
-					sourceType: "module",
-					sourceFilename: facadeAsset.source,
-				});
-
-				let imported: any = [];
-
-				function addImported(id, start, end) {
-					imported.push({
-						id, start, end
-					});
-				}
-
-				traverseAST(AST, {
-					ImportDeclaration({ node }) {
-						addImported(node.source.value, node.source.start, node.source.end);
-					},
-					ExportAllDeclaration({ node }) {
-						addImported(node.source.value, node.source.start, node.source.end);
-					},
-					ExportNamedDeclaration({node}) {
-						if (node.source) {
-							addImported(
-								node.source.value,
-								node.source.start,
-								node.source.end
-							);
-						}
-					}
-				});
-
-				for (let node of imported) {
-					let id = node.id;
-					
-					if (!dependencies.some((ex) => ex == id)) {
-						dependencies.push(id);
-					}
-
-					if (errorRegex.test(id)) {
-						// Remove import if error
-						chunk.update(node.start, node.end, "");
-					} else {
-						// Make path relative
-						let relative = path.relative(dirname, id);
-						chunk.update(node.start, node.end, `"./${relative}"`);
-					}
-				}
-			}
-
-			facadeAsset.content = chunk.toString();
-			/* let parsed = babelLoader.parse(facadeAsset, facadeBundler);
-
-			chunk = parsed.metadata.compilation;
-
-			for (let node of parsed.metadata.depNodes) {
-				let argNode = node.arguments[0];
-				let id = argNode.value;
-				if (dependencies.some((ex) => ex == id)) continue;
-				dependencies.push(id);
-
-				if (errorRegex.test(id)) {
-					// Remove import if error
-					chunk.update(node.start, node.end, "");
-				} else {
-					// Make path relative
-					let relative = path.relative(dirname, id);
-					chunk.update(argNode.start, argNode.end, `"./${relative}"`);
-				}
-			}
-
-			facadeAsset.content = chunk.toString(); */
+		let fetchResponse = await fetch(source);
+		if (!fetchResponse.ok) {
+			throw new Error(`Failed to fetch ${source}.`);
 		}
 
-		graph.push(facadeAsset);
+		let content = await fetchResponse.text();
+		let dependencies: string[] = [];
 
-		// Scan dependencies
-		for (let dep of dependencies) {
-			let depAbsolutePath = path.resolve(dirname, dep);
+		// Try parsing content
+		let AST: any = null;
+		try {
+			if (!/\.(css|json)$/.test(source)) {
+				AST = getAST(content, {
+					sourceType: "module",
+					sourceFilename: source,
+				});
+			}
+		} catch (error) {
+			//
+		}
 
-			// Skip if it is in the graph already
-			if (graph.some((d) => d.source == depAbsolutePath)) {
-				continue;
+		// Get dependencies if there's an AST
+		if (AST) {
+			let chunk = new MagicString(content);
+
+			let imports: ImportedInfo[] = [];
+
+			function addImported(id: string, start, end) {
+				imports.push({
+					id,
+					start,
+					end,
+				} as ImportedInfo);
 			}
 
-			// Skip if error
-			if (errorRegex.test(dep) || errorRegex.test(fetchResponse.url)) {
-				console.warn(`Failed to fetch ${depAbsolutePath}`);
-				continue;
+			traverseAST(AST, {
+				ImportDeclaration({ node }) {
+					addImported(node.source.value, node.source.start, node.source.end);
+				},
+				ExportAllDeclaration({ node }) {
+					addImported(node.source.value, node.source.start, node.source.end);
+				},
+				ExportNamedDeclaration({ node }) {
+					if (node.source) {
+						addImported(node.source.value, node.source.start, node.source.end);
+					}
+				},
+			});
+
+			for (let node of imports) {
+				let id = node.id;
+
+				let from = source.replace(this.providerRegex, "");
+				let to = id.replace(this.providerRegex, "");
+
+				let fromBaseDir = path.dirname(from);
+				let relative = path.relative(fromBaseDir, to);
+				let absolute = path.resolve(fromBaseDir, relative);
+
+				// For skypack's URL format
+				if (/,mode=imports/.test(source)) {
+					absolute = path.resolve(fromBaseDir, id);
+				}
+
+				if (!dependencies.some((ex) => ex == absolute)) {
+					dependencies.push(absolute);
+				}
+
+				chunk.update(node.start, node.end, `"./${relative}"`);
 			}
 
-			await this._createGraph(depAbsolutePath, graph);
+			content = chunk.toString();
+		}
+
+		// Add to graph
+		graph.push({
+			content,
+			source: source.replace(this.providerRegex, ""),
+		} as Dependency);
+
+		// Scan dependency's dependencies
+		for (let dependency of dependencies) {
+			if (!graph.some((v) => v.source === dependency)) {
+				let url = `${this.provider}${dependency.replace(/^\//, "")}`;
+				await this._createGraph(url, graph);
+			}
 		}
 
 		return graph;
 	}
 
-	public async get(
-		name: string,
-		version: string = ""
-	): Promise<InstallationResult> {
-		let result: InstallationResult = {
-			name: "",
-			version: "",
-			path: "",
-			graph: [],
-		};
+	public async install(source: string) {
+		let pkg = parsePackageName(source);
+		let name = pkg.name;
+		let version = pkg.version;
+		let subpath = pkg.path;
 
-		// Get proper package name and version
-		let parsedPackageName = parsePackageName(name);
-		name = parsedPackageName.name;
-		version = parsedPackageName.version;
-		result.name = name;
-		result.path = parsedPackageName.path;
-		
-		// Temporarily replace "/" with "|" so we can properly get the dirname
-		let target = `${name}@${version}${parsedPackageName.path}`.replace(
-			/\//g,
-			"|"
-		);
+		// Fetch
+		let target = `${name}@${version}${subpath}`;
+		let url = `${this.provider}${target}`;
 
-		// Check cache
-		let cached = this._cache.get(target);
-		if (cached) {
-			return cached;
+		// Create graph
+		let graph = await this._createGraph(url);
+
+		// Fix entry's source
+		if (subpath) {
+			let extension = path.extname(subpath);
+			if (extension) {
+				graph[0].source = subpath;
+			} else {
+				graph[0].source = path.join(subpath, "index.js");
+			}
+		} else {
+			graph[0].source = "index.js";
 		}
 
-		// Get graph
-		let graph = await this._createGraph(target);
-		graph[0].source = "index" + ".js";
-		result.graph = graph;
-
-		// Get version
-		let fetchedVersion: any = new RegExp(name + versionRegexString).exec(
-			graph[0].content
-		);
-
-		if (fetchedVersion) {
-			fetchedVersion = versionRegex
-				.exec(fetchedVersion[0])?.[0]
-				.substring(1)
-				.replace("v", "");
+		// Add to bundler assets
+		for (let asset of graph) {
+			let cmSource = path.join("node_modules", name, asset.source);
+			await this.bundler.addAsset(cmSource, asset.content);
 		}
-
-		result.version = fetchedVersion || version;
-
-		// Cache
-		this._cache.set(target, result);
-
-		return result;
 	}
 }
