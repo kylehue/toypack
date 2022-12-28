@@ -7,7 +7,10 @@ import {
 
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
-import { availablePlugins, transform } from "@babel/standalone";
+import {
+	availablePlugins,
+	transform,
+} from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import MagicString from "magic-string";
 
@@ -62,17 +65,27 @@ export default class BabelLoader implements ToypackLoader {
 					!!bundler.options.bundleOptions?.output?.sourceMap &&
 					!isCoreModule,
 				compact: false,
-				presets: ["typescript", "react"],
-				plugins: [availablePlugins["transform-modules-commonjs"]],
+				presets: [
+					"typescript",
+					[
+						"react",
+						{
+							development: bundler.options.bundleOptions?.mode == "development",
+						},
+					],
+					"env"
+				],
+				plugins: [
+					availablePlugins["transform-modules-commonjs"]
+				],
 			});
 
 			if (transpiled.code) {
 				let chunk = new MagicString(transpiled.code);
 
 				const AST = getAST(transpiled.code, {
-					sourceType: "module",
-					errorRecovery: true,
-					sourceFilename: asset.source,
+					sourceType: "script",
+					sourceFilename: asset.source
 				});
 
 				traverseAST(AST, {
@@ -93,13 +106,6 @@ export default class BabelLoader implements ToypackLoader {
 						}
 					},
 				});
-
-				if (/\.[tj]sx$/.test(asset.source)) {
-					chunk.prepend(`var React = require("react");\n`);
-					if (!result.dependencies.some((v) => v === "react")) {
-						result.dependencies.push("react");
-					}
-				}
 
 				result.metadata.compilation = chunk;
 

@@ -14,6 +14,7 @@ import {
 	JSONLoader,
 	AssetLoader,
 	CSSLoader,
+	HTMLLoader,
 } from "@toypack/loaders";
 import { NodePolyfillPlugin } from "@toypack/plugins";
 import { defaultOptions } from "@toypack/core/options";
@@ -80,12 +81,16 @@ export default class Toypack {
 		this.addLoader(new JSONLoader());
 		this.addLoader(new CSSLoader());
 		this.addLoader(new AssetLoader());
+		this.addLoader(new HTMLLoader());
 
 		/* Default plugins */
 		this.addPlugin(new NodePolyfillPlugin());
 
 		/*  */
-		this.addAsset("/node_modules/toypack/empty/index.js", "module.exports = {};");
+		this.addAsset(
+			"/node_modules/toypack/empty/index.js",
+			"module.exports = {};"
+		);
 	}
 
 	public hooks: Hooks = {
@@ -295,31 +300,35 @@ export default class Toypack {
 			}
 		}
 
+		const tryFileThenIndex = (x: string) => {
+			let file = loadAsFile(x);
+
+			if (file) {
+				return file;
+			} else {
+				let index = loadIndex(x);
+
+				if (index) {
+					return index;
+				} else {
+					return loadIndex(x);
+				}
+			}
+		}
+
 		const loadAsDirectory = (x: string) => {
 			let pkg = this.assets.get(path.join(x, "package.json"));
 
 			if (typeof pkg?.content == "string") {
 				let main = JSON.parse(pkg.content).main;
 				if (!main) {
-					return loadIndex(x);
+					return tryFileThenIndex(x);
 				} else {
 					let absolutePath = path.join(x, main);
-					let file = loadAsFile(absolutePath);
-
-					if (file) {
-						return file;
-					} else {
-						let index = loadIndex(absolutePath);
-
-						if (index) {
-							return index;
-						} else {
-							return loadIndex(x);
-						}
-					}
+					return tryFileThenIndex(absolutePath);
 				}
 			} else {
-				return loadIndex(x);
+				return tryFileThenIndex(x);
 			}
 		};
 

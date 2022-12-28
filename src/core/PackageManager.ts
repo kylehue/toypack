@@ -2,15 +2,14 @@ import Toypack from "./Toypack";
 import path from "path-browserify";
 import MagicString from "magic-string";
 import { parse as parsePackageName } from "parse-package-name";
-import { parse as getAST, ParseResult } from "@babel/parser";
+import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
-
-const versionRegexString = "@v?[0-9]+\\.[0-9]+\\.[0-9]+";
 
 const packageProviders = {
 	"esm.sh": "https://esm.sh/",
 	skypack: "https://cdn.skypack.dev/",
 };
+
 export type PackageProvider = keyof typeof packageProviders;
 
 interface Dependency {
@@ -27,6 +26,7 @@ interface ImportedInfo {
 export default class PackageManager {
 	public provider: string;
 	public providerRegex: RegExp;
+	private _cache: Map<string, Dependency[]> = new Map();
 	constructor(public bundler: Toypack) {
 		this.provider = packageProviders[bundler.options.packageProvider as string];
 
@@ -133,11 +133,17 @@ export default class PackageManager {
 		let subpath = pkg.path;
 
 		// Fetch
-		let target = `${name}@${version}${subpath}`;
+		let target = `${name}@${version}?dev${subpath}`;
 		let url = `${this.provider}${target}`;
 
-		// Create graph
-		let graph = await this._createGraph(url);
+		// Get graph
+		let graph: Dependency[] | null = null;
+		let cached = this._cache.get(target);
+		if (cached) {
+			graph = cached;
+		} else {
+			graph = await this._createGraph(url);
+		}
 
 		// Fix entry's source
 		if (subpath) {
@@ -156,5 +162,8 @@ export default class PackageManager {
 			let cmSource = path.join("node_modules", name, asset.source);
 			await this.bundler.addAsset(cmSource, asset.content);
 		}
+
+		// Cache
+		this._cache.set(target, graph);
 	}
 }
