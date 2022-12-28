@@ -17,7 +17,7 @@ module.exports = merge(common, {
 	plugins: [
 		new HTMLWebpackPlugin({
 			title: "test",
-			template: path.resolve(__dirname, "../static/index.html"),
+			template: path.resolve(__dirname, "../examples/index.html"),
 		}),
 	],
 });

@@ -42,8 +42,6 @@
 				await toypack.addDependency("react-dom");
 				await toypack.addDependency("use-state-in-custom-properties"); */
 				//await toypack.addDependency("bootstrap");
-				//await toypack.addDependency("bootstrap@5.2.3/dist/css/bootstrap.min.css");
-
 				await toypack.packageManager.install("bootstrap@5.2.3/dist/css/bootstrap.min.css");
 				await toypack.packageManager.install("vue@3.2.23");
 				await toypack.packageManager.install("react");
@@ -112,10 +110,12 @@ div {
 "react/main.jsx": `
 import React, { useState } from "react";
 import ReactDOM from 'react-dom/client';
+import crypto from "crypto";
+console.log(crypto);
 
 function App() {
    let [count, setCount] = useState(0);
-	
+	const greet = "hello!";
    return (
       <div>
          <span>{ greet + " " + count }</span>
@@ -124,7 +124,7 @@ function App() {
    )
 }
 
-ReactDOM.createRoot(document.body).render(
+ReactDOM.createRoot(document.querySelector("#root")).render(
 	<App></App>
 );
 `,
@@ -132,6 +132,7 @@ ReactDOM.createRoot(document.body).render(
 "react/App.jsx": `
 import React from 'react';
 import { useState, useEffect } from 'react';
+window.React1 = require('react');
 function App() {
    let [count, setCount] = useState(0);
 	
@@ -151,8 +152,8 @@ export default App;
 <html>\
 <head>\
    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui\">\
-   <script type=\"text/javascript\" src=\"src/index.js\"><\/script>\
-   <link rel=\"stylesheet\" href=\"styles/main.css\"></link>\
+   <script type=\"text/javascript\" src=\"react/main.jsx\"><\/script>\
+   <!-- <link rel=\"stylesheet\" href=\"styles/main.css\"></link> -->\
    <title>cool website!!!!</title>\
    <!-- <script>console.log(123);</script> -->\
 </head>\
@@ -196,6 +197,12 @@ export default App;
 			}
 
 			window.toypack = toypack;
+
+			window.testCode = (code) => {
+				let sb = document.createElement("iframe");
+				document.body.appendChild(sb);
+				sb.srcdoc = `<html><head><script type="module">${code}<\/script></head></html>`
+			}
 			console.log(toypack);
 		</script>
 	</body>

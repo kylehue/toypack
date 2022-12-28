@@ -4,6 +4,8 @@ import MagicString from "magic-string";
 import { parse as parsePackageName } from "parse-package-name";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
+import { AssetInterface } from "./types";
+import { isLocal } from "@toypack/utils";
 
 const packageProviders = {
 	"esm.sh": "https://esm.sh/",
@@ -23,6 +25,16 @@ interface ImportedInfo {
 	end: number;
 }
 
+interface ParsedPackageName {
+	name: string;
+	version: string;
+	path: string;
+}
+
+function getCoreModuleSubpath(source: string) {
+	return source.split("/").splice(3).join("/");
+}
+
 export default class PackageManager {
 	public provider: string;
 	public providerRegex: RegExp;
@@ -33,7 +45,11 @@ export default class PackageManager {
 		this.providerRegex = new RegExp(this.provider.replace(/\./g, "\\."));
 	}
 
-	private async _createGraph(source: string, graph: Dependency[] = []) {
+	private async _createGraph(
+		source: string,
+		pkg: ParsedPackageName,
+		graph: Dependency[] = []
+	) {
 		// Fetch
 		let fetchResponse = await fetch(source);
 		if (!fetchResponse.ok) {
@@ -95,7 +111,7 @@ export default class PackageManager {
 				let absolute = path.resolve(fromBaseDir, relative);
 
 				// For skypack's URL format
-				if (/,mode=imports/.test(source)) {
+				if (isLocal(id) && !id.startsWith("/")) {
 					absolute = path.resolve(fromBaseDir, id);
 				}
 
@@ -103,7 +119,7 @@ export default class PackageManager {
 					dependencies.push(absolute);
 				}
 
-				chunk.update(node.start, node.end, `"./${relative}"`);
+				chunk.update(node.start, node.end, `"${pkg.name}${absolute}"`);
 			}
 
 			content = chunk.toString();
@@ -117,9 +133,10 @@ export default class PackageManager {
 
 		// Scan dependency's dependencies
 		for (let dependency of dependencies) {
-			if (!graph.some((v) => v.source === dependency)) {
-				let url = `${this.provider}${dependency.replace(/^\//, "")}`;
-				await this._createGraph(url, graph);
+			let dep = dependency.replace(/^\//, "");
+			if (!graph.some((v) => v.source.replace(/^\//, "") === dep)) {
+				let url = `${this.provider}${dep}`;
+				await this._createGraph(url, pkg, graph);
 			}
 		}
 
@@ -127,13 +144,23 @@ export default class PackageManager {
 	}
 
 	public async install(source: string) {
-		let pkg = parsePackageName(source);
+		let pkg: ParsedPackageName = parsePackageName(source);
 		let name = pkg.name;
 		let version = pkg.version;
 		let subpath = pkg.path;
 
 		// Fetch
-		let target = `${name}@${version}?dev${subpath}`;
+		let target = `${name}@${version}${subpath}`;
+
+		// Dev mode
+		if (this.provider == packageProviders["esm.sh"]) {
+			if (this.bundler.options.bundleOptions?.mode === "development") {
+				target += "?dev";
+			} else {
+				target += "?prod";
+			}
+		}
+
 		let url = `${this.provider}${target}`;
 
 		// Get graph
@@ -142,7 +169,7 @@ export default class PackageManager {
 		if (cached) {
 			graph = cached;
 		} else {
-			graph = await this._createGraph(url);
+			graph = await this._createGraph(url, pkg, []);
 		}
 
 		// Fix entry's source
@@ -155,6 +182,25 @@ export default class PackageManager {
 			}
 		} else {
 			graph[0].source = "index.js";
+		}
+
+		// Check duplicate contents
+		// Duplicates will just contain exports that links to the original content
+		// Solves https://github.com/facebook/react/issues/13991
+		let bundlerAssets = this.bundler.assets.values();
+		for (let i = 0; i < this.bundler.assets.size; i++) {
+			let coreAsset: AssetInterface = bundlerAssets.next().value;
+			if (!coreAsset.source.startsWith("/node_modules/")) continue;
+			for (let graphAsset of graph) {
+				let isSameContent = coreAsset.content === graphAsset.content;
+				let isSameSource =
+					getCoreModuleSubpath(coreAsset.source) ===
+					getCoreModuleSubpath(graphAsset.source);
+				if (isSameContent || isSameSource) {
+					let target = coreAsset.source.replace("/node_modules/", "");
+					graphAsset.content = `export * from "${target}";export {default} from "${target}";`;
+				}
+			}
 		}
 
 		// Add to bundler assets

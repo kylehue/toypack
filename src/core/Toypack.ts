@@ -762,6 +762,7 @@ export default class Toypack {
 		<script defer src="${contentURL}"></script>
 	</head>
 	<body>
+		<div id="root"></div>
 	</body>
 </html>
 `;

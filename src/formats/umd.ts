@@ -5,7 +5,7 @@ import { minimizeStr } from "@toypack/utils";
 
 function getTopUMD(name: string) {
 	return minimizeStr(
-		`((root, factory) => {
+		`(function (root, factory) {
    if (typeof exports === "object" && typeof module === "object") {
       module.exports = factory();
    } else if (typeof define === "function" && define.amd) {
@@ -64,7 +64,7 @@ export default function format(
 		content: {} as MagicString,
 	};
 
-	chunk.prepend(`init: (module, exports, require) => {`);
+	chunk.prepend(`init: function(module, exports, require) {`);
 	chunk.prepend(`${asset.id}: {`);
 	chunk.append(`},`);
 	chunk.append(`map: ${JSON.stringify(asset.dependencyMap) || "{}"}`);
