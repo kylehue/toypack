@@ -49,6 +49,23 @@ interface Hooks {
 	failedResolve: (fn: Function) => void;
 }
 
+const colors = {
+	success: "#3fe63c",
+	warning: "#f5b514",
+	danger: "#e61c1c",
+	info: "#3b97ed",
+};
+
+function getTimeColor(time: number) {
+	if (time < 5000) {
+		return colors.success;
+	} else if (time < 10000) {
+		return colors.warning;
+	} else {
+		return colors.danger;
+	}
+}
+
 (window as any).path = path;
 
 export default class Toypack {
@@ -64,7 +81,6 @@ export default class Toypack {
 	private _prevContentURL;
 	private _prevContentDocURL;
 	private _graphCache: Map<string, AssetInterface> = new Map();
-	private _bundleCache: Map<string, AssetInterface> = new Map();
 	constructor(options?: ToypackOptions) {
 		if (options) {
 			this.defineOptions(options);
@@ -170,12 +186,8 @@ export default class Toypack {
 			extension,
 			loader,
 			loaderData: {
-				parse: {
-					dependencies: [],
-				},
-				compile: {
-					content: {} as MagicString,
-				},
+				parse: null,
+				compile: null,
 			},
 			dependencyMap: {},
 			isObscure: !textExtensions.includes(extension) || isURL(source),
@@ -282,10 +294,13 @@ export default class Toypack {
 		// Resolve.alias
 		let aliasData = this._getResolveAliasData(x);
 		if (aliasData) {
-			let aliased = path.join(aliasData.replacement, x.replace(aliasData.alias, ""));
+			let aliased = path.join(
+				aliasData.replacement,
+				x.replace(aliasData.alias, "")
+			);
 			let aliasIsCoreModule =
 				!isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
-			
+
 			if (!aliasIsCoreModule) {
 				aliased = "./" + path.relative(opts.baseDir, aliased);
 			}
@@ -435,6 +450,7 @@ export default class Toypack {
 			typeof asset.loader.parse != "function"
 		) {
 			graph.push(asset);
+			asset.isModified = false;
 		} else {
 			let parseData: ParsedAsset = { dependencies: [] };
 			let cached = this._graphCache.get(source);
@@ -554,47 +570,35 @@ export default class Toypack {
 
 		let sourceMapOutputSource = entryOutputPath + ".map";
 
-		console.time("Total Graph Time");
+		let graphTotalTime: number = 0;
+		let graphStartTime: number = 0;
+		if (options?.logs) {
+			graphStartTime = performance.now();
+		}
+
 		let graph = await this._createGraph(entrySource);
-		console.timeEnd("Total Graph Time");
+
+		let bundleTotalTime: number = 0;
+		let bundleStartTime: number = 0;
+		if (options?.logs) {
+			bundleStartTime = performance.now();
+			graphTotalTime = bundleStartTime - graphStartTime;
+		}
+
 		let bundle = new Bundle();
 		let sourceMap: MapCombiner | null = null;
-
-		console.time("Total Bundle Time");
 
 		if (options?.output?.sourceMap && options?.mode == "development") {
 			sourceMap = MapCombiner.create(sourceMapOutputSource);
 		}
 
+		let cachedCounter = 0;
+		let compiledCounter = 0;
+
 		let prevLine = 0;
 
 		for (let i = 0; i < graph.length; i++) {
 			const asset = graph[i];
-			const cached = this._bundleCache.get(asset.source);
-			asset.isModified = asset.content !== cached?.content;
-
-			if (!asset.isModified && asset.compilationData) {
-				bundle.addSource({
-					filename: asset.source,
-					content: asset.compilationData.content,
-				});
-
-				if (asset.compilationData.isMapped) {
-					sourceMap?.addFile(
-						{
-							sourceFile: asset.source,
-							source: asset.compilationData.map.toComment(),
-						},
-						{
-							line: prevLine,
-						}
-					);
-				}
-
-				prevLine += asset.compilationData.offset;
-				console.log("%c Cached: ", "color: gold;", asset.source);
-				continue;
-			}
 
 			let chunkContent = {} as MagicString;
 			let chunkSourceMap: SourceMap = new SourceMap();
@@ -605,9 +609,14 @@ export default class Toypack {
 
 			// [1] - Compile
 			let compiled: CompiledAsset = {} as CompiledAsset;
-			if (typeof asset.loader.compile == "function") {
-				compiled = await asset.loader.compile(asset, this);
-				console.log("%c Compiled: ", "color: red;", asset.source);
+			if (asset.isModified || !asset.loaderData.compile?.content) {
+				if (typeof asset.loader.compile == "function") {
+					compiled = await asset.loader.compile(asset, this);
+				}
+				compiledCounter++;
+			} else {
+				compiled = asset.loaderData.compile;
+				cachedCounter++;
 			}
 
 			// If compiler didn't return any content, use asset's raw content
@@ -677,22 +686,9 @@ export default class Toypack {
 			}
 
 			// Offset source map
-			let offset = 0;
 			if (sourceMap) {
-				offset = chunkContent.toString().split("\n").length;
+				let offset = chunkContent.toString().split("\n").length;
 				prevLine += offset;
-			}
-
-			// Cache
-			if (asset.isModified) {
-				asset.compilationData = {
-					content: chunkContent,
-					map: chunkSourceMap,
-					offset,
-					isMapped,
-				};
-
-				this._bundleCache.set(asset.source, Object.assign({}, asset));
 			}
 		}
 
@@ -808,8 +804,34 @@ export default class Toypack {
 				}
 			}
 		}
-		console.log(bundleResult);
-		console.timeEnd("Total Bundle Time");
+
+		if (options?.logs) {
+			bundleTotalTime = performance.now() - bundleStartTime;
+
+			console.log(
+				`%cTotal graph time: %c${graphTotalTime.toFixed(0)} ms`,
+				"font-weight: bold; color: white;",
+				"color: " + getTimeColor(graphTotalTime)
+			);
+			
+			console.log(
+				`%cTotal bundle time: %c${bundleTotalTime.toFixed(0)} ms`,
+				"font-weight: bold; color: white;",
+				"color: " + getTimeColor(bundleTotalTime)
+			);
+
+			console.log(
+				`%cCached assets: %c${cachedCounter.toString()}`,
+				"font-weight: bold; color: white;",
+				"color: #cfd0d1;"
+			);
+
+			console.log(
+				`%cCompiled assets: %c${compiledCounter.toString()}`,
+				"font-weight: bold; color: white;",
+				"color: #cfd0d1;"
+			);
+		}
 
 		await this._initHooks("done");
 

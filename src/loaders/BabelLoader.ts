@@ -72,8 +72,7 @@ export default class BabelLoader implements ToypackLoader {
 						{
 							development: bundler.options.bundleOptions?.mode == "development",
 						},
-					],
-					"env"
+					]
 				],
 				plugins: [
 					availablePlugins["transform-modules-commonjs"]

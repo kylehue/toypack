@@ -65,10 +65,10 @@ export interface OutputOptions {
 export interface BundleOptions {
 	/**
 	 * @default `development`
-	 * 
+	 *
 	 * @desc
 	 * - `development` - Optimized for a fast and flexible workflow during the development process.
-	 * 
+	 *
 	 * - `production` - Optimized for performance and efficiency in a live production environment.
 	 */
 	mode?: "development" | "production";
@@ -89,6 +89,10 @@ export interface BundleOptions {
 	 * @desc Configure how modules are resolved.
 	 */
 	resolve?: ModuleResolveOptions;
+	/**
+	 * @desc When this option is enabled, Toypack will output detailed log messages to the console.
+	 */
+	logs?: boolean;
 }
 
 export interface ModuleResolveOptions {
@@ -162,12 +166,6 @@ export interface AssetInterface {
 	extension: string;
 	loader: ToypackLoader;
 	loaderData: LoaderData;
-	compilationData?: {
-		map: SourceMap;
-		content: MagicString;
-		offset: number;
-		isMapped: boolean;
-	};
 	dependencyMap: Object;
 	contentURL: string;
 	isObscure: boolean;

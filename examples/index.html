@@ -20,7 +20,7 @@
 						assetFilename: "my/cool/assets/[dir][base]",
 						name: "CoolLibrary",
 						asset: "external",
-						sourceMap: "inline-cheap-sourcemap",
+						sourceMap: false,
 					},
 					resolve: {
 						alias: {
@@ -30,7 +30,8 @@
 						fallback: {
 							fs: false
 						}
-					}
+					},
+					logs: true
 				},
 				packageProvider: "esm.sh"
 			});
@@ -46,8 +47,8 @@
 				await toypack.packageManager.install("bootstrap@5.2.3/dist/css/bootstrap.min.css");
 				// await toypack.packageManager.install("vue@3.2.23");
 				await toypack.packageManager.install("uuid");
-				await toypack.packageManager.install("react");
 				await toypack.packageManager.install("react-dom/client");
+				await toypack.packageManager.install("react");
 				
 				let sampleSimpleAssets = {
 "src/index.js": `
@@ -95,13 +96,12 @@ html {
 	height: 100vh;
 }
 
-body {
+#greet {
 	background-image: url("https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg");
-	color: var(--accent);
 }
 
-div {
-	background-image: url("../assets/sample.jpg");
+body {
+	color: var(--bg);
 }`,
 
 "react/main.jsx": `
@@ -123,9 +123,9 @@ export default function App() {
    let [count, setCount] = useState(0);
 	
    return (
-      <div>
-         <span>{ greet + " " + count }</span>
-         <button onClick={() => setCount(count + 1)}>click me!</button>
+      <div className="d-flex flex-column">
+         <h1>{ greet + " " + count }</h1>
+         <button className="w-100 rounded" onClick={() => setCount(count + 1)}>click me!</button>
       </div>
    )
 }
@@ -142,12 +142,12 @@ export default function App() {
    <!-- <script>console.log(123);</script> -->\
 </head>\
 <body class=\"theme-test w-100 h-100\">\
-   <div class=\"w-100 h-100 d-flex align-items-center justify-content-center\" id=\"greet\">\
+   <div class=\"d-flex align-items-center justify-content-center\" id=\"greet\">\
       <p>Hello World!</p>\
       <div>nested test!</div>\
-		<div id=\"root\">\
-		</div>\
    </div>\
+	<div class=\"w-100 h-100\" id=\"root\">\
+	</div>\
 </body>\
 </html>",
 

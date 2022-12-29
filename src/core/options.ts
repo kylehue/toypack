@@ -14,7 +14,8 @@ export const bundleOptions: BundleOptions = {
    resolve: {
       extensions: [".js", ".json"]
    },
-   plugins: []
+	plugins: [],
+	logs: true
 };
 
 export const postCSSOptions: PostCSSOptions = {
