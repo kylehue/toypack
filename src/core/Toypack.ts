@@ -58,7 +58,7 @@ export default class Toypack {
 	public plugins: ToypackPlugin[] = [];
 	public outputSource: string = "";
 	public dependencies = {};
-	public packageManager = new PackageManager(this);
+	public packageManager;
 	public _sourceMapConfig;
 	public _lastId: number = 0;
 	private _prevContentURL;
@@ -75,6 +75,8 @@ export default class Toypack {
 		if (typeof sourceMapConfig == "string") {
 			this._sourceMapConfig = sourceMapConfig.split("-");
 		}
+
+		this.packageManager = new PackageManager(this);
 
 		/* Default loaders */
 		this.addLoader(new BabelLoader());
@@ -280,24 +282,15 @@ export default class Toypack {
 		// Resolve.alias
 		let aliasData = this._getResolveAliasData(x);
 		if (aliasData) {
-			let aliasRegex = new RegExp(`^${aliasData.alias}`);
-			if (aliasRegex.test(x)) {
-				let aliasIsCoreModule =
-					!isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
-				if (aliasIsCoreModule) {
-					x = aliasData.replacement;
-				} else {
-					let target = path.join(
-						aliasData.replacement,
-						x.replace(aliasRegex, "")
-					);
-
-					target = path.join("/", target);
-					let resolvedAlias = path.relative(opts.baseDir, target);
-
-					x = resolvedAlias;
-				}
+			let aliased = path.join(aliasData.replacement, x.replace(aliasData.alias, ""));
+			let aliasIsCoreModule =
+				!isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
+			
+			if (!aliasIsCoreModule) {
+				aliased = "./" + path.relative(opts.baseDir, aliased);
 			}
+
+			x = aliased;
 		}
 
 		const tryFileThenIndex = (x: string) => {
@@ -314,7 +307,7 @@ export default class Toypack {
 					return loadIndex(x);
 				}
 			}
-		}
+		};
 
 		const loadAsDirectory = (x: string) => {
 			let pkg = this.assets.get(path.join(x, "package.json"));
@@ -404,8 +397,19 @@ export default class Toypack {
 	private _getResolveAliasData(str: string) {
 		let aliases = this.options.bundleOptions?.resolve?.alias;
 		if (aliases) {
+			// Find strict equals first
 			for (let [alias, replacement] of Object.entries(aliases)) {
-				if (str.startsWith(alias)) {
+				if (str === alias) {
+					return {
+						alias,
+						replacement,
+					};
+				}
+			}
+
+			for (let [alias, replacement] of Object.entries(aliases)) {
+				let aliasRegex = new RegExp(`^${alias}/`);
+				if (aliasRegex.test(str)) {
 					return {
 						alias,
 						replacement,
@@ -762,7 +766,6 @@ export default class Toypack {
 		<script defer src="${contentURL}"></script>
 	</head>
 	<body>
-		<div id="root"></div>
 	</body>
 </html>
 `;

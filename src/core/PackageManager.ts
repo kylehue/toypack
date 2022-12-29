@@ -41,7 +41,6 @@ export default class PackageManager {
 	private _cache: Map<string, Dependency[]> = new Map();
 	constructor(public bundler: Toypack) {
 		this.provider = packageProviders[bundler.options.packageProvider as string];
-
 		this.providerRegex = new RegExp(this.provider.replace(/\./g, "\\."));
 	}
 
@@ -110,7 +109,6 @@ export default class PackageManager {
 				let relative = path.relative(fromBaseDir, to);
 				let absolute = path.resolve(fromBaseDir, relative);
 
-				// For skypack's URL format
 				if (isLocal(id) && !id.startsWith("/")) {
 					absolute = path.resolve(fromBaseDir, id);
 				}

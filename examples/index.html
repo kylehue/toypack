@@ -13,14 +13,14 @@
 			let toypack = new Toypack.default({
 				bundleOptions: {
 					mode: "development",
-					entry: "react/main.jsx",
+					entry: "index.html",
 					output: {
 						path: "lib",
 						filename: "path/to/[base]",
 						assetFilename: "my/cool/assets/[dir][base]",
 						name: "CoolLibrary",
 						asset: "external",
-						sourceMap: false,
+						sourceMap: "inline-cheap-sourcemap",
 					},
 					resolve: {
 						alias: {
@@ -31,7 +31,8 @@
 							fs: false
 						}
 					}
-				}
+				},
+				packageProvider: "esm.sh"
 			});
 
 			(async () => {
@@ -43,35 +44,31 @@
 				await toypack.addDependency("use-state-in-custom-properties"); */
 				//await toypack.addDependency("bootstrap");
 				await toypack.packageManager.install("bootstrap@5.2.3/dist/css/bootstrap.min.css");
-				await toypack.packageManager.install("vue@3.2.23");
+				// await toypack.packageManager.install("vue@3.2.23");
+				await toypack.packageManager.install("uuid");
 				await toypack.packageManager.install("react");
 				await toypack.packageManager.install("react-dom/client");
 				
 				let sampleSimpleAssets = {
-					"src/index.js": `import { PI } from "@scripts/PI";
-import pkg from "../package";
-import "../styles/main";
+"src/index.js": `
 import "bootstrap/dist/css/bootstrap.min.css";
+import "../react/main"
+import pkg from "../package";
+console.log(pkg);
+import { PI } from "@scripts/PI";
 import { stuff } from "@stuff/here/TheStuff";
+console.log(PI, stuff);
 import confetti from "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js";
+console.log(confetti);
 import coolImg from "../assets/sample.jpg";
 import logo from "../public/logo.svg";
-import { createApp } from "vue";
-console.log(createApp);
-import process from "process";
-console.log(process);
-/* import path, { dirname } from "path";
-import { v4 } from "uuid";
-import fs from "fs";
-console.log(fs);
-//import "bootstrap/dist/css/bootstrap.min.css";
-console.log(path, dirname("path/to/some/file.txt"));
-console.log(v4()); */
-console.log(document.getElementById("root"))
 console.log(coolImg, logo);
-console.log(confetti);
-console.log(pkg);
-console.log(PI, stuff);`,
+import path, { dirname } from "path";
+console.log(path, dirname("path/to/some/file.txt"));
+import { v4 } from "uuid";
+console.log(v4());
+import fs from "fs";
+console.log(fs);`,
 
 					"scripts/PI.js": `import Circle from "./Circle";
 import coolImage from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg";
@@ -110,19 +107,7 @@ div {
 "react/main.jsx": `
 import React, { useState } from "react";
 import ReactDOM from 'react-dom/client';
-import crypto from "crypto";
-console.log(crypto);
-
-function App() {
-   let [count, setCount] = useState(0);
-	const greet = "hello!";
-   return (
-      <div>
-         <span>{ greet + " " + count }</span>
-         <button onClick={() => setCount(count + 1)}>click me!</button>
-      </div>
-   )
-}
+import App from "./App";
 
 ReactDOM.createRoot(document.querySelector("#root")).render(
 	<App></App>
@@ -132,8 +117,9 @@ ReactDOM.createRoot(document.querySelector("#root")).render(
 "react/App.jsx": `
 import React from 'react';
 import { useState, useEffect } from 'react';
-window.React1 = require('react');
-function App() {
+
+export default function App() {
+	const greet = "Hello world!";
    let [count, setCount] = useState(0);
 	
    return (
@@ -143,8 +129,6 @@ function App() {
       </div>
    )
 }
-
-export default App;
 `,
 
 "index.html": "\
@@ -152,8 +136,8 @@ export default App;
 <html>\
 <head>\
    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui\">\
-   <script type=\"text/javascript\" src=\"react/main.jsx\"><\/script>\
-   <!-- <link rel=\"stylesheet\" href=\"styles/main.css\"></link> -->\
+   <script type=\"text/javascript\" src=\"src/index.js\"><\/script>\
+   <link rel=\"stylesheet\" href=\"styles/main.css\"></link>\
    <title>cool website!!!!</title>\
    <!-- <script>console.log(123);</script> -->\
 </head>\
@@ -161,8 +145,8 @@ export default App;
    <div class=\"w-100 h-100 d-flex align-items-center justify-content-center\" id=\"greet\">\
       <p>Hello World!</p>\
       <div>nested test!</div>\
-   </div>\
-   <div id=\"root\">\
+		<div id=\"root\">\
+		</div>\
    </div>\
 </body>\
 </html>",

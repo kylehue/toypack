@@ -27,6 +27,9 @@ describe("Resolve", () => {
 				resolve: {
 					alias: {
 						"@utils": "/test/utils/",
+						react: "reactlib",
+						"react-dom": "reactlib-dom",
+						"react/css": "/node_modules/reactlib/test/hello.css",
 					},
 				},
 			},
@@ -35,6 +38,10 @@ describe("Resolve", () => {
 		await toypack.addAsset("test/utils/tester/index.js");
 		await toypack.addAsset("test/utils/tester/stuff.js");
 		await toypack.addAsset("test/utils/foo/bar.js");
+		await toypack.addAsset("node_modules/reactlib/index.js");
+		await toypack.addAsset("node_modules/reactlib/test/hello.css");
+		await toypack.addAsset("node_modules/reactlib-dom/index.js");
+		await toypack.addAsset("node_modules/reactlib-dom/test/hello.css");
 	});
 
 	test("Simple", () => {
@@ -88,6 +95,23 @@ describe("Resolve", () => {
 
 		let res2 = toypack.resolve("@utils/tester");
 		expect(res2).toBe(path.normalize("/test/utils/tester/index.js"));
+
+		let res3 = toypack.resolve("react/test/hello.css");
+		expect(res3).toBe(path.normalize("/node_modules/reactlib/test/hello.css"));
+
+		let res4 = toypack.resolve("react");
+		expect(res4).toBe(path.normalize("/node_modules/reactlib/index.js"));
+
+		let res5 = toypack.resolve("react-dom/test/hello.css");
+		expect(res5).toBe(
+			path.normalize("/node_modules/reactlib-dom/test/hello.css")
+		);
+
+		let res6 = toypack.resolve("react-dom");
+		expect(res6).toBe(path.normalize("/node_modules/reactlib-dom/index.js"));
+
+		let res7 = toypack.resolve("react/css");
+		expect(res7).toBe(path.normalize("/node_modules/reactlib/test/hello.css"));
 	});
 
 	test("Core modules", () => {
