@@ -11,9 +11,9 @@ export const bundleOptions: BundleOptions = {
 		asset: "external",
 		assetFilename: "[name][ext]",
 	},
-   resolve: {
-      extensions: [".js", ".json"]
-   },
+	resolve: {
+		extensions: [".js", ".json"],
+	},
 	plugins: [],
 	logs: true
 };

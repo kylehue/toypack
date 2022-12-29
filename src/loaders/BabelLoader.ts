@@ -14,9 +14,40 @@ import {
 import Toypack from "@toypack/core/Toypack";
 import MagicString from "magic-string";
 
+import { TransformOptions } from "@babel/core";
+import { merge, cloneDeep } from "lodash";
+
+const defaultTransformOptions: TransformOptions = {
+	sourceType: "module",
+	compact: false,
+	presets: ["typescript", "react"],
+	plugins: [availablePlugins["transform-modules-commonjs"]],
+};
+
+const defaultOptions: BabelLoaderOptions = {
+	transformOptions: defaultTransformOptions,
+	autoImportReactPragma: true
+}
+
+interface BabelLoaderOptions {
+	/**
+	 * @desc Babel transform options.
+	 */
+	transformOptions: TransformOptions;
+	/**
+	 * @default true
+	 * @desc When enabled, bundler will automatically import React pragma in JSX files.
+	 */
+	autoImportReactPragma?: boolean;
+}
+
 export default class BabelLoader implements ToypackLoader {
 	public name = "BabelLoader";
 	public test = /\.([jt]sx?)$/;
+
+	constructor(public options?: BabelLoaderOptions) {
+		this.options = merge(cloneDeep(defaultOptions), options);
+	}
 
 	public compile(asset: AssetInterface) {
 		if (typeof asset.content != "string") {
@@ -56,35 +87,26 @@ export default class BabelLoader implements ToypackLoader {
 		};
 
 		if (!asset.isObscure) {
-			const transpiled = transform(asset.content, {
-				sourceType: "module",
-				sourceFileName: asset.source,
-				filename: asset.source,
-				sourceMaps:
-					bundler.options.bundleOptions?.mode == "development" &&
-					!!bundler.options.bundleOptions?.output?.sourceMap &&
-					!isCoreModule,
-				compact: false,
-				presets: [
-					"typescript",
-					[
-						"react",
-						{
-							development: bundler.options.bundleOptions?.mode == "development",
-						},
-					]
-				],
-				plugins: [
-					availablePlugins["transform-modules-commonjs"]
-				],
-			});
+			const transformOptions = {
+				...this.options?.transformOptions,
+				...{
+					sourceFileName: asset.source,
+					filename: asset.source,
+					sourceMaps:
+						bundler.options.bundleOptions?.mode == "development" &&
+						!!bundler.options.bundleOptions?.output?.sourceMap &&
+						!isCoreModule,
+				} as TransformOptions,
+			};
+
+			const transpiled = transform(asset.content, transformOptions);
 
 			if (transpiled.code) {
 				let chunk = new MagicString(transpiled.code);
 
 				const AST = getAST(transpiled.code, {
 					sourceType: "script",
-					sourceFilename: asset.source
+					sourceFilename: asset.source,
 				});
 
 				traverseAST(AST, {
@@ -105,6 +127,10 @@ export default class BabelLoader implements ToypackLoader {
 						}
 					},
 				});
+
+				if (/\.[jt]sx$/.test(asset.source) && this.options?.autoImportReactPragma) {
+					chunk.prepend(`var React = require("react");`);
+				}
 
 				result.metadata.compilation = chunk;
 

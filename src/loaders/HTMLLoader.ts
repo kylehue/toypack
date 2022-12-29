@@ -25,8 +25,8 @@ function walk(AST: INode, fn: (node: HTMLNode) => void) {
 	}
 }
 
-export default class LoaderTemplate implements ToypackLoader {
-	public name = "LoaderTemplate";
+export default class HTMLLoader implements ToypackLoader {
+	public name = "HTMLLoader";
 	public test = /\.html$/;
 
 	public parse(asset: AssetInterface, bundler: Toypack) {

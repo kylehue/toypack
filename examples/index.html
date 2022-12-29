@@ -105,7 +105,7 @@ body {
 }`,
 
 "react/main.jsx": `
-import React, { useState } from "react";
+import React from "react";
 import ReactDOM from 'react-dom/client';
 import App from "./App";
 
@@ -115,8 +115,7 @@ ReactDOM.createRoot(document.querySelector("#root")).render(
 `,
 
 "react/App.jsx": `
-import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function App() {
 	const greet = "Hello world!";
