@@ -5,13 +5,30 @@ import { cloneDeep, merge } from "lodash";
 import SourceMap from "./SourceMap";
 import MagicString, { Bundle } from "magic-string";
 import path from "path-browserify";
-import Toypack, { getTimeColor, textExtensions } from "./Toypack";
+import Toypack, { textExtensions } from "./Toypack";
 import { CompiledAsset, BundleOptions, BundleResult } from "./types";
 import createGraph from "./createGraph";
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import applyUMD from "@toypack/formats/umd";
 import babelMinify from "babel-minify";
+
+const colors = {
+	success: "#3fe63c",
+	warning: "#f5b514",
+	danger: "#e61c1c",
+	info: "#3b97ed",
+};
+
+function getTimeColor(time: number) {
+	if (time < 5000) {
+		return colors.success;
+	} else if (time < 10000) {
+		return colors.warning;
+	} else {
+		return colors.danger;
+	}
+}
 
 export default async function bundle(
 	bundler: Toypack,
@@ -27,13 +44,6 @@ export default async function bundle(
 
 	if (!entrySource) {
 		throw new Error(`Bundle Error: Entry point not found.`);
-	}
-
-	for (let plugin of bundler.plugins) {
-		if (!plugin._applied) {
-			await plugin.apply(bundler);
-			plugin._applied = true;
-		}
 	}
 
 	bundler.outputSource = formatPath(
@@ -86,30 +96,34 @@ export default async function bundle(
 		const isCoreModule = /^\/node_modules\//.test(asset.source);
 
 		// [1] - Compile
-		let compiled: CompiledAsset = {} as CompiledAsset;
+		let compilation: CompiledAsset = {} as CompiledAsset;
 		if (asset.isModified || !asset.loaderData.compile?.content) {
 			if (typeof asset.loader.compile == "function") {
-				compiled = await asset.loader.compile(asset, bundler);
+				compilation = await asset.loader.compile(asset, bundler);
+				bundler._initHooks("afterCompile", {
+					compilation,
+					asset,
+				});
 			}
 			compiledCounter++;
 		} else {
-			compiled = asset.loaderData.compile;
+			compilation = asset.loaderData.compile;
 			cachedCounter++;
 		}
 
 		// If compiler didn't return any content, use asset's raw content
 		// This is for assets that don't need compilation
-		if (!compiled.content) {
+		if (!compilation.content) {
 			let rawContent = typeof asset.content == "string" ? asset.content : "";
-			compiled.content = new MagicString(rawContent);
+			compilation.content = new MagicString(rawContent);
 		}
 
 		// Save to loader data
-		asset.loaderData.compile = compiled;
+		asset.loaderData.compile = compilation;
 
 		// Update chunk
-		chunkContent = compiled.content;
-		chunkSourceMap.mergeWith(compiled.map);
+		chunkContent = compilation.content;
+		chunkSourceMap.mergeWith(compilation.map);
 
 		// [2] - Format
 		let formatted = applyUMD(chunkContent.clone(), asset, bundler, {
@@ -140,7 +154,7 @@ export default async function bundle(
 				chunkContent.generateMap({
 					source: asset.source,
 					includeContent: false,
-					hires: bundler._sourceMapConfig[1] == "original",
+					hires: bundler._sourceMapConfig[1] == "hires",
 				})
 			);
 
@@ -263,7 +277,7 @@ export default async function bundle(
 		await bundler.addAsset(entryOutputPath, bundleResult.content);
 
 		// Out resources
-		if (options?.output?.asset == "external") {
+		if (options?.output?.resourceType == "external") {
 			for (let asset of graph) {
 				// Skip if not a local resource
 				if (!(asset.loader instanceof AssetLoader) || isURL(asset.source))
@@ -310,8 +324,6 @@ export default async function bundle(
 			"color: #cfd0d1;"
 		);
 	}
-
-	await bundler._initHooks("done");
 
 	return bundleResult;
 }

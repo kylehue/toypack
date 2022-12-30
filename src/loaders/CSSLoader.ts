@@ -155,9 +155,7 @@ export default class CSSLoader implements ToypackLoader {
 
 		// Imports
 		for (let dependency in asset.dependencyMap) {
-			chunk.prepend(
-				`var ${cleanStr(dependency)} = require("${dependency}");`
-			);
+			chunk.prepend(`var ${cleanStr(dependency)} = require("${dependency}");`);
 		}
 
 		result.content = chunk;

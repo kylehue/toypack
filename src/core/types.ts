@@ -12,7 +12,7 @@ export interface ResolveOptions {
 }
 
 type SourceMapOptionsOutput = "inline" | "external";
-type SourceMapOptionsQuality = "cheap" | "original";
+type SourceMapOptionsQuality = "cheap" | "hires";
 type SourceMapOptionsSources = "nosources" | "sources";
 type SourceMapOptions =
 	| `${SourceMapOptionsOutput}-${SourceMapOptionsQuality}-${SourceMapOptionsSources}`
@@ -20,84 +20,80 @@ type SourceMapOptions =
 
 export interface OutputOptions {
 	/**
+	 * The output directory of the bundle.
 	 * @default `dist`
-	 * @desc The output directory of the bundle.
 	 */
 	path?: string;
 	/**
+	 * The filename of the bundle.
 	 * @default `[name][ext]`
-	 * @desc The filename of the bundle.
 	 */
 	filename?: string;
 	/**
-	 * @default `inline-cheap-sources`
-	 *
-	 * @desc
 	 * - `inline-*-*` - Appended directly to the code as a data URL, allowing the source map to be accessed without an additional file.
 	 * - `external-*-*` - Stored in a separate file and referenced by the compiled code.
-	 * - `*-cheap-*` - Only map the lines of code, rather than the specific columns, resulting in a smaller and less detailed source map.
-	 * - `*-original-*` - Map both lines and columns of code, providing a more detailed and accurate representation of the original source code.
+	 * - `*-hires-*` - Map both lines and columns of code, providing a more detailed and accurate representation of the original source code.
+	 * - `*-cheap-*` - Less detailed source map. Resulting in a smaller and faster bundle.
 	 * - `*-*-nosources` - No source code is included. This results in a smaller source map file, but may make debugging more difficult.
 	 * - `*-*-sources` - Opposite of `*-*-nosources`.
 	 * - Set to `false` to disable.
 	 *
 	 * **Note:** Becomes `false` when in production mode.
+	 * @default `inline-cheap-sources`
 	 */
 	sourceMap?: SourceMapOptions;
 	/**
-	 * @desc The name of your library.
+	 * The name of your library.
 	 */
 	name?: string;
 	/**
-	 * @default `external`
-	 * @desc
 	 * - Set to `inline` to append directly to the code as a data URL.
 	 * - Set to `external` to save as an external resource.
+	 * @default `external`
 	 */
-	asset?: "inline" | "external";
+	resourceType?: "inline" | "external";
 	/**
+	 * The filename of the assets.
 	 * @default `[name][ext]`
-	 * @desc The filename of the assets.
 	 */
 	assetFilename?: string;
 }
 
 export interface BundleOptions {
 	/**
-	 * @default `development`
-	 *
-	 * @desc
 	 * - `development` - Optimized for a fast and flexible workflow during the development process.
 	 *
 	 * - `production` - Optimized for performance and efficiency in a live production environment.
+	 * @default `development`
 	 */
 	mode?: "development" | "production";
 	/**
+	 * The starting point of the bundle.
 	 * @default `/`
-	 * @desc The starting point of the bundle.
 	 */
 	entry?: string;
 	/**
-	 * @desc Output options.
+	 * Output options.
 	 */
 	output?: OutputOptions;
 	/**
-	 * @desc Toypack plugins.
+	 * Toypack plugins.
 	 */
 	plugins?: ToypackPlugin[];
 	/**
-	 * @desc Configure how modules are resolved.
+	 * Configure how modules are resolved.
 	 */
 	resolve?: ModuleResolveOptions;
 	/**
-	 * @desc When this option is enabled, Toypack will output detailed log messages to the console.
+	 * When this option is enabled, Toypack will output detailed log messages to the console.
+	 * @default true
 	 */
 	logs?: boolean;
 }
 
 export interface ModuleResolveOptions {
 	/**
-	 * @desc Create aliases to import or require certain modules more easily.
+	 * Create aliases to import or require certain modules more easily.
 	 * @example
 	 * {
 	 * 	alias: {
@@ -113,25 +109,25 @@ export interface ModuleResolveOptions {
 	 */
 	alias?: Object;
 	/**
-	 * @desc Redirect module requests when normal resolving fails.
+	 * Redirect module requests when normal resolving fails.
 	 */
 	fallback?: Object;
 	/**
-	 * @default
 	 * [".js", ".json"]
 	 *
-	 * @desc Attempt to resolve the extensions provided in order.
+	 * Attempt to resolve the extensions provided in order.
+	 * @default
 	 */
 	extensions?: string[];
 }
 
 export interface PostCSSOptions {
 	/**
-	 * @desc PostCSS plugins.
+	 * PostCSS plugins.
 	 */
 	plugins?: AcceptedPlugin[];
 	/**
-	 * @desc PostCSS processing options.
+	 * PostCSS processing options.
 	 */
 	options?: ProcessOptions;
 }
@@ -146,8 +142,8 @@ export interface ToypackOptions {
 	 */
 	postCSSOptions?: PostCSSOptions;
 	/**
+	 * The package provider.
 	 * @default `esm.sh`
-	 * @desc The package provider.
 	 */
 	packageProvider?: PackageProvider;
 }

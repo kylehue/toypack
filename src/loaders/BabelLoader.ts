@@ -23,19 +23,13 @@ const defaultTransformOptions: TransformOptions = {
 
 const defaultOptions: BabelLoaderOptions = {
 	transformOptions: defaultTransformOptions,
-	autoImportReactPragma: true,
 };
 
 interface BabelLoaderOptions {
 	/**
-	 * @desc Babel transform options.
+	 * Babel transform options.
 	 */
 	transformOptions: TransformOptions;
-	/**
-	 * @default true
-	 * @desc When enabled, bundler will automatically import React pragma in JSX files.
-	 */
-	autoImportReactPragma?: boolean;
 }
 
 export default class BabelLoader implements ToypackLoader {
@@ -90,24 +84,6 @@ export default class BabelLoader implements ToypackLoader {
 			const transpiled = transform(content, transformOptions);
 			if (transpiled.code) {
 				let chunk = new MagicString(transpiled.code);
-
-				// Auto import react pragma
-				if (
-					this.options?.autoImportReactPragma &&
-					/\.[jt]sx$/.test(asset.source) &&
-					!parseMetadata.isReactPragmaImported
-				) {
-					let isStrictMode = transpiled.code.startsWith(`"use strict";`);
-
-					let index = 0;
-
-					if (isStrictMode) {
-						index += `"use strict";`.length;
-					}
-
-					chunk.prependRight(index, `\nvar React = require("react");`);
-				}
-
 				result.content = chunk;
 			}
 
@@ -158,13 +134,6 @@ export default class BabelLoader implements ToypackLoader {
 			const imports = getModuleImports(AST);
 			for (let dep of imports) {
 				let isAdded = result.dependencies.some((d) => d === dep.id);
-
-				// Check if React pragma is already imported
-				if (/\.[jt]sx$/.test(asset.source)) {
-					if (dep.id == "react" && dep.specifiers.some((s) => s === "React")) {
-						result.metadata.isReactPragmaImported = true;
-					}
-				}
 
 				if (!isAdded) {
 					result.dependencies.push(dep.id);

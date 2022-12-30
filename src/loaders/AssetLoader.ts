@@ -1,5 +1,9 @@
 import Toypack from "@toypack/core/Toypack";
-import { AssetInterface, CompiledAsset, ToypackLoader } from "@toypack/core/types";
+import {
+	AssetInterface,
+	CompiledAsset,
+	ToypackLoader,
+} from "@toypack/core/types";
 import { formatPath, isLocal, isURL } from "@toypack/utils";
 import MagicString from "magic-string";
 import { relative, dirname, join } from "path-browserify";
@@ -14,7 +18,7 @@ export default class AssetLoader implements ToypackLoader {
 
 		if (
 			bundler.options.bundleOptions?.mode == "production" &&
-			bundler.options.bundleOptions?.output?.asset == "external" &&
+			bundler.options.bundleOptions?.output?.resourceType == "external" &&
 			!isURL(asset.source)
 		) {
 			let dir = dirname(bundler.outputSource);
@@ -23,12 +27,12 @@ export default class AssetLoader implements ToypackLoader {
 				asset.source,
 				bundler.options.bundleOptions?.output?.assetFilename || ""
 			);
-         
-         target = relative(dir, assetOutputFilename);
-         
-         if (!isLocal(target)) {
-            target = join("/", target);
-         }
+
+			target = relative(dir, assetOutputFilename);
+
+			if (!isLocal(target)) {
+				target = join("/", target);
+			}
 		}
 
 		if (target) {

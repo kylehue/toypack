@@ -5,7 +5,7 @@ import Toypack from "./Toypack";
 import { AssetInterface, ParsedAsset } from "./types";
 
 export default async function createGraph(
-   bundler: Toypack,
+	bundler: Toypack,
 	source: string,
 	graph: AssetInterface[] = []
 ) {
@@ -68,9 +68,12 @@ export default async function createGraph(
 				});
 
 				if (!resolved) {
-					await bundler._initHooks("failedResolve", dependency);
-					resolved = bundler.resolve(dependency, {
-						baseDir,
+					await bundler._initHooks("failedResolve", {
+						target: dependency,
+						parent: asset,
+						changeResolved(newResolved: string) {
+							resolved = newResolved;
+						},
 					});
 				}
 

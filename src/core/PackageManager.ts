@@ -114,7 +114,7 @@ export default class PackageManager {
 
 	/**
 	 * Adds a package to the bundler.
-	 * 
+	 *
 	 * @param {string} source The package source. Format is `<name>@<version><subpath>`
 	 * @example
 	 *

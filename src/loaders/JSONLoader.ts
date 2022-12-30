@@ -3,7 +3,6 @@ import {
 	AssetInterface,
 	CompiledAsset,
 	ToypackLoader,
-	ParsedAsset,
 } from "@toypack/core/types";
 import MagicString from "magic-string";
 
@@ -19,7 +18,7 @@ export default class JSONLoader implements ToypackLoader {
 			throw error;
 		}
 
-      let chunk = new MagicString(asset.content);
+		let chunk = new MagicString(asset.content);
 		chunk.prepend("module.exports = ");
 
 		let result: CompiledAsset = {

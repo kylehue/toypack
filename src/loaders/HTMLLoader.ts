@@ -150,9 +150,7 @@ export default class HTMLLoader implements ToypackLoader {
 					if (node instanceof IHTMLElement) {
 						let nodeVarId: string = (node as any).varId;
 						for (let [key, value] of Object.entries(node.attrs)) {
-							chunk.append(
-								`${nodeVarId}.setAttribute("${key}", "${value}");`
-							);
+							chunk.append(`${nodeVarId}.setAttribute("${key}", "${value}");`);
 						}
 					}
 				}

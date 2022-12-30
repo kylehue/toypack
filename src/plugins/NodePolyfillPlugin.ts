@@ -1,5 +1,6 @@
 import Toypack from "@toypack/core/Toypack";
 import { ToypackPlugin } from "@toypack/core/types";
+import path from "path-browserify";
 
 const polyfills = {
 	assert: "assert/",
@@ -33,21 +34,27 @@ const polyfills = {
 };
 
 export default class NodePolyfillPlugin implements ToypackPlugin {
-	async apply(bundler: Toypack) {
+	apply(bundler: Toypack) {
 		// Only add dependency if it's required
-		bundler.hooks.failedResolve(async (failedPath: string) => {
-			if (failedPath in polyfills) {
+		bundler.hooks.failedResolve(async (resolver) => {
+			if (resolver.target in polyfills) {
 				bundler.defineOptions({
 					bundleOptions: {
 						resolve: {
 							fallback: {
-								[failedPath]: polyfills[failedPath],
+								[resolver.target]: polyfills[resolver.target],
 							},
 						},
 					},
 				});
 
-				await bundler.packageManager.install(polyfills[failedPath]);
+				await bundler.packageManager.install(polyfills[resolver.target]);
+
+				let newResolved = bundler.resolve(resolver.target, {
+					baseDir: path.dirname(resolver.parent.source),
+				});
+
+				resolver.changeResolved(newResolved);
 			}
 		});
 	}

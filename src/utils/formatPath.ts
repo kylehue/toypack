@@ -12,7 +12,7 @@ export default function formatPath(from: string, to: string) {
 			value = `/${value}/`;
 		}
 
-		result = result.replace(propertyRegex, (value as any));
+		result = result.replace(propertyRegex, value as any);
 	}
 
 	result = join(result);

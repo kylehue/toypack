@@ -10,7 +10,7 @@ export interface SourceMapData {
 	sourcesContent: string[];
 	sourceRoot: string;
 	file: string;
-};
+}
 
 export default class SourceMap implements SourceMapData {
 	public version: number = 3;
@@ -47,7 +47,7 @@ export default class SourceMap implements SourceMapData {
 	mergeWith(generated: any) {
 		if (!generated) return this;
 		if (this.mappings === generated.mappings) return this;
-		
+
 		let merged;
 		if (!this.mappings) {
 			merged = generated;
@@ -58,7 +58,7 @@ export default class SourceMap implements SourceMapData {
 		for (let [key, value] of Object.entries(merged)) {
 			(this as SourceMapData)[key] = value;
 		}
-		
+
 		return this;
 	}
 }

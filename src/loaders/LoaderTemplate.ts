@@ -1,5 +1,10 @@
 import Toypack from "@toypack/core/Toypack";
-import { AssetInterface, CompiledAsset, ToypackLoader, ParsedAsset } from "@toypack/core/types";
+import {
+	AssetInterface,
+	CompiledAsset,
+	ToypackLoader,
+	ParsedAsset,
+} from "@toypack/core/types";
 import MagicString from "magic-string";
 
 export default class LoaderTemplate implements ToypackLoader {

@@ -45,8 +45,8 @@ export default function getModuleImports(AST: Node | Node[]) {
 			if (node.source) {
 				addImported(node.source.value, node.source.start, node.source.end);
 			}
-      },
-      // For CJS require() and dynamic imports
+		},
+		// For CJS require() and dynamic imports
 		CallExpression(dir) {
 			let argNode = dir.node.arguments[0];
 			let callee = dir.node.callee;
@@ -55,9 +55,9 @@ export default function getModuleImports(AST: Node | Node[]) {
 					callee.type == "Import") &&
 				argNode.type == "StringLiteral"
 			) {
-            let parent = dir.parent;
-            
-            // Extract specifiers
+				let parent = dir.parent;
+
+				// Extract specifiers
 				let specifiers: string[] = [];
 				if (parent.type == "VariableDeclarator") {
 					if (parent.id.type == "Identifier") {

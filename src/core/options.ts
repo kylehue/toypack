@@ -1,4 +1,8 @@
-import { BundleOptions, PostCSSOptions, ToypackOptions } from "@toypack/core/types";
+import {
+	BundleOptions,
+	PostCSSOptions,
+	ToypackOptions,
+} from "@toypack/core/types";
 
 export const bundleOptions: BundleOptions = {
 	mode: "development",
@@ -8,14 +12,14 @@ export const bundleOptions: BundleOptions = {
 		filename: "[name][ext]",
 		name: "",
 		sourceMap: "inline-cheap-sources",
-		asset: "external",
+		resourceType: "external",
 		assetFilename: "[name][ext]",
 	},
 	resolve: {
 		extensions: [".js", ".json"],
 	},
 	plugins: [],
-	logs: true
+	logs: true,
 };
 
 export const postCSSOptions: PostCSSOptions = {

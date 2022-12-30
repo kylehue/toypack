@@ -68,7 +68,7 @@ export default function format(
 	chunk.prepend(`${asset.id}: {`);
 	chunk.append(`},`);
 	chunk.append(`map: ${JSON.stringify(asset.dependencyMap) || "{}"}`);
-   chunk.append(`},`);
+	chunk.append(`},`);
 
 	if (isFirst) {
 		chunk.prepend(getTopUMD(name));

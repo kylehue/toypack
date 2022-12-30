@@ -94,7 +94,7 @@ export async function add(
 		if (isURL(asset.source)) {
 			assetURL = asset.source;
 		} else {
-			if (bundler.options.bundleOptions?.output?.asset == "inline") {
+			if (bundler.options.bundleOptions?.output?.resourceType == "inline") {
 				let base64 = getBtoa(asset.content);
 				assetURL = `data:${asset.type};base64,${base64}`;
 			} else {

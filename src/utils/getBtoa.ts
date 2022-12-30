@@ -13,8 +13,8 @@ export default function getBtoa(content: string | ArrayBuffer) {
 	} else if (typeof Buffer === "function") {
 		if (content instanceof ArrayBuffer) {
 			return Buffer.from(new Uint8Array(content)).toString("base64");
-      }
-      
+		}
+
 		return Buffer.from(content, "utf-8").toString("base64");
 	}
 }

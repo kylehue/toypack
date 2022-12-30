@@ -118,7 +118,7 @@ function getResolved(bundler: Toypack, x: string, opts) {
 			return loadAsDirectory(bundler, resolved, opts.extensions);
 		}
 	}
-};
+}
 
 /**
  * Resolves a module path to its absolute path.
