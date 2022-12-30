@@ -18,8 +18,7 @@ import SourceMap from "@toypack/core/SourceMap";
 const defaultTransformOptions: TransformOptions = {
 	sourceType: "module",
 	compact: false,
-	presets: ["typescript", "react"],
-	plugins: [availablePlugins["transform-modules-commonjs"]],
+	presets: ["typescript", "react", "env"],
 };
 
 const defaultOptions: BabelLoaderOptions = {
@@ -74,7 +73,8 @@ export default class BabelLoader implements ToypackLoader {
 
 			let parseMetadata = asset.loaderData.parse?.metadata;
 
-			// Replace "__esModule" identifiers to something else as they are reserved.
+			// Replace "__esModule" identifiers to something else to avoid error.
+			// Solve the case similar to https://github.com/evanw/esbuild/issues/1591
 			let content = asset.content;
 			if (parseMetadata.esModuleFlagNodes.length) {
 				let chunk = new MagicString(content);
@@ -85,7 +85,7 @@ export default class BabelLoader implements ToypackLoader {
 
 				content = chunk.toString();
 			}
-			
+
 			// Transpile
 			const transpiled = transform(content, transformOptions);
 			if (transpiled.code) {

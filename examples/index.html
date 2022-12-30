@@ -69,7 +69,11 @@ console.log(path, dirname("path/to/some/file.txt"));
 import { v4 } from "uuid";
 console.log(v4());
 import fs from "fs";
-console.log(fs);`,
+console.log(fs);
+(async() => {
+	let dynamicPI = await import("@scripts/PI.js");
+	console.log(dynamicPI);
+})();`,
 
 					"scripts/PI.js": `import Circle from "./Circle";
 import coolImage from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg";
