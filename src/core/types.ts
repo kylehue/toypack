@@ -209,5 +209,6 @@ export interface ToypackPlugin {
 export interface BundleResult {
 	content: string;
 	contentURL: string | null;
+	contentDoc: string | null;
 	contentDocURL: string | null;
 }

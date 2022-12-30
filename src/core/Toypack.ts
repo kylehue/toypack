@@ -314,13 +314,7 @@ export default class Toypack {
 			if (file) {
 				return file;
 			} else {
-				let index = loadIndex(x);
-
-				if (index) {
-					return index;
-				} else {
-					return loadIndex(x);
-				}
+				return loadIndex(x);
 			}
 		};
 
@@ -395,7 +389,7 @@ export default class Toypack {
 		return result;
 	}
 
-	private _getResolveFallbackData(str: string) {
+	public _getResolveFallbackData(str: string) {
 		let fallbacks = this.options.bundleOptions?.resolve?.fallback;
 		if (fallbacks) {
 			for (let [id, fallback] of Object.entries(fallbacks)) {
@@ -409,7 +403,7 @@ export default class Toypack {
 		}
 	}
 
-	private _getResolveAliasData(str: string) {
+	public _getResolveAliasData(str: string) {
 		let aliases = this.options.bundleOptions?.resolve?.alias;
 		if (aliases) {
 			// Find strict equals first
@@ -633,7 +627,7 @@ export default class Toypack {
 			chunkContent = compiled.content;
 			chunkSourceMap.mergeWith(compiled.map);
 
-			// [3] - Format
+			// [2] - Format
 			let formatted = applyUMD(chunkContent.clone(), asset, this, {
 				entryId: this.assets.get(entrySource)?.id,
 				isFirst,
@@ -644,7 +638,7 @@ export default class Toypack {
 			chunkContent = formatted.content;
 			chunkSourceMap.mergeWith(formatted.map);
 
-			// [4] - Add to bundle
+			// [3] - Add to bundle
 			bundle.addSource({
 				filename: asset.source,
 				content: chunkContent,
@@ -698,7 +692,7 @@ export default class Toypack {
 		// Minify if in production mode
 		if (options?.mode == "production") {
 			let transpiled = transform(finalContent, {
-				presets: ["es2015-loose"],
+				presets: ["env", "es2015-loose"],
 			});
 
 			let minified = babelMinify(transpiled.code, {
@@ -741,6 +735,7 @@ export default class Toypack {
 		let bundleResult: BundleResult = {
 			content: finalContent,
 			contentURL: null,
+			contentDoc: null,
 			contentDocURL: null,
 		};
 
@@ -748,36 +743,36 @@ export default class Toypack {
 			URL.revokeObjectURL(this._prevContentURL);
 		}
 
-		let contentURL = URL.createObjectURL(
+		bundleResult.contentURL = URL.createObjectURL(
 			new Blob([finalContent], {
 				type: "application/javascript",
 			})
 		);
 
-		this._prevContentURL = contentURL;
+		this._prevContentURL = bundleResult.contentURL;
 
-		let contentDoc = `<!DOCTYPE html>
+		bundleResult.contentDoc = `<!DOCTYPE html>
 <html>
 	<head>
-		<script defer src="${contentURL}"></script>
+		<script defer src="${bundleResult.contentURL}"></script>
 	</head>
 	<body>
 	</body>
 </html>
 `;
+		
+		
 		if (this._prevContentDocURL?.startsWith("blob:")) {
 			URL.revokeObjectURL(this._prevContentDocURL);
 		}
 
-		let contentDocURL = URL.createObjectURL(
-			new Blob([contentDoc], {
+		bundleResult.contentDocURL = URL.createObjectURL(
+			new Blob([bundleResult.contentDoc], {
 				type: "text/html",
 			})
 		);
 
-		this._prevContentDocURL = contentDocURL;
-		bundleResult.contentURL = contentURL;
-		bundleResult.contentDocURL = contentDocURL;
+		this._prevContentDocURL = bundleResult.contentDocURL;
 
 		// Out
 		if (options?.mode == "production") {

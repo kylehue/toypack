@@ -5,7 +5,7 @@ import { parse as parsePackageName } from "parse-package-name";
 import { parse as getAST } from "@babel/parser";
 import traverseAST from "@babel/traverse";
 import { AssetInterface } from "./types";
-import { isLocal } from "@toypack/utils";
+import { getModuleImports, isLocal } from "@toypack/utils";
 
 const packageProviders = {
 	"esm.sh": "https://esm.sh/",
@@ -17,12 +17,6 @@ export type PackageProvider = keyof typeof packageProviders;
 interface Dependency {
 	content: string;
 	source: string;
-}
-
-interface ImportedInfo {
-	id: string;
-	start: number;
-	end: number;
 }
 
 interface ParsedPackageName {
@@ -74,30 +68,7 @@ export default class PackageManager {
 		// Get dependencies if there's an AST
 		if (AST) {
 			let chunk = new MagicString(content);
-
-			let imports: ImportedInfo[] = [];
-
-			function addImported(id: string, start, end) {
-				imports.push({
-					id,
-					start,
-					end,
-				} as ImportedInfo);
-			}
-
-			traverseAST(AST, {
-				ImportDeclaration({ node }) {
-					addImported(node.source.value, node.source.start, node.source.end);
-				},
-				ExportAllDeclaration({ node }) {
-					addImported(node.source.value, node.source.start, node.source.end);
-				},
-				ExportNamedDeclaration({ node }) {
-					if (node.source) {
-						addImported(node.source.value, node.source.start, node.source.end);
-					}
-				},
-			});
+			let imports = getModuleImports(AST);
 
 			for (let node of imports) {
 				let id = node.id;
@@ -161,6 +132,14 @@ export default class PackageManager {
 
 		let url = `${this.provider}${target}`;
 
+		if (this.bundler.options.bundleOptions?.logs) {
+			console.log(
+				`%cInstalling: %c${name + subpath}`,
+				"font-weight: bold; color: white;",
+				"color: #cfd0d1;"
+			);
+		}
+
 		// Get graph
 		let graph: Dependency[] | null = null;
 		let cached = this._cache.get(target);
@@ -205,6 +184,14 @@ export default class PackageManager {
 		for (let asset of graph) {
 			let cmSource = path.join("node_modules", name, asset.source);
 			await this.bundler.addAsset(cmSource, asset.content);
+		}
+
+		if (this.bundler.options.bundleOptions?.logs) {
+			console.log(
+				`%cSuccessfully installed: %c${name + subpath} (added ${graph.length} packages)`,
+				"font-weight: bold; color: white;",
+				"color: #cfd0d1;"
+			);
 		}
 
 		// Cache

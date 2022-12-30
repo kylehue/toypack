@@ -20,7 +20,7 @@
 						assetFilename: "my/cool/assets/[dir][base]",
 						name: "CoolLibrary",
 						asset: "external",
-						sourceMap: false,
+						sourceMap: "inline-original-sources",
 					},
 					resolve: {
 						alias: {
@@ -108,19 +108,22 @@ body {
 import React from "react";
 import ReactDOM from 'react-dom/client';
 import App from "./App";
-
+const React2 = require("react");
+const {default: React3} = require("react");
 ReactDOM.createRoot(document.querySelector("#root")).render(
-	<App></App>
+	<App foo="bar"></App>
 );
 `,
 
 "react/App.jsx": `
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-export default function App() {
+export default function App(props) {
 	const greet = "Hello world!";
    let [count, setCount] = useState(0);
-	
+	useEffect(() => {
+		console.log(props);
+	}, []);
    return (
       <div className="d-flex flex-column">
          <h1>{ greet + " " + count }</h1>

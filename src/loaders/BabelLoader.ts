@@ -6,16 +6,14 @@ import {
 } from "@toypack/core/types";
 
 import { parse as getAST } from "@babel/parser";
-import traverseAST from "@babel/traverse";
-import {
-	availablePlugins,
-	transform,
-} from "@babel/standalone";
+import { availablePlugins, transform } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import MagicString from "magic-string";
 
 import { TransformOptions } from "@babel/core";
 import { merge, cloneDeep } from "lodash";
+import { getModuleImports } from "@toypack/utils";
+import SourceMap from "@toypack/core/SourceMap";
 
 const defaultTransformOptions: TransformOptions = {
 	sourceType: "module",
@@ -26,8 +24,8 @@ const defaultTransformOptions: TransformOptions = {
 
 const defaultOptions: BabelLoaderOptions = {
 	transformOptions: defaultTransformOptions,
-	autoImportReactPragma: true
-}
+	autoImportReactPragma: true,
+};
 
 interface BabelLoaderOptions {
 	/**
@@ -49,7 +47,7 @@ export default class BabelLoader implements ToypackLoader {
 		this.options = merge(cloneDeep(defaultOptions), options);
 	}
 
-	public compile(asset: AssetInterface) {
+	public compile(asset: AssetInterface, bundler: Toypack) {
 		if (typeof asset.content != "string") {
 			let error = new Error(
 				"Babel Compile Error: Asset content must be string."
@@ -59,13 +57,49 @@ export default class BabelLoader implements ToypackLoader {
 
 		let result: CompiledAsset = {} as CompiledAsset;
 
-		let parseMetadata = asset.loaderData.parse?.metadata;
-		if (parseMetadata?.compilation) {
-			result.content = parseMetadata.compilation;
-		}
+		if (!asset.isObscure) {
+			const isCoreModule = /^\/node_modules\//.test(asset.source);
+			const transformOptions = {
+				...this.options?.transformOptions,
+				...({
+					sourceFileName: asset.source,
+					filename: asset.source,
+					sourceMaps:
+						bundler.options.bundleOptions?.mode == "development" &&
+						!!bundler.options.bundleOptions?.output?.sourceMap &&
+						!isCoreModule,
+					envName: bundler.options.bundleOptions?.mode,
+				} as TransformOptions),
+			};
 
-		if (parseMetadata?.map) {
-			result.map = parseMetadata.map;
+			const transpiled = transform(asset.content, transformOptions);
+
+			if (transpiled.code) {
+				let chunk = new MagicString(transpiled.code);
+
+				// Auto import react pragma
+				if (
+					this.options?.autoImportReactPragma &&
+					/\.[jt]sx$/.test(asset.source) &&
+					!asset.loaderData.parse?.metadata.isReactPragmaImported
+				) {
+					let isStrictMode = transpiled.code.startsWith(`"use strict";`);
+					
+					let index = 0;
+
+					if (isStrictMode) {
+						index += `"use strict";`.length;
+					}
+
+					chunk.prependRight(index ,`\nvar React = require("react");`);
+				}
+
+				result.content = chunk;
+			}
+
+			if (transpiled.map) {
+				result.map = new SourceMap(transpiled.map);
+			}
 		}
 
 		return result;
@@ -77,65 +111,34 @@ export default class BabelLoader implements ToypackLoader {
 			throw error;
 		}
 
-		const isCoreModule = /^\/?node_modules\/?/.test(asset.source);
-
 		let result: ParsedAsset = {
 			dependencies: [],
 			metadata: {
-				depNodes: [],
+				isReactPragmaImported: false,
 			},
 		};
 
 		if (!asset.isObscure) {
-			const transformOptions = {
-				...this.options?.transformOptions,
-				...{
-					sourceFileName: asset.source,
-					filename: asset.source,
-					sourceMaps:
-						bundler.options.bundleOptions?.mode == "development" &&
-						!!bundler.options.bundleOptions?.output?.sourceMap &&
-						!isCoreModule,
-				} as TransformOptions,
-			};
+			const AST = getAST(asset.content, {
+				sourceType: "module",
+				sourceFilename: asset.source,
+				plugins: ["typescript", "jsx"],
+			});
 
-			const transpiled = transform(asset.content, transformOptions);
+			const imports = getModuleImports(AST);
 
-			if (transpiled.code) {
-				let chunk = new MagicString(transpiled.code);
+			for (let dep of imports) {
+				let isAdded = result.dependencies.some((d) => d === dep.id);
 
-				const AST = getAST(transpiled.code, {
-					sourceType: "script",
-					sourceFilename: asset.source,
-				});
-
-				traverseAST(AST, {
-					CallExpression: ({ node }) => {
-						let argNode = node.arguments[0];
-						let callee = node.callee;
-						if (
-							callee.type === "Identifier" &&
-							callee.name == "require" &&
-							argNode.type == "StringLiteral"
-						) {
-							let id = argNode.value;
-							if (!id) return;
-							if (result.dependencies.some((dep) => dep === id)) return;
-
-							result.dependencies.push(id);
-							result.metadata.depNodes.push(node);
-						}
-					},
-				});
-
-				if (/\.[jt]sx$/.test(asset.source) && this.options?.autoImportReactPragma) {
-					chunk.prepend(`var React = require("react");`);
+				// Check if React pragma is already imported
+				if (/\.[jt]sx$/.test(asset.source)) {
+					if (dep.id == "react" && dep.specifiers.some((s) => s === "React")) {
+						result.metadata.isReactPragmaImported = true;
+					}
 				}
 
-				result.metadata.compilation = chunk;
-
-				if (transpiled.map) {
-					result.metadata.map = transpiled.map;
+				if (!isAdded) {
+					result.dependencies.push(dep.id);
 				}
 			}
 		}
