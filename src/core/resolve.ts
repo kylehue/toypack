@@ -3,11 +3,18 @@ import path from "path-browserify";
 import Toypack, { textExtensions, resourceExtensions } from "./Toypack";
 import { ResolveOptions } from "./types";
 
-export function getResolveFallbackData(bundler: Toypack, str: string) {
+/**
+ * Searches for the fallback data of a module id in the `fallback` field of the `bundleOptions.resolve` object.
+ *
+ * @param {object} bundler - The bundler instance.
+ * @param {string} x - The module id.
+ * @returns {object} The fallback data.
+ */
+export function getResolveFallbackData(bundler: Toypack, x: string) {
 	let fallbacks = bundler.options.bundleOptions?.resolve?.fallback;
 	if (fallbacks) {
 		for (let [id, fallback] of Object.entries(fallbacks)) {
-			if (str.startsWith(id)) {
+			if (x.startsWith(id)) {
 				return {
 					id,
 					fallback,
@@ -17,12 +24,19 @@ export function getResolveFallbackData(bundler: Toypack, str: string) {
 	}
 }
 
-export function getResolveAliasData(bundler: Toypack, str: string) {
+/**
+ * Searches for the alias data of a module id in the `alias` field of the `bundleOptions.resolve` object.
+ *
+ * @param {Toypack} bundler The bundler instance.
+ * @param {string} x The module id.
+ * @returns {object} The alias data.
+ */
+export function getResolveAliasData(bundler: Toypack, x: string) {
 	let aliases = bundler.options.bundleOptions?.resolve?.alias;
 	if (aliases) {
 		// Find strict equals first
 		for (let [alias, replacement] of Object.entries(aliases)) {
-			if (str === alias) {
+			if (x === alias) {
 				return {
 					alias,
 					replacement,
@@ -32,7 +46,7 @@ export function getResolveAliasData(bundler: Toypack, str: string) {
 
 		for (let [alias, replacement] of Object.entries(aliases)) {
 			let aliasRegex = new RegExp(`^${alias}/`);
-			if (aliasRegex.test(str)) {
+			if (aliasRegex.test(x)) {
 				return {
 					alias,
 					replacement,
@@ -42,6 +56,78 @@ export function getResolveAliasData(bundler: Toypack, str: string) {
 	}
 }
 
+function tryFileThenIndex(bundler: Toypack, x: string, extensions: string[]) {
+	let file = loadAsFile(bundler, x, extensions);
+
+	if (file) {
+		return file;
+	} else {
+		return loadIndex(bundler, x, extensions);
+	}
+}
+
+function loadAsDirectory(bundler: Toypack, x: string, extensions: string[]) {
+	let pkg = bundler.assets.get(path.join(x, "package.json"));
+
+	if (typeof pkg?.content == "string") {
+		let main = JSON.parse(pkg.content).main;
+		if (!main) {
+			return tryFileThenIndex(bundler, x, extensions);
+		} else {
+			let absolutePath = path.join(x, main);
+			return tryFileThenIndex(bundler, absolutePath, extensions);
+		}
+	} else {
+		return tryFileThenIndex(bundler, x, extensions);
+	}
+}
+
+function loadAsFile(bundler: Toypack, x: string, extensions: string[]) {
+	let parsedPath = path.parse(x);
+	let noExt = path.join(parsedPath.dir, parsedPath.name);
+
+	for (let i = 0; i < extensions.length; i++) {
+		let extension = extensions[i];
+		let asset = bundler.assets.get(noExt + extension);
+
+		if (asset) {
+			return asset.source;
+		}
+	}
+
+	return "";
+}
+
+function loadIndex(bundler: Toypack, x: string, extensions: string[]) {
+	let resolvedIndex = path.join(x, "index");
+	return loadAsFile(bundler, resolvedIndex, extensions);
+}
+
+function getResolved(bundler: Toypack, x: string, opts) {
+	if (opts.includeCoreModules && !isLocal(x) && !isURL(x)) {
+		let resolved = path.join("/", "node_modules", x);
+		return loadAsDirectory(bundler, resolved, opts.extensions);
+	} else if (isURL(x)) {
+		return x;
+	} else {
+		let resolved = path.join("/", opts.baseDir, x);
+		let file = loadAsFile(bundler, resolved, opts.extensions);
+		if (file) {
+			return file;
+		} else {
+			return loadAsDirectory(bundler, resolved, opts.extensions);
+		}
+	}
+};
+
+/**
+ * Resolves a module path to its absolute path.
+ *
+ * @param {Toypack} bundler The bundler instance.
+ * @param {string} x The module path to resolve.
+ * @param {ResolveOptions} options Resolving options.
+ * @returns {string} The absolute path of the module.
+ */
 export default function resolve(
 	bundler: Toypack,
 	x: string,
@@ -94,71 +180,7 @@ export default function resolve(
 		x = aliased;
 	}
 
-	const tryFileThenIndex = (x: string) => {
-		let file = loadAsFile(x);
-
-		if (file) {
-			return file;
-		} else {
-			return loadIndex(x);
-		}
-	};
-
-	const loadAsDirectory = (x: string) => {
-		let pkg = bundler.assets.get(path.join(x, "package.json"));
-
-		if (typeof pkg?.content == "string") {
-			let main = JSON.parse(pkg.content).main;
-			if (!main) {
-				return tryFileThenIndex(x);
-			} else {
-				let absolutePath = path.join(x, main);
-				return tryFileThenIndex(absolutePath);
-			}
-		} else {
-			return tryFileThenIndex(x);
-		}
-	};
-
-	const loadAsFile = (x: string) => {
-		let parsedPath = path.parse(x);
-		let noExt = path.join(parsedPath.dir, parsedPath.name);
-
-		for (let i = 0; i < opts.extensions.length; i++) {
-			let extension = opts.extensions[i];
-			let asset = bundler.assets.get(noExt + extension);
-
-			if (asset) {
-				return asset.source;
-			}
-		}
-
-		return "";
-	};
-
-	const loadIndex = (x: string) => {
-		let resolvedIndex = path.join(x, "index");
-		return loadAsFile(resolvedIndex);
-	};
-
-	const resolve = (x: string) => {
-		if (opts.includeCoreModules && !isLocal(x) && !isURL(x)) {
-			let resolved = path.join("/", "node_modules", x);
-			return loadAsDirectory(resolved);
-		} else if (isURL(x)) {
-			return x;
-		} else {
-			let resolved = path.join("/", opts.baseDir, x);
-			let file = loadAsFile(resolved);
-			if (file) {
-				return file;
-			} else {
-				return loadAsDirectory(resolved);
-			}
-		}
-	};
-
-	result = resolve(x);
+	result = getResolved(bundler, x, opts);
 
 	// Resolve.fallback
 	if (!result) {
@@ -167,7 +189,7 @@ export default function resolve(
 			if (typeof fallbackData.fallback == "boolean") {
 				result = "/node_modules/toypack/empty/index.js";
 			} else if (typeof fallbackData.fallback == "string") {
-				result = resolve(fallbackData.fallback);
+				result = getResolved(bundler, fallbackData.fallback, opts);
 			}
 		}
 	}

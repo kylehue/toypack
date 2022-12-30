@@ -112,6 +112,16 @@ export default class PackageManager {
 		return graph;
 	}
 
+	/**
+	 * Adds a package to the bundler.
+	 * 
+	 * @param {string} source The package source. Format is `<name>@<version><subpath>`
+	 * @example
+	 *
+	 * install("bootstrap");
+	 * install("bootstrap/dist/css/bootstrap.min.css");
+	 * install("bootstrap@5.2/dist/css/bootstrap.min.css");
+	 */
 	public async install(source: string) {
 		let pkg: ParsedPackageName = parsePackageName(source);
 		let name = pkg.name;
@@ -188,7 +198,9 @@ export default class PackageManager {
 
 		if (this.bundler.options.bundleOptions?.logs) {
 			console.log(
-				`%cSuccessfully installed: %c${name + subpath} (added ${graph.length} packages)`,
+				`%cSuccessfully installed: %c${name + subpath} (added ${
+					graph.length
+				} packages)`,
 				"font-weight: bold; color: white;",
 				"color: #cfd0d1;"
 			);

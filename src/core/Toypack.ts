@@ -125,18 +125,43 @@ export default class Toypack {
 		}
 	}
 
+	/**
+	 * Modifies the options for the Toypack instance.
+	 *
+	 * @param {ToypackOptions} options - Toypack options.
+	 */
 	public defineOptions(options: ToypackOptions) {
 		merge(this.options, options);
 	}
 
+	/**
+	 * Adds an asset to the bundler.
+	 *
+	 * @param {string} source - The source path of the asset.
+	 * @param {string|ArrayBuffer} [content] - The contents of the asset.
+	 * @returns {Promise<Asset>} The asset that was added.
+	 */
 	public async addAsset(source: string, content: string | ArrayBuffer = "") {
 		return await addAsset(this, source, content);
 	}
 
+	/**
+	 * Resolves a module path to its absolute path.
+	 *
+	 * @param {string} x - The module path to resolve.
+	 * @param {ResolveOptions} [options] - Resolving options.
+	 * @returns {string} The absolute path of the module.
+	 */
 	public resolve(x: string, options?: ResolveOptions) {
 		return resolve(this, x, options);
 	}
 
+	/**
+	 * Bundles the assets starting from the entry point.
+	 *
+	 * @param {object} [options] - Bundle options.
+	 * @returns {Promise<BundleResult>} A bundle result.
+	 */
 	public async bundle(options?: BundleOptions) {
 		return await bundle(this, options);
 	}

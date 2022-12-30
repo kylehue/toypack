@@ -9,12 +9,12 @@ import { parse as getAST } from "@babel/parser";
 import { availablePlugins, transform } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import MagicString from "magic-string";
-
+import traverse from "@babel/traverse";
 import { TransformOptions } from "@babel/core";
 import { merge, cloneDeep } from "lodash";
 import { getModuleImports } from "@toypack/utils";
 import SourceMap from "@toypack/core/SourceMap";
-
+(window as any).transform = transform;
 const defaultTransformOptions: TransformOptions = {
 	sourceType: "module",
 	compact: false,
@@ -72,8 +72,22 @@ export default class BabelLoader implements ToypackLoader {
 				} as TransformOptions),
 			};
 
-			const transpiled = transform(asset.content, transformOptions);
+			let parseMetadata = asset.loaderData.parse?.metadata;
 
+			// Replace "__esModule" identifiers to something else as they are reserved.
+			let content = asset.content;
+			if (parseMetadata.esModuleFlagNodes.length) {
+				let chunk = new MagicString(content);
+
+				for (let flag of parseMetadata.esModuleFlagNodes) {
+					chunk.update(flag.start, flag.end, "__esModule_reserved");
+				}
+
+				content = chunk.toString();
+			}
+			
+			// Transpile
+			const transpiled = transform(content, transformOptions);
 			if (transpiled.code) {
 				let chunk = new MagicString(transpiled.code);
 
@@ -81,17 +95,17 @@ export default class BabelLoader implements ToypackLoader {
 				if (
 					this.options?.autoImportReactPragma &&
 					/\.[jt]sx$/.test(asset.source) &&
-					!asset.loaderData.parse?.metadata.isReactPragmaImported
+					!parseMetadata.isReactPragmaImported
 				) {
 					let isStrictMode = transpiled.code.startsWith(`"use strict";`);
-					
+
 					let index = 0;
 
 					if (isStrictMode) {
 						index += `"use strict";`.length;
 					}
 
-					chunk.prependRight(index ,`\nvar React = require("react");`);
+					chunk.prependRight(index, `\nvar React = require("react");`);
 				}
 
 				result.content = chunk;
@@ -115,6 +129,7 @@ export default class BabelLoader implements ToypackLoader {
 			dependencies: [],
 			metadata: {
 				isReactPragmaImported: false,
+				esModuleFlagNodes: [],
 			},
 		};
 
@@ -125,8 +140,22 @@ export default class BabelLoader implements ToypackLoader {
 				plugins: ["typescript", "jsx"],
 			});
 
-			const imports = getModuleImports(AST);
+			// Extract "__esModule" identifiers so that we can replace them when compiling.
+			if (/__esModule/g.test(asset.content)) {
+				traverse(AST, {
+					Identifier({ node }) {
+						if (node.name == "__esModule") {
+							result.metadata.esModuleFlagNodes.push({
+								start: node.start,
+								end: node.end,
+							});
+						}
+					},
+				});
+			}
 
+			// Extract dependencies
+			const imports = getModuleImports(AST);
 			for (let dep of imports) {
 				let isAdded = result.dependencies.some((d) => d === dep.id);
 
