@@ -2,7 +2,6 @@ import MagicString from "magic-string";
 import { AcceptedPlugin, ProcessOptions } from "postcss";
 import SourceMap from "./SourceMap";
 import Toypack from "./Toypack";
-import { TransformOptions } from "@babel/core";
 import { PackageProvider } from "./PackageManager";
 
 export interface ResolveOptions {
@@ -153,7 +152,7 @@ interface LoaderData {
 	parse: ParsedAsset | null;
 }
 
-export interface AssetInterface {
+export interface IAsset {
 	id: number;
 	name: string;
 	source: string;
@@ -185,12 +184,12 @@ export interface ToypackLoader {
 	name: string;
 	test: RegExp;
 	parse?: (
-		asset: AssetInterface,
+		asset: IAsset,
 		bundler: Toypack,
 		options?: any
 	) => ParsedAsset | Promise<ParsedAsset>;
 	compile?: (
-		asset: AssetInterface,
+		asset: IAsset,
 		bundler: Toypack,
 		options?: any
 	) => CompiledAsset | Promise<CompiledAsset>;

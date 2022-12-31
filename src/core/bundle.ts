@@ -12,6 +12,7 @@ import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import applyUMD from "@toypack/formats/umd";
 import babelMinify from "babel-minify";
+import { IAfterCompileDescriptor } from "./Hooks";
 
 const colors = {
 	success: "#3fe63c",
@@ -109,7 +110,7 @@ export default async function bundle(
 				bundler._initHooks("afterCompile", {
 					compilation,
 					asset,
-				});
+				} as IAfterCompileDescriptor);
 			}
 			compiledCounter++;
 		} else {

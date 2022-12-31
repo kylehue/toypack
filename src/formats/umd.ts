@@ -1,5 +1,5 @@
 import Toypack from "@toypack/core/Toypack";
-import { AssetInterface, CompiledAsset } from "@toypack/core/types";
+import { IAsset, CompiledAsset } from "@toypack/core/types";
 import MagicString from "magic-string";
 import { minimizeStr } from "@toypack/utils";
 
@@ -54,7 +54,7 @@ function getBottomUMD(entryId: string) {
 
 export default function format(
 	chunk: MagicString,
-	asset: AssetInterface,
+	asset: IAsset,
 	bundler: Toypack,
 	{ entryId, isFirst, isLast }
 ) {

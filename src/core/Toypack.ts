@@ -1,7 +1,7 @@
 import {
 	ResolveOptions,
 	ToypackOptions,
-	AssetInterface,
+	IAsset,
 	ToypackLoader,
 	ToypackPlugin,
 	BundleOptions,
@@ -42,7 +42,7 @@ export const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".
 export const textExtensions = [...appExtensions, ...styleExtensions];
 
 export default class Toypack {
-	public assets: Map<string, AssetInterface> = new Map();
+	public assets: Map<string, IAsset> = new Map();
 	public options: ToypackOptions = cloneDeep(defaultOptions);
 	public loaders: ToypackLoader[] = [];
 	public plugins: ToypackPlugin[] = [];
@@ -50,7 +50,7 @@ export default class Toypack {
 	public dependencies = {};
 	public packageManager: PackageManager;
 	public hooks = new Hooks();
-	public assetCache: Map<string, AssetInterface> = new Map();
+	public assetCache: Map<string, IAsset> = new Map();
 	public bundleContentURL: string | null = null;
 	public bundleContentDocURL: string | null = null;
 	constructor(options?: ToypackOptions) {
@@ -68,19 +68,14 @@ export default class Toypack {
 		this.loaders.push(new HTMLLoader());
 
 		/* Default plugins */
-		this.addPlugin(new NodePolyfillPlugin());
-		this.addPlugin(new AutoImportJSXPragmaPlugin());
+		this.use(new NodePolyfillPlugin());
+		this.use(new AutoImportJSXPragmaPlugin());
 
 		// Add empty object for fallbacks with no polyfill
 		this.addAsset(
 			"/node_modules/toypack/empty/index.js",
 			"module.exports = {};"
 		);
-	}
-
-	public addPlugin(plugin: ToypackPlugin) {
-		this.plugins.push(plugin);
-		plugin.apply(this);
 	}
 
 	public async _initHooks(hookName: HookName, ...args) {
@@ -90,6 +85,15 @@ export default class Toypack {
 				await fn(...args);
 			}
 		}
+	}
+
+	/**
+	 * Add a plugin.
+	 * @param plugin The Toypack plugin.
+	 */
+	public use(plugin: ToypackPlugin) {
+		this.plugins.push(plugin);
+		plugin.apply(this);
 	}
 
 	/**

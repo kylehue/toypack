@@ -1,5 +1,5 @@
 import {
-	AssetInterface,
+	IAsset,
 	ToypackLoader,
 	ParsedAsset,
 	CompiledAsset,
@@ -40,7 +40,7 @@ export default class BabelLoader implements ToypackLoader {
 		this.options = merge(cloneDeep(defaultOptions), options);
 	}
 
-	public compile(asset: AssetInterface, bundler: Toypack) {
+	public compile(asset: IAsset, bundler: Toypack) {
 		if (typeof asset.content != "string") {
 			let error = new Error(
 				"Babel Compile Error: Asset content must be string."
@@ -91,7 +91,7 @@ export default class BabelLoader implements ToypackLoader {
 		return result;
 	}
 
-	public parse(asset: AssetInterface, bundler: Toypack) {
+	public parse(asset: IAsset, bundler: Toypack) {
 		if (typeof asset.content != "string") {
 			let error = new Error("Babel Parse Error: Asset content must be string.");
 			throw error;

@@ -1,6 +1,6 @@
 import Toypack from "@toypack/core/Toypack";
 import {
-	AssetInterface,
+	IAsset,
 	CompiledAsset,
 	ToypackLoader,
 	ParsedAsset,
@@ -33,7 +33,7 @@ export default class CSSLoader implements ToypackLoader {
 	public name = "CSSLoader";
 	public test = /\.css$/;
 
-	public parse(asset: AssetInterface, bundler: Toypack, options?) {
+	public parse(asset: IAsset, bundler: Toypack, options?) {
 		if (typeof asset.content != "string") {
 			let error = new Error("CSS Parse Error: Content must be string.");
 			throw error;
@@ -110,7 +110,7 @@ export default class CSSLoader implements ToypackLoader {
 		return result;
 	}
 
-	public compile(asset: AssetInterface, bundler: Toypack) {
+	public compile(asset: IAsset, bundler: Toypack) {
 		if (typeof asset.content != "string") {
 			let error = new Error("CSS Compile Error: Content must be string.");
 			throw error;

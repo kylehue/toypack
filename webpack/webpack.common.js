@@ -43,7 +43,7 @@ module.exports = {
 	},
 	resolve: {
 		alias: {
-			"@toypack": resolve("../src/")
+			"@toypack": resolve("../src/"),
 		},
 		fallback: {
 			fs: false,

@@ -36,25 +36,25 @@ const polyfills = {
 export default class NodePolyfillPlugin implements ToypackPlugin {
 	apply(bundler: Toypack) {
 		// Only add dependency if it's required
-		bundler.hooks.failedResolve(async (resolver) => {
-			if (resolver.target in polyfills) {
+		bundler.hooks.failedResolve(async (descriptor) => {
+			if (descriptor.target in polyfills) {
 				bundler.defineOptions({
 					bundleOptions: {
 						resolve: {
 							fallback: {
-								[resolver.target]: polyfills[resolver.target],
+								[descriptor.target]: polyfills[descriptor.target],
 							},
 						},
 					},
 				});
 
-				await bundler.packageManager.install(polyfills[resolver.target]);
+				await bundler.packageManager.install(polyfills[descriptor.target]);
 
-				let newResolved = bundler.resolve(resolver.target, {
-					baseDir: path.dirname(resolver.parent.source),
+				let newResolved = bundler.resolve(descriptor.target, {
+					baseDir: path.dirname(descriptor.parent.source),
 				});
 
-				resolver.changeResolved(newResolved);
+				descriptor.changeResolved(newResolved);
 			}
 		});
 	}

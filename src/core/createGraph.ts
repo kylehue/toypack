@@ -1,13 +1,14 @@
 import { isURL, isLocal } from "@toypack/utils";
 import path from "path-browserify";
+import { IFailedResolveDescriptor } from "./Hooks";
 import { getResolveAliasData } from "./resolve";
 import Toypack from "./Toypack";
-import { AssetInterface, ParsedAsset } from "./types";
+import { IAsset, ParsedAsset } from "./types";
 
 export default async function createGraph(
 	bundler: Toypack,
 	source: string,
-	graph: AssetInterface[] = []
+	graph: IAsset[] = []
 ) {
 	let isExternal = isURL(source);
 	source = isExternal ? source : path.join("/", source);
@@ -74,7 +75,7 @@ export default async function createGraph(
 						changeResolved(newResolved: string) {
 							resolved = newResolved;
 						},
-					});
+					} as IFailedResolveDescriptor);
 				}
 
 				if (resolved) {

@@ -1,4 +1,4 @@
-const { default: Toypack } = require("@toypack/core/Toypack");
+const { default: Toypack } = require("../lib/core/Toypack.js");
 const path = require("path-browserify");
 let toypack = new Toypack();
 

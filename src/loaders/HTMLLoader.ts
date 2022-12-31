@@ -1,6 +1,6 @@
 import Toypack from "@toypack/core/Toypack";
 import {
-	AssetInterface,
+	IAsset,
 	CompiledAsset,
 	ToypackLoader,
 	ParsedAsset,
@@ -29,7 +29,7 @@ export default class HTMLLoader implements ToypackLoader {
 	public name = "HTMLLoader";
 	public test = /\.html$/;
 
-	public parse(asset: AssetInterface, bundler: Toypack) {
+	public parse(asset: IAsset, bundler: Toypack) {
 		let result: ParsedAsset = {
 			dependencies: [],
 			metadata: {},
@@ -92,7 +92,7 @@ export default class HTMLLoader implements ToypackLoader {
 		return result;
 	}
 
-	public compile(asset: AssetInterface, bundler: Toypack) {
+	public compile(asset: IAsset, bundler: Toypack) {
 		let result: CompiledAsset = {
 			content: {} as MagicString,
 		};

@@ -1,6 +1,6 @@
 module.exports = {
 	testEnvironment: "jsdom",
-	preset: "ts-jest",
+	/* preset: "ts-jest",
 	transform: {
 		"^.+\\.tsx?$": [
 			"ts-jest",
@@ -14,7 +14,7 @@ module.exports = {
 	},
 	moduleNameMapper: {
 		"^@toypack(.*)$": "<rootDir>/src$1",
-	},
-	roots: ["<rootDir>/src", "<rootDir>/test"],
+	}, */
+	roots: ["<rootDir>/lib", "<rootDir>/test"],
 	setupFiles: ["<rootDir>/test/jest.stub.js"],
 };

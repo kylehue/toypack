@@ -1,6 +1,6 @@
 import Toypack from "@toypack/core/Toypack";
 import {
-	AssetInterface,
+	IAsset,
 	CompiledAsset,
 	ToypackLoader,
 } from "@toypack/core/types";
@@ -13,7 +13,7 @@ export default class AssetLoader implements ToypackLoader {
 	public test =
 		/\.(png|jpe?g|gif|svg|bmp|tiff?|woff|woff2|ttf|eot|otf|webp|mp[34]|wav|mkv|wmv|m4v|mov|avi|flv|webm|flac|mka|m4a|aac|ogg|map)(\?.*)?$/;
 
-	public compile(asset: AssetInterface, bundler: Toypack) {
+	public compile(asset: IAsset, bundler: Toypack) {
 		let target = asset.contentURL;
 
 		if (

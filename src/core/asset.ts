@@ -1,7 +1,7 @@
 import { isURL, getBtoa } from "@toypack/utils";
 import path from "path-browserify";
 import Toypack, { textExtensions } from "./Toypack";
-import { AssetInterface } from "./types";
+import { IAsset } from "./types";
 import mime from "mime-types";
 
 function getLoader(bundler: Toypack, source: string) {
@@ -36,7 +36,7 @@ export function create(
 
 	let name = "asset-" + id + extension;
 
-	let asset: AssetInterface = {
+	let asset: IAsset = {
 		id,
 		name,
 		source,
@@ -73,7 +73,7 @@ export async function add(
 		}
 	}
 
-	let asset: AssetInterface = create(bundler, source, content);
+	let asset: IAsset = create(bundler, source, content);
 
 	// Fetch if source is external url and not cached
 	if (isExternal && !cached) {
