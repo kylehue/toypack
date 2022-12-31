@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
 		"target": "ES2015",
-		"module": "CommonJS",
+		"module": "ESNext",
 		"lib": ["ES6", "DOM", "ES2015", "ES2016", "ES2017", "ScriptHost"],
 		"moduleResolution": "Node",
 		"useDefineForClassFields": true,

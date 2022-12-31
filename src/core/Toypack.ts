@@ -48,22 +48,14 @@ export default class Toypack {
 	public plugins: ToypackPlugin[] = [];
 	public outputSource: string = "";
 	public dependencies = {};
-	public packageManager;
+	public packageManager: PackageManager;
 	public hooks = new Hooks();
-	public _sourceMapConfig;
-	public _lastId: number = 0;
-	public _prevContentURL;
-	public _prevContentDocURL;
-	public _graphCache: Map<string, AssetInterface> = new Map();
+	public assetCache: Map<string, AssetInterface> = new Map();
+	public bundleContentURL: string | null = null;
+	public bundleContentDocURL: string | null = null;
 	constructor(options?: ToypackOptions) {
 		if (options) {
 			this.defineOptions(options);
-		}
-
-		this._sourceMapConfig = [];
-		let sourceMapConfig = this.options.bundleOptions?.output?.sourceMap;
-		if (typeof sourceMapConfig == "string") {
-			this._sourceMapConfig = sourceMapConfig.split("-");
 		}
 
 		this.packageManager = new PackageManager(this);

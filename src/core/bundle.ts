@@ -85,6 +85,12 @@ export default async function bundle(
 
 	let prevLine = 0;
 
+	let sourceMapConfigArray: string[] = [];
+	let sourceMapConfig = bundler.options.bundleOptions?.output?.sourceMap;
+	if (typeof sourceMapConfig == "string") {
+		sourceMapConfigArray = sourceMapConfig.split("-");
+	}
+
 	for (let i = 0; i < graph.length; i++) {
 		const asset = graph[i];
 
@@ -154,13 +160,13 @@ export default async function bundle(
 				chunkContent.generateMap({
 					source: asset.source,
 					includeContent: false,
-					hires: bundler._sourceMapConfig[1] == "hires",
+					hires: sourceMapConfigArray[1] == "hires",
 				})
 			);
 
 			// Add sources content
 			if (
-				bundler._sourceMapConfig[2] == "sources" &&
+				sourceMapConfigArray[2] == "sources" &&
 				typeof asset.content == "string"
 			) {
 				chunkSourceMap.sourcesContent[0] = asset.content;
@@ -208,13 +214,13 @@ export default async function bundle(
 			sourceMap?.base64()
 		).toObject();
 
-		if (bundler._sourceMapConfig[2] == "nosources") {
+		if (sourceMapConfigArray[2] == "nosources") {
 			sourceMapObject.sourcesContent = [];
 		}
 
 		if (
 			options?.mode == "development" ||
-			bundler._sourceMapConfig[0] == "inline"
+			sourceMapConfigArray[0] == "inline"
 		) {
 			finalContent += MapConverter.fromObject(sourceMapObject).toComment();
 		} else {
@@ -237,8 +243,8 @@ export default async function bundle(
 		contentDocURL: null,
 	};
 
-	if (bundler._prevContentURL?.startsWith("blob:")) {
-		URL.revokeObjectURL(bundler._prevContentURL);
+	if (bundler.bundleContentURL?.startsWith("blob:")) {
+		URL.revokeObjectURL(bundler.bundleContentURL);
 	}
 
 	bundleResult.contentURL = URL.createObjectURL(
@@ -247,7 +253,7 @@ export default async function bundle(
 		})
 	);
 
-	bundler._prevContentURL = bundleResult.contentURL;
+	bundler.bundleContentURL = bundleResult.contentURL;
 
 	bundleResult.contentDoc = `<!DOCTYPE html>
 <html>
@@ -259,8 +265,8 @@ export default async function bundle(
 </html>
 `;
 
-	if (bundler._prevContentDocURL?.startsWith("blob:")) {
-		URL.revokeObjectURL(bundler._prevContentDocURL);
+	if (bundler.bundleContentDocURL?.startsWith("blob:")) {
+		URL.revokeObjectURL(bundler.bundleContentDocURL);
 	}
 
 	bundleResult.contentDocURL = URL.createObjectURL(
@@ -269,7 +275,7 @@ export default async function bundle(
 		})
 	);
 
-	bundler._prevContentDocURL = bundleResult.contentDocURL;
+	bundler.bundleContentDocURL = bundleResult.contentDocURL;
 
 	// Out
 	if (options?.mode == "production") {

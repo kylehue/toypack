@@ -21,21 +21,20 @@ export default function getModuleImports(AST: Node | Node[]) {
 
 	// Ids are needed for dependency graphs
 	// Start and end positions are needed for changing the imported ids to fixed paths so that they can properly be resolved when graphing
-	// Specifiers are needed for babel loader so that we can check if specific specifiers are already imported. It will be used to auto import react pragmas
 	traverseAST(AST, {
 		ImportDeclaration({ node }) {
-			let specifiers: string[] = [];
+			/* let specifiers: string[] = [];
 			if (node.specifiers) {
 				for (let spec of node.specifiers) {
 					specifiers.push(spec.local.name);
 				}
-			}
+			} */
 
 			addImported(
 				node.source.value,
 				node.source.start,
-				node.source.end,
-				specifiers
+				node.source.end
+				/*, specifiers */
 			);
 		},
 		ExportAllDeclaration({ node }) {
@@ -58,7 +57,7 @@ export default function getModuleImports(AST: Node | Node[]) {
 				let parent = dir.parent;
 
 				// Extract specifiers
-				let specifiers: string[] = [];
+				/* let specifiers: string[] = [];
 				if (parent.type == "VariableDeclarator") {
 					if (parent.id.type == "Identifier") {
 						specifiers.push(parent.id.name);
@@ -75,9 +74,13 @@ export default function getModuleImports(AST: Node | Node[]) {
 							}
 						}
 					}
-				}
+				} */
 
-				addImported(argNode.value, argNode.start, argNode.end, specifiers);
+				addImported(
+					argNode.value,
+					argNode.start,
+					argNode.end /* , specifiers */
+				);
 			}
 		},
 	});

@@ -1,6 +1,5 @@
 import { getBtoa } from "@toypack/utils";
 import mergeSourceMap from "merge-source-map";
-import cloneDeep = require("lodash.clonedeep");
 
 export interface SourceMapData {
 	version: number;

@@ -118,7 +118,7 @@ function getResolved(bundler: Toypack, x: string, opts) {
 			return loadAsDirectory(bundler, resolved, opts.extensions);
 		}
 	}
-}
+};
 
 /**
  * Resolves a module path to its absolute path.
@@ -136,7 +136,7 @@ export default function resolve(
 	if (typeof x !== "string") {
 		throw new TypeError("Path must be a string.");
 	}
-
+	
 	let result = "";
 	let orig = x;
 

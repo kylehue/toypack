@@ -27,7 +27,7 @@ export default async function createGraph(
 		asset.isModified = false;
 	} else {
 		let parseData: ParsedAsset = { dependencies: [] };
-		let cached = bundler._graphCache.get(source);
+		let cached = bundler.assetCache.get(source);
 		asset.isModified = asset.content !== cached?.content;
 		// Reuse the old parse data if content didn't change
 		if (!asset.isModified && asset?.loaderData.parse) {
@@ -44,7 +44,7 @@ export default async function createGraph(
 		graph.push(asset);
 
 		// Cache
-		bundler._graphCache.set(asset.source, Object.assign({}, asset));
+		bundler.assetCache.set(asset.source, Object.assign({}, asset));
 
 		// Scan asset's dependencies
 		for (let dependency of parseData.dependencies) {
@@ -82,7 +82,7 @@ export default async function createGraph(
 				}
 			} else {
 				// If a URL and not in cache, add to assets
-				if (!bundler._graphCache.get(dependency)) {
+				if (!bundler.assetCache.get(dependency)) {
 					await bundler.addAsset(dependency);
 				}
 			}

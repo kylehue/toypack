@@ -6,7 +6,7 @@ import {
 } from "@toypack/core/types";
 
 import { parse as getAST } from "@babel/parser";
-import { availablePlugins, transform } from "@babel/standalone";
+import { transformFromAst } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import MagicString from "magic-string";
 import traverse from "@babel/traverse";
@@ -14,7 +14,7 @@ import { TransformOptions } from "@babel/core";
 import { merge, cloneDeep } from "lodash";
 import { getModuleImports } from "@toypack/utils";
 import SourceMap from "@toypack/core/SourceMap";
-(window as any).transform = transform;
+
 const defaultTransformOptions: TransformOptions = {
 	sourceType: "module",
 	compact: false,
@@ -67,28 +67,24 @@ export default class BabelLoader implements ToypackLoader {
 
 			let parseMetadata = asset.loaderData.parse?.metadata;
 
-			// Replace "__esModule" identifiers to something else to avoid error.
-			// Solve the case similar to https://github.com/evanw/esbuild/issues/1591
-			let content = asset.content;
-			if (parseMetadata.esModuleFlagNodes.length) {
-				let chunk = new MagicString(content);
-
-				for (let flag of parseMetadata.esModuleFlagNodes) {
-					chunk.update(flag.start, flag.end, "__esModule_reserved");
-				}
-
-				content = chunk.toString();
-			}
-
 			// Transpile
-			const transpiled = transform(content, transformOptions);
-			if (transpiled.code) {
+			const transpiled: any = transformFromAst(
+				parseMetadata.AST,
+				undefined,
+				transformOptions
+			);
+
+			if (transpiled?.code) {
 				let chunk = new MagicString(transpiled.code);
 				result.content = chunk;
-			}
 
-			if (transpiled.map) {
-				result.map = new SourceMap(transpiled.map);
+				if (transpiled.map) {
+					result.map = new SourceMap(transpiled.map);
+				}
+			} else {
+				throw new Error(
+					`Babel Compile Error: Failed to compile ${asset.source}`
+				);
 			}
 		}
 
@@ -103,10 +99,7 @@ export default class BabelLoader implements ToypackLoader {
 
 		let result: ParsedAsset = {
 			dependencies: [],
-			metadata: {
-				isReactPragmaImported: false,
-				esModuleFlagNodes: [],
-			},
+			metadata: {},
 		};
 
 		if (!asset.isObscure) {
@@ -116,15 +109,13 @@ export default class BabelLoader implements ToypackLoader {
 				plugins: ["typescript", "jsx"],
 			});
 
-			// Extract "__esModule" identifiers so that we can replace them when compiling.
+			// Replace "__esModule" identifiers to "__esModule_reserved" to avoid compile error.
+			// Solves the case similar to https://github.com/evanw/esbuild/issues/1591
 			if (/__esModule/g.test(asset.content)) {
 				traverse(AST, {
 					Identifier({ node }) {
 						if (node.name == "__esModule") {
-							result.metadata.esModuleFlagNodes.push({
-								start: node.start,
-								end: node.end,
-							});
+							node.name = "__esModule_reserved";
 						}
 					},
 				});
@@ -139,6 +130,8 @@ export default class BabelLoader implements ToypackLoader {
 					result.dependencies.push(dep.id);
 				}
 			}
+
+			result.metadata.AST = AST;
 		}
 
 		return result;

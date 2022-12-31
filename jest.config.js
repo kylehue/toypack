@@ -5,10 +5,7 @@ module.exports = {
 		"^.+\\.tsx?$": [
 			"ts-jest",
 			{
-				tsconfig: {
-					target: "esnext",
-					sourceMap: true,
-				},
+				tsconfig: require("./tsconfig.json").compilerOptions,
 				diagnostics: {
 					exclude: ["**"],
 				},

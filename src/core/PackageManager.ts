@@ -3,8 +3,6 @@ import path from "path-browserify";
 import MagicString from "magic-string";
 import { parse as parsePackageName } from "parse-package-name";
 import { parse as getAST } from "@babel/parser";
-import traverseAST from "@babel/traverse";
-import { AssetInterface } from "./types";
 import { getModuleImports, isLocal } from "@toypack/utils";
 
 const packageProviders = {
@@ -17,12 +15,6 @@ export type PackageProvider = keyof typeof packageProviders;
 interface Dependency {
 	content: string;
 	source: string;
-}
-
-interface ParsedPackageName {
-	name: string;
-	version: string;
-	path: string;
 }
 
 function getCoreModuleSubpath(source: string) {
@@ -38,76 +30,103 @@ export default class PackageManager {
 		this.providerRegex = new RegExp(this.provider.replace(/\./g, "\\."));
 	}
 
-	private async _createGraph(
-		source: string,
-		pkg: ParsedPackageName,
-		graph: Dependency[] = []
-	) {
-		// Fetch
-		let fetchResponse = await fetch(source);
-		if (!fetchResponse.ok) {
-			throw new Error(`Failed to fetch ${source}.`);
-		}
+	private async _createGraph(name: string, entryURL: string) {
+		const graph: Dependency[] = [];
+		const bundlerAssets = Object.fromEntries(this.bundler.assets);
+		const bundlerAssetSources = Object.keys(bundlerAssets);
+		const init = async (url: string) => {
+			let dependencies: string[] = [];
+			let designatedSource = url
+				.replace(this.providerRegex, "")
+				.replace(/^\//, "");
+			
+			// Dedupe if same source
+			for (let source of bundlerAssetSources) {
+				// Skip if not a core module
+				if (!source.startsWith("/node_modules/")) continue;
+				
+				let subpath = getCoreModuleSubpath(source);
+				let isSameSource = subpath === designatedSource;
 
-		let content = await fetchResponse.text();
-		let dependencies: string[] = [];
+				if (isSameSource) {
+					let target = source.replace("/node_modules/", "");
+					let content = `export * from "${target}";\nexport {default} from "${target}";`;
+					graph.push({
+						content,
+						source: designatedSource,
+					} as Dependency);
 
-		// Try parsing content
-		let AST: any = null;
-		try {
-			if (!/\.(css|json)$/.test(source)) {
-				AST = getAST(content, {
-					sourceType: "module",
-					sourceFilename: source,
-				});
+					return;
+				}
 			}
-		} catch (error) {
-			//
-		}
 
-		// Get dependencies if there's an AST
-		if (AST) {
-			let chunk = new MagicString(content);
-			let imports = getModuleImports(AST);
+			// Fetch
+			let fetchResponse = await fetch(url);
+			if (!fetchResponse.ok) {
+				throw new Error(`Failed to fetch ${url}.`);
+			}
 
-			for (let node of imports) {
-				let id = node.id;
+			let content = await fetchResponse.text();
 
-				let from = source.replace(this.providerRegex, "");
-				let to = id.replace(this.providerRegex, "");
+			// Try parsing content
+			let AST: any = null;
+			try {
+				if (!/\.(css|json)$/.test(url)) {
+					AST = getAST(content, {
+						sourceType: "module",
+						sourceFilename: designatedSource,
+					});
+				}
+			} catch (error) {
+				//
+			}
 
-				let fromBaseDir = path.dirname(from);
-				let relative = path.relative(fromBaseDir, to);
-				let absolute = path.resolve(fromBaseDir, relative);
+			// Get dependencies if there's an AST
+			if (AST) {
+				let chunk = new MagicString(content);
+				let imports = getModuleImports(AST);
 
-				if (isLocal(id) && !id.startsWith("/")) {
-					absolute = path.resolve(fromBaseDir, id);
+				for (let node of imports) {
+					let imported = node.id;
+
+					let from = designatedSource;
+					let to = imported.replace(this.providerRegex, "");
+
+					let fromBaseDir = path.dirname(from);
+					let relative = path.relative(fromBaseDir, to);
+					let absolute = path.resolve(fromBaseDir, relative);
+
+					if (isLocal(imported) && !imported.startsWith("/")) {
+						absolute = path.resolve(fromBaseDir, imported);
+					}
+
+					if (!dependencies.some((ex) => ex == absolute)) {
+						dependencies.push(absolute);
+					}
+
+					chunk.update(node.start, node.end, `"${name}${absolute}"`);
 				}
 
-				if (!dependencies.some((ex) => ex == absolute)) {
-					dependencies.push(absolute);
+				content = chunk.toString();
+			}
+
+			// Add to graph
+			graph.push({
+				content,
+				source: designatedSource,
+			} as Dependency);
+
+			// Scan dependency's dependencies
+			for (let dependency of dependencies) {
+				let dep = dependency.replace(/^\//, "");
+				if (!graph.some((v) => v.source === dep)) {
+					let url = `${this.provider}${dep}`;
+					await init(url);
 				}
-
-				chunk.update(node.start, node.end, `"${pkg.name}${absolute}"`);
 			}
+		};
 
-			content = chunk.toString();
-		}
-
-		// Add to graph
-		graph.push({
-			content,
-			source: source.replace(this.providerRegex, ""),
-		} as Dependency);
-
-		// Scan dependency's dependencies
-		for (let dependency of dependencies) {
-			let dep = dependency.replace(/^\//, "");
-			if (!graph.some((v) => v.source.replace(/^\//, "") === dep)) {
-				let url = `${this.provider}${dep}`;
-				await this._createGraph(url, pkg, graph);
-			}
-		}
+		await init(entryURL);
 
 		return graph;
 	}
@@ -123,7 +142,7 @@ export default class PackageManager {
 	 * install("bootstrap@5.2/dist/css/bootstrap.min.css");
 	 */
 	public async install(source: string) {
-		let pkg: ParsedPackageName = parsePackageName(source);
+		let pkg = parsePackageName(source);
 		let name = pkg.name;
 		let version = pkg.version;
 		let subpath = pkg.path;
@@ -156,7 +175,7 @@ export default class PackageManager {
 		if (cached) {
 			graph = cached;
 		} else {
-			graph = await this._createGraph(url, pkg, []);
+			graph = await this._createGraph(pkg.name, url);
 		}
 
 		// Fix entry's source
@@ -171,29 +190,10 @@ export default class PackageManager {
 			graph[0].source = "index.js";
 		}
 
-		// Check duplicate contents
-		// Duplicates will just contain exports that links to the original content
-		// Solves https://github.com/facebook/react/issues/13991
-		let bundlerAssets = this.bundler.assets.values();
-		for (let i = 0; i < this.bundler.assets.size; i++) {
-			let coreAsset: AssetInterface = bundlerAssets.next().value;
-			if (!coreAsset.source.startsWith("/node_modules/")) continue;
-			for (let graphAsset of graph) {
-				let isSameContent = coreAsset.content === graphAsset.content;
-				let isSameSource =
-					getCoreModuleSubpath(coreAsset.source) ===
-					getCoreModuleSubpath(graphAsset.source);
-				if (isSameContent || isSameSource) {
-					let target = coreAsset.source.replace("/node_modules/", "");
-					graphAsset.content = `export * from "${target}";export {default} from "${target}";`;
-				}
-			}
-		}
-
 		// Add to bundler assets
 		for (let asset of graph) {
-			let cmSource = path.join("node_modules", name, asset.source);
-			await this.bundler.addAsset(cmSource, asset.content);
+			let coreSource = path.join("node_modules", name, asset.source);
+			await this.bundler.addAsset(coreSource, asset.content);
 		}
 
 		if (this.bundler.options.bundleOptions?.logs) {

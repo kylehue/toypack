@@ -12,6 +12,8 @@ function getLoader(bundler: Toypack, source: string) {
 	}
 }
 
+var lastId = 0;
+
 export function create(
 	bundler: Toypack,
 	source: string,
@@ -20,7 +22,7 @@ export function create(
 	let isExternal = isURL(source);
 	source = isExternal ? source : path.join("/", source);
 	let cached = bundler.assets.get(source);
-	let id = cached ? cached.id : ++bundler._lastId;
+	let id = cached ? cached.id : ++lastId;
 	let type = mime.lookup(source) || "";
 	let extension = path.extname(source);
 
