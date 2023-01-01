@@ -1,49 +1,44 @@
-const { default: Toypack } = require("../lib/core/Toypack.js");
+const Toypack = require("../lib/core/Toypack.js");
 const path = require("path-browserify");
-let toypack = new Toypack();
+const toypack = new Toypack();
 
 toypack.defineOptions({
 	bundleOptions: {
 		entry: "src/main.js",
+		resolve: {
+			alias: {
+				"@utils": "/test/utils/",
+				react: "reactlib",
+				"react-dom": "reactlib-dom",
+				"react/css": "/node_modules/reactlib/test/hello.css",
+			},
+		},
 	},
 });
 
+beforeAll(async () => {
+	await toypack.addAsset("src/main.js");
+	await toypack.addAsset("assets/image.jpg");
+	await toypack.addAsset("someFile.js");
+	await toypack.addAsset("someFolder/file.js");
+	await toypack.addAsset(
+		"someFolder/package.json",
+		JSON.stringify({
+			main: "file.js",
+		})
+	);
+	await toypack.addAsset("anotherFolder/index.js");
+	await toypack.addAsset("node_modules/hello/index.js");
+	await toypack.addAsset("test/utils/tester/index.js");
+	await toypack.addAsset("test/utils/tester/stuff.js");
+	await toypack.addAsset("test/utils/foo/bar.js");
+	await toypack.addAsset("node_modules/reactlib/index.js");
+	await toypack.addAsset("node_modules/reactlib/test/hello.css");
+	await toypack.addAsset("node_modules/reactlib-dom/index.js");
+	await toypack.addAsset("node_modules/reactlib-dom/test/hello.css");
+});
+
 describe("Resolve", () => {
-	beforeAll(async () => {
-		await toypack.addAsset("src/main.js");
-		await toypack.addAsset("assets/image.jpg");
-		await toypack.addAsset("someFile.js");
-		await toypack.addAsset("someFolder/file.js");
-		await toypack.addAsset(
-			"someFolder/package.json",
-			JSON.stringify({
-				main: "file.js",
-			})
-		);
-		await toypack.addAsset("anotherFolder/index.js");
-		await toypack.addAsset("node_modules/hello/index.js");
-		toypack.defineOptions({
-			bundleOptions: {
-				resolve: {
-					alias: {
-						"@utils": "/test/utils/",
-						react: "reactlib",
-						"react-dom": "reactlib-dom",
-						"react/css": "/node_modules/reactlib/test/hello.css",
-					},
-				},
-			},
-		});
-
-		await toypack.addAsset("test/utils/tester/index.js");
-		await toypack.addAsset("test/utils/tester/stuff.js");
-		await toypack.addAsset("test/utils/foo/bar.js");
-		await toypack.addAsset("node_modules/reactlib/index.js");
-		await toypack.addAsset("node_modules/reactlib/test/hello.css");
-		await toypack.addAsset("node_modules/reactlib-dom/index.js");
-		await toypack.addAsset("node_modules/reactlib-dom/test/hello.css");
-	});
-
 	test("Simple", () => {
 		let res = toypack.resolve("./src/main.js", {
 			baseDir: ".",

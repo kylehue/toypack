@@ -3,14 +3,19 @@ const webpack = require("webpack");
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const TSCAlias = require("tsc-alias").replaceTscAliasPaths;
 const glob = require("glob");
+
 function resolve(dir) {
 	return path.resolve(__dirname, dir);
 }
 
-const LOADERS = glob
-	.sync("./loaders/*.ts", {
+const deps = glob
+	.sync("./(loaders|plugins)/*.ts", {
 		cwd: resolve("../src"),
-		ignore: ["./loaders/index.ts", "./loaders/LoaderTemplate.ts"],
+		ignore: [
+			"./loaders/index.ts",
+			"./plugins/index.ts",
+			"./loaders/LoaderTemplate.ts",
+		],
 	})
 	.reduce((acc, current) => {
 		let parsedPath = path.parse(current);
@@ -22,8 +27,18 @@ const LOADERS = glob
 
 module.exports = {
 	entry: {
-		...LOADERS,
+		...deps,
 		"core/Toypack": resolve("../src/index.ts"),
+	},
+	output: {
+		filename: "[name].js",
+		path: resolve("../lib"),
+		clean: true,
+		library: {
+			name: "Toypack",
+			type: "umd",
+			export: "default",
+		},
 	},
 	module: {
 		rules: [
@@ -49,16 +64,6 @@ module.exports = {
 			fs: false,
 		},
 		extensions: [".ts", ".js", ".json"],
-	},
-	output: {
-		path: resolve("../lib"),
-		filename: "[name].js",
-		clean: true,
-		library: {
-			name: "Toypack",
-			type: "umd",
-			export: "default",
-		},
 	},
 	plugins: [
 		{

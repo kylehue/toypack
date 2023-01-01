@@ -1,2 +1,3 @@
 import "whatwg-fetch";
-export * as default from "@toypack/core/Toypack";
+export * from "@toypack/core/Toypack";
+export { default } from "@toypack/core/Toypack";

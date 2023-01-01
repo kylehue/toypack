@@ -10,7 +10,7 @@
 	},
 	"homepage": "https://github.com/kylehue/toypack#readme",
 	"scripts": {
-		"dev": "concurrently \"webpack --config webpack/webpack.dev.js\" \"webpack serve --config webpack/webpack.dev.js\"",
+		"dev": "webpack --config webpack/webpack.dev.js",
 		"build": "webpack --config webpack/webpack.prod.js",
 		"publish": "npm run build && npm publish",
 		"dev-test": "concurrently --kill-others \"npm run dev\" \"jest --watchAll\"",
@@ -26,14 +26,14 @@
 	],
 	"exports": {
 		".": {
-			"import": {
-				"default": "./lib/core/Toypack.js"
-			},
+			"import": "./lib/core/Toypack.js",
 			"require": "./lib/core/Toypack.js",
 			"types": "./lib/core/Toypack.d.ts"
 		},
 		"./loaders": "./lib/loaders/index.js",
-		"./loaders/*": "./lib/loaders/*"
+		"./loaders/*": "./lib/loaders/*",
+		"./plugins": "./lib/plugins/index.js",
+		"./plugins/*": "./lib/plugins/*"
 	},
 	"keywords": [
 		"build",
