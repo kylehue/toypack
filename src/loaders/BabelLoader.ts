@@ -11,7 +11,7 @@ import Toypack from "@toypack/core/Toypack";
 import MagicString from "magic-string";
 import traverse from "@babel/traverse";
 import { TransformOptions } from "@babel/core";
-import { merge, cloneDeep } from "lodash";
+import { merge, cloneDeep } from "lodash-es";
 import { getModuleImports } from "@toypack/utils";
 import SourceMap from "@toypack/core/SourceMap";
 
@@ -111,7 +111,8 @@ export default class BabelLoader implements ToypackLoader {
 
 			// Replace "__esModule" identifiers to "__esModule_reserved" to avoid compile error.
 			// Solves the case similar to https://github.com/evanw/esbuild/issues/1591
-			if (/__esModule/g.test(asset.content)) {
+			const isCoreModule = /^\/node_modules\//.test(asset.source);
+			if (isCoreModule && /__esModule/g.test(asset.content)) {
 				traverse(AST, {
 					Identifier({ node }) {
 						if (node.name == "__esModule") {

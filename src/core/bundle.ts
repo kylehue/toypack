@@ -1,7 +1,6 @@
-import { transform } from "@babel/standalone";
 import { AssetLoader } from "@toypack/loaders";
 import { formatPath, isURL } from "@toypack/utils";
-import { cloneDeep, merge } from "lodash";
+import { cloneDeep, merge } from "lodash-es";
 import SourceMap from "./SourceMap";
 import MagicString, { Bundle } from "magic-string";
 import path from "path-browserify";
@@ -41,7 +40,7 @@ export default async function bundle(
 		options = bundler.options.bundleOptions;
 	}
 
-	let entrySource = bundler.resolve(path.join("/", options?.entry || ""));
+	let entrySource = await bundler.resolve(path.join("/", options?.entry || ""));
 
 	if (!entrySource) {
 		throw new Error(`Bundle Error: Entry point not found.`);
@@ -107,7 +106,7 @@ export default async function bundle(
 		if (asset.isModified || !asset.loaderData.compile?.content) {
 			if (typeof asset.loader.compile == "function") {
 				compilation = await asset.loader.compile(asset, bundler);
-				bundler._initHooks("afterCompile", {
+				bundler.hooks.trigger("afterCompile", {
 					compilation,
 					asset,
 				} as IAfterCompileDescriptor);
@@ -196,11 +195,7 @@ export default async function bundle(
 
 	// Minify if in production mode
 	if (options?.mode == "production") {
-		let transpiled = transform(finalContent, {
-			presets: ["env", "es2015-loose"],
-		});
-
-		let minified = babelMinify(transpiled.code, {
+		let minified = babelMinify(finalContent, {
 			mangle: {
 				topLevel: true,
 				keepClassName: true,

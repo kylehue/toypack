@@ -7,11 +7,12 @@ import {
 } from "@toypack/core/types";
 import { cleanStr, isURL } from "@toypack/utils";
 import MagicString from "magic-string";
-import postcss from "postcss";
+import postcss, { AcceptedPlugin, ProcessOptions } from "postcss";
 import valueParser from "postcss-value-parser";
 import { parse as parseCSS } from "postcss";
 import { dirname } from "path-browserify";
 import { minimizeStr } from "@toypack/utils";
+import { cloneDeep, merge } from "lodash-es";
 const URLFunctionRegex = /url\s*\("?(?![a-z]+:)/;
 
 function getTemplate(id: string | number) {
@@ -29,9 +30,35 @@ if (_style.styleSheet){
 `);
 }
 
+const defaultOptions: CSSLoaderOptions = {
+	postcssConfig: {
+		options: {},
+		plugins: []
+	}
+};
+
+export interface PostCSSConfig {
+	/**
+	 * PostCSS plugins.
+	 */
+	plugins?: AcceptedPlugin[];
+	/**
+	 * PostCSS processing options.
+	 */
+	options?: ProcessOptions;
+}
+
+interface CSSLoaderOptions {
+	postcssConfig?: PostCSSConfig;
+}
+
 export default class CSSLoader implements ToypackLoader {
 	public name = "CSSLoader";
 	public test = /\.css$/;
+	
+	constructor(public options?: CSSLoaderOptions) {
+		this.options = merge(cloneDeep(defaultOptions), options);
+	}
 
 	public parse(asset: IAsset, bundler: Toypack, options?) {
 		if (typeof asset.content != "string") {
@@ -41,7 +68,7 @@ export default class CSSLoader implements ToypackLoader {
 
 		const AST = parseCSS(
 			asset.content,
-			bundler.options.postCSSOptions?.options
+			this.options?.postcssConfig?.options
 		);
 
 		const result: ParsedAsset = {
@@ -79,7 +106,7 @@ export default class CSSLoader implements ToypackLoader {
 				const isURLFunction = URLFunctionRegex.test(node.value);
 				if (isURLFunction) {
 					let parsedValue = valueParser(node.value);
-					parsedValue.walk((valueNode: any) => {
+					parsedValue.walk(async (valueNode: any) => {
 						if (
 							valueNode.type === "function" &&
 							valueNode.value === "url" &&
@@ -91,7 +118,7 @@ export default class CSSLoader implements ToypackLoader {
 								result.dependencies.push(source);
 
 								// Require asset
-								let dependencyAbsolutePath = bundler.resolve(source, {
+								let dependencyAbsolutePath = await bundler.resolve(source, {
 									baseDir: dirname(asset.source),
 								});
 
@@ -125,8 +152,8 @@ export default class CSSLoader implements ToypackLoader {
 
 		// Process
 		if (!isURL(asset.source)) {
-			const plugins = bundler.options.postCSSOptions?.plugins || [];
-			const options = bundler.options.postCSSOptions?.options || {};
+			const plugins = this.options?.postcssConfig?.plugins;
+			const options = this.options?.postcssConfig?.options;
 			processedContent = postcss(plugins).process(
 				processedContent,
 				options

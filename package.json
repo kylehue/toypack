@@ -2,8 +2,8 @@
 	"name": "toypack",
 	"version": "0.0.1",
 	"description": "A sandbox bundler for browsers.",
-	"main": "./lib/core/Toypack.js",
-	"typings": "./lib/core/Toypack.d.ts",
+	"main": "./lib/Toypack.js",
+	"typings": "./lib/index.d.ts",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/kylehue/toypack.git"
@@ -13,7 +13,7 @@
 		"dev": "webpack --config webpack/webpack.dev.js",
 		"build": "webpack --config webpack/webpack.prod.js",
 		"publish": "npm run build && npm publish",
-		"dev-test": "concurrently --kill-others \"npm run dev\" \"jest --watchAll\"",
+		"dev-test": "concurrently \"npm run dev\" \"jest --watchAll\"",
 		"test": "jest"
 	},
 	"author": "kylehue",
@@ -26,14 +26,10 @@
 	],
 	"exports": {
 		".": {
-			"import": "./lib/core/Toypack.js",
-			"require": "./lib/core/Toypack.js",
-			"types": "./lib/core/Toypack.d.ts"
-		},
-		"./loaders": "./lib/loaders/index.js",
-		"./loaders/*": "./lib/loaders/*",
-		"./plugins": "./lib/plugins/index.js",
-		"./plugins/*": "./lib/plugins/*"
+			"import": "./lib/Toypack.js",
+			"require": "./lib/Toypack.js",
+			"types": "./lib/Toypack.d.ts"
+		}
 	},
 	"keywords": [
 		"build",
@@ -47,9 +43,11 @@
 		"@types/combine-source-map": "^0.8.2",
 		"@types/convert-source-map": "^2.0.0",
 		"@types/jest": "^29.2.4",
+		"@types/lodash-es": "^4.17.6",
 		"@types/lodash.clonedeep": "^4.5.7",
 		"@types/lodash.merge": "^4.6.7",
 		"@types/path-browserify": "^1.0.0",
+		"babel-loader": "^9.1.0",
 		"concurrently": "^7.6.0",
 		"glob": "^8.0.3",
 		"html-webpack-plugin": "^5.5.0",
@@ -58,6 +56,7 @@
 		"jest-mock-fetch": "^2.0.5",
 		"node-polyfill-webpack-plugin": "^2.0.1",
 		"path-browserify": "^1.0.1",
+		"terser-webpack-plugin": "^5.3.6",
 		"ts-jest": "^29.0.3",
 		"ts-loader": "^9.4.1",
 		"tsc-alias": "^1.7.1",
@@ -80,9 +79,10 @@
 		"combine-source-map": "^0.8.0",
 		"convert-source-map": "^2.0.0",
 		"esbuild": "^0.16.12",
+		"lodash": "^4.17.21",
+		"lodash-es": "^4.17.21",
 		"lodash.camelcase": "^4.3.0",
 		"lodash.clonedeep": "^4.5.0",
-		"lodash.merge": "^4.6.2",
 		"magic-string": "^0.26.7",
 		"memfs": "^3.4.12",
 		"merge-source-map": "^1.1.0",

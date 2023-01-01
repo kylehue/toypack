@@ -1,8 +1,15 @@
-import "../lib/core/Toypack.js";
+import "../lib/Toypack.js";
+import "../lib/BabelLoader.js";
+import "../lib/AssetLoader.js";
+import "../lib/CSSLoader.js";
+import "../lib/HTMLLoader.js";
+import "../lib/JSONLoader.js";
+import "../lib/AutoImportJSXPragmaPlugin.js";
+import "../lib/NodePolyfillPlugin.js";
 import sampleAssets from "./sampleAssets.js";
 let toypack = new Toypack({
 	bundleOptions: {
-		mode: "development",
+		mode: "production",
 		entry: "index.html",
 		output: {
 			path: "lib",
@@ -25,6 +32,14 @@ let toypack = new Toypack({
 	},
 	packageProvider: "esm.sh",
 });
+
+toypack.loaders.push(new BabelLoader());
+toypack.loaders.push(new AssetLoader());
+toypack.loaders.push(new CSSLoader());
+toypack.loaders.push(new HTMLLoader());
+toypack.loaders.push(new JSONLoader());
+toypack.use(new AutoImportJSXPragmaPlugin());
+toypack.use(new NodePolyfillPlugin());
 
 (async () => {
 	/* await toypack.addDependency("vue@3.2.23");

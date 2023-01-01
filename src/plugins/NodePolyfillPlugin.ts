@@ -1,6 +1,6 @@
 import Toypack from "@toypack/core/Toypack";
 import { ToypackPlugin } from "@toypack/core/types";
-import path from "path-browserify";
+import { dirname } from "path-browserify";
 
 const polyfills = {
 	assert: "assert/",
@@ -50,8 +50,8 @@ export default class NodePolyfillPlugin implements ToypackPlugin {
 
 				await bundler.packageManager.install(polyfills[descriptor.target]);
 
-				let newResolved = bundler.resolve(descriptor.target, {
-					baseDir: path.dirname(descriptor.parent.source),
+				let newResolved = await bundler.resolve(descriptor.target, {
+					baseDir: dirname(descriptor.parent.source),
 				});
 
 				descriptor.changeResolved(newResolved);

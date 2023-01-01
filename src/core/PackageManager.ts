@@ -24,6 +24,7 @@ function getCoreModuleSubpath(source: string) {
 export default class PackageManager {
 	public provider: string;
 	public providerRegex: RegExp;
+	public dependencies: Object = {};
 	private _cache: Map<string, Dependency[]> = new Map();
 	constructor(public bundler: Toypack) {
 		this.provider = packageProviders[bundler.options.packageProvider as string];
@@ -39,12 +40,12 @@ export default class PackageManager {
 			let designatedSource = url
 				.replace(this.providerRegex, "")
 				.replace(/^\//, "");
-			
+
 			// Dedupe if same source
 			for (let source of bundlerAssetSources) {
 				// Skip if not a core module
 				if (!source.startsWith("/node_modules/")) continue;
-				
+
 				let subpath = getCoreModuleSubpath(source);
 				let isSameSource = subpath === designatedSource;
 
@@ -194,6 +195,29 @@ export default class PackageManager {
 		for (let asset of graph) {
 			let coreSource = path.join("node_modules", name, asset.source);
 			await this.bundler.addAsset(coreSource, asset.content);
+		}
+
+		// Update dependencies
+		let versionTag = version == "latest" ? version : "^" + version;
+		this.dependencies[name] = versionTag;
+
+		// Update package.json
+		let assetPackage = this.bundler.assets.get("/package.json");
+		if (typeof assetPackage?.content == "string") {
+			let assetPackageParsed = JSON.parse(assetPackage.content);
+
+			if (typeof assetPackageParsed.dependencies != "object") {
+				assetPackageParsed.dependencies = {};
+			}
+
+			assetPackageParsed.dependencies = this.dependencies;
+			this.bundler.addAsset("/package.json", JSON.stringify(assetPackageParsed));
+		} else {
+			let newPackage = JSON.stringify({
+				dependencies: this.dependencies
+			});
+
+			this.bundler.addAsset("/package.json", newPackage);
 		}
 
 		if (this.bundler.options.bundleOptions?.logs) {

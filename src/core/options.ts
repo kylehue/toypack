@@ -1,6 +1,5 @@
 import {
 	BundleOptions,
-	PostCSSOptions,
 	ToypackOptions,
 } from "@toypack/core/types";
 
@@ -22,13 +21,7 @@ export const bundleOptions: BundleOptions = {
 	logs: true,
 };
 
-export const postCSSOptions: PostCSSOptions = {
-	plugins: [],
-	options: {},
-};
-
 export const defaultOptions: ToypackOptions = {
 	bundleOptions,
-	postCSSOptions,
 	packageProvider: "esm.sh",
 };

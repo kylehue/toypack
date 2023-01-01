@@ -1,5 +1,4 @@
 import MagicString from "magic-string";
-import { AcceptedPlugin, ProcessOptions } from "postcss";
 import SourceMap from "./SourceMap";
 import Toypack from "./Toypack";
 import { PackageProvider } from "./PackageManager";
@@ -120,26 +119,11 @@ export interface ModuleResolveOptions {
 	extensions?: string[];
 }
 
-export interface PostCSSOptions {
-	/**
-	 * PostCSS plugins.
-	 */
-	plugins?: AcceptedPlugin[];
-	/**
-	 * PostCSS processing options.
-	 */
-	options?: ProcessOptions;
-}
-
 export interface ToypackOptions {
 	/**
 	 * Bundle options.
 	 */
 	bundleOptions?: BundleOptions;
-	/**
-	 * PostCSS options.
-	 */
-	postCSSOptions?: PostCSSOptions;
 	/**
 	 * The package provider.
 	 * @default `esm.sh`
@@ -180,7 +164,6 @@ export interface CompiledAsset {
 }
 
 export interface ToypackLoader {
-	bundler?: Toypack;
 	name: string;
 	test: RegExp;
 	parse?: (

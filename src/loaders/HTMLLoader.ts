@@ -13,7 +13,7 @@ import {
 	TextNode as ITextNode,
 } from "node-html-parser";
 import { isURL } from "@toypack/utils";
-import * as path from "path-browserify";
+import { join } from "path-browserify";
 
 type HTMLNode = INode | IHTMLElement | ITextNode;
 function walk(AST: INode, fn: (node: HTMLNode) => void) {
@@ -46,7 +46,7 @@ export default class HTMLLoader implements ToypackLoader {
 				// If path is not an external url, make sure the path starts from root
 				// This avoids the resolver from searching in core modules
 				if (!isURL(id)) {
-					id = path.join("/", id);
+					id = join("/", id);
 				}
 
 				result.dependencies.push(id);

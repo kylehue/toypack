@@ -9,7 +9,7 @@ function resolve(dir) {
 }
 
 const deps = glob
-	.sync("./(loaders|plugins)/*.ts", {
+	.sync("{./loaders/*.ts,./plugins/*.ts}", {
 		cwd: resolve("../src"),
 		ignore: [
 			"./loaders/index.ts",
@@ -21,21 +21,21 @@ const deps = glob
 		let parsedPath = path.parse(current);
 		let name = parsedPath.name;
 		let outdir = path.join(parsedPath.dir, name);
-		acc[outdir] = resolve("../src/" + current);
+		acc[/* outdir */ name] = resolve("../src/" + current);
 		return acc;
 	}, {});
 
 module.exports = {
 	entry: {
 		...deps,
-		"core/Toypack": resolve("../src/index.ts"),
+		Toypack: resolve("../src/index.ts"),
 	},
 	output: {
 		filename: "[name].js",
 		path: resolve("../lib"),
 		clean: true,
 		library: {
-			name: "Toypack",
+			name: "[name]",
 			type: "umd",
 			export: "default",
 		},
@@ -44,15 +44,13 @@ module.exports = {
 		rules: [
 			{
 				test: /\.ts$/,
-				use: [
-					{
-						loader: "ts-loader",
-						options: {
-							configFile: resolve("../tsconfig.json"),
-						},
-					},
-				],
+				use: "ts-loader",
 				exclude: /node_modules/,
+				sideEffects: false,
+			},
+			{
+				test: /src\/index\.ts/,
+				sideEffects: true
 			},
 		],
 	},

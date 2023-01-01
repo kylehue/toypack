@@ -6,26 +6,13 @@ import {
 	ToypackPlugin,
 	BundleOptions,
 } from "@toypack/core/types";
-import {
-	BabelLoader,
-	JSONLoader,
-	AssetLoader,
-	CSSLoader,
-	HTMLLoader,
-} from "@toypack/loaders";
-import {
-	AutoImportJSXPragmaPlugin,
-	NodePolyfillPlugin,
-} from "@toypack/plugins";
 import { defaultOptions } from "@toypack/core/options";
-
-import { merge, cloneDeep } from "lodash";
-
+import { merge, cloneDeep } from "lodash-es";
 import PackageManager from "./PackageManager";
 import resolve from "./resolve";
 import bundle from "./bundle";
 import { add as addAsset } from "./asset";
-import Hooks, { HookName } from "./Hooks";
+import Hooks from "./Hooks";
 
 export const styleExtensions = [".css", ".sass", ".scss", ".less"];
 export const appExtensions = [
@@ -50,41 +37,16 @@ export default class Toypack {
 	public dependencies = {};
 	public packageManager: PackageManager;
 	public hooks = new Hooks();
-	public assetCache: Map<string, IAsset> = new Map();
+	public _assetCache: Map<string, IAsset> = new Map();
 	public bundleContentURL: string | null = null;
 	public bundleContentDocURL: string | null = null;
+
 	constructor(options?: ToypackOptions) {
 		if (options) {
 			this.defineOptions(options);
 		}
 
 		this.packageManager = new PackageManager(this);
-
-		/* Default loaders */
-		this.loaders.push(new BabelLoader());
-		this.loaders.push(new JSONLoader());
-		this.loaders.push(new CSSLoader());
-		this.loaders.push(new AssetLoader());
-		this.loaders.push(new HTMLLoader());
-
-		/* Default plugins */
-		this.use(new NodePolyfillPlugin());
-		this.use(new AutoImportJSXPragmaPlugin());
-
-		// Add empty object for fallbacks with no polyfill
-		this.addAsset(
-			"/node_modules/toypack/empty/index.js",
-			"module.exports = {};"
-		);
-	}
-
-	public async _initHooks(hookName: HookName, ...args) {
-		let hooks = this.hooks.taps.get(hookName);
-		if (hooks) {
-			for (let fn of hooks) {
-				await fn(...args);
-			}
-		}
 	}
 
 	/**
@@ -97,7 +59,7 @@ export default class Toypack {
 	}
 
 	/**
-	 * Modifies the options for the Toypack instance.
+	 * Modify the options.
 	 *
 	 * @param {ToypackOptions} options - Toypack options.
 	 */

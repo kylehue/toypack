@@ -33,6 +33,8 @@ import coolImage from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-13
 console.log(coolImage);
 export const PI = 3.14;`,
 
+   
+   
 	"scripts/Circle.js": `export default class Circle {}`,
 
 	"styles/colors.css": `:root {
@@ -136,6 +138,6 @@ export default function App(props) {
 	).arrayBuffer(),
 
 
-   
+
 	"public/logo.svg": "",
 };

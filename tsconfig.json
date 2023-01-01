@@ -1,8 +1,8 @@
 {
 	"compilerOptions": {
-		"target": "ES2015",
-		"module": "ESNext",
-		"lib": ["ES6", "DOM", "ES2015", "ES2016", "ES2017", "ScriptHost"],
+		"target": "ES6",
+		"module": "ES6",
+		"lib": ["ES6", "DOM"],
 		"moduleResolution": "Node",
 		"useDefineForClassFields": true,
 		"strict": true,
@@ -24,5 +24,5 @@
 		"declarationDir": "lib",
 		"noImplicitAny": false
 	},
-	"include": ["./src/**/*.ts"]
+	"include": ["./src/**/*.ts"],
 }

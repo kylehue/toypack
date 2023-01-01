@@ -1,4 +1,11 @@
-const Toypack = require("../lib/core/Toypack.js");
+const Toypack = require("../lib/Toypack.js");
+const AssetLoader = require("../lib/AssetLoader.js");
+const BabelLoader = require("../lib/BabelLoader.js");
+const CSSLoader = require("../lib/CSSLoader.js");
+const HTMLLoader = require("../lib/HTMLLoader.js");
+const JSONLoader = require("../lib/JSONLoader.js");
+const AutoImportJSXPragmaPlugin = require("../lib/AutoImportJSXPragmaPlugin.js");
+const NodePolyfillPlugin = require("../lib/NodePolyfillPlugin.js");
 const path = require("path-browserify");
 const toypack = new Toypack();
 
@@ -17,6 +24,13 @@ toypack.defineOptions({
 });
 
 beforeAll(async () => {
+	toypack.loaders.push(new BabelLoader());
+	toypack.loaders.push(new AssetLoader());
+	toypack.loaders.push(new CSSLoader());
+	toypack.loaders.push(new HTMLLoader());
+	toypack.loaders.push(new JSONLoader());
+	toypack.use(new AutoImportJSXPragmaPlugin());
+	toypack.use(new NodePolyfillPlugin());
 	await toypack.addAsset("src/main.js");
 	await toypack.addAsset("assets/image.jpg");
 	await toypack.addAsset("someFile.js");
@@ -39,8 +53,8 @@ beforeAll(async () => {
 });
 
 describe("Resolve", () => {
-	test("Simple", () => {
-		let res = toypack.resolve("./src/main.js", {
+	test("Simple", async () => {
+		let res = await toypack.resolve("./src/main.js", {
 			baseDir: ".",
 		});
 
@@ -48,7 +62,7 @@ describe("Resolve", () => {
 
 		expect(res).toBe(expected);
 
-		let noExtensions = toypack.resolve("./src/main.js", {
+		let noExtensions = await toypack.resolve("./src/main.js", {
 			baseDir: ".",
 			extensions: [],
 		});
@@ -56,28 +70,28 @@ describe("Resolve", () => {
 		expect(noExtensions).not.toBe(expected);
 	});
 
-	test("baseDir", () => {
-		let res = toypack.resolve("../assets/image.jpg", {
+	test("baseDir", async () => {
+		let res = await toypack.resolve("../assets/image.jpg", {
 			baseDir: path.dirname("src/main.js"),
 		});
 
 		expect(res).toBe(path.normalize("/assets/image.jpg"));
 
-		let res2 = toypack.resolve("./src/main.js", {
+		let res2 = await toypack.resolve("./src/main.js", {
 			baseDir: "src",
 		});
 
 		expect(res2).not.toBe(path.normalize("/src/main.js"));
 	});
 
-	test("Directories", () => {
-		let res = toypack.resolve("./someFolder", {
+	test("Directories", async () => {
+		let res = await toypack.resolve("./someFolder", {
 			baseDir: ".",
 		});
 
 		expect(res).toBe(path.normalize("/someFolder/file.js"));
 
-		let res2 = toypack.resolve("./anotherFolder", {
+		let res2 = await toypack.resolve("./anotherFolder", {
 			baseDir: ".",
 		});
 
@@ -85,32 +99,32 @@ describe("Resolve", () => {
 	});
 
 	test("Alias", async () => {
-		let res = toypack.resolve("@utils/foo/bar");
+		let res = await toypack.resolve("@utils/foo/bar");
 		expect(res).toBe(path.normalize("/test/utils/foo/bar.js"));
 
-		let res2 = toypack.resolve("@utils/tester");
+		let res2 = await toypack.resolve("@utils/tester");
 		expect(res2).toBe(path.normalize("/test/utils/tester/index.js"));
 
-		let res3 = toypack.resolve("react/test/hello.css");
+		let res3 = await toypack.resolve("react/test/hello.css");
 		expect(res3).toBe(path.normalize("/node_modules/reactlib/test/hello.css"));
 
-		let res4 = toypack.resolve("react");
+		let res4 = await toypack.resolve("react");
 		expect(res4).toBe(path.normalize("/node_modules/reactlib/index.js"));
 
-		let res5 = toypack.resolve("react-dom/test/hello.css");
+		let res5 = await toypack.resolve("react-dom/test/hello.css");
 		expect(res5).toBe(
 			path.normalize("/node_modules/reactlib-dom/test/hello.css")
 		);
 
-		let res6 = toypack.resolve("react-dom");
+		let res6 = await toypack.resolve("react-dom");
 		expect(res6).toBe(path.normalize("/node_modules/reactlib-dom/index.js"));
 
-		let res7 = toypack.resolve("react/css");
+		let res7 = await toypack.resolve("react/css");
 		expect(res7).toBe(path.normalize("/node_modules/reactlib/test/hello.css"));
 	});
 
-	test("Core modules", () => {
-		let res = toypack.resolve("hello", {
+	test("Core modules", async () => {
+		let res = await toypack.resolve("hello", {
 			baseDir: ".",
 		});
 
@@ -118,7 +132,7 @@ describe("Resolve", () => {
 
 		expect(res).toBe(expected);
 
-		let excludeCoreModules = toypack.resolve("hello", {
+		let excludeCoreModules = await toypack.resolve("hello", {
 			baseDir: ".",
 			includeCoreModules: false,
 		});
@@ -126,8 +140,8 @@ describe("Resolve", () => {
 		expect(excludeCoreModules).not.toBe(expected);
 	});
 
-	test("External URLs", () => {
-		let res = toypack.resolve(
+	test("External URLs", async () => {
+		let res = await toypack.resolve(
 			"https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
 		);
 

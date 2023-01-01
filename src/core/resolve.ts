@@ -128,7 +128,7 @@ function getResolved(bundler: Toypack, x: string, opts) {
  * @param {ResolveOptions} options Resolving options.
  * @returns {string} The absolute path of the module.
  */
-export default function resolve(
+export default async function resolve(
 	bundler: Toypack,
 	x: string,
 	options?: ResolveOptions
@@ -187,7 +187,13 @@ export default function resolve(
 		let fallbackData = getResolveFallbackData(bundler, orig);
 		if (fallbackData) {
 			if (typeof fallbackData.fallback == "boolean") {
-				result = "/node_modules/toypack/empty/index.js";
+				// Add module with empty object for fallbacks with no polyfill
+				let empty = await bundler.addAsset(
+					"node_modules/toypack/empty/index.js",
+					"module.exports = {};"
+				);
+
+				result = empty.source;
 			} else if (typeof fallbackData.fallback == "string") {
 				result = getResolved(bundler, fallbackData.fallback, opts);
 			}

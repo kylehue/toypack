@@ -18,11 +18,10 @@ export function create(
 	bundler: Toypack,
 	source: string,
 	content: string | ArrayBuffer
-) {
+): IAsset {
 	let isExternal = isURL(source);
 	source = isExternal ? source : path.join("/", source);
-	let cached = bundler.assets.get(source);
-	let id = cached ? cached.id : ++lastId;
+	let id = ++lastId;
 	let type = mime.lookup(source) || "";
 	let extension = path.extname(source);
 
@@ -62,10 +61,7 @@ export async function add(
 	bundler: Toypack,
 	source: string,
 	content: string | ArrayBuffer = ""
-) {
-	let isExternal = isURL(source);
-	source = isExternal ? source : path.join("/", source);
-
+): Promise<IAsset> {
 	let cached = bundler.assets.get(source);
 	if (cached) {
 		if (cached.content === content || isURL(cached.source)) {
@@ -73,9 +69,10 @@ export async function add(
 		}
 	}
 
-	let asset: IAsset = create(bundler, source, content);
+	let asset: IAsset = cached ? cached : create(bundler, source, content);
 
 	// Fetch if source is external url and not cached
+	let isExternal = isURL(asset.source);
 	if (isExternal && !cached) {
 		let fetchResponse = await fetch(source);
 		if (textExtensions.includes(asset.extension)) {
@@ -115,7 +112,9 @@ export async function add(
 	asset.contentURL = assetURL;
 
 	// Out
-	bundler.assets.set(source, asset);
+	if (!cached) {
+		bundler.assets.set(asset.source, asset);
+	}
 
 	return asset;
 }

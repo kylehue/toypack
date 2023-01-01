@@ -1,6 +1,6 @@
 import { IAsset, CompiledAsset } from "./types";
 
-export type HookName = keyof Omit<Hooks, "taps">;
+export type HookName = keyof Omit<Hooks, "taps" | "trigger">;
 
 export interface IFailedResolveDescriptor {
 	target: string;
@@ -8,7 +8,7 @@ export interface IFailedResolveDescriptor {
 	changeResolved: (newResolved: string) => void;
 }
 
-type IFailedResolve = (
+type IFailedResolveCallback = (
 	descriptor: IFailedResolveDescriptor
 ) => void | Promise<any>;
 
@@ -17,7 +17,7 @@ export interface IAfterCompileDescriptor {
 	asset: IAsset;
 }
 
-type IAfterCompile = (
+type IAfterCompileCallback = (
 	descriptor: IAfterCompileDescriptor
 ) => void | Promise<any>;
 
@@ -39,11 +39,20 @@ export default class Hooks {
 		}
 	}
 
-	public failedResolve(fn: IFailedResolve) {
+	public async trigger(hookName: HookName, ...args) {
+		let hooks = this.taps.get(hookName);
+		if (hooks) {
+			for (let fn of hooks) {
+				await fn(...args);
+			}
+		}
+	}
+
+	public failedResolve(fn: IFailedResolveCallback) {
 		this._tapHook("failedResolve", fn);
 	}
 
-	public afterCompile(fn: IAfterCompile) {
+	public afterCompile(fn: IAfterCompileCallback) {
 		this._tapHook("afterCompile", fn);
 	}
 }
