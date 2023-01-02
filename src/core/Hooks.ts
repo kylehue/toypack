@@ -1,6 +1,6 @@
 import { IAsset, CompiledAsset } from "./types";
 
-export type HookName = keyof Omit<Hooks, "taps" | "trigger">;
+export type HookName = keyof Omit<Hooks, "taps" | "trigger" | "destroy">;
 
 export interface FailedResolveDescriptor {
    target: string;
@@ -54,5 +54,5 @@ export default class Hooks {
 
    public afterCompile(fn: AfterCompileCallback) {
       this._tapHook("afterCompile", fn);
-   }
+	}
 }

@@ -41,7 +41,7 @@ export default class HTMLLoader implements ToypackLoader {
 
       let AST = parseHTML(asset.content);
 
-      function addToDependencies(id: string) {
+      function addToDependencies(id: string, requestOptions?: RequestInit) {
          if (id) {
             // If path is not an external url, make sure the path starts from root
             // This avoids the resolver from searching in core modules
@@ -49,7 +49,10 @@ export default class HTMLLoader implements ToypackLoader {
                id = join("/", id);
             }
 
-            result.dependencies.push(id);
+            result.dependencies.push({
+               source: id,
+               requestOptions,
+            });
          }
       }
 
@@ -58,7 +61,9 @@ export default class HTMLLoader implements ToypackLoader {
          if (node instanceof IHTMLElement) {
             // Scripts
             if (node.tagName == "SCRIPT" && node.attrs?.src) {
-               addToDependencies(node.attrs?.src);
+               addToDependencies(node.attrs?.src, {
+                  integrity: node.attrs?.integrity,
+               });
 
                // Remove from tree
                node.remove();
@@ -66,7 +71,9 @@ export default class HTMLLoader implements ToypackLoader {
 
             // Styles
             if (node.tagName == "LINK" && node.attrs?.rel == "stylesheet") {
-               addToDependencies(node.attrs?.href);
+               addToDependencies(node.attrs?.href, {
+                  integrity: node.attrs?.integrity,
+               });
 
                // Remove from tree
                node.remove();
@@ -173,7 +180,7 @@ export default class HTMLLoader implements ToypackLoader {
          let dependencies = asset.loaderData.parse?.dependencies;
          if (dependencies) {
             for (let dependency of dependencies) {
-               chunk.append(`require("${dependency}");`);
+               chunk.append(`require("${dependency.source}");`);
             }
          }
 

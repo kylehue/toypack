@@ -134,7 +134,7 @@ export default async function resolve(
    options?: ResolveOptions
 ) {
    if (typeof x !== "string") {
-      throw new TypeError("Path must be a string.");
+      throw new TypeError("Path must be a string. Received " + typeof x);
    }
 
    let result = "";

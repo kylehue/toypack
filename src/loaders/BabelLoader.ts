@@ -17,6 +17,7 @@ const defaultTransformOptions: TransformOptions = {
    sourceType: "module",
    compact: false,
    presets: ["typescript", "react", "env"],
+   comments: false,
 };
 
 const defaultOptions: BabelLoaderOptions = {
@@ -59,7 +60,7 @@ export default class BabelLoader implements ToypackLoader {
                   bundler.options.bundleOptions?.mode == "development" &&
                   !!bundler.options.bundleOptions?.output?.sourceMap &&
                   !isCoreModule,
-               envName: bundler.options.bundleOptions?.mode,
+               envName: bundler.options.bundleOptions?.mode
             } as TransformOptions),
          };
 
@@ -125,10 +126,12 @@ export default class BabelLoader implements ToypackLoader {
          });
 
          for (let dep of imports) {
-            let isAdded = result.dependencies.some((d) => d === dep.id);
+            let isAdded = result.dependencies.some((d) => d.source === dep.id);
 
             if (!isAdded) {
-               result.dependencies.push(dep.id);
+               result.dependencies.push({
+                  source: dep.id,
+               });
             }
          }
 

@@ -1,11 +1,4 @@
-const Toypack = require("../lib/Toypack.js");
-const AssetLoader = require("../lib/AssetLoader.js");
-const BabelLoader = require("../lib/BabelLoader.js");
-const CSSLoader = require("../lib/CSSLoader.js");
-const HTMLLoader = require("../lib/HTMLLoader.js");
-const JSONLoader = require("../lib/JSONLoader.js");
-const AutoImportJSXPragmaPlugin = require("../lib/AutoImportJSXPragmaPlugin.js");
-const NodePolyfillPlugin = require("../lib/NodePolyfillPlugin.js");
+const { default: Toypack } = require("@toypack/core/Toypack");
 const path = require("path-browserify");
 const toypack = new Toypack();
 
@@ -24,13 +17,6 @@ toypack.defineOptions({
 });
 
 beforeAll(async () => {
-   toypack.loaders.push(new BabelLoader());
-   toypack.loaders.push(new AssetLoader());
-   toypack.loaders.push(new CSSLoader());
-   toypack.loaders.push(new HTMLLoader());
-   toypack.loaders.push(new JSONLoader());
-   toypack.use(new AutoImportJSXPragmaPlugin());
-   toypack.use(new NodePolyfillPlugin());
    await toypack.addAsset("src/main.js");
    await toypack.addAsset("assets/image.jpg");
    await toypack.addAsset("someFile.js");

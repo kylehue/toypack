@@ -66,7 +66,7 @@ export default function format(
 
    chunk.prepend(`init: function(module, exports, require) {`);
    chunk.prepend(`${asset.id}: {`);
-   chunk.append(`},`);
+   chunk.append(`\n},`);
    chunk.append(`map: ${JSON.stringify(asset.dependencyMap) || "{}"}`);
    chunk.append(`},`);
 

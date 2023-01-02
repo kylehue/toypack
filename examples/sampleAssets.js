@@ -19,6 +19,7 @@ import { v4 } from "uuid";
 console.log(v4());
 import fs from "fs";
 console.log(fs);
+import "../styles/sampleSass1.scss";
 (async() => {
 	let dynamicPI = await import("@scripts/PI.js");
 	console.log(dynamicPI);
@@ -61,6 +62,32 @@ html {
 body {
 	color: var(--bg);
 }`,
+   
+	
+	
+	
+	"styles/sampleSass1.scss": `
+@import "./sampleSass2";
+
+body {
+	background: skyblue;
+
+	p {
+		font-size: 30px;
+		font-weight: bold;
+		@include bigRedText;
+	}
+}
+`,
+	
+	
+	
+	"styles/sampleSass2.scss": `
+@mixin bigRedText {
+	font-size: 50px;
+	color: red;
+}
+`,
 
    
    
@@ -98,25 +125,25 @@ export default function App(props) {
    
    
 	"index.html":
-		'\
-<!DOCTYPE html>\
-<html>\
-<head>\
-   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">\
-   <script type="text/javascript" src="src/index.js"></script>\
-   <link rel="stylesheet" href="styles/main.css"></link>\
-   <title>cool website!!!!</title>\
-   <!-- <script>console.log(123);</script> -->\
-</head>\
-<body class="theme-test w-100 h-100">\
-   <div class="d-flex align-items-center justify-content-center" id="greet">\
-      <p>Hello World!</p>\
-      <div>nested test!</div>\
-   </div>\
-	<div class="w-100 h-100" id="root">\
-	</div>\
-</body>\
-</html>',
+		`
+<!DOCTYPE html>
+<html>
+<head>
+   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+   <title>cool website!!!!</title>
+   <script type="text/javascript" src="src/index.js"></script>
+   <link rel="stylesheet" href="styles/main.css"></link>
+   <!-- <script>console.log(123);</script> -->
+</head>
+<body class="theme-test w-100 h-100">
+   <div class="d-flex align-items-center justify-content-center" id="greet">
+      <p>Hello World!</p>
+      <div>nested test!</div>
+   </div>
+	<div class="w-100 h-100" id="root">
+	</div>
+</body>
+</html>`,
 
    
    

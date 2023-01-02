@@ -1,11 +1,4 @@
 import "../lib/Toypack.js";
-import "../lib/BabelLoader.js";
-import "../lib/AssetLoader.js";
-import "../lib/CSSLoader.js";
-import "../lib/HTMLLoader.js";
-import "../lib/JSONLoader.js";
-import "../lib/AutoImportJSXPragmaPlugin.js";
-import "../lib/NodePolyfillPlugin.js";
 import sampleAssets from "./sampleAssets.js";
 let toypack = new Toypack({
    bundleOptions: {
@@ -33,14 +26,6 @@ let toypack = new Toypack({
    packageProvider: "esm.sh",
 });
 
-toypack.loaders.push(new BabelLoader());
-toypack.loaders.push(new AssetLoader());
-toypack.loaders.push(new CSSLoader());
-toypack.loaders.push(new HTMLLoader());
-toypack.loaders.push(new JSONLoader());
-toypack.use(new AutoImportJSXPragmaPlugin());
-toypack.use(new NodePolyfillPlugin());
-
 (async () => {
    /* await toypack.addDependency("vue@3.2.23");
 				await toypack.addDependency("uuid");
@@ -48,9 +33,7 @@ toypack.use(new NodePolyfillPlugin());
 				await toypack.addDependency("react-dom");
 				await toypack.addDependency("use-state-in-custom-properties"); */
    //await toypack.addDependency("bootstrap");
-   await toypack.packageManager.install(
-      "bootstrap@5.2.3/dist/css/bootstrap.min.css"
-   );
+   await toypack.packageManager.install("bootstrap");
    // await toypack.packageManager.install("vue@3.2.23");
    await toypack.packageManager.install("uuid");
    await toypack.packageManager.install("react");

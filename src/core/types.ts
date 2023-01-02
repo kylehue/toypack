@@ -154,8 +154,13 @@ export interface IAsset {
    blob: Blob;
 }
 
+export interface DependencyData {
+   source: string;
+   requestOptions?: RequestInit;
+}
+
 export interface ParsedAsset {
-   dependencies: string[];
+   dependencies: DependencyData[];
    metadata?: any;
 }
 

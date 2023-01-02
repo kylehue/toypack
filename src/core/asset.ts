@@ -62,10 +62,15 @@ export function create(
    return asset;
 }
 
+export interface AssetOptions {
+   requestOptions?: RequestInit;
+}
+
 export async function add(
    bundler: Toypack,
    source: string,
-   content: string | ArrayBuffer = ""
+   content: string | ArrayBuffer = "",
+   options?: AssetOptions
 ): Promise<IAsset> {
    let isExternal = isURL(source);
    source = isExternal ? source : path.join("/", source);
@@ -80,7 +85,7 @@ export async function add(
 
    // Fetch if source is external url and not cached
    if (isExternal && !cached) {
-      let fetchResponse = await fetch(source);
+      let fetchResponse = await fetch(source, options?.requestOptions);
       if (textExtensions.includes(asset.extension)) {
          asset.content = await fetchResponse.text();
       } else {

@@ -49,13 +49,13 @@ export default async function createGraph(
 
       // Scan asset's dependencies
       for (let dependency of parseData.dependencies) {
-         let dependencyAbsolutePath: string = dependency;
+         let dependencyAbsolutePath: string = dependency.source;
          let baseDir = path.dirname(source);
-         let isExternal = isURL(dependency);
-         let isCoreModule = !isLocal(dependency) && !isExternal;
+         let isExternal = isURL(dependency.source);
+         let isCoreModule = !isLocal(dependency.source) && !isExternal;
 
          // Check if aliased
-         let aliasData = getResolveAliasData(bundler, dependency);
+         let aliasData = getResolveAliasData(bundler, dependency.source);
          if (aliasData) {
             isCoreModule =
                !isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
@@ -64,13 +64,13 @@ export default async function createGraph(
          // If not a url, resolve
          if (!isExternal) {
             // Resolve
-            let resolved = await bundler.resolve(dependency, {
+            let resolved = await bundler.resolve(dependency.source, {
                baseDir,
             });
 
             if (!resolved) {
                await bundler.hooks.trigger("failedResolve", {
-                  target: dependency,
+                  target: dependency.source,
                   parent: asset,
                   changeResolved(newResolved: string) {
                      resolved = newResolved;
@@ -83,16 +83,17 @@ export default async function createGraph(
             }
          } else {
             // If a URL and not in cache, add to assets
-            if (!bundler._assetCache.get(dependency)) {
-               await bundler.addAsset(dependency);
+            if (!bundler._assetCache.get(dependency.source)) {
+               await bundler.addAsset(dependency.source, undefined, {
+                  requestOptions: dependency.requestOptions
+               });
             }
          }
 
          let dependencyAsset = bundler.assets.get(dependencyAbsolutePath);
-
          if (dependencyAsset) {
             // Add to dependency mapping
-            asset.dependencyMap[dependency] = dependencyAsset.id;
+            asset.dependencyMap[dependency.source] = dependencyAsset.id;
 
             // Scan
             let isAdded = graph.some(

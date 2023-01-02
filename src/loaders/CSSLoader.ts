@@ -6,7 +6,7 @@ import {
    ParsedAsset,
 } from "@toypack/core/types";
 import { cleanStr } from "@toypack/utils";
-import postcss, { AcceptedPlugin, ProcessOptions } from "postcss";
+import postcss, { AcceptedPlugin, ProcessOptions, ChildNode } from "postcss";
 import valueParser from "postcss-value-parser";
 import { parse as parseCSS } from "postcss";
 import { dirname } from "path-browserify";
@@ -47,8 +47,12 @@ export interface PostCSSConfig {
    options?: ProcessOptions;
 }
 
-interface CSSLoaderOptions {
+export interface CSSLoaderOptions {
    postcssConfig?: PostCSSConfig;
+}
+
+export interface ParseOptions {
+   checkImported?: (imported: string, node: ChildNode) => void;
 }
 
 export default class CSSLoader implements ToypackLoader {
@@ -59,7 +63,7 @@ export default class CSSLoader implements ToypackLoader {
       this.options = merge(cloneDeep(defaultOptions), options);
    }
 
-   public parse(asset: IAsset, bundler: Toypack, options?) {
+   public parse(asset: IAsset, bundler: Toypack, options?: ParseOptions) {
       if (typeof asset.content != "string") {
          let error = new Error("CSS Parse Error: Content must be string.");
          throw error;
@@ -72,11 +76,11 @@ export default class CSSLoader implements ToypackLoader {
          metadata: { AST, URLDependencies: [] },
       };
 
-      AST.walk((node: any) => {
+      AST.walk((node) => {
          if (node.type == "atrule" && node.name == "import") {
             let parsedValue = valueParser(node.params);
-            parsedValue.walk((valueNode: any) => {
-               let dependencyId: any = null;
+            parsedValue.walk((valueNode) => {
+               let dependencyId: string | null = null;
                if (
                   valueNode.type == "function" &&
                   valueNode.value == "url" &&
@@ -88,30 +92,34 @@ export default class CSSLoader implements ToypackLoader {
                }
 
                if (dependencyId) {
-                  result.dependencies.push(dependencyId);
+                  result.dependencies.push({
+                     source: dependencyId,
+                  });
 
                   // Remove from AST
-                  if (typeof options?.checkAtRules == "function") {
-                     options.checkAtRules(node, dependencyId);
-                  } else {
-                     node.remove();
+                  if (typeof options?.checkImported == "function") {
+                     options.checkImported(dependencyId, node);
                   }
+
+                  node.remove();
                }
             });
          } else if (node.type == "decl") {
             const isURLFunction = URLFunctionRegex.test(node.value);
             if (isURLFunction) {
                let parsedValue = valueParser(node.value);
-               parsedValue.walk(async (valueNode: any) => {
+               parsedValue.walk(async (valueNode) => {
                   if (
                      valueNode.type === "function" &&
                      valueNode.value === "url" &&
                      valueNode.nodes.length &&
                      !valueNode.nodes[0].value.startsWith("#")
                   ) {
-                     let source = valueNode.nodes[0]?.value;
+                     let source: string = valueNode.nodes[0]?.value;
                      if (!source.startsWith("data:")) {
-                        result.dependencies.push(source);
+                        result.dependencies.push({
+                           source: source,
+                        });
 
                         // Require asset
                         let dependencyAbsolutePath = await bundler.resolve(

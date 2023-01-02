@@ -11,13 +11,14 @@ import { merge, cloneDeep } from "lodash-es";
 import PackageManager from "./PackageManager";
 import resolve from "./resolve";
 import bundle from "./bundle";
-import { add as addAsset } from "./asset";
+import { add as addAsset, AssetOptions } from "./asset";
 import Hooks from "./Hooks";
 import MagicString from "magic-string";
 import { Node } from "@babel/traverse";
 import { getASTImports } from "@toypack/utils";
 import { Options } from "@toypack/utils/getASTImports";
-
+import { AutoImportJSXPragmaPlugin, AutoInstallSubPackagesPlugin, NodePolyfillPlugin } from "@toypack/plugins";
+import { AssetLoader, BabelLoader, CSSLoader, HTMLLoader, JSONLoader, SassLoader } from "@toypack/loaders";
 export const styleExtensions = [".css", ".sass", ".scss", ".less"];
 export const appExtensions = [
    ".js",
@@ -51,6 +52,19 @@ export default class Toypack {
       }
 
       this.packageManager = new PackageManager(this);
+
+      // Default loaders
+      this.loaders.push(new AssetLoader());
+      this.loaders.push(new BabelLoader());
+      this.loaders.push(new CSSLoader());
+      this.loaders.push(new HTMLLoader());
+      this.loaders.push(new JSONLoader());
+      this.loaders.push(new SassLoader());
+
+      // Default plugins
+      this.use(new AutoInstallSubPackagesPlugin());
+      this.use(new AutoImportJSXPragmaPlugin());
+      this.use(new NodePolyfillPlugin());
    }
 
    public _getASTImports(AST: Node | Node[], options?: Options) {
@@ -86,8 +100,8 @@ export default class Toypack {
     * @param {string|ArrayBuffer} [content] - The contents of the asset.
     * @returns {Promise<Asset>} The asset that was added.
     */
-   public async addAsset(source: string, content: string | ArrayBuffer = "") {
-      return await addAsset(this, source, content);
+   public async addAsset(source: string, content: string | ArrayBuffer = "", options?: AssetOptions) {
+      return await addAsset(this, source, content, options);
    }
 
    /**
