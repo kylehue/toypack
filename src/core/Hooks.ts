@@ -2,57 +2,57 @@ import { IAsset, CompiledAsset } from "./types";
 
 export type HookName = keyof Omit<Hooks, "taps" | "trigger">;
 
-export interface IFailedResolveDescriptor {
-	target: string;
-	parent: IAsset;
-	changeResolved: (newResolved: string) => void;
+export interface FailedResolveDescriptor {
+   target: string;
+   parent: IAsset;
+   changeResolved: (newResolved: string) => void;
 }
 
-type IFailedResolveCallback = (
-	descriptor: IFailedResolveDescriptor
+type FailedResolveCallback = (
+   descriptor: FailedResolveDescriptor
 ) => void | Promise<any>;
 
-export interface IAfterCompileDescriptor {
-	compilation: CompiledAsset;
-	asset: IAsset;
+export interface AfterCompileDescriptor {
+   compilation: CompiledAsset;
+   asset: IAsset;
 }
 
-type IAfterCompileCallback = (
-	descriptor: IAfterCompileDescriptor
+type AfterCompileCallback = (
+   descriptor: AfterCompileDescriptor
 ) => void | Promise<any>;
 
 export default class Hooks {
-	public taps: Map<HookName, Function[]> = new Map();
+   public taps: Map<HookName, Function[]> = new Map();
 
-	constructor() {}
+   constructor() {}
 
-	private _tapHook(hookName: HookName, hookFunction: Function) {
-		if (typeof hookFunction == "function") {
-			if (!this.taps.get(hookName)) {
-				this.taps.set(hookName, []);
-			}
+   private _tapHook(hookName: HookName, hookFunction: Function) {
+      if (typeof hookFunction == "function") {
+         if (!this.taps.get(hookName)) {
+            this.taps.set(hookName, []);
+         }
 
-			let hookGroup = this.taps.get(hookName);
-			if (hookGroup) {
-				hookGroup.push(hookFunction);
-			}
-		}
-	}
+         let hookGroup = this.taps.get(hookName);
+         if (hookGroup) {
+            hookGroup.push(hookFunction);
+         }
+      }
+   }
 
-	public async trigger(hookName: HookName, ...args) {
-		let hooks = this.taps.get(hookName);
-		if (hooks) {
-			for (let fn of hooks) {
-				await fn(...args);
-			}
-		}
-	}
+   public async trigger(hookName: HookName, ...args) {
+      let hooks = this.taps.get(hookName);
+      if (hooks) {
+         for (let fn of hooks) {
+            await fn(...args);
+         }
+      }
+   }
 
-	public failedResolve(fn: IFailedResolveCallback) {
-		this._tapHook("failedResolve", fn);
-	}
+   public failedResolve(fn: FailedResolveCallback) {
+      this._tapHook("failedResolve", fn);
+   }
 
-	public afterCompile(fn: IAfterCompileCallback) {
-		this._tapHook("afterCompile", fn);
-	}
+   public afterCompile(fn: AfterCompileCallback) {
+      this._tapHook("afterCompile", fn);
+   }
 }

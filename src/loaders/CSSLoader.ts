@@ -1,12 +1,11 @@
 import Toypack from "@toypack/core/Toypack";
 import {
-	IAsset,
-	CompiledAsset,
-	ToypackLoader,
-	ParsedAsset,
+   IAsset,
+   CompiledAsset,
+   ToypackLoader,
+   ParsedAsset,
 } from "@toypack/core/types";
-import { cleanStr, isURL } from "@toypack/utils";
-import MagicString from "magic-string";
+import { cleanStr } from "@toypack/utils";
 import postcss, { AcceptedPlugin, ProcessOptions } from "postcss";
 import valueParser from "postcss-value-parser";
 import { parse as parseCSS } from "postcss";
@@ -16,7 +15,7 @@ import { cloneDeep, merge } from "lodash-es";
 const URLFunctionRegex = /url\s*\("?(?![a-z]+:)/;
 
 function getTemplate(id: string | number) {
-	return minimizeStr(`
+   return minimizeStr(`
 var _head = document.head || document.getElementsByTagName("head")[0];
 _style = document.createElement("style");
 _style.dataset.toypackId = "asset-${id}";
@@ -31,162 +30,160 @@ if (_style.styleSheet){
 }
 
 const defaultOptions: CSSLoaderOptions = {
-	postcssConfig: {
-		options: {},
-		plugins: []
-	}
+   postcssConfig: {
+      options: {},
+      plugins: [],
+   },
 };
 
 export interface PostCSSConfig {
-	/**
-	 * PostCSS plugins.
-	 */
-	plugins?: AcceptedPlugin[];
-	/**
-	 * PostCSS processing options.
-	 */
-	options?: ProcessOptions;
+   /**
+    * PostCSS plugins.
+    */
+   plugins?: AcceptedPlugin[];
+   /**
+    * PostCSS processing options.
+    */
+   options?: ProcessOptions;
 }
 
 interface CSSLoaderOptions {
-	postcssConfig?: PostCSSConfig;
+   postcssConfig?: PostCSSConfig;
 }
 
 export default class CSSLoader implements ToypackLoader {
-	public name = "CSSLoader";
-	public test = /\.css$/;
-	
-	constructor(public options?: CSSLoaderOptions) {
-		this.options = merge(cloneDeep(defaultOptions), options);
-	}
+   public name = "CSSLoader";
+   public test = /\.css$/;
 
-	public parse(asset: IAsset, bundler: Toypack, options?) {
-		if (typeof asset.content != "string") {
-			let error = new Error("CSS Parse Error: Content must be string.");
-			throw error;
-		}
+   constructor(public options?: CSSLoaderOptions) {
+      this.options = merge(cloneDeep(defaultOptions), options);
+   }
 
-		const AST = parseCSS(
-			asset.content,
-			this.options?.postcssConfig?.options
-		);
+   public parse(asset: IAsset, bundler: Toypack, options?) {
+      if (typeof asset.content != "string") {
+         let error = new Error("CSS Parse Error: Content must be string.");
+         throw error;
+      }
 
-		const result: ParsedAsset = {
-			dependencies: [],
-			metadata: { AST, URLDependencies: [] },
-		};
+      const AST = parseCSS(asset.content, this.options?.postcssConfig?.options);
 
-		AST.walk((node: any) => {
-			if (node.type == "atrule" && node.name == "import") {
-				let parsedValue = valueParser(node.params);
-				parsedValue.walk((valueNode: any) => {
-					let dependencyId: any = null;
-					if (
-						valueNode.type == "function" &&
-						valueNode.value == "url" &&
-						valueNode.nodes.length
-					) {
-						dependencyId = valueNode.nodes[0]?.value;
-					} else if (valueNode.value && !valueNode.nodes?.length) {
-						dependencyId = valueNode.value;
-					}
+      const result: ParsedAsset = {
+         dependencies: [],
+         metadata: { AST, URLDependencies: [] },
+      };
 
-					if (dependencyId) {
-						result.dependencies.push(dependencyId);
+      AST.walk((node: any) => {
+         if (node.type == "atrule" && node.name == "import") {
+            let parsedValue = valueParser(node.params);
+            parsedValue.walk((valueNode: any) => {
+               let dependencyId: any = null;
+               if (
+                  valueNode.type == "function" &&
+                  valueNode.value == "url" &&
+                  valueNode.nodes.length
+               ) {
+                  dependencyId = valueNode.nodes[0]?.value;
+               } else if (valueNode.value && !valueNode.nodes?.length) {
+                  dependencyId = valueNode.value;
+               }
 
-						// Remove from AST
-						if (typeof options?.checkAtRules == "function") {
-							options.checkAtRules(node, dependencyId);
-						} else {
-							node.remove();
-						}
-					}
-				});
-			} else if (node.type == "decl") {
-				const isURLFunction = URLFunctionRegex.test(node.value);
-				if (isURLFunction) {
-					let parsedValue = valueParser(node.value);
-					parsedValue.walk(async (valueNode: any) => {
-						if (
-							valueNode.type === "function" &&
-							valueNode.value === "url" &&
-							valueNode.nodes.length &&
-							!valueNode.nodes[0].value.startsWith("#")
-						) {
-							let source = valueNode.nodes[0]?.value;
-							if (!source.startsWith("data:")) {
-								result.dependencies.push(source);
+               if (dependencyId) {
+                  result.dependencies.push(dependencyId);
 
-								// Require asset
-								let dependencyAbsolutePath = await bundler.resolve(source, {
-									baseDir: dirname(asset.source),
-								});
+                  // Remove from AST
+                  if (typeof options?.checkAtRules == "function") {
+                     options.checkAtRules(node, dependencyId);
+                  } else {
+                     node.remove();
+                  }
+               }
+            });
+         } else if (node.type == "decl") {
+            const isURLFunction = URLFunctionRegex.test(node.value);
+            if (isURLFunction) {
+               let parsedValue = valueParser(node.value);
+               parsedValue.walk(async (valueNode: any) => {
+                  if (
+                     valueNode.type === "function" &&
+                     valueNode.value === "url" &&
+                     valueNode.nodes.length &&
+                     !valueNode.nodes[0].value.startsWith("#")
+                  ) {
+                     let source = valueNode.nodes[0]?.value;
+                     if (!source.startsWith("data:")) {
+                        result.dependencies.push(source);
 
-								let cached = bundler.assets.get(dependencyAbsolutePath);
+                        // Require asset
+                        let dependencyAbsolutePath = await bundler.resolve(
+                           source,
+                           {
+                              baseDir: dirname(asset.source),
+                           }
+                        );
 
-								if (cached) {
-									node.value = `url("\${${cleanStr(source)}}")`;
-								}
-							}
-						}
-					});
-				}
-			}
-		});
+                        let cached = bundler.assets.get(dependencyAbsolutePath);
 
-		return result;
-	}
+                        if (cached) {
+                           node.value = `url("\${${cleanStr(source)}}")`;
+                        }
+                     }
+                  }
+               });
+            }
+         }
+      });
 
-	public compile(asset: IAsset, bundler: Toypack) {
-		if (typeof asset.content != "string") {
-			let error = new Error("CSS Compile Error: Content must be string.");
-			throw error;
-		}
+      return result;
+   }
 
-		const result: CompiledAsset = {
-			content: {} as MagicString,
-		};
+   public compile(asset: IAsset, bundler: Toypack) {
+      if (typeof asset.content != "string") {
+         let error = new Error("CSS Compile Error: Content must be string.");
+         throw error;
+      }
 
-		let processedContent =
-			asset.loaderData?.parse?.metadata?.AST?.toString() || asset.content;
+      const result: CompiledAsset = {
+         content: bundler._createMagicString(asset.content),
+      };
 
-		// Process
-		if (!isURL(asset.source)) {
-			const plugins = this.options?.postcssConfig?.plugins;
-			const options = this.options?.postcssConfig?.options;
-			processedContent = postcss(plugins).process(
-				processedContent,
-				options
-			).css;
-		}
+      let processedContent =
+         asset.loaderData?.parse?.metadata?.AST?.toString() || asset.content;
 
-		let styleContent = 'var __styleContent__ = ("")';
-		for (let line of processedContent.split("\n")) {
-			line = line.replaceAll("`", "\\`");
-			styleContent += `.concat(\`${line}\`)`;
-		}
+      // Process
+      if (!asset.isExternal) {
+         const plugins = this.options?.postcssConfig?.plugins;
+         const options = this.options?.postcssConfig?.options;
+         processedContent = postcss(plugins).process(
+            processedContent,
+            options
+         ).css;
+      }
 
-		styleContent += ";";
+      let styleContent = 'var __styleContent__ = ("")';
+      for (let line of processedContent.split("\n")) {
+         line = line.replaceAll("`", "\\`");
+         styleContent += `.concat(\`${line}\`)`;
+      }
 
-		let chunk = new MagicString(asset.content);
+      styleContent += ";";
 
-		// For dummy source map
-		chunk.update(0, chunk.length(), styleContent);
-		chunk.append(getTemplate(asset.id));
+      // For dummy source map
+      result.content.update(0, result.content.length(), styleContent);
+      result.content.append(getTemplate(asset.id));
 
-		// Avoid style duplicates
-		chunk.prepend(`if (!_style) {`).append("}");
-		chunk.prepend(
-			`var _style = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
-		);
+      // Avoid style duplicates
+      result.content.prepend(`if (!_style) {`).append("}");
+      result.content.prepend(
+         `var _style = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
+      );
 
-		// Imports
-		for (let dependency in asset.dependencyMap) {
-			chunk.prepend(`var ${cleanStr(dependency)} = require("${dependency}");`);
-		}
+      // Imports
+      for (let dependency in asset.dependencyMap) {
+         result.content.prepend(
+            `var ${cleanStr(dependency)} = require("${dependency}");`
+         );
+      }
 
-		result.content = chunk;
-
-		return result;
-	}
+      return result;
+   }
 }

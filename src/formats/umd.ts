@@ -4,8 +4,8 @@ import MagicString from "magic-string";
 import { minimizeStr } from "@toypack/utils";
 
 function getTopUMD(name: string) {
-	return minimizeStr(
-		`(function (root, factory) {
+   return minimizeStr(
+      `(function (root, factory) {
    if (typeof exports === "object" && typeof module === "object") {
       module.exports = factory();
    } else if (typeof define === "function" && define.amd) {
@@ -17,11 +17,11 @@ function getTopUMD(name: string) {
    }
 })(self, function() {
    var __modules__ = {`.replace(new RegExp("__NAME_MARKER__", "g"), name)
-	);
+   );
 }
 
 function getBottomUMD(entryId: string) {
-	return minimizeStr(`};
+   return minimizeStr(`};
    /* Require function */
    var __moduleCache__ = {};
    function __require__(assetId) {
@@ -53,31 +53,31 @@ function getBottomUMD(entryId: string) {
 }
 
 export default function format(
-	chunk: MagicString,
-	asset: IAsset,
-	bundler: Toypack,
-	{ entryId, isFirst, isLast }
+   chunk: MagicString,
+   asset: IAsset,
+   bundler: Toypack,
+   { entryId, isFirst, isLast }
 ) {
-	let name = bundler.options.bundleOptions?.output?.name || "";
+   let name = bundler.options.bundleOptions?.output?.name || "";
 
-	let result: CompiledAsset = {
-		content: {} as MagicString,
-	};
+   let result: CompiledAsset = {
+      content: {} as MagicString,
+   };
 
-	chunk.prepend(`init: function(module, exports, require) {`);
-	chunk.prepend(`${asset.id}: {`);
-	chunk.append(`},`);
-	chunk.append(`map: ${JSON.stringify(asset.dependencyMap) || "{}"}`);
-	chunk.append(`},`);
+   chunk.prepend(`init: function(module, exports, require) {`);
+   chunk.prepend(`${asset.id}: {`);
+   chunk.append(`},`);
+   chunk.append(`map: ${JSON.stringify(asset.dependencyMap) || "{}"}`);
+   chunk.append(`},`);
 
-	if (isFirst) {
-		chunk.prepend(getTopUMD(name));
-	}
+   if (isFirst) {
+      chunk.prepend(getTopUMD(name));
+   }
 
-	if (isLast) {
-		chunk.append(getBottomUMD(entryId));
-	}
+   if (isLast) {
+      chunk.append(getBottomUMD(entryId));
+   }
 
-	result.content = chunk.trim();
-	return result;
+   result.content = chunk.trim();
+   return result;
 }

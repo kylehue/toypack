@@ -1,7 +1,6 @@
 export default {
 
    "src/index.js": `
-
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../react/main"
 import pkg from "../package";
@@ -28,7 +27,6 @@ console.log(fs);
 
    
    "scripts/PI.js": `import Circle from "./Circle";
-
 import coolImage from "https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg";
 console.log(coolImage);
 export const PI = 3.14;`,
@@ -36,7 +34,6 @@ export const PI = 3.14;`,
    
    
 	"scripts/Circle.js": `export default class Circle {}`,
-
 	"styles/colors.css": `:root {
 	--accent: yellow;
 	--bg: black;
@@ -52,7 +49,6 @@ export const stuff = PI + 20;
    
    
 	"styles/main.css": `@import "./colors";
-
 html {
 	width: 100vw;
 	height: 100vh;

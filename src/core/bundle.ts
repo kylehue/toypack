@@ -11,247 +11,250 @@ import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import applyUMD from "@toypack/formats/umd";
 import babelMinify from "babel-minify";
-import { IAfterCompileDescriptor } from "./Hooks";
+import { AfterCompileDescriptor } from "./Hooks";
 
 const colors = {
-	success: "#3fe63c",
-	warning: "#f5b514",
-	danger: "#e61c1c",
-	info: "#3b97ed",
+   success: "#3fe63c",
+   warning: "#f5b514",
+   danger: "#e61c1c",
+   info: "#3b97ed",
 };
 
 function getTimeColor(time: number) {
-	if (time < 5000) {
-		return colors.success;
-	} else if (time < 10000) {
-		return colors.warning;
-	} else {
-		return colors.danger;
-	}
+   if (time < 5000) {
+      return colors.success;
+   } else if (time < 10000) {
+      return colors.warning;
+   } else {
+      return colors.danger;
+   }
 }
 
 export default async function bundle(
-	bundler: Toypack,
-	options?: BundleOptions
+   bundler: Toypack,
+   options?: BundleOptions
 ) {
-	if (options) {
-		options = merge(cloneDeep(bundler.options.bundleOptions || {}), options);
-	} else {
-		options = bundler.options.bundleOptions;
-	}
+   if (options) {
+      options = merge(cloneDeep(bundler.options.bundleOptions || {}), options);
+   } else {
+      options = bundler.options.bundleOptions;
+   }
 
-	let entrySource = await bundler.resolve(path.join("/", options?.entry || ""));
+   let entrySource = await bundler.resolve(
+      path.join("/", options?.entry || "")
+   );
 
-	if (!entrySource) {
-		throw new Error(`Bundle Error: Entry point not found.`);
-	}
+   if (!entrySource) {
+      throw new Error(`Bundle Error: Entry point not found.`);
+   }
 
-	bundler.outputSource = formatPath(
-		entrySource,
-		options?.output?.filename || ""
-	);
+   bundler.outputSource = formatPath(
+      entrySource,
+      options?.output?.filename || ""
+   );
 
-	let entryOutputPath = path.join(
-		options?.output?.path || "",
-		bundler.outputSource
-	);
+   let entryOutputPath = path.join(
+      options?.output?.path || "",
+      bundler.outputSource
+   );
 
-	let sourceMapOutputSource = entryOutputPath + ".map";
+   let sourceMapOutputSource = entryOutputPath + ".map";
 
-	let graphTotalTime: number = 0;
-	let graphStartTime: number = 0;
-	if (options?.logs) {
-		graphStartTime = performance.now();
-	}
+   let graphTotalTime: number = 0;
+   let graphStartTime: number = 0;
+   if (options?.logs) {
+      graphStartTime = performance.now();
+   }
 
-	let graph = await createGraph(bundler, entrySource);
+   let graph = await createGraph(bundler, entrySource);
 
-	let bundleTotalTime: number = 0;
-	let bundleStartTime: number = 0;
-	if (options?.logs) {
-		bundleStartTime = performance.now();
-		graphTotalTime = bundleStartTime - graphStartTime;
-	}
+   let bundleTotalTime: number = 0;
+   let bundleStartTime: number = 0;
+   if (options?.logs) {
+      bundleStartTime = performance.now();
+      graphTotalTime = bundleStartTime - graphStartTime;
+   }
 
-	let bundle = new Bundle();
-	let sourceMap: MapCombiner | null = null;
+   let bundle = new Bundle();
+   let sourceMap: MapCombiner | null = null;
 
-	if (options?.output?.sourceMap && options?.mode == "development") {
-		sourceMap = MapCombiner.create(sourceMapOutputSource);
-	}
+   if (options?.output?.sourceMap && options?.mode == "development") {
+      sourceMap = MapCombiner.create(sourceMapOutputSource);
+   }
 
-	let cachedCounter = 0;
-	let compiledCounter = 0;
+   let cachedCounter = 0;
+   let compiledCounter = 0;
 
-	let prevLine = 0;
+   let prevLine = 0;
 
-	let sourceMapConfigArray: string[] = [];
-	let sourceMapConfig = bundler.options.bundleOptions?.output?.sourceMap;
-	if (typeof sourceMapConfig == "string") {
-		sourceMapConfigArray = sourceMapConfig.split("-");
-	}
+   let sourceMapConfigArray: string[] = [];
+   let sourceMapConfig = bundler.options.bundleOptions?.output?.sourceMap;
+   if (typeof sourceMapConfig == "string") {
+      sourceMapConfigArray = sourceMapConfig.split("-");
+   }
 
-	for (let i = 0; i < graph.length; i++) {
-		const asset = graph[i];
+   for (let i = 0; i < graph.length; i++) {
+      const asset = graph[i];
 
-		let chunkContent = {} as MagicString;
-		let chunkSourceMap: SourceMap = new SourceMap();
+      let chunkContent = {} as MagicString;
+      let chunkSourceMap: SourceMap = new SourceMap();
 
-		const isFirst = i === 0;
-		const isLast = i === graph.length - 1 || graph.length == 1;
-		const isCoreModule = /^\/node_modules\//.test(asset.source);
+      const isFirst = i === 0;
+      const isLast = i === graph.length - 1 || graph.length == 1;
+      const isCoreModule = /^\/node_modules\//.test(asset.source);
 
-		// [1] - Compile
-		let compilation: CompiledAsset = {} as CompiledAsset;
-		if (asset.isModified || !asset.loaderData.compile?.content) {
-			if (typeof asset.loader.compile == "function") {
-				compilation = await asset.loader.compile(asset, bundler);
-				bundler.hooks.trigger("afterCompile", {
-					compilation,
-					asset,
-				} as IAfterCompileDescriptor);
-			}
-			compiledCounter++;
-		} else {
-			compilation = asset.loaderData.compile;
-			cachedCounter++;
-		}
+      // [1] - Compile
+      let compilation: CompiledAsset = {} as CompiledAsset;
+      if (asset.isModified || !asset.loaderData.compile?.content) {
+         if (typeof asset.loader.compile == "function") {
+            compilation = await asset.loader.compile(asset, bundler);
+            bundler.hooks.trigger("afterCompile", {
+               compilation,
+               asset,
+            } as AfterCompileDescriptor);
+         }
 
-		// If compiler didn't return any content, use asset's raw content
-		// This is for assets that don't need compilation
-		if (!compilation.content) {
-			let rawContent = typeof asset.content == "string" ? asset.content : "";
-			compilation.content = new MagicString(rawContent);
-		}
+         compiledCounter++;
+      } else {
+         compilation = asset.loaderData.compile;
+         cachedCounter++;
+      }
 
-		// Save to loader data
-		asset.loaderData.compile = compilation;
+      // If compiler didn't return any content, use asset's raw content
+      // This is for assets that don't need compilation
+      if (!compilation.content) {
+         let rawContent = typeof asset.content == "string" ? asset.content : "";
+         compilation.content = new MagicString(rawContent);
+      }
 
-		// Update chunk
-		chunkContent = compilation.content;
-		chunkSourceMap.mergeWith(compilation.map);
+      // Save to loader data
+      asset.loaderData.compile = compilation;
 
-		// [2] - Format
-		let formatted = applyUMD(chunkContent.clone(), asset, bundler, {
-			entryId: bundler.assets.get(entrySource)?.id,
-			isFirst,
-			isLast,
-		});
+      // Update chunk
+      chunkContent = compilation.content;
+      chunkSourceMap.mergeWith(compilation.map);
 
-		// Update chunk
-		chunkContent = formatted.content;
-		chunkSourceMap.mergeWith(formatted.map);
+      // [2] - Format
+      let formatted = applyUMD(chunkContent.clone(), asset, bundler, {
+         entryId: bundler.assets.get(entrySource)?.id,
+         isFirst,
+         isLast,
+      });
 
-		// [3] - Add to bundle
-		bundle.addSource({
-			filename: asset.source,
-			content: chunkContent,
-		});
+      // Update chunk
+      chunkContent = formatted.content;
+      chunkSourceMap.mergeWith(formatted.map);
 
-		let isMapped =
-			!!sourceMap &&
-			!!chunkSourceMap &&
-			textExtensions.includes(asset.extension) &&
-			typeof asset.content == "string" &&
-			!isCoreModule;
+      // [3] - Add to bundle
+      bundle.addSource({
+         filename: asset.source,
+         content: chunkContent,
+      });
 
-		if (isMapped) {
-			chunkSourceMap.mergeWith(
-				chunkContent.generateMap({
-					source: asset.source,
-					includeContent: false,
-					hires: sourceMapConfigArray[1] == "hires",
-				})
-			);
+      let isMapped =
+         !!sourceMap &&
+         !!chunkSourceMap &&
+         textExtensions.includes(asset.extension) &&
+         typeof asset.content == "string" &&
+         !isCoreModule;
 
-			// Add sources content
-			if (
-				sourceMapConfigArray[2] == "sources" &&
-				typeof asset.content == "string"
-			) {
-				chunkSourceMap.sourcesContent[0] = asset.content;
-			}
+      if (isMapped) {
+         chunkSourceMap.mergeWith(
+            chunkContent.generateMap({
+               source: asset.source,
+               includeContent: false,
+               hires: sourceMapConfigArray[1] == "hires",
+            })
+         );
 
-			sourceMap?.addFile(
-				{
-					sourceFile: asset.source,
-					source: chunkSourceMap.toComment(),
-				},
-				{
-					line: prevLine,
-				}
-			);
-		}
+         // Add sources content
+         if (
+            sourceMapConfigArray[2] == "sources" &&
+            typeof asset.content == "string"
+         ) {
+            chunkSourceMap.sourcesContent[0] = asset.content;
+         }
 
-		// Offset source map
-		if (sourceMap) {
-			let offset = chunkContent.toString().split("\n").length;
-			prevLine += offset;
-		}
-	}
+         sourceMap?.addFile(
+            {
+               sourceFile: asset.source,
+               source: chunkSourceMap.toComment(),
+            },
+            {
+               line: prevLine,
+            }
+         );
+      }
 
-	//
-	let finalContent = bundle.toString();
+      // Offset source map
+      if (sourceMap) {
+         let offset = chunkContent.toString().split("\n").length;
+         prevLine += offset;
+      }
+   }
 
-	// Minify if in production mode
-	if (options?.mode == "production") {
-		let minified = babelMinify(finalContent, {
-			mangle: {
-				topLevel: true,
-				keepClassName: true,
-			},
-		});
+   //
+   let finalContent = bundle.toString();
 
-		finalContent = minified.code;
-	}
+   // Minify if in production mode
+   if (options?.mode == "production") {
+      let minified = babelMinify(finalContent, {
+         mangle: {
+            topLevel: true,
+            keepClassName: true,
+         },
+      });
 
-	if (sourceMap) {
-		let sourceMapObject = MapConverter.fromBase64(
-			sourceMap?.base64()
-		).toObject();
+      finalContent = minified.code;
+   }
 
-		if (sourceMapConfigArray[2] == "nosources") {
-			sourceMapObject.sourcesContent = [];
-		}
+   if (sourceMap) {
+      let sourceMapObject = MapConverter.fromBase64(
+         sourceMap?.base64()
+      ).toObject();
 
-		if (
-			options?.mode == "development" ||
-			sourceMapConfigArray[0] == "inline"
-		) {
-			finalContent += MapConverter.fromObject(sourceMapObject).toComment();
-		} else {
-			// Out source map
-			await bundler.addAsset(
-				sourceMapOutputSource,
-				JSON.stringify(sourceMapObject)
-			);
+      if (sourceMapConfigArray[2] == "nosources") {
+         sourceMapObject.sourcesContent = [];
+      }
 
-			let sourceMapBasename = path.basename(sourceMapOutputSource);
+      if (
+         options?.mode == "development" ||
+         sourceMapConfigArray[0] == "inline"
+      ) {
+         finalContent += MapConverter.fromObject(sourceMapObject).toComment();
+      } else {
+         // Out source map
+         await bundler.addAsset(
+            sourceMapOutputSource,
+            JSON.stringify(sourceMapObject)
+         );
 
-			finalContent += `\n//# sourceMappingURL=${sourceMapBasename}`;
-		}
-	}
+         let sourceMapBasename = path.basename(sourceMapOutputSource);
 
-	let bundleResult: BundleResult = {
-		content: finalContent,
-		contentURL: null,
-		contentDoc: null,
-		contentDocURL: null,
-	};
+         finalContent += `\n//# sourceMappingURL=${sourceMapBasename}`;
+      }
+   }
 
-	if (bundler.bundleContentURL?.startsWith("blob:")) {
-		URL.revokeObjectURL(bundler.bundleContentURL);
-	}
+   let bundleResult: BundleResult = {
+      content: finalContent,
+      contentURL: null,
+      contentDoc: null,
+      contentDocURL: null,
+   };
 
-	bundleResult.contentURL = URL.createObjectURL(
-		new Blob([finalContent], {
-			type: "application/javascript",
-		})
-	);
+   if (bundler.bundleContentURL?.startsWith("blob:")) {
+      URL.revokeObjectURL(bundler.bundleContentURL);
+   }
 
-	bundler.bundleContentURL = bundleResult.contentURL;
+   bundleResult.contentURL = URL.createObjectURL(
+      new Blob([finalContent], {
+         type: "application/javascript",
+      })
+   );
 
-	bundleResult.contentDoc = `<!DOCTYPE html>
+   bundler.bundleContentURL = bundleResult.contentURL;
+
+   bundleResult.contentDoc = `<!DOCTYPE html>
 <html>
 	<head>
 		<script defer src="${bundleResult.contentURL}"></script>
@@ -261,71 +264,70 @@ export default async function bundle(
 </html>
 `;
 
-	if (bundler.bundleContentDocURL?.startsWith("blob:")) {
-		URL.revokeObjectURL(bundler.bundleContentDocURL);
-	}
+   if (bundler.bundleContentDocURL?.startsWith("blob:")) {
+      URL.revokeObjectURL(bundler.bundleContentDocURL);
+   }
 
-	bundleResult.contentDocURL = URL.createObjectURL(
-		new Blob([bundleResult.contentDoc], {
-			type: "text/html",
-		})
-	);
+   bundleResult.contentDocURL = URL.createObjectURL(
+      new Blob([bundleResult.contentDoc], {
+         type: "text/html",
+      })
+   );
 
-	bundler.bundleContentDocURL = bundleResult.contentDocURL;
+   bundler.bundleContentDocURL = bundleResult.contentDocURL;
 
-	// Out
-	if (options?.mode == "production") {
-		// Out bundle
-		await bundler.addAsset(entryOutputPath, bundleResult.content);
+   // Out
+   if (options?.mode == "production") {
+      // Out bundle
+      await bundler.addAsset(entryOutputPath, bundleResult.content);
 
-		// Out resources
-		if (options?.output?.resourceType == "external") {
-			for (let asset of graph) {
-				// Skip if not a local resource
-				if (!(asset.loader instanceof AssetLoader) || isURL(asset.source))
-					continue;
-				let resource = asset;
-				let resourceOutputFilename = formatPath(
-					resource.source,
-					options?.output?.assetFilename || ""
-				);
-				let resourceOutputPath = path.join(
-					options?.output?.path || "",
-					resourceOutputFilename
-				);
+      // Out resources
+      if (options?.output?.resourceType == "external") {
+         for (let asset of graph) {
+            // Skip if not a local resource
+            if (asset.isResource && !asset.isExternal) {
+               let resource = asset;
+               let resourceOutputFilename = formatPath(
+                  resource.source,
+                  options?.output?.assetFilename || ""
+               );
+               let resourceOutputPath = path.join(
+                  options?.output?.path || "",
+                  resourceOutputFilename
+               );
+               await bundler.addAsset(resourceOutputPath, bundleResult.content);
+            }
+         }
+      }
+   }
 
-				await bundler.addAsset(resourceOutputPath, bundleResult.content);
-			}
-		}
-	}
+   if (options?.logs) {
+      bundleTotalTime = performance.now() - bundleStartTime;
 
-	if (options?.logs) {
-		bundleTotalTime = performance.now() - bundleStartTime;
+      console.log(
+         `%cTotal graph time: %c${graphTotalTime.toFixed(0)} ms`,
+         "font-weight: bold; color: white;",
+         "color: " + getTimeColor(graphTotalTime)
+      );
 
-		console.log(
-			`%cTotal graph time: %c${graphTotalTime.toFixed(0)} ms`,
-			"font-weight: bold; color: white;",
-			"color: " + getTimeColor(graphTotalTime)
-		);
+      console.log(
+         `%cTotal bundle time: %c${bundleTotalTime.toFixed(0)} ms`,
+         "font-weight: bold; color: white;",
+         "color: " + getTimeColor(bundleTotalTime)
+      );
 
-		console.log(
-			`%cTotal bundle time: %c${bundleTotalTime.toFixed(0)} ms`,
-			"font-weight: bold; color: white;",
-			"color: " + getTimeColor(bundleTotalTime)
-		);
+      console.log(
+         `%cCached assets: %c${cachedCounter.toString()}`,
+         "font-weight: bold; color: white;",
+         "color: #cfd0d1;"
+      );
 
-		console.log(
-			`%cCached assets: %c${cachedCounter.toString()}`,
-			"font-weight: bold; color: white;",
-			"color: #cfd0d1;"
-		);
+      console.log(
+         `%cCompiled assets: %c${compiledCounter.toString()}`,
+         "font-weight: bold; color: white;",
+         "color: #cfd0d1;"
+      );
+   }
 
-		console.log(
-			`%cCompiled assets: %c${compiledCounter.toString()}`,
-			"font-weight: bold; color: white;",
-			"color: #cfd0d1;"
-		);
-	}
-
-	return bundleResult;
+   return bundleResult;
 }
