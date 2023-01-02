@@ -13,6 +13,7 @@ import { merge } from "lodash-es";
 import { isURL } from "@toypack/utils";
 import { dirname } from "path-browserify";
 import { create as createAsset } from "@toypack/core/asset";
+
 export default class SassLoader implements ToypackLoader {
    public name = "SassLoader";
    public test = /\.s[ac]ss$/;
@@ -33,6 +34,7 @@ export default class SassLoader implements ToypackLoader {
          dependencies: [],
       };
 
+      // Prepare CSS loader
       let CSSLoader: CSSLoader | null = this._getCSSLoader(bundler);
       if (!CSSLoader) {
          throw new Error(
@@ -70,6 +72,7 @@ export default class SassLoader implements ToypackLoader {
          throw error;
       }
 
+      // Prepare CSS loader
       let CSSLoader: CSSLoader | null = this._getCSSLoader(bundler);
       if (!CSSLoader) {
          throw new Error(
@@ -77,7 +80,9 @@ export default class SassLoader implements ToypackLoader {
          );
       }
 
-      let CSSCompilation: any = await new Promise((fulfill) => {
+      // Get CSS compilation
+      let CSSCompilation: any = await new Promise((resolve) => {
+         // Manage imports
          Sass.importer(async (request, done) => {
             let requestedSource = await bundler.resolve(request.current, {
                baseDir: dirname(asset.source),
@@ -91,29 +96,30 @@ export default class SassLoader implements ToypackLoader {
             });
          });
 
+         // Compile
          Sass.compile(
             asset.content,
             {
                indentedSyntax: /\.sass$/.test(asset.source),
             },
             (result) => {
-               fulfill(result);
+               resolve(result);
             }
          );
       });
 
-      let JSCompilation: CompiledAsset;
-      if (CSSLoader) {
-         let CSSCompilationAsset = createAsset(bundler, asset.source, CSSCompilation.text);
-         JSCompilation = CSSLoader.compile(CSSCompilationAsset, bundler);
-      } else {
-         let error = new Error(
-            "Sass Compile Error: CSS compiler is required to compile Sass files."
-         );
-         throw error;
-      }
+      // Create mock asset for the CSS compilation
+      let CSSCompilationAsset = createAsset(
+         bundler,
+         asset.source,
+         CSSCompilation.text
+      );
 
-      let result: CompiledAsset = JSCompilation;
+      // Use CSSLoader to compile to JS
+      let result: CompiledAsset = CSSLoader.compile(
+         CSSCompilationAsset,
+         bundler
+      );
 
       return result;
    }
