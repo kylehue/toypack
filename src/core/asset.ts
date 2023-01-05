@@ -14,6 +14,26 @@ function getLoader(bundler: Toypack, source: string) {
 
 var lastId = 0;
 
+export function parseSource(source: string) {
+   let split = source.split("?");
+   let target = split[0];
+   let query = split[1];
+   let params: Object = {};
+
+   if (query) {
+      let querySplit = query.split("&");
+      for (let param of querySplit) {
+         let paramSplit = param.split("=");
+         params[paramSplit[0]] = paramSplit[1] ? paramSplit[1] : true;
+      }
+   }
+
+   return {
+      source: target,
+      params,
+   };
+}
+
 export function create(
    bundler: Toypack,
    source: string,
@@ -21,10 +41,10 @@ export function create(
 ): IAsset {
    let isExternal = isURL(source);
    source = isExternal ? source : path.join("/", source);
+
    let id = ++lastId;
    let type = mime.lookup(source) || "";
    let extension = path.extname(source);
-
    let loader = getLoader(bundler, source);
 
    if (!loader) {
@@ -34,7 +54,6 @@ export function create(
    }
 
    let name = "asset-" + id + extension;
-
    let isResource = !textExtensions.includes(extension);
    let isObscure = isResource || isExternal;
 
@@ -51,6 +70,8 @@ export function create(
          compile: null,
       },
       dependencyMap: {},
+      params: {},
+      parsedSource: source,
       isObscure,
       isExternal,
       isResource,

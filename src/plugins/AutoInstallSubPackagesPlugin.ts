@@ -5,9 +5,9 @@ import { dirname } from "path-browserify";
 
 export default class AutoInstallSubPackagesPlugin implements ToypackPlugin {
    apply(bundler: Toypack) {
-      const currentDeps = bundler.packageManager.dependencies;
       bundler.hooks.failedResolve(async (descriptor) => {
-         let pkg = parsePackageName(descriptor.target);
+         const currentDeps = bundler.packageManager.dependencies;
+         const pkg = parsePackageName(descriptor.target);
 
          // Only auto-install if there's a subpath
          if (pkg.path) {

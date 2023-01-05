@@ -1,9 +1,52 @@
 import { isURL, isLocal } from "@toypack/utils";
-import path from "path-browserify";
+import path, { parse } from "path-browserify";
+import { create } from "./asset";
 import { FailedResolveDescriptor } from "./Hooks";
 import { getResolveAliasData } from "./resolve";
 import Toypack from "./Toypack";
-import { IAsset, ParsedAsset } from "./types";
+import { DependencyData, IAsset, ParsedAsset, ToypackLoader, UseCompile } from "./types";
+
+async function parseStruct(struct: UseCompile, bundler: Toypack) {
+   const result = {
+      failedLoader: false,
+      dependencies: [] as DependencyData[],
+   }
+
+   const init = async (struct: UseCompile) => {
+      for (let [lang, chunks] of Object.entries(struct)) {
+         // Get loader
+         let loader: ToypackLoader | null = null;
+         let mockName = "." + lang;
+         for (let ldr of bundler.loaders) {
+            if (ldr.test.test(mockName)) {
+               loader = ldr;
+               break;
+            }
+         }
+
+         // Compile
+         if (loader) {
+            if (typeof loader.parse == "function") {
+               for (let chunk of chunks) {
+                  let mockAsset = create(bundler, mockName, chunk.content);
+                  let parsed = await loader.parse(mockAsset, bundler);
+                  if (parsed.use) {
+                     await init(parsed.use);
+                  } else {
+                     result.dependencies.push(...parsed.dependencies);
+                  }
+               }
+            }
+         } else {
+            result.failedLoader = true;
+            return result;
+         }
+      }
+   }
+
+   await init(struct);
+   return result;
+}
 
 export default async function createGraph(
    bundler: Toypack,
@@ -35,6 +78,17 @@ export default async function createGraph(
          parseData = asset.loaderData.parse;
       } else {
          parseData = await asset.loader.parse(asset, bundler);
+      }
+
+      if (parseData.use) {
+         let parsedStruct = await parseStruct(parseData.use, bundler);
+         if (parsedStruct.failedLoader) {
+             throw new Error(
+                `Asset Parse Error: Could not parse ${asset.source} because it relies on loaders that are not present.`
+             );
+         } else { 
+            parseData.dependencies.push(...parsedStruct.dependencies);
+         }
       }
 
       // Update asset's loader data
@@ -85,7 +139,7 @@ export default async function createGraph(
             // If a URL and not in cache, add to assets
             if (!bundler._assetCache.get(dependency.source)) {
                await bundler.addAsset(dependency.source, undefined, {
-                  requestOptions: dependency.requestOptions
+                  requestOptions: dependency.requestOptions,
                });
             }
          }

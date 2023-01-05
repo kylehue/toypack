@@ -47,6 +47,7 @@
       "@types/lodash.clonedeep": "^4.5.7",
       "@types/lodash.merge": "^4.6.7",
       "@types/path-browserify": "^1.0.0",
+      "@types/shortid": "^0.0.29",
       "babel-loader": "^9.1.0",
       "concurrently": "^7.6.0",
       "glob": "^8.0.3",
@@ -97,6 +98,7 @@
       "posthtml-render": "^3.0.0",
       "sass.js": "^0.11.1",
       "semver": "^7.3.8",
+      "shortid": "^2.2.16",
       "source-map": "^0.7.4",
       "whatwg-fetch": "^3.6.2"
    }

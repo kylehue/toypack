@@ -6,9 +6,13 @@ import {
    ParsedAsset,
 } from "@toypack/core/types";
 import { cleanStr } from "@toypack/utils";
-import postcss, { AcceptedPlugin, ProcessOptions, ChildNode } from "postcss";
+import postcss, {
+   parse as parseCSS,
+   AcceptedPlugin,
+   ProcessOptions,
+   ChildNode,
+} from "postcss";
 import valueParser from "postcss-value-parser";
-import { parse as parseCSS } from "postcss";
 import { dirname } from "path-browserify";
 import { minimizeStr } from "@toypack/utils";
 import { cloneDeep, merge } from "lodash-es";
@@ -51,8 +55,8 @@ export interface CSSLoaderOptions {
    postcssConfig?: PostCSSConfig;
 }
 
-export interface ParseOptions {
-   checkImported?: (imported: string, node: ChildNode) => void;
+export interface ParseOptions extends CSSLoaderOptions {
+   keepAtImportRules?: boolean;
 }
 
 export default class CSSLoader implements ToypackLoader {
@@ -69,7 +73,10 @@ export default class CSSLoader implements ToypackLoader {
          throw error;
       }
 
-      const AST = parseCSS(asset.content, this.options?.postcssConfig?.options);
+      const AST = parseCSS(
+         asset.content,
+         options?.postcssConfig?.options || this.options?.postcssConfig?.options
+      );
 
       const result: ParsedAsset = {
          dependencies: [],
@@ -78,6 +85,7 @@ export default class CSSLoader implements ToypackLoader {
 
       AST.walk((node) => {
          if (node.type == "atrule" && node.name == "import") {
+            // @import
             let parsedValue = valueParser(node.params);
             parsedValue.walk((valueNode) => {
                let dependencyId: string | null = null;
@@ -97,14 +105,13 @@ export default class CSSLoader implements ToypackLoader {
                   });
 
                   // Remove from AST
-                  if (typeof options?.checkImported == "function") {
-                     options.checkImported(dependencyId, node);
+                  if (!options?.keepAtImportRules) {
+                     node.remove();
                   }
-
-                  node.remove();
                }
             });
          } else if (node.type == "decl") {
+            // css-property: url(...)
             const isURLFunction = URLFunctionRegex.test(node.value);
             if (isURLFunction) {
                let parsedValue = valueParser(node.value);
@@ -115,7 +122,7 @@ export default class CSSLoader implements ToypackLoader {
                      valueNode.nodes.length &&
                      !valueNode.nodes[0].value.startsWith("#")
                   ) {
-                     let source: string = valueNode.nodes[0]?.value;
+                     let source: string = valueNode.nodes[0].value;
                      if (!source.startsWith("data:")) {
                         result.dependencies.push({
                            source: source,
@@ -155,12 +162,13 @@ export default class CSSLoader implements ToypackLoader {
       };
 
       let processedContent =
-         asset.loaderData?.parse?.metadata?.AST?.toString() || asset.content;
+         asset.loaderData?.parse?.metadata?.AST || asset.content;
 
       // Process
       if (!asset.isExternal) {
          const plugins = this.options?.postcssConfig?.plugins;
          const options = this.options?.postcssConfig?.options;
+
          processedContent = postcss(plugins).process(
             processedContent,
             options
@@ -176,20 +184,23 @@ export default class CSSLoader implements ToypackLoader {
       styleContent += ";";
 
       // For dummy source map
-      result.content.update(0, result.content.length(), styleContent);
-      result.content.append(getTemplate(asset.id));
+      result.content?.update(0, result.content.length(), styleContent);
+      result.content?.append(getTemplate(asset.id));
 
       // Avoid style duplicates
-      result.content.prepend(`if (!_style) {`).append("}");
-      result.content.prepend(
+      result.content?.prepend(`if (!_style) {`).append("}");
+      result.content?.prepend(
          `var _style = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
       );
 
       // Imports
-      for (let dependency in asset.dependencyMap) {
-         result.content.prepend(
-            `var ${cleanStr(dependency)} = require("${dependency}");`
-         );
+      let deps = asset.loaderData.parse?.dependencies;
+      if (deps) {
+         for (let dep of deps) {
+            result.content?.prepend(
+               `var ${cleanStr(dep.source)} = require("${dep.source}");`
+            );
+         }
       }
 
       return result;

@@ -5,6 +5,7 @@ import {
    ToypackLoader,
    ToypackPlugin,
    BundleOptions,
+   SourceMapOptionsArray,
 } from "@toypack/core/types";
 import { defaultOptions } from "@toypack/core/options";
 import { merge, cloneDeep } from "lodash-es";
@@ -18,7 +19,15 @@ import { Node } from "@babel/traverse";
 import { getASTImports } from "@toypack/utils";
 import { Options } from "@toypack/utils/getASTImports";
 import { AutoImportJSXPragmaPlugin, AutoInstallSubPackagesPlugin, NodePolyfillPlugin } from "@toypack/plugins";
-import { AssetLoader, BabelLoader, CSSLoader, HTMLLoader, JSONLoader, SassLoader } from "@toypack/loaders";
+import {
+   AssetLoader,
+   BabelLoader,
+   CSSLoader,
+   HTMLLoader,
+   JSONLoader,
+   SassLoader,
+   VueLoader,
+} from "@toypack/loaders";
 export const styleExtensions = [".css", ".sass", ".scss", ".less"];
 export const appExtensions = [
    ".js",
@@ -42,6 +51,7 @@ export default class Toypack {
    public dependencies = {};
    public packageManager: PackageManager;
    public hooks = new Hooks();
+   public _sourceMapConfig: SourceMapOptionsArray | null = null;
    public _assetCache: Map<string, IAsset> = new Map();
    public bundleContentURL: string | null = null;
    public bundleContentDocURL: string | null = null;
@@ -60,6 +70,7 @@ export default class Toypack {
       this.loaders.push(new HTMLLoader());
       this.loaders.push(new JSONLoader());
       this.loaders.push(new SassLoader());
+      this.loaders.push(new VueLoader());
 
       // Default plugins
       this.use(new AutoInstallSubPackagesPlugin());
@@ -91,6 +102,14 @@ export default class Toypack {
     */
    public defineOptions(options: ToypackOptions) {
       merge(this.options, options);
+
+      let sourceMapConfigArray: string[] = [];
+      let sourceMapConfig = this.options.bundleOptions?.output?.sourceMap;
+      if (typeof sourceMapConfig == "string") {
+         sourceMapConfigArray = sourceMapConfig.split("-");
+      }
+
+      this._sourceMapConfig = sourceMapConfigArray as SourceMapOptionsArray;
    }
 
    /**

@@ -1,8 +1,8 @@
 export default {
 
    "src/index.js": `
-import "bootstrap/dist/css/bootstrap.min.css";
-import "../react/main"
+//import "bootstrap/dist/css/bootstrap.min.css";
+//import "../react/main"
 import pkg from "../package";
 console.log(pkg);
 import { PI } from "@scripts/PI";
@@ -13,13 +13,16 @@ console.log(confetti);
 import coolImg from "../assets/sample.jpg";
 import logo from "../public/logo.svg";
 console.log(coolImg, logo);
-import path, { dirname } from "path";
-console.log(path, dirname("path/to/some/file.txt"));
-import { v4 } from "uuid";
-console.log(v4());
+//import path, { dirname } from "path";
+//console.log(path, dirname("path/to/some/file.txt"));
+//import { v4 } from "uuid";
+//console.log(v4());
 import fs from "fs";
 console.log(fs);
-import "../styles/sampleSass1.scss";
+//import "../styles/sampleSass1.scss";
+import { createApp } from "vue";
+import App from "../vue/App.vue";
+createApp(App).mount("#vueroot");
 (async() => {
 	let dynamicPI = await import("@scripts/PI.js");
 	console.log(dynamicPI);
@@ -73,6 +76,7 @@ body {
 	background: skyblue;
 
 	p {
+		background-image: url("https://cdn.pixabay.com/photo/2016/04/13/09/19/curious-1326327_960_720.jpg");
 		font-size: 30px;
 		font-weight: bold;
 		@include bigRedText;
@@ -123,6 +127,53 @@ export default function App(props) {
 `,
 
    
+     
+	"vue/App.vue": `
+<template>
+<h1 class="vue-theme">Hello vue!</h1>
+<button @click="increment">Click me!</button>
+<h3>{{counter}}</h3>
+</template>
+
+<script lang="ts">
+export default {}
+console.log(456);
+</script>
+
+<script setup lang="ts">
+import { ref } from "vue";
+var counter = ref(0);
+var hello: string = "Hello world!";
+function increment() {
+	counter.value += 1;
+}
+
+console.log(hello);
+</script>
+
+<style scoped>
+.vue-theme {
+	color: #24f05a;
+	background: #2a2b30;
+}
+</style>
+
+<style lang="scss" scoped>
+@import "../styles/sampleSass2.scss";
+@mixin coolText{
+	color: white;
+	border: 4px solid gold;
+	box-shadow: 0 0 8px 4px yellow;
+}
+
+h3 {
+	@include coolText;
+	@include bigRedText;
+}
+</style>
+`,
+
+   
    
 	"index.html":
 		`
@@ -141,6 +192,8 @@ export default function App(props) {
       <div>nested test!</div>
    </div>
 	<div class="w-100 h-100" id="root">
+	</div>
+	<div class="w-100 h-100" id="vueroot">
 	</div>
 </body>
 </html>`,

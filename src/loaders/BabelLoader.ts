@@ -5,10 +5,10 @@ import {
    CompiledAsset,
 } from "@toypack/core/types";
 
-import { parse as getAST } from "@babel/parser";
-import { transformFromAst } from "@babel/standalone";
+import { parse as getAST, ParseResult, ParserOptions } from "@babel/parser";
+import { transformFromAst, transform } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
-import { TraverseOptions } from "@babel/traverse";
+import { TraverseOptions, Node } from "@babel/traverse";
 import { TransformOptions } from "@babel/core";
 import { merge, cloneDeep } from "lodash-es";
 import SourceMap from "@toypack/core/SourceMap";
@@ -20,15 +20,26 @@ const defaultTransformOptions: TransformOptions = {
    comments: false,
 };
 
+const defaultParseOptions: ParserOptions = {
+   sourceType: "module",
+   plugins: ["typescript", "jsx"],
+};
+
 const defaultOptions: BabelLoaderOptions = {
    transformOptions: defaultTransformOptions,
+   parseOptions: defaultParseOptions,
 };
 
 interface BabelLoaderOptions {
    /**
     * Babel transform options.
     */
-   transformOptions: TransformOptions;
+   transformOptions?: TransformOptions;
+   parseOptions?: ParserOptions;
+}
+
+export interface ParseOptions {
+   AST?: Node | Node[];
 }
 
 export default class BabelLoader implements ToypackLoader {
@@ -50,7 +61,6 @@ export default class BabelLoader implements ToypackLoader {
       let result: CompiledAsset = {} as CompiledAsset;
 
       if (!asset.isObscure) {
-         const isCoreModule = /^\/node_modules\//.test(asset.source);
          const transformOptions = {
             ...this.options?.transformOptions,
             ...({
@@ -58,20 +68,17 @@ export default class BabelLoader implements ToypackLoader {
                filename: asset.source,
                sourceMaps:
                   bundler.options.bundleOptions?.mode == "development" &&
-                  !!bundler.options.bundleOptions?.output?.sourceMap &&
-                  !isCoreModule,
-               envName: bundler.options.bundleOptions?.mode
+                  !!bundler.options.bundleOptions?.output?.sourceMap,
+               envName: bundler.options.bundleOptions?.mode,
             } as TransformOptions),
          };
 
          let parseMetadata = asset.loaderData.parse?.metadata;
 
          // Transpile
-         const transpiled: any = transformFromAst(
-            parseMetadata.AST,
-            undefined,
-            transformOptions
-         );
+         const transpiled: any = parseMetadata?.AST
+            ? transformFromAst(parseMetadata.AST, undefined, transformOptions)
+            : transform(asset.content, transformOptions);
 
          if (transpiled?.code) {
             let chunk = bundler._createMagicString(transpiled.code);
@@ -90,7 +97,7 @@ export default class BabelLoader implements ToypackLoader {
       return result;
    }
 
-   public parse(asset: IAsset, bundler: Toypack) {
+   public parse(asset: IAsset, bundler: Toypack, options?: ParseOptions) {
       if (typeof asset.content != "string") {
          let error = new Error(
             "Babel Parse Error: Asset content must be string."
@@ -104,11 +111,12 @@ export default class BabelLoader implements ToypackLoader {
       };
 
       if (!asset.isObscure) {
-         const AST = getAST(asset.content, {
-            sourceType: "module",
-            sourceFilename: asset.source,
-            plugins: ["typescript", "jsx"],
-         });
+         const AST = options?.AST
+            ? options.AST
+            : getAST(asset.content, {
+                 ...this.options?.parseOptions,
+                 sourceFilename: asset.source,
+              });
 
          const isCoreModule = /^\/node_modules\//.test(asset.source);
          let traverseOptions: TraverseOptions = {};

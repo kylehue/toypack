@@ -1,5 +1,5 @@
 import MagicString from "magic-string";
-import SourceMap from "./SourceMap";
+import SourceMap, { SourceMapData } from "./SourceMap";
 import Toypack from "./Toypack";
 import { PackageProvider } from "./PackageManager";
 
@@ -15,6 +15,12 @@ type SourceMapOptionsSources = "nosources" | "sources";
 type SourceMapOptions =
    | `${SourceMapOptionsOutput}-${SourceMapOptionsQuality}-${SourceMapOptionsSources}`
    | false;
+
+export type SourceMapOptionsArray = [
+   SourceMapOptionsOutput,
+   SourceMapOptionsQuality,
+   SourceMapOptionsSources
+];
 
 export interface OutputOptions {
    /**
@@ -147,6 +153,8 @@ export interface IAsset {
    loaderData: LoaderData;
    dependencyMap: Object;
    contentURL: string;
+   params: Object;
+   parsedSource: string;
    isObscure: boolean;
    isExternal: boolean;
    isResource: boolean;
@@ -159,13 +167,22 @@ export interface DependencyData {
    requestOptions?: RequestInit;
 }
 
+interface StructureData {
+   content: string;
+   map?: SourceMapData;
+}
+
+export type UseCompile = { [key: string]: StructureData[] };
+
 export interface ParsedAsset {
    dependencies: DependencyData[];
+   use?: UseCompile;
    metadata?: any;
 }
 
 export interface CompiledAsset {
    content: MagicString;
+   use?: UseCompile;
    map?: SourceMap;
    metadata?: any;
 }

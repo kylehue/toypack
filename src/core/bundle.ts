@@ -5,13 +5,21 @@ import SourceMap from "./SourceMap";
 import MagicString, { Bundle } from "magic-string";
 import path from "path-browserify";
 import Toypack, { textExtensions } from "./Toypack";
-import { CompiledAsset, BundleOptions, BundleResult } from "./types";
+import {
+   CompiledAsset,
+   BundleOptions,
+   BundleResult,
+   ToypackLoader,
+   UseCompile,
+   IAsset,
+} from "./types";
 import createGraph from "./createGraph";
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import applyUMD from "@toypack/formats/umd";
 import babelMinify from "babel-minify";
 import { AfterCompileDescriptor } from "./Hooks";
+import { create } from "./asset";
 
 const colors = {
    success: "#3fe63c",
@@ -28,6 +36,55 @@ function getTimeColor(time: number) {
    } else {
       return colors.danger;
    }
+}
+
+async function compileStruct(struct: UseCompile, bundler: Toypack) {
+   const result = {
+      failedLoader: false,
+      contents: [] as string[],
+      map: new SourceMap()
+   };
+
+   const init = async (struct: UseCompile) => {
+      for (let [lang, chunks] of Object.entries(struct)) {
+         // Get loader
+         let loader: ToypackLoader | null = null;
+         let mockName = "asset." + lang;
+         for (let ldr of bundler.loaders) {
+            if (ldr.test.test(mockName)) {
+               loader = ldr;
+               break;
+            }
+         }
+
+         // Compile
+         if (loader) {
+            if (typeof loader.compile == "function") {
+               for (let chunk of chunks) {
+                  let mockAsset = create(bundler, mockName, chunk.content);
+                  let comp = await loader.compile(mockAsset, bundler);
+
+                  if (result.map && comp.map) {
+                     result.map.mergeWith(comp.map);
+                  }
+
+                  if (comp.use) {
+                     await init(comp.use);
+                  } else {
+                     result.contents.push(comp.content.toString());
+                  }
+               }
+            }
+         } else {
+            result.failedLoader = true;
+            return result;
+         }
+      }
+   };
+
+   await init(struct);
+
+   return result;
 }
 
 export default async function bundle(
@@ -67,7 +124,6 @@ export default async function bundle(
    }
 
    let graph = await createGraph(bundler, entrySource);
-
    let bundleTotalTime: number = 0;
    let bundleStartTime: number = 0;
    if (options?.logs) {
@@ -87,12 +143,6 @@ export default async function bundle(
 
    let prevLine = 0;
 
-   let sourceMapConfigArray: string[] = [];
-   let sourceMapConfig = bundler.options.bundleOptions?.output?.sourceMap;
-   if (typeof sourceMapConfig == "string") {
-      sourceMapConfigArray = sourceMapConfig.split("-");
-   }
-
    for (let i = 0; i < graph.length; i++) {
       const asset = graph[i];
 
@@ -108,6 +158,34 @@ export default async function bundle(
       if (asset.isModified || !asset.loaderData.compile?.content) {
          if (typeof asset.loader.compile == "function") {
             compilation = await asset.loader.compile(asset, bundler);
+
+            // Does this asset's loader rely on other loaders?
+            // If so, use the other loaders to compile it
+            if (compilation.use) {
+               let structCompilation = await compileStruct(
+                  compilation.use,
+                  bundler
+               );
+
+               if (structCompilation.failedLoader) {
+                  throw new Error(
+                     `Compilation Error: Could not compile ${asset.source} because it relies on loaders that are not present.`
+                  );
+               } else {
+                  for (let content of structCompilation.contents) {
+                     compilation.content?.append(content + "\n");
+                  }
+
+                  if (
+                     structCompilation.map &&
+                     compilation.map &&
+                     typeof asset.content == "string"
+                  ) {
+                     compilation.map.mergeWith(structCompilation.map);
+                  }
+               }
+            }
+
             bundler.hooks.trigger("afterCompile", {
                compilation,
                asset,
@@ -142,8 +220,10 @@ export default async function bundle(
       });
 
       // Update chunk
-      chunkContent = formatted.content;
-      chunkSourceMap.mergeWith(formatted.map);
+      if (formatted.content) {
+         chunkContent = formatted.content;
+         chunkSourceMap.mergeWith(formatted.map);
+      }
 
       // [3] - Add to bundle
       bundle.addSource({
@@ -159,17 +239,20 @@ export default async function bundle(
          !isCoreModule;
 
       if (isMapped) {
-         chunkSourceMap.mergeWith(
-            chunkContent.generateMap({
-               source: asset.source,
-               includeContent: false,
-               hires: sourceMapConfigArray[1] == "hires",
-            })
-         );
+         // Only finalize source map if chunk's loader didn't rely on other loaders (i have no clue why but it works)
+         if (!compilation.use) {
+            chunkSourceMap.mergeWith(
+               chunkContent.generateMap({
+                  source: asset.source,
+                  includeContent: false,
+                  hires: bundler._sourceMapConfig?.[1] == "hires",
+               })
+            );
+         }
 
          // Add sources content
          if (
-            sourceMapConfigArray[2] == "sources" &&
+            bundler._sourceMapConfig?.[2] == "sources" &&
             typeof asset.content == "string"
          ) {
             chunkSourceMap.sourcesContent[0] = asset.content;
@@ -213,13 +296,13 @@ export default async function bundle(
          sourceMap?.base64()
       ).toObject();
 
-      if (sourceMapConfigArray[2] == "nosources") {
+      if (bundler._sourceMapConfig?.[2] == "nosources") {
          sourceMapObject.sourcesContent = [];
       }
 
       if (
          options?.mode == "development" ||
-         sourceMapConfigArray[0] == "inline"
+         bundler._sourceMapConfig?.[0] == "inline"
       ) {
          finalContent += MapConverter.fromObject(sourceMapObject).toComment();
       } else {

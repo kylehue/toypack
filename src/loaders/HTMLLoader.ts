@@ -169,11 +169,11 @@ export default class HTMLLoader implements ToypackLoader {
 
          // Add head and body element variables
          chunk.prepend(
-            `let ${metadata.body.varId} = document.body || document.getElementsByTagName("body")[0];`
+            `var ${metadata.body.varId} = document.body || document.getElementsByTagName("body")[0];`
          );
 
          chunk.prepend(
-            `let ${metadata.head.varId} = document.head || document.getElementsByTagName("head")[0];`
+            `var ${metadata.head.varId} = document.head || document.getElementsByTagName("head")[0];`
          );
 
          // Imports

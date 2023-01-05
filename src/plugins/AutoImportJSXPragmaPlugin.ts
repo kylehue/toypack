@@ -5,7 +5,7 @@ export default class AutoImportJSXPragmaPlugin implements ToypackPlugin {
    apply(bundler: Toypack) {
       bundler.hooks.afterCompile((descriptor) => {
          if (/\.[jt]sx$/.test(descriptor.asset.source)) {
-            descriptor.compilation.content.prepend(
+            descriptor.compilation.content?.prepend(
                '\nvar React = require("react");'
             );
          }

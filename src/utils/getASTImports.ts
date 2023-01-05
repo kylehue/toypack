@@ -1,4 +1,4 @@
-import traverseAST, { Node, TraverseOptions } from "@babel/traverse";
+import traverseAST, { Node, TraverseOptions, VisitNode } from "@babel/traverse";
 
 export interface ImportNode {
    id: string;
@@ -15,6 +15,14 @@ export interface Options {
       | "ExportNamedDeclaration"
       | "CallExpression"
    >;
+}
+
+function traverseArrayAST(AST, traverseOptions) {
+   for (let node of AST) {
+      if (node.type in traverseOptions) {
+         traverseOptions[node.type]({node});
+      }
+   }
 }
 
 export default function getModuleImports(
@@ -34,7 +42,7 @@ export default function getModuleImports(
 
    // Ids are needed for dependency graphs
    // Start and end positions are needed for changing the imported ids to fixed paths so that they can properly be resolved when graphing
-   traverseAST(AST, {
+   let traverseOptions: TraverseOptions = {
       ...options?.traverse,
       ImportDeclaration({ node }) {
          /* let specifiers: string[] = [];
@@ -97,7 +105,13 @@ export default function getModuleImports(
             );
          }
       },
-   });
+   };
+
+   if (Array.isArray(AST)) {
+      traverseArrayAST(AST, traverseOptions);
+   } else {
+      traverseAST(AST, traverseOptions);
+   }
 
    return imports;
 }

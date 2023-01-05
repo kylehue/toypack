@@ -8,12 +8,11 @@ import {
 import Sass from "sass.js";
 import postcssSASS from "postcss-sass";
 import postcssSCSS from "postcss-scss";
-import CSSLoader, { CSSLoaderOptions } from "./CSSLoader";
-import { merge } from "lodash-es";
-import { isURL } from "@toypack/utils";
+import CSSLoader from "./CSSLoader";
+import { cleanStr, isURL } from "@toypack/utils";
 import { dirname } from "path-browserify";
-import { create as createAsset } from "@toypack/core/asset";
 
+let cssLoader: CSSLoader | null = null;
 export default class SassLoader implements ToypackLoader {
    public name = "SassLoader";
    public test = /\.s[ac]ss$/;
@@ -35,33 +34,36 @@ export default class SassLoader implements ToypackLoader {
       };
 
       // Prepare CSS loader
-      let CSSLoader: CSSLoader | null = this._getCSSLoader(bundler);
-      if (!CSSLoader) {
+      if (!cssLoader) {
+         cssLoader = this._getCSSLoader(bundler);
+      }
+
+      if (!cssLoader) {
          throw new Error(
             "Sass Parse Error: CSSLoader is needed to parse Sass files."
          );
       }
 
-      // Modify CSSLoader options
-      merge(CSSLoader.options, {
+      // Parse
+      let parsed = cssLoader.parse(asset, bundler, {
+         keepAtImportRules: true,
          postcssConfig: {
             options: {
                syntax: /\.sass$/.test(asset.source) ? postcssSASS : postcssSCSS,
             },
          },
-      } as CSSLoaderOptions);
-
-      // Parse
-      CSSLoader.parse(asset, bundler, {
-         checkImported(imported) {
-            // Only include URL imports and let Sass compiler handle local imports
-            if (isURL(imported)) {
-               result.dependencies.push({
-                  source: imported,
-               });
-            }
-         },
       });
+
+      // Only keep url deps
+      for (let i = 0; i < parsed.dependencies.length; i++) {
+         let dep = parsed.dependencies[i];
+
+         if (!isURL(dep.source)) {
+            parsed.dependencies.splice(i, 1);
+         }
+      }
+
+      result.dependencies = parsed.dependencies;
 
       return result;
    }
@@ -73,8 +75,11 @@ export default class SassLoader implements ToypackLoader {
       }
 
       // Prepare CSS loader
-      let CSSLoader: CSSLoader | null = this._getCSSLoader(bundler);
-      if (!CSSLoader) {
+      if (!cssLoader) {
+         cssLoader = this._getCSSLoader(bundler);
+      }
+
+      if (!cssLoader) {
          throw new Error(
             "Sass Parse Error: CSSLoader is needed to compile Sass files."
          );
@@ -82,7 +87,7 @@ export default class SassLoader implements ToypackLoader {
 
       // Get CSS compilation
       let CSSCompilation: any = await new Promise((resolve) => {
-         // Manage imports
+         // Handle imports
          Sass.importer(async (request, done) => {
             let requestedSource = await bundler.resolve(request.current, {
                baseDir: dirname(asset.source),
@@ -96,9 +101,12 @@ export default class SassLoader implements ToypackLoader {
             });
          });
 
+         let content =
+            asset.loaderData?.parse?.metadata?.AST?.toString() || asset.content;
+
          // Compile
          Sass.compile(
-            asset.content,
+            content,
             {
                indentedSyntax: /\.sass$/.test(asset.source),
             },
@@ -108,18 +116,27 @@ export default class SassLoader implements ToypackLoader {
          );
       });
 
-      // Create mock asset for the CSS compilation
-      let CSSCompilationAsset = createAsset(
-         bundler,
-         asset.source,
-         CSSCompilation.text
-      );
+      let result: CompiledAsset = {
+         content: bundler._createMagicString(""),
+         use: {
+            css: [
+               {
+                  content: CSSCompilation.text,
+                  map: CSSCompilation.map,
+               },
+            ]
+         }
+      };
 
-      // Use CSSLoader to compile to JS
-      let result: CompiledAsset = CSSLoader.compile(
-         CSSCompilationAsset,
-         bundler
-      );
+      // Imports
+      let deps = asset.loaderData.parse?.dependencies;
+      if (deps) {
+         for (let dep of deps) {
+            result.content?.prepend(
+               `var ${cleanStr(dep.source)} = require("${dep.source}");`
+            );
+         }
+      }
 
       return result;
    }
