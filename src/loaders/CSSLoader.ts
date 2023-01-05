@@ -161,8 +161,7 @@ export default class CSSLoader implements ToypackLoader {
          content: bundler._createMagicString(asset.content),
       };
 
-      let processedContent =
-         asset.loaderData?.parse?.metadata?.AST || asset.content;
+      let processedContent: string = asset.content;
 
       // Process
       if (!asset.isExternal) {
@@ -170,18 +169,15 @@ export default class CSSLoader implements ToypackLoader {
          const options = this.options?.postcssConfig?.options;
 
          processedContent = postcss(plugins).process(
-            processedContent,
+            asset.loaderData?.parse?.metadata?.AST || processedContent,
             options
          ).css;
       }
 
-      let styleContent = 'var __styleContent__ = ("")';
-      for (let line of processedContent.split("\n")) {
-         line = line.replaceAll("`", "\\`");
-         styleContent += `.concat(\`${line}\`)`;
-      }
-
-      styleContent += ";";
+      let styleContent = `var __styleContent__ = (\`${processedContent.replace(
+         /`/g,
+         "\\`"
+      )}\`);`;
 
       // For dummy source map
       result.content?.update(0, result.content.length(), styleContent);

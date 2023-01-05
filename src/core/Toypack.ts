@@ -18,7 +18,12 @@ import MagicString from "magic-string";
 import { Node } from "@babel/traverse";
 import { getASTImports } from "@toypack/utils";
 import { Options } from "@toypack/utils/getASTImports";
-import { AutoImportJSXPragmaPlugin, AutoInstallSubPackagesPlugin, NodePolyfillPlugin } from "@toypack/plugins";
+import {
+   AutoImportJSXPragmaPlugin,
+   AutoInstallSubPackagesPlugin,
+   NodePolyfillPlugin,
+   DefinePlugin,
+} from "@toypack/plugins";
 import {
    AssetLoader,
    BabelLoader,
@@ -76,6 +81,10 @@ export default class Toypack {
       this.use(new AutoInstallSubPackagesPlugin());
       this.use(new AutoImportJSXPragmaPlugin());
       this.use(new NodePolyfillPlugin());
+      this.use(new DefinePlugin({
+         __VUE_OPTIONS_API__: true,
+         __VUE_PROD_DEVTOOLS__: false
+      }));
    }
 
    public _getASTImports(AST: Node | Node[], options?: Options) {
@@ -119,7 +128,11 @@ export default class Toypack {
     * @param {string|ArrayBuffer} [content] - The contents of the asset.
     * @returns {Promise<Asset>} The asset that was added.
     */
-   public async addAsset(source: string, content: string | ArrayBuffer = "", options?: AssetOptions) {
+   public async addAsset(
+      source: string,
+      content: string | ArrayBuffer = "",
+      options?: AssetOptions
+   ) {
       return await addAsset(this, source, content, options);
    }
 

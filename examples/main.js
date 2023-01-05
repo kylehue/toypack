@@ -36,8 +36,8 @@ let toypack = new Toypack({
    //await toypack.packageManager.install("bootstrap");
    await toypack.packageManager.install("vue");
    //await toypack.packageManager.install("uuid");
-   //await toypack.packageManager.install("react");
-   //await toypack.packageManager.install("react-dom/client");
+   await toypack.packageManager.install("react");
+   await toypack.packageManager.install("react-dom/client");
 
    for (let [source, content] of Object.entries(sampleAssets)) {
       await toypack.addAsset(source, content);

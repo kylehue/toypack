@@ -6,28 +6,21 @@ import {
    ParsedAsset,
    DependencyData,
 } from "@toypack/core/types";
-import MagicString from "magic-string";
-import BabelLoader from "./BabelLoader";
-import CSSLoader from "./CSSLoader";
-import SassLoader from "./SassLoader";
 import {
    parse as parseSFC,
    compileScript,
    compileStyle,
-   rewriteDefault,
    compileTemplate,
    SFCDescriptor,
    SFCTemplateCompileOptions,
    SFCScriptCompileOptions,
    SFCScriptBlock,
 } from "@vue/compiler-sfc";
-import { generate } from "shortid";
+import * as shortid from "shortid";
 import { getASTImports } from "@toypack/utils";
 import { Node } from "@babel/traverse";
-import { Statement } from "@babel/types";
-import { join } from "path-browserify";
 import SourceMap from "@toypack/core/SourceMap";
-import { create } from "@toypack/core/asset";
+shortid.characters("1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_");
 
 function extractDeps(AST?: Node | Node[]) {
    const deps: DependencyData[] = [];
@@ -59,7 +52,7 @@ export default class VueLoader implements ToypackLoader {
       }
 
       // Create scope id
-      const scopeId = generate();
+      const scopeId = shortid.generate();
 
       let result: ParsedAsset = {
          dependencies: [],
@@ -234,8 +227,15 @@ export default class VueLoader implements ToypackLoader {
             result.use[lang] = [];
          }
 
+         let styleCompilation = compileStyle({
+            id: metadata.scopeId,
+            filename: asset.source,
+            source: style.content,
+            scoped: style.scoped
+         });
+
          result.use[lang].push({
-            content: style.content,
+            content: styleCompilation.code,
          });
       }
 

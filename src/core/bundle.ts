@@ -172,9 +172,12 @@ export default async function bundle(
                      `Compilation Error: Could not compile ${asset.source} because it relies on loaders that are not present.`
                   );
                } else {
+                  let code = "";
                   for (let content of structCompilation.contents) {
-                     compilation.content?.append(content + "\n");
+                     code += content + "\n";
                   }
+
+                  compilation.content = bundler._createMagicString(code);
 
                   if (
                      structCompilation.map &&

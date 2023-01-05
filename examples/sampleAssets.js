@@ -2,7 +2,6 @@ export default {
 
    "src/index.js": `
 //import "bootstrap/dist/css/bootstrap.min.css";
-//import "../react/main"
 import pkg from "../package";
 console.log(pkg);
 import { PI } from "@scripts/PI";
@@ -19,7 +18,8 @@ console.log(coolImg, logo);
 //console.log(v4());
 import fs from "fs";
 console.log(fs);
-//import "../styles/sampleSass1.scss";
+import "../react/main";
+import "../styles/sampleSass1.scss";
 import { createApp } from "vue";
 import App from "../vue/App.vue";
 createApp(App).mount("#vueroot");
@@ -112,17 +112,27 @@ ReactDOM.createRoot(document.querySelector("#root")).render(
 import { useState, useEffect } from 'react';
 
 export default function App(props) {
-	const greet = "Hello world!";
+	const greet = "Hello react!";
    let [count, setCount] = useState(0);
 	useEffect(() => {
 		console.log(props);
 	}, []);
    return (
       <div className="d-flex flex-column">
-         <h1>{ greet + " " + count }</h1>
+         <h1 style={stylesheet.greet}>{ greet + " " + count }</h1>
          <button className="w-100 rounded" onClick={() => setCount(count + 1)}>click me!</button>
       </div>
    )
+}
+
+const stylesheet = {
+	greet: {
+		color: "#47b4c4",
+		background: "#26323b",
+		padding: 10,
+		borderRadius: 5,
+		boxShadow: "0 0 10px 5px white"
+	}
 }
 `,
 
