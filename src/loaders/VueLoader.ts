@@ -161,6 +161,7 @@ export default class VueLoader implements ToypackLoader {
       let templateCompileOptions: SFCTemplateCompileOptions =
          metadata.templateCompileOptions;
       let scriptCompilation: SFCScriptBlock = metadata.scriptCompilation;
+      let map = new SourceMap(scriptCompilation.map);
 
       let content = bundler._createMagicString(scriptCompilation.content);
 
@@ -184,7 +185,6 @@ export default class VueLoader implements ToypackLoader {
       }
 
       if (metadata.needToCompileTemplate) {
-         // TODO: Merge template's source map
          let parsedTemplate = compileTemplate(templateCompileOptions);
 
          // Add to content
@@ -214,15 +214,18 @@ export default class VueLoader implements ToypackLoader {
       // Export the SFC instance
       content.append(`\nexport default ${compIdentifier};`);
 
+      // Finalize source map
+      map.mergeWith(
+         content.generateMap({
+            source: asset.source,
+            hires: bundler._sourceMapConfig?.[1] == "hires",
+         })
+      );
+
       // Out
       let result: CompiledAsset = {
          content: bundler._createMagicString(""),
-         map: new SourceMap(scriptCompilation.map).mergeWith(
-            content.generateMap({
-               source: asset.source,
-               hires: bundler._sourceMapConfig?.[1] == "hires",
-            })
-         ),
+         map,
          use: {
             [scriptCompilation.lang || "js"]: [
                {

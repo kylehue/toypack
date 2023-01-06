@@ -10,7 +10,7 @@ import {
    BundleOptions,
    BundleResult,
    ToypackLoader,
-   UseCompile,
+   UseLoader,
    IAsset,
 } from "./types";
 import createGraph from "./createGraph";
@@ -38,14 +38,14 @@ function getTimeColor(time: number) {
    }
 }
 
-async function compileStruct(struct: UseCompile, asset: IAsset, bundler: Toypack) {
+async function compileStruct(struct: UseLoader, asset: IAsset, bundler: Toypack) {
    const result = {
       failedLoader: false,
       contents: [] as string[],
       map: new SourceMap()
    };
 
-   const init = async (struct: UseCompile) => {
+   const init = async (struct: UseLoader) => {
       for (let [lang, chunks] of Object.entries(struct)) {
          // Get loader
          let loader: ToypackLoader | null = null;
@@ -177,7 +177,7 @@ export default async function bundle(
                } else {
                   let code = "";
                   for (let content of structCompilation.contents) {
-                     code += content + "\n";
+                     code += `(function(){${content}})();`;
                   }
 
                   compilation.content = bundler._createMagicString(code);

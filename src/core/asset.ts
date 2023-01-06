@@ -14,26 +14,6 @@ function getLoader(bundler: Toypack, source: string) {
 
 var lastId = 0;
 
-export function parseSource(source: string) {
-   let split = source.split("?");
-   let target = split[0];
-   let query = split[1];
-   let params: Object = {};
-
-   if (query) {
-      let querySplit = query.split("&");
-      for (let param of querySplit) {
-         let paramSplit = param.split("=");
-         params[paramSplit[0]] = paramSplit[1] ? paramSplit[1] : true;
-      }
-   }
-
-   return {
-      source: target,
-      params,
-   };
-}
-
 export function create(
    bundler: Toypack,
    source: string,
@@ -100,6 +80,8 @@ export async function add(
       if (cached.content === content || isURL(cached.source)) {
          return cached;
       }
+
+      cached.content = content;
    }
 
    let asset: IAsset = cached ? cached : create(bundler, source, content);

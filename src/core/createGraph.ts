@@ -9,16 +9,16 @@ import {
    IAsset,
    ParsedAsset,
    ToypackLoader,
-   UseCompile,
+   UseLoader,
 } from "./types";
 
-async function parseStruct(struct: UseCompile, bundler: Toypack) {
+async function parseStruct(struct: UseLoader, bundler: Toypack) {
    const result = {
       failedLoader: false,
       dependencies: [] as DependencyData[],
    };
 
-   const init = async (struct: UseCompile) => {
+   const init = async (struct: UseLoader) => {
       for (let [lang, chunks] of Object.entries(struct)) {
          // Get loader
          let loader: ToypackLoader | null = null;

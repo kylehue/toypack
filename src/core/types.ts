@@ -167,23 +167,23 @@ export interface DependencyData {
    requestOptions?: RequestInit;
 }
 
-interface StructureData {
-   content: string;
-   map?: SourceMapData;
-}
-
-export type UseCompile = { [key: string]: StructureData[] };
+export type UseLoader = {
+   [key: string]: {
+      content: string;
+      map?: SourceMapData;
+   }[];
+};
 
 export interface ParsedAsset {
    dependencies: DependencyData[];
    filter?: (DependencyData) => boolean;
-   use?: UseCompile;
+   use?: UseLoader;
    metadata?: any;
 }
 
 export interface CompiledAsset {
    content: MagicString;
-   use?: UseCompile;
+   use?: UseLoader;
    map?: SourceMap;
    metadata?: any;
 }
