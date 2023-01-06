@@ -20,7 +20,10 @@ import * as shortid from "shortid";
 import { getASTImports } from "@toypack/utils";
 import { Node } from "@babel/traverse";
 import SourceMap from "@toypack/core/SourceMap";
-shortid.characters("1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_");
+
+const safeHTMLDatasetCharacters =
+   "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
+shortid.characters(safeHTMLDatasetCharacters);
 
 function extractDeps(AST?: Node | Node[]) {
    const deps: DependencyData[] = [];

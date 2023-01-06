@@ -176,6 +176,7 @@ export type UseCompile = { [key: string]: StructureData[] };
 
 export interface ParsedAsset {
    dependencies: DependencyData[];
+   filter?: (DependencyData) => boolean;
    use?: UseCompile;
    metadata?: any;
 }

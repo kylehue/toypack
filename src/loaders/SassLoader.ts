@@ -29,8 +29,13 @@ export default class SassLoader implements ToypackLoader {
    }
 
    public parse(asset: IAsset, bundler: Toypack) {
+      if (typeof asset.content != "string") {
+         let error = new Error("Sass Parse Error: Content must be string.");
+         throw error;
+      }
+
       let result: ParsedAsset = {
-         dependencies: [],
+         dependencies: []
       };
 
       // Prepare CSS loader
@@ -74,17 +79,6 @@ export default class SassLoader implements ToypackLoader {
          throw error;
       }
 
-      // Prepare CSS loader
-      if (!cssLoader) {
-         cssLoader = this._getCSSLoader(bundler);
-      }
-
-      if (!cssLoader) {
-         throw new Error(
-            "Sass Parse Error: CSSLoader is needed to compile Sass files."
-         );
-      }
-
       // Get CSS compilation
       let CSSCompilation: any = await new Promise((resolve) => {
          // Handle imports
@@ -100,13 +94,10 @@ export default class SassLoader implements ToypackLoader {
                content: cached?.content,
             });
          });
-
-         let content =
-            asset.loaderData?.parse?.metadata?.AST?.toString() || asset.content;
-
+         
          // Compile
          Sass.compile(
-            content,
+            asset.content,
             {
                indentedSyntax: /\.sass$/.test(asset.source),
             },
@@ -124,19 +115,9 @@ export default class SassLoader implements ToypackLoader {
                   content: CSSCompilation.text,
                   map: CSSCompilation.map,
                },
-            ]
-         }
+            ],
+         },
       };
-
-      // Imports
-      let deps = asset.loaderData.parse?.dependencies;
-      if (deps) {
-         for (let dep of deps) {
-            result.content?.prepend(
-               `var ${cleanStr(dep.source)} = require("${dep.source}");`
-            );
-         }
-      }
 
       return result;
    }

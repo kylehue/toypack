@@ -38,7 +38,7 @@ function getTimeColor(time: number) {
    }
 }
 
-async function compileStruct(struct: UseCompile, bundler: Toypack) {
+async function compileStruct(struct: UseCompile, asset: IAsset, bundler: Toypack) {
    const result = {
       failedLoader: false,
       contents: [] as string[],
@@ -62,6 +62,8 @@ async function compileStruct(struct: UseCompile, bundler: Toypack) {
             if (typeof loader.compile == "function") {
                for (let chunk of chunks) {
                   let mockAsset = create(bundler, mockName, chunk.content);
+                  mockAsset.loaderData.parse = asset.loaderData.parse;
+
                   let comp = await loader.compile(mockAsset, bundler);
 
                   if (result.map && comp.map) {
@@ -164,6 +166,7 @@ export default async function bundle(
             if (compilation.use) {
                let structCompilation = await compileStruct(
                   compilation.use,
+                  asset,
                   bundler
                );
 

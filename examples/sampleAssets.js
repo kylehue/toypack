@@ -16,10 +16,11 @@ console.log(coolImg, logo);
 //console.log(path, dirname("path/to/some/file.txt"));
 //import { v4 } from "uuid";
 //console.log(v4());
-import fs from "fs";
-console.log(fs);
-import "../react/main";
+// import fs from "fs";
+// console.log(fs);
+
 import "../styles/sampleSass1.scss";
+import "../react/main";
 import { createApp } from "vue";
 import App from "../vue/App.vue";
 createApp(App).mount("#vueroot");

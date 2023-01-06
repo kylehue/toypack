@@ -11,24 +11,29 @@ import postcss, {
    AcceptedPlugin,
    ProcessOptions,
    ChildNode,
+   AtRule,
+   Declaration,
+   Root,
 } from "postcss";
 import valueParser from "postcss-value-parser";
 import { dirname } from "path-browserify";
 import { minimizeStr } from "@toypack/utils";
 import { cloneDeep, merge } from "lodash-es";
-const URLFunctionRegex = /url\s*\("?(?![a-z]+:)/;
 
+const urlFunctionRegex = /url\s*\("?(?![a-z]+:)/;
+const styleTagIdentifier = "__style__";
+const stylesheetIdentifier = "__stylesheet__";
 function getTemplate(id: string | number) {
    return minimizeStr(`
 var _head = document.head || document.getElementsByTagName("head")[0];
-_style = document.createElement("style");
-_style.dataset.toypackId = "asset-${id}";
-_style.setAttribute("type", "text/css");
-_head.appendChild(_style);
-if (_style.styleSheet){
-  _style.styleSheet.cssText = __styleContent__;
+${styleTagIdentifier} = document.createElement("style");
+${styleTagIdentifier}.dataset.toypackId = "asset-${id}";
+${styleTagIdentifier}.setAttribute("type", "text/css");
+_head.appendChild(${styleTagIdentifier});
+if (${styleTagIdentifier}.styleSheet){
+  ${styleTagIdentifier}.styleSheet.cssText = ${stylesheetIdentifier};
 } else {
-  _style.appendChild(document.createTextNode(__styleContent__));
+  ${styleTagIdentifier}.appendChild(document.createTextNode(${stylesheetIdentifier}));
 }
 `);
 }
@@ -59,6 +64,12 @@ export interface ParseOptions extends CSSLoaderOptions {
    keepAtImportRules?: boolean;
 }
 
+interface ParseMetadata {
+   AST: Root;
+   atImportRuleNodes: AtRule[];
+   urlDeclarationNodes: Declaration[];
+}
+
 export default class CSSLoader implements ToypackLoader {
    public name = "CSSLoader";
    public test = /\.css$/;
@@ -78,9 +89,15 @@ export default class CSSLoader implements ToypackLoader {
          options?.postcssConfig?.options || this.options?.postcssConfig?.options
       );
 
+      let parseMetadata: ParseMetadata = {
+         AST,
+         atImportRuleNodes: [],
+         urlDeclarationNodes: [],
+      };
+
       const result: ParsedAsset = {
          dependencies: [],
-         metadata: { AST, URLDependencies: [] },
+         metadata: parseMetadata,
       };
 
       AST.walk((node) => {
@@ -104,15 +121,13 @@ export default class CSSLoader implements ToypackLoader {
                      source: dependencyId,
                   });
 
-                  // Remove from AST
-                  if (!options?.keepAtImportRules) {
-                     node.remove();
-                  }
+                  // Save
+                  parseMetadata.atImportRuleNodes.push(node);
                }
             });
          } else if (node.type == "decl") {
             // css-property: url(...)
-            const isURLFunction = URLFunctionRegex.test(node.value);
+            const isURLFunction = urlFunctionRegex.test(node.value);
             if (isURLFunction) {
                let parsedValue = valueParser(node.value);
                parsedValue.walk(async (valueNode) => {
@@ -128,6 +143,8 @@ export default class CSSLoader implements ToypackLoader {
                            source: source,
                         });
 
+                        parseMetadata.urlDeclarationNodes.push(node);
+
                         // Require asset
                         let dependencyAbsolutePath = await bundler.resolve(
                            source,
@@ -140,6 +157,7 @@ export default class CSSLoader implements ToypackLoader {
 
                         if (cached) {
                            node.value = `url("\${${cleanStr(source)}}")`;
+                           
                         }
                      }
                   }
@@ -161,32 +179,40 @@ export default class CSSLoader implements ToypackLoader {
          content: bundler._createMagicString(asset.content),
       };
 
-      let processedContent: string = asset.content;
+      let parseMetadata: ParseMetadata = asset.loaderData.parse?.metadata;
+      let content: string | Root = asset.content;
+
+      // Reuse AST if it exists
+      if (parseMetadata?.AST) {
+         content = parseMetadata.AST;
+
+         // Remove import nodes
+         for (let node of parseMetadata.atImportRuleNodes) {
+            node.remove();
+         }
+      }
 
       // Process
+      let processedContent: string = asset.content;
       if (!asset.isExternal) {
          const plugins = this.options?.postcssConfig?.plugins;
          const options = this.options?.postcssConfig?.options;
 
-         processedContent = postcss(plugins).process(
-            asset.loaderData?.parse?.metadata?.AST || processedContent,
-            options
-         ).css;
+         processedContent = postcss(plugins).process(content, options).css;
       }
 
-      let styleContent = `var __styleContent__ = (\`${processedContent.replace(
+      let styleContent = `var ${stylesheetIdentifier} = (\`${processedContent.replace(
          /`/g,
          "\\`"
       )}\`);`;
 
-      // For dummy source map
       result.content?.update(0, result.content.length(), styleContent);
       result.content?.append(getTemplate(asset.id));
 
       // Avoid style duplicates
-      result.content?.prepend(`if (!_style) {`).append("}");
+      result.content?.prepend(`if (!${styleTagIdentifier}) {`).append("}");
       result.content?.prepend(
-         `var _style = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
+         `var ${styleTagIdentifier} = document.querySelector("[data-toypack-id~='asset-${asset.id}']");`
       );
 
       // Imports

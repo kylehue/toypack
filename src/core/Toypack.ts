@@ -81,10 +81,12 @@ export default class Toypack {
       this.use(new AutoInstallSubPackagesPlugin());
       this.use(new AutoImportJSXPragmaPlugin());
       this.use(new NodePolyfillPlugin());
-      this.use(new DefinePlugin({
-         __VUE_OPTIONS_API__: true,
-         __VUE_PROD_DEVTOOLS__: false
-      }));
+      this.use(
+         new DefinePlugin({
+            __VUE_OPTIONS_API__: true,
+            __VUE_PROD_DEVTOOLS__: false,
+         })
+      );
    }
 
    public _getASTImports(AST: Node | Node[], options?: Options) {

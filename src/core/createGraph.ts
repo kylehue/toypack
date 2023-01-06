@@ -4,19 +4,25 @@ import { create } from "./asset";
 import { FailedResolveDescriptor } from "./Hooks";
 import { getResolveAliasData } from "./resolve";
 import Toypack from "./Toypack";
-import { DependencyData, IAsset, ParsedAsset, ToypackLoader, UseCompile } from "./types";
+import {
+   DependencyData,
+   IAsset,
+   ParsedAsset,
+   ToypackLoader,
+   UseCompile,
+} from "./types";
 
 async function parseStruct(struct: UseCompile, bundler: Toypack) {
    const result = {
       failedLoader: false,
       dependencies: [] as DependencyData[],
-   }
+   };
 
    const init = async (struct: UseCompile) => {
       for (let [lang, chunks] of Object.entries(struct)) {
          // Get loader
          let loader: ToypackLoader | null = null;
-         let mockName = "." + lang;
+         let mockName = "asset." + lang;
          for (let ldr of bundler.loaders) {
             if (ldr.test.test(mockName)) {
                loader = ldr;
@@ -30,6 +36,7 @@ async function parseStruct(struct: UseCompile, bundler: Toypack) {
                for (let chunk of chunks) {
                   let mockAsset = create(bundler, mockName, chunk.content);
                   let parsed = await loader.parse(mockAsset, bundler);
+                  
                   if (parsed.use) {
                      await init(parsed.use);
                   } else {
@@ -42,7 +49,7 @@ async function parseStruct(struct: UseCompile, bundler: Toypack) {
             return result;
          }
       }
-   }
+   };
 
    await init(struct);
    return result;
@@ -83,11 +90,24 @@ export default async function createGraph(
       if (parseData.use) {
          let parsedStruct = await parseStruct(parseData.use, bundler);
          if (parsedStruct.failedLoader) {
-             throw new Error(
-                `Asset Parse Error: Could not parse ${asset.source} because it relies on loaders that are not present.`
-             );
-         } else { 
+            throw new Error(
+               `Asset Parse Error: Could not parse ${asset.source} because it relies on loaders that are not present.`
+            );
+         } else {
             parseData.dependencies.push(...parsedStruct.dependencies);
+         }
+      }
+
+      // Filter
+      if (typeof parseData.filter == "function") {
+         for (let i = 0; i < parseData.dependencies.length; i++) {
+            let dep = parseData.dependencies[i];
+
+            let isAccepted = parseData.filter(dep);
+
+            if (!isAccepted) {
+               parseData.dependencies.splice(i, 1);
+            }
          }
       }
 
@@ -106,14 +126,14 @@ export default async function createGraph(
          let dependencyAbsolutePath: string = dependency.source;
          let baseDir = path.dirname(source);
          let isExternal = isURL(dependency.source);
-         let isCoreModule = !isLocal(dependency.source) && !isExternal;
+         /* let isCoreModule = !isLocal(dependency.source) && !isExternal;
 
          // Check if aliased
          let aliasData = getResolveAliasData(bundler, dependency.source);
          if (aliasData) {
             isCoreModule =
                !isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
-         }
+         } */
 
          // If not a url, resolve
          if (!isExternal) {
