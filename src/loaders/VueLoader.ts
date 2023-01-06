@@ -82,6 +82,11 @@ export default class VueLoader implements ToypackLoader {
       let descriptor = parsedSFC.descriptor;
       result.metadata.descriptor = descriptor;
 
+      // Only compile template if there's no script setup
+      // This is because template is inlined when there's script setup
+      result.metadata.needToCompileTemplate =
+         descriptor.template && descriptor.script && !descriptor.scriptSetup;
+
       // Compile script
       const templateCompileOptions: SFCTemplateCompileOptions = {
          id: scopeId,
@@ -89,7 +94,7 @@ export default class VueLoader implements ToypackLoader {
          source: descriptor.template?.content || "",
          isProd: bundler.options.bundleOptions?.mode == "production",
          slotted: descriptor.slotted,
-         scoped: descriptor.styles.some((s) => s.scoped),
+         scoped: descriptor.styles.some((s) => s.scoped)
       };
       result.metadata.templateCompileOptions = templateCompileOptions;
 
@@ -107,11 +112,21 @@ export default class VueLoader implements ToypackLoader {
       let scriptCompilation = compileScript(descriptor, scriptCompileOptions);
       result.metadata.scriptCompilation = scriptCompilation;
 
-      // Extract script dependencies
+      // Extract script dependencies from template and
       result.dependencies.push(...extractDeps(scriptCompilation.scriptAst));
       result.dependencies.push(
          ...extractDeps(scriptCompilation.scriptSetupAst)
       );
+
+      // Add "vue" dependency if template is compiled
+      // This is because we aren't using "extractDeps" on template compilation
+      if (result.metadata.needToCompileTemplate) {
+         if (!result.dependencies.some((d) => d.source === "vue")) {
+            result.dependencies.push({
+               source: "vue",
+            });
+         }
+      }
 
       // Parse style
       for (let style of descriptor.styles) {
@@ -168,15 +183,12 @@ export default class VueLoader implements ToypackLoader {
          };
       }
 
-      // Only compile template if there is no script setup
-      if (descriptor.template && descriptor.script && !descriptor.scriptSetup) {
+      if (metadata.needToCompileTemplate) {
          // TODO: Merge template's source map
          let parsedTemplate = compileTemplate(templateCompileOptions);
-         //console.log("%c Parsed Template: ", "color: yellow;");
-         //console.log(parsedTemplate);
 
+         // Add to content
          if (parsedTemplate.code) {
-            // ?[4] - Append parsed template script into script code
             content.append("\n");
             content.append(
                parsedTemplate.code.replace(
@@ -234,7 +246,7 @@ export default class VueLoader implements ToypackLoader {
             id: metadata.scopeId,
             filename: asset.source,
             source: style.content,
-            scoped: style.scoped
+            scoped: style.scoped,
          });
 
          result.use[lang].push({
