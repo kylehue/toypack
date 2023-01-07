@@ -145,8 +145,8 @@ export default class Toypack {
     * @param {ResolveOptions} [options] - Resolving options.
     * @returns {string} The absolute path of the module.
     */
-   public resolve(x: string, options?: ResolveOptions) {
-      return resolve(this, x, options);
+   public async resolve(x: string, options?: ResolveOptions) {
+      return await resolve(this, x, options);
    }
 
    /**
