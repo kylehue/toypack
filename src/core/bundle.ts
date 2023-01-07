@@ -240,7 +240,7 @@ export default async function bundle(
       let isMapped =
          !!sourceMap &&
          !!chunkSourceMap &&
-         textExtensions.includes(asset.extension) &&
+         !asset.isResource &&
          typeof asset.content == "string" &&
          !isCoreModule;
 

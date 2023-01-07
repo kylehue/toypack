@@ -206,12 +206,8 @@ export default class PackageManager {
       let assetPackage = this.bundler.assets.get("/package.json");
       if (typeof assetPackage?.content == "string") {
          let assetPackageParsed = JSON.parse(assetPackage.content);
-
-         if (typeof assetPackageParsed.dependencies != "object") {
-            assetPackageParsed.dependencies = {};
-         }
-
          assetPackageParsed.dependencies = this.dependencies;
+         
          await this.bundler.addAsset(
             "/package.json",
             JSON.stringify(assetPackageParsed)
@@ -220,7 +216,7 @@ export default class PackageManager {
          let newPackage = JSON.stringify({
             dependencies: this.dependencies,
          });
-
+         
          await this.bundler.addAsset("/package.json", newPackage);
       }
 

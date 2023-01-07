@@ -10,9 +10,7 @@ import postcss, {
    parse as parseCSS,
    AcceptedPlugin,
    ProcessOptions,
-   ChildNode,
    AtRule,
-   Declaration,
    Root,
 } from "postcss";
 import valueParser from "postcss-value-parser";
@@ -60,14 +58,9 @@ export interface CSSLoaderOptions {
    postcssConfig?: PostCSSConfig;
 }
 
-export interface ParseOptions extends CSSLoaderOptions {
-   keepAtImportRules?: boolean;
-}
-
 interface ParseMetadata {
    AST: Root;
    atImportRuleNodes: AtRule[];
-   urlDeclarationNodes: Declaration[];
 }
 
 export default class CSSLoader implements ToypackLoader {
@@ -78,7 +71,7 @@ export default class CSSLoader implements ToypackLoader {
       this.options = merge(cloneDeep(defaultOptions), options);
    }
 
-   public parse(asset: IAsset, bundler: Toypack, options?: ParseOptions) {
+   public parse(asset: IAsset, bundler: Toypack, options?: CSSLoaderOptions) {
       if (typeof asset.content != "string") {
          let error = new Error("CSS Parse Error: Content must be string.");
          throw error;
@@ -92,7 +85,6 @@ export default class CSSLoader implements ToypackLoader {
       let parseMetadata: ParseMetadata = {
          AST,
          atImportRuleNodes: [],
-         urlDeclarationNodes: [],
       };
 
       const result: ParsedAsset = {
@@ -143,8 +135,6 @@ export default class CSSLoader implements ToypackLoader {
                            source: source,
                         });
 
-                        parseMetadata.urlDeclarationNodes.push(node);
-
                         // Require asset
                         let dependencyAbsolutePath = await bundler.resolve(
                            source,
@@ -157,7 +147,6 @@ export default class CSSLoader implements ToypackLoader {
 
                         if (cached) {
                            node.value = `url("\${${cleanStr(source)}}")`;
-                           
                         }
                      }
                   }

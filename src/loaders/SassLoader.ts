@@ -51,7 +51,6 @@ export default class SassLoader implements ToypackLoader {
 
       // Parse
       let parsed = cssLoader.parse(asset, bundler, {
-         keepAtImportRules: true,
          postcssConfig: {
             options: {
                syntax: /\.sass$/.test(asset.source) ? postcssSASS : postcssSCSS,

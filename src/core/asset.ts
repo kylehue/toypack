@@ -76,6 +76,7 @@ export async function add(
    let isExternal = isURL(source);
    source = isExternal ? source : path.join("/", source);
    let cached = bundler.assets.get(source);
+
    if (cached) {
       if (cached.content === content || isURL(cached.source)) {
          return cached;
@@ -89,7 +90,7 @@ export async function add(
    // Fetch if source is external url and not cached
    if (isExternal && !cached) {
       let fetchResponse = await fetch(source, options?.requestOptions);
-      if (textExtensions.includes(asset.extension)) {
+      if (!asset.isResource) {
          asset.content = await fetchResponse.text();
       } else {
          asset.content = await fetchResponse.arrayBuffer();
