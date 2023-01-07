@@ -27,21 +27,14 @@ let toypack = new Toypack({
 });
 
 (async () => {
-   /* await toypack.addDependency("vue@3.2.23");
-				await toypack.addDependency("uuid");
-				await toypack.addDependency("react");
-				await toypack.addDependency("react-dom");
-				await toypack.addDependency("use-state-in-custom-properties"); */
-   //await toypack.addDependency("bootstrap");
+   for (let [source, content] of Object.entries(sampleAssets)) {
+      await toypack.addAsset(source, content);
+   }
    //await toypack.packageManager.install("bootstrap");
    await toypack.packageManager.install("vue");
    //await toypack.packageManager.install("uuid");
    await toypack.packageManager.install("react");
    await toypack.packageManager.install("react-dom/client");
-
-   for (let [source, content] of Object.entries(sampleAssets)) {
-      await toypack.addAsset(source, content);
-   }
 
    await toypack.bundle();
 })();

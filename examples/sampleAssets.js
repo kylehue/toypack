@@ -193,7 +193,7 @@ h3 {
 <head>
    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
    <title>cool website!!!!</title>
-   <script type="text/javascript" src="src/index.js"></script>
+   <script type="text/javascript" src="src/index"></script>
    <link rel="stylesheet" href="styles/main.css"></link>
    <!-- <script>console.log(123);</script> -->
 </head>
