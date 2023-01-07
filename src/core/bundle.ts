@@ -18,7 +18,7 @@ import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import applyUMD from "@toypack/formats/umd";
 import babelMinify from "babel-minify";
-import { AfterCompileDescriptor } from "./Hooks";
+import { AfterCompileDescriptor, BeforeCompileDescriptor, DoneDescriptor } from "./Hooks";
 import { create } from "./asset";
 
 const colors = {
@@ -159,6 +159,10 @@ export default async function bundle(
       let compilation: CompiledAsset = {} as CompiledAsset;
       if (asset.isModified || !asset.loaderData.compile?.content) {
          if (typeof asset.loader.compile == "function") {
+            await bundler.hooks.trigger("beforeCompile", {
+               asset,
+            } as BeforeCompileDescriptor);
+
             compilation = await asset.loader.compile(asset, bundler);
 
             // Does this asset's loader rely on other loaders?
@@ -192,7 +196,7 @@ export default async function bundle(
                }
             }
 
-            bundler.hooks.trigger("afterCompile", {
+            await bundler.hooks.trigger("afterCompile", {
                compilation,
                asset,
             } as AfterCompileDescriptor);
@@ -281,6 +285,11 @@ export default async function bundle(
          prevLine += offset;
       }
    }
+
+   // Trigger done hook
+   await bundler.hooks.trigger("done", {
+      content: bundle
+   } as DoneDescriptor);
 
    //
    let finalContent = bundle.toString();

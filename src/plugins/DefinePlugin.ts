@@ -8,7 +8,7 @@ export default class DefinePlugin implements ToypackPlugin {
       bundler.hooks.afterCompile((descriptor) => {
          if (this.options) {
             for (let [target, replacement] of Object.entries(this.options)) {
-               descriptor.compilation.content.replaceAll(target, replacement.toString());
+               descriptor.compilation.content?.replaceAll(target, replacement.toString());
             }
          }
       });

@@ -126,14 +126,6 @@ export default async function createGraph(
          let dependencyAbsolutePath: string = dependency.source;
          let baseDir = path.dirname(source);
          let isExternal = isURL(dependency.source);
-         /* let isCoreModule = !isLocal(dependency.source) && !isExternal;
-
-         // Check if aliased
-         let aliasData = getResolveAliasData(bundler, dependency.source);
-         if (aliasData) {
-            isCoreModule =
-               !isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
-         } */
 
          // If not a url, resolve
          if (!isExternal) {
@@ -142,6 +134,7 @@ export default async function createGraph(
                baseDir,
             });
 
+            // Trigger failed resolve hook
             if (!resolved) {
                await bundler.hooks.trigger("failedResolve", {
                   target: dependency.source,

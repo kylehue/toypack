@@ -1,6 +1,8 @@
+import { Bundle } from "magic-string";
+import SourceMap from "./SourceMap";
 import { IAsset, CompiledAsset } from "./types";
 
-export type HookName = keyof Omit<Hooks, "taps" | "trigger" | "destroy">;
+export type HookName = keyof Omit<Hooks, "taps" | "trigger">;
 
 export interface FailedResolveDescriptor {
    target: string;
@@ -12,6 +14,14 @@ type FailedResolveCallback = (
    descriptor: FailedResolveDescriptor
 ) => void | Promise<any>;
 
+export interface BeforeCompileDescriptor {
+   asset: IAsset;
+}
+
+type BeforeCompileCallback = (
+   descriptor: BeforeCompileDescriptor
+) => void | Promise<any>;
+
 export interface AfterCompileDescriptor {
    compilation: CompiledAsset;
    asset: IAsset;
@@ -19,6 +29,14 @@ export interface AfterCompileDescriptor {
 
 type AfterCompileCallback = (
    descriptor: AfterCompileDescriptor
+) => void | Promise<any>;
+
+export interface DoneDescriptor {
+   content: Bundle;
+}
+
+type DoneCallback = (
+   descriptor: DoneDescriptor
 ) => void | Promise<any>;
 
 export default class Hooks {
@@ -54,5 +72,13 @@ export default class Hooks {
 
    public afterCompile(fn: AfterCompileCallback) {
       this._tapHook("afterCompile", fn);
-	}
+   }
+
+   public beforeCompile(fn: BeforeCompileCallback) {
+      this._tapHook("beforeCompile", fn);
+   }
+
+   public done(fn: DoneCallback) {
+      this._tapHook("done", fn);
+   }
 }
