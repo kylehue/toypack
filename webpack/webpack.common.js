@@ -31,9 +31,7 @@ module.exports = {
       Toypack: resolve("../src/index.ts"),
    },
    output: {
-      filename: "[name].js",
       path: resolve("../lib"),
-      clean: true,
       library: {
          name: "[name]",
          type: "umd",
