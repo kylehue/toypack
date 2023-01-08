@@ -11,7 +11,7 @@
    "homepage": "https://github.com/kylehue/toypack#readme",
    "scripts": {
       "dev": "webpack --config webpack/webpack.dev.js",
-      "build": "webpack --config webpack/webpack.prod.js",
+      "build": "concurrently \"rimraf lib\" \"webpack --config webpack/webpack.prod.js\"",
       "publish": "npm run build && npm publish",
       "dev-test": "concurrently \"npm run dev\" \"jest --watchAll\"",
       "test": "jest"
