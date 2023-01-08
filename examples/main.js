@@ -1,4 +1,8 @@
 import "../lib/Toypack.js";
+import "../lib/BabelLoader.js";
+import "../lib/VueLoader.js";
+import "../lib/SassLoader.js";
+import "../lib/DefinePlugin.js";
 import sampleAssets from "./sampleAssets.js";
 let toypack = new Toypack({
    bundleOptions: {
@@ -25,6 +29,17 @@ let toypack = new Toypack({
    },
    packageProvider: "esm.sh",
 });
+
+toypack.loaders.push(new BabelLoader());
+toypack.loaders.push(new VueLoader());
+toypack.loaders.push(new SassLoader());
+
+toypack.use(
+   new DefinePlugin({
+      __VUE_OPTIONS_API__: true,
+      __VUE_PROD_DEVTOOLS__: false,
+   })
+);
 
 (async () => {
    for (let [source, content] of Object.entries(sampleAssets)) {

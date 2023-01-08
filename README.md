@@ -84,7 +84,7 @@ Modify the Toypack options.
 
 #### Type
 ```ts
-(options?: ToypackOptions) => void;
+(options: ToypackOptions) => void;
 ```
 #### Example
 ```js
@@ -107,13 +107,17 @@ Add a plugin.
 toypack.use(/* plugin */);
 ```
 
-### Loaders
-Please note that Babel, Vue, and Sass loaders are not included in the default set of loaders to optimize initial page load times. It is more efficient to include these loaders only when they are needed, rather than including them all at once. Example below shows how to add a loader:
+### Note to Loaders
+Please note that Babel, Vue, and Sass loaders are not included in the default set of loaders to optimize initial page load times. It is more efficient to include these loaders only when they are needed, rather than including them all at once. Example below shows how to add `BabelLoader` when it's needed:
 
 ```js
-async function sassIsNeeded() {
-   // Import dinamically
-   let sassLoader = await import("toypack/lib/SassLoader.js");
-   toypack.loaders.push(sassLoader);
-}
+// Tap into failedLoader hook
+toypack.hooks.failedLoader(async (descriptor) => {
+   let pattern = /\.(t|j)sx?$/; // .js, .ts, .jsx, .tsx
+   if (pattern.test(descriptor.asset.source)) {
+      // Import dinamically
+      let BabelLoader = await import("toypack/lib/BabelLoader.js");
+      toypack.loaders.push(new BabelLoader());
+   }
+});
 ```
