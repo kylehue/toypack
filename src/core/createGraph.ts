@@ -1,16 +1,9 @@
-import { isURL, isLocal } from "@toypack/utils";
-import path, { parse } from "path-browserify";
-import { create } from "./asset";
-import { FailedResolveDescriptor } from "./Hooks";
-import { getResolveAliasData } from "./resolve";
+import { isURL } from "@toypack/utils";
+import path from "path-browserify";
+import { create as createAsset } from "./asset";
+import { FailedResolveDescriptor, ParseDescriptor } from "./Hooks";
 import Toypack from "./Toypack";
-import {
-   DependencyData,
-   IAsset,
-   ParsedAsset,
-   ToypackLoader,
-   UseLoader,
-} from "./types";
+import { DependencyData, Asset, ParsedAsset, UseLoader } from "./types";
 
 async function parseStruct(struct: UseLoader, bundler: Toypack) {
    const result = {
@@ -21,22 +14,16 @@ async function parseStruct(struct: UseLoader, bundler: Toypack) {
    const init = async (struct: UseLoader) => {
       for (let [lang, chunks] of Object.entries(struct)) {
          // Get loader
-         let loader: ToypackLoader | null = null;
-         let mockName = "asset." + lang;
-         for (let ldr of bundler.loaders) {
-            if (ldr.test.test(mockName)) {
-               loader = ldr;
-               break;
-            }
-         }
+         let mockName = "_loader_chunk_." + lang;
+         let loader = await bundler._getLoaderByAsset(createAsset(mockName));
 
          // Compile
          if (loader) {
             if (typeof loader.parse == "function") {
                for (let chunk of chunks) {
-                  let mockAsset = create(bundler, mockName, chunk.content);
+                  let mockAsset = createAsset(mockName, chunk.content);
                   let parsed = await loader.parse(mockAsset, bundler);
-                  
+
                   if (parsed.use) {
                      await init(parsed.use);
                   } else {
@@ -58,7 +45,7 @@ async function parseStruct(struct: UseLoader, bundler: Toypack) {
 export default async function createGraph(
    bundler: Toypack,
    source: string,
-   graph: IAsset[] = []
+   graph: Asset[] = []
 ) {
    let isExternal = isURL(source);
    source = isExternal ? source : path.join("/", source);
@@ -69,10 +56,22 @@ export default async function createGraph(
       throw new Error(`Graph Error: Cannot find asset ${source}`);
    }
 
+   await bundler.hooks.trigger("parse", {
+      asset,
+   } as ParseDescriptor);
+
+   let loader = await bundler._getLoaderByAsset(asset);
+
+   if (!loader) {
+      throw new Error(
+         `Asset Error: ${asset.source} is not supported. You might want to add a loader for this file type.`
+      );
+   }
+
    if (
       isExternal ||
       typeof asset.content != "string" ||
-      typeof asset.loader.parse != "function"
+      typeof loader.parse != "function"
    ) {
       graph.push(asset);
       asset.isModified = false;
@@ -84,7 +83,7 @@ export default async function createGraph(
       if (!asset.isModified && asset?.loaderData.parse) {
          parseData = asset.loaderData.parse;
       } else {
-         parseData = await asset.loader.parse(asset, bundler);
+         parseData = await loader.parse(asset, bundler);
       }
 
       if (parseData.use) {

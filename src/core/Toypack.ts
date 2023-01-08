@@ -1,7 +1,7 @@
 import {
    ResolveOptions,
    ToypackOptions,
-   IAsset,
+   Asset,
    ToypackLoader,
    ToypackPlugin,
    BundleOptions,
@@ -13,7 +13,7 @@ import PackageManager from "./PackageManager";
 import resolve from "./resolve";
 import bundle from "./bundle";
 import { add as addAsset, AssetOptions } from "./asset";
-import Hooks from "./Hooks";
+import Hooks, { FailedLoaderDescriptor } from "./Hooks";
 import MagicString from "magic-string";
 import { Node } from "@babel/traverse";
 import { getASTImports } from "@toypack/utils";
@@ -22,16 +22,12 @@ import {
    AutoImportJSXPragmaPlugin,
    AutoInstallSubPackagesPlugin,
    NodePolyfillPlugin,
-   DefinePlugin,
 } from "@toypack/plugins";
 import {
    AssetLoader,
-   BabelLoader,
    CSSLoader,
    HTMLLoader,
    JSONLoader,
-   SassLoader,
-   VueLoader,
 } from "@toypack/loaders";
 export const styleExtensions = [".css", ".sass", ".scss", ".less"];
 export const appExtensions = [
@@ -48,7 +44,7 @@ export const resourceExtensions = [".png",".jpg",".jpeg",".gif",".svg",".bmp",".
 export const textExtensions = [...appExtensions, ...styleExtensions];
 
 export default class Toypack {
-   public assets: Map<string, IAsset> = new Map();
+   public assets: Map<string, Asset> = new Map();
    public options: ToypackOptions = cloneDeep(defaultOptions);
    public loaders: ToypackLoader[] = [];
    public plugins: ToypackPlugin[] = [];
@@ -57,7 +53,7 @@ export default class Toypack {
    public packageManager: PackageManager;
    public hooks = new Hooks();
    public _sourceMapConfig: SourceMapOptionsArray | null = null;
-   public _assetCache: Map<string, IAsset> = new Map();
+   public _assetCache: Map<string, Asset> = new Map();
    public bundleContentURL: string | null = null;
    public bundleContentDocURL: string | null = null;
 
@@ -70,23 +66,14 @@ export default class Toypack {
 
       // Default loaders
       this.loaders.push(new AssetLoader());
-      this.loaders.push(new BabelLoader());
       this.loaders.push(new CSSLoader());
       this.loaders.push(new HTMLLoader());
       this.loaders.push(new JSONLoader());
-      this.loaders.push(new SassLoader());
-      this.loaders.push(new VueLoader());
 
       // Default plugins
       this.use(new AutoInstallSubPackagesPlugin());
       this.use(new AutoImportJSXPragmaPlugin());
       this.use(new NodePolyfillPlugin());
-      this.use(
-         new DefinePlugin({
-            __VUE_OPTIONS_API__: true,
-            __VUE_PROD_DEVTOOLS__: false,
-         })
-      );
    }
 
    public _getASTImports(AST: Node | Node[], options?: Options) {
@@ -95,6 +82,30 @@ export default class Toypack {
 
    public _createMagicString(str: string) {
       return new MagicString(str);
+   }
+
+   public async _getLoaderByAsset(asset: Asset) {
+      const getLoaderBySource = (source: string) => {
+         for (let loader of this.loaders) {
+            if (loader.test.test(source)) {
+               return loader;
+            }
+         }
+      };
+
+      let loader = getLoaderBySource(asset.source);
+
+      if (!loader) {
+         // Trigger failed loader hook
+         await this.hooks.trigger("failedLoader", {
+            asset,
+         } as FailedLoaderDescriptor);
+
+         // Retry
+         loader = getLoaderBySource(asset.source);
+      }
+
+      return loader || null;
    }
 
    /**

@@ -11,15 +11,19 @@ import {
    BundleResult,
    ToypackLoader,
    UseLoader,
-   IAsset,
+   Asset,
 } from "./types";
 import createGraph from "./createGraph";
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import applyUMD from "@toypack/formats/umd";
 import babelMinify from "babel-minify";
-import { AfterCompileDescriptor, BeforeCompileDescriptor, DoneDescriptor } from "./Hooks";
-import { create } from "./asset";
+import {
+   AfterCompileDescriptor,
+   BeforeCompileDescriptor,
+   DoneDescriptor,
+} from "./Hooks";
+import { create as createAsset } from "./asset";
 
 const colors = {
    success: "#3fe63c",
@@ -38,30 +42,28 @@ function getTimeColor(time: number) {
    }
 }
 
-async function compileStruct(struct: UseLoader, asset: IAsset, bundler: Toypack) {
+async function compileStruct(
+   struct: UseLoader,
+   asset: Asset,
+   bundler: Toypack
+) {
    const result = {
       failedLoader: false,
       contents: [] as string[],
-      map: new SourceMap()
+      map: new SourceMap(),
    };
 
    const init = async (struct: UseLoader) => {
       for (let [lang, chunks] of Object.entries(struct)) {
          // Get loader
-         let loader: ToypackLoader | null = null;
-         let mockName = "asset." + lang;
-         for (let ldr of bundler.loaders) {
-            if (ldr.test.test(mockName)) {
-               loader = ldr;
-               break;
-            }
-         }
+         let mockName = "_loader_chunk_." + lang;
+         let loader = await bundler._getLoaderByAsset(createAsset(mockName));
 
          // Compile
          if (loader) {
             if (typeof loader.compile == "function") {
                for (let chunk of chunks) {
-                  let mockAsset = create(bundler, mockName, chunk.content);
+                  let mockAsset = createAsset(mockName, chunk.content);
                   mockAsset.loaderData.parse = asset.loaderData.parse;
 
                   let comp = await loader.compile(mockAsset, bundler);
@@ -147,6 +149,13 @@ export default async function bundle(
 
    for (let i = 0; i < graph.length; i++) {
       const asset = graph[i];
+      const loader = await bundler._getLoaderByAsset(asset);
+
+      if (!loader) {
+         throw new Error(
+            `Asset Error: ${asset.source} is not supported. You might want to add a loader for this file type.`
+         );
+      }
 
       let chunkContent = {} as MagicString;
       let chunkSourceMap: SourceMap = new SourceMap();
@@ -158,12 +167,12 @@ export default async function bundle(
       // [1] - Compile
       let compilation: CompiledAsset = {} as CompiledAsset;
       if (asset.isModified || !asset.loaderData.compile?.content) {
-         if (typeof asset.loader.compile == "function") {
+         if (typeof loader.compile == "function") {
             await bundler.hooks.trigger("beforeCompile", {
                asset,
             } as BeforeCompileDescriptor);
 
-            compilation = await asset.loader.compile(asset, bundler);
+            compilation = await loader.compile(asset, bundler);
 
             // Does this asset's loader rely on other loaders?
             // If so, use the other loaders to compile it
@@ -288,7 +297,7 @@ export default async function bundle(
 
    // Trigger done hook
    await bundler.hooks.trigger("done", {
-      content: bundle
+      content: bundle,
    } as DoneDescriptor);
 
    //
