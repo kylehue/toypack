@@ -142,14 +142,13 @@ interface LoaderData {
    parse: ParsedAsset | null;
 }
 
-export interface IAsset {
+export interface Asset {
    id: number;
    name: string;
    source: string;
    content: string | ArrayBuffer;
    type: string;
    extension: string;
-   loader: ToypackLoader;
    loaderData: LoaderData;
    dependencyMap: Object;
    contentURL: string;
@@ -192,12 +191,12 @@ export interface ToypackLoader {
    name: string;
    test: RegExp;
    parse?: (
-      asset: IAsset,
+      asset: Asset,
       bundler: Toypack,
       options?: any
    ) => ParsedAsset | Promise<ParsedAsset>;
    compile?: (
-      asset: IAsset,
+      asset: Asset,
       bundler: Toypack,
       options?: any
    ) => CompiledAsset | Promise<CompiledAsset>;

@@ -1,50 +1,33 @@
 import { isURL, getBtoa } from "@toypack/utils";
 import path from "path-browserify";
 import Toypack, { textExtensions } from "./Toypack";
-import { IAsset } from "./types";
+import { Asset } from "./types";
 import mime from "mime-types";
-
-function getLoader(bundler: Toypack, source: string) {
-   for (let loader of bundler.loaders) {
-      if (loader.test.test(source)) {
-         return loader;
-      }
-   }
-}
 
 var lastId = 0;
 
 export function create(
-   bundler: Toypack,
    source: string,
-   content: string | ArrayBuffer
-): IAsset {
+   content: string | ArrayBuffer = ""
+): Asset {
    let isExternal = isURL(source);
    source = isExternal ? source : path.join("/", source);
 
    let id = ++lastId;
    let type = mime.lookup(source) || "";
    let extension = path.extname(source);
-   let loader = getLoader(bundler, source);
-
-   if (!loader) {
-      throw new Error(
-         `Asset Error: ${source} is not supported. You might want to add a loader for this file type.`
-      );
-   }
 
    let name = "asset-" + id + extension;
    let isResource = !textExtensions.includes(extension);
    let isObscure = isResource || isExternal;
 
-   let asset: IAsset = {
+   let asset: Asset = {
       id,
       name,
       source,
       content,
       type,
       extension,
-      loader,
       loaderData: {
          parse: null,
          compile: null,
@@ -72,7 +55,7 @@ export async function add(
    source: string,
    content: string | ArrayBuffer = "",
    options?: AssetOptions
-): Promise<IAsset> {
+): Promise<Asset> {
    let isExternal = isURL(source);
    source = isExternal ? source : path.join("/", source);
    let cached = bundler.assets.get(source);
@@ -85,7 +68,7 @@ export async function add(
       cached.content = content;
    }
 
-   let asset: IAsset = cached ? cached : create(bundler, source, content);
+   let asset: Asset = cached ? cached : create(source, content);
 
    // Fetch if source is external url and not cached
    if (isExternal && !cached) {
