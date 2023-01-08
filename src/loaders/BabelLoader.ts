@@ -1,11 +1,11 @@
 import {
-   IAsset,
+   Asset,
    ToypackLoader,
    ParsedAsset,
    CompiledAsset,
 } from "@toypack/core/types";
 
-import { parse as getAST, ParseResult, ParserOptions } from "@babel/parser";
+import { parse as getAST, ParserOptions } from "@babel/parser";
 import { transformFromAst, transform } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import { TraverseOptions, Node } from "@babel/traverse";
@@ -50,7 +50,7 @@ export default class BabelLoader implements ToypackLoader {
       this.options = merge(cloneDeep(defaultOptions), options);
    }
 
-   public compile(asset: IAsset, bundler: Toypack) {
+   public compile(asset: Asset, bundler: Toypack) {
       if (typeof asset.content != "string") {
          let error = new Error(
             "Babel Compile Error: Asset content must be string."
@@ -97,7 +97,7 @@ export default class BabelLoader implements ToypackLoader {
       return result;
    }
 
-   public parse(asset: IAsset, bundler: Toypack, options?: ParseOptions) {
+   public parse(asset: Asset, bundler: Toypack, options?: ParseOptions) {
       if (typeof asset.content != "string") {
          let error = new Error(
             "Babel Parse Error: Asset content must be string."

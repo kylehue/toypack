@@ -1,11 +1,11 @@
 import Toypack from "@toypack/core/Toypack";
-import { IAsset, CompiledAsset, ToypackLoader } from "@toypack/core/types";
+import { Asset, CompiledAsset, ToypackLoader } from "@toypack/core/types";
 
 export default class JSONLoader implements ToypackLoader {
    public name = "JSONLoader";
    public test = /\.json$/;
 
-   public compile(asset: IAsset, bundler: Toypack) {
+   public compile(asset: Asset, bundler: Toypack) {
       if (typeof asset.content != "string") {
          let error = new Error(
             "JSON Compile Error: Asset content must be string."

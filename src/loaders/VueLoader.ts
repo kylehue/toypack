@@ -1,6 +1,6 @@
 import Toypack from "@toypack/core/Toypack";
 import {
-   IAsset,
+   Asset,
    CompiledAsset,
    ToypackLoader,
    ParsedAsset,
@@ -49,7 +49,7 @@ export default class VueLoader implements ToypackLoader {
    public name = "VueLoader";
    public test = /\.vue$/;
 
-   public parse(asset: IAsset, bundler: Toypack) {
+   public parse(asset: Asset, bundler: Toypack) {
       if (typeof asset.content != "string") {
          throw new Error("Vue Parse Error: Asset content must be string.");
       }
@@ -146,7 +146,7 @@ export default class VueLoader implements ToypackLoader {
       return result;
    }
 
-   public compile(asset: IAsset, bundler: Toypack) {
+   public compile(asset: Asset, bundler: Toypack) {
       if (typeof asset.content != "string") {
          throw new Error("Vue Compile Error: Asset content must be string.");
       }
