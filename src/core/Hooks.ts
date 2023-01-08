@@ -1,12 +1,12 @@
 import { Bundle } from "magic-string";
 import SourceMap from "./SourceMap";
-import { IAsset, CompiledAsset } from "./types";
+import { Asset, CompiledAsset } from "./types";
 
 export type HookName = keyof Omit<Hooks, "taps" | "trigger">;
 
 export interface FailedResolveDescriptor {
    target: string;
-   parent: IAsset;
+   parent: Asset;
    changeResolved: (newResolved: string) => void;
 }
 
@@ -15,7 +15,7 @@ type FailedResolveCallback = (
 ) => void | Promise<any>;
 
 export interface BeforeCompileDescriptor {
-   asset: IAsset;
+   asset: Asset;
 }
 
 type BeforeCompileCallback = (
@@ -24,20 +24,32 @@ type BeforeCompileCallback = (
 
 export interface AfterCompileDescriptor {
    compilation: CompiledAsset;
-   asset: IAsset;
+   asset: Asset;
 }
 
 type AfterCompileCallback = (
    descriptor: AfterCompileDescriptor
 ) => void | Promise<any>;
 
+export interface ParseDescriptor {
+   asset: Asset;
+}
+
+type ParseCallback = (descriptor: ParseDescriptor) => void | Promise<any>;
+
+export interface FailedLoaderDescriptor {
+   asset: Asset;
+}
+
+type FailedLoaderCallback = (
+   descriptor: FailedLoaderDescriptor
+) => void | Promise<any>;
+
 export interface DoneDescriptor {
    content: Bundle;
 }
 
-type DoneCallback = (
-   descriptor: DoneDescriptor
-) => void | Promise<any>;
+type DoneCallback = (descriptor: DoneDescriptor) => void | Promise<any>;
 
 export default class Hooks {
    public taps: Map<HookName, Function[]> = new Map();
@@ -76,6 +88,14 @@ export default class Hooks {
 
    public beforeCompile(fn: BeforeCompileCallback) {
       this._tapHook("beforeCompile", fn);
+   }
+
+   public parse(fn: ParseCallback) {
+      this._tapHook("parse", fn);
+   }
+
+   public failedLoader(fn: FailedLoaderCallback) {
+      this._tapHook("failedLoader", fn);
    }
 
    public done(fn: DoneCallback) {
