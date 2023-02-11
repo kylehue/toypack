@@ -6,7 +6,12 @@ import {
 } from "@toypack/core/types";
 
 import { parse as getAST, ParserOptions } from "@babel/parser";
-import { transformFromAst, transform } from "@babel/standalone";
+import {
+   transformFromAst,
+   transform,
+   registerPlugin,
+   registerPreset,
+} from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import { TraverseOptions, Node } from "@babel/traverse";
 import { TransformOptions } from "@babel/core";
@@ -28,6 +33,8 @@ const defaultParseOptions: ParserOptions = {
 const defaultOptions: BabelLoaderOptions = {
    transformOptions: defaultTransformOptions,
    parseOptions: defaultParseOptions,
+   registerPlugins: [],
+   registerPresets: []
 };
 
 interface BabelLoaderOptions {
@@ -36,6 +43,8 @@ interface BabelLoaderOptions {
     */
    transformOptions?: TransformOptions;
    parseOptions?: ParserOptions;
+   registerPlugins?: [string, object | (() => void)][];
+   registerPresets?: [string, object | (() => void)][];
 }
 
 export interface ParseOptions {
@@ -48,6 +57,18 @@ export default class BabelLoader implements ToypackLoader {
 
    constructor(public options?: BabelLoaderOptions) {
       this.options = merge(cloneDeep(defaultOptions), options);
+
+      if (this.options?.registerPlugins?.length) {
+         for (let plugin of this.options.registerPlugins) {
+            registerPlugin(plugin[0], plugin[1]);
+         }
+      }
+
+      if (this.options?.registerPresets?.length) {
+         for (let preset of this.options.registerPresets) {
+            registerPreset(preset[0], preset[1]);
+         }
+      }
    }
 
    public compile(asset: Asset, bundler: Toypack) {
