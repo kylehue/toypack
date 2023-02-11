@@ -195,7 +195,12 @@ export default class CSSLoader implements ToypackLoader {
          "\\`"
       )}\`);`;
 
-      result.content?.update(0, result.content.length(), styleContent);
+      if (result.content?.length()) {
+         result.content.update(0, result.content.length(), styleContent);
+      } else {
+         result.content.prepend(styleContent);
+      }
+
       result.content?.append(getTemplate(asset.id));
 
       // Avoid style duplicates

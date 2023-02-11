@@ -112,7 +112,10 @@ export default class HTMLLoader implements ToypackLoader {
 
       if (metadata) {
          let chunk = bundler._createMagicString(asset.content);
-         chunk.update(0, chunk.length(), "");
+         
+         if (chunk.length()) {
+            chunk.update(0, chunk.length(), "");
+         }
 
          // Transforms HTML AST into a javascript code and appends it to chunk
          function transformAndAppend(node: HTMLNode) {
