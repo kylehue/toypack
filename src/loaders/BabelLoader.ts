@@ -131,7 +131,7 @@ export default class BabelLoader implements ToypackLoader {
          metadata: {},
       };
 
-      if (!asset.isObscure) {
+      if (!asset.isObscure || asset.isExternal) {
          const AST = options?.AST
             ? options.AST
             : getAST(asset.content, {
