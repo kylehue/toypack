@@ -51,6 +51,14 @@ export interface DoneDescriptor {
 
 type DoneCallback = (descriptor: DoneDescriptor) => void | Promise<any>;
 
+export interface InstallPackageDescriptor {
+   name: string;
+   version: string;
+   subpath: string;
+}
+
+type InstallPackageCallback = (descriptor: InstallPackageDescriptor) => void | Promise<any>;
+
 export default class Hooks {
    public taps: Map<HookName, Function[]> = new Map();
 
@@ -100,5 +108,9 @@ export default class Hooks {
 
    public done(fn: DoneCallback) {
       this._tapHook("done", fn);
+   }
+
+   public installPackage(fn: InstallPackageCallback) {
+      this._tapHook("installPackage", fn);
    }
 }

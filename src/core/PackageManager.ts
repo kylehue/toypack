@@ -4,6 +4,7 @@ import MagicString from "magic-string";
 import { parse as parsePackageName } from "parse-package-name";
 import { parse as getAST } from "@babel/parser";
 import { isLocal } from "@toypack/utils";
+import { InstallPackageDescriptor } from "./Hooks";
 
 const packageProviders = {
    "esm.sh": "https://esm.sh/",
@@ -32,7 +33,7 @@ export default class PackageManager {
       this.providerRegex = new RegExp(this.provider.replace(/\./g, "\\."));
    }
 
-   private async _createGraph(name: string, entryURL: string) {
+   public async _createGraph(name: string, entryURL: string) {
       const graph: Dependency[] = [];
       const bundlerAssets = Object.fromEntries(this.bundler.assets);
       const bundlerAssetSources = Object.keys(bundlerAssets);
@@ -65,7 +66,10 @@ export default class PackageManager {
          // Fetch
          let fetchResponse = await fetch(url);
          if (!fetchResponse.ok) {
-            throw new Error(`Failed to fetch ${url}.`);
+            if (this.bundler.options.bundleOptions?.logs) {
+               console.warn(`Failed to fetch ${url}.`);
+               return;
+            }
          }
 
          let content = await fetchResponse.text();
@@ -77,6 +81,7 @@ export default class PackageManager {
                AST = getAST(content, {
                   sourceType: "module",
                   sourceFilename: designatedSource,
+                  plugins: ["typescript"]
                });
             }
          } catch (error) {
@@ -219,6 +224,12 @@ export default class PackageManager {
          
          await this.bundler.addAsset("/package.json", newPackage);
       }
+
+      this.bundler.hooks.trigger("installPackage", {
+         name: pkg.name,
+         version: pkg.version,
+         subpath: pkg.path
+      } as InstallPackageDescriptor);
 
       if (this.bundler.options.bundleOptions?.logs) {
          console.log(
