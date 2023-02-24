@@ -138,9 +138,7 @@ export default class HTMLLoader implements ToypackLoader {
             } else if (node instanceof ITextNode) {
                if (!node.isWhitespace) {
                   // Instantiate text
-                  let textNodeCode = `"".concat(\"${node.rawText
-                     .split("\n")
-                     .join('").concat("')}\")`;
+                  let textNodeCode = `\`${node.rawText}\``;
                   chunk.prepend(
                      `var ${nodeVarId} = document.createTextNode(${textNodeCode});`
                   );
