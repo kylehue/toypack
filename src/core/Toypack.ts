@@ -21,7 +21,6 @@ import { Options } from "@toypack/utils/getASTImports";
 import {
    AutoImportJSXPragmaPlugin,
    AutoInstallSubPackagesPlugin,
-   NodePolyfillPlugin,
 } from "@toypack/plugins";
 import {
    AssetLoader,
@@ -29,6 +28,7 @@ import {
    HTMLLoader,
    JSONLoader,
 } from "@toypack/loaders";
+import createGraph from "./createGraph";
 export const styleExtensions = [".css", ".sass", ".scss", ".less"];
 export const appExtensions = [
    ".js",
@@ -73,7 +73,6 @@ export default class Toypack {
       // Default plugins
       this.use(new AutoInstallSubPackagesPlugin());
       this.use(new AutoImportJSXPragmaPlugin());
-      this.use(new NodePolyfillPlugin());
    }
 
    public _getASTImports(AST: Node | Node[], options?: Options) {
@@ -168,5 +167,15 @@ export default class Toypack {
     */
    public async bundle(options?: BundleOptions) {
       return await bundle(this, options);
+   }
+
+   /**
+    * Create a dependency graph starting from the entry point.
+    * 
+    * @param source - The entry point of the graph.
+    * @returns {Promise<BundleResult>} An array of assets.
+    */
+   public async createGraph(source: string) {
+      return await createGraph(this, source);
    }
 }
