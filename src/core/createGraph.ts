@@ -62,16 +62,16 @@ export default async function createGraph(
 
    let loader = await bundler._getLoaderByAsset(asset);
 
-   if (!loader) {
+   /* if (!loader) {
       throw new Error(
          `Asset Error: ${asset.source} is not supported. You might want to add a loader for this file type.`
       );
-   }
+   } */
 
    if (
-      isExternal ||
+      // isExternal ||
       typeof asset.content != "string" ||
-      typeof loader.parse != "function"
+      typeof loader?.parse != "function"
    ) {
       graph.push(asset);
       asset.isModified = false;
