@@ -24,7 +24,10 @@ const defaultTransformOptions: TransformOptions = {
    sourceType: "module",
    compact: false,
    presets: ["typescript", "react", "env"],
-   plugins: [addModuleExportsPlugin],
+   plugins: [
+      addModuleExportsPlugin,
+      availablePlugins["transform-typescript"],
+   ],
    comments: false,
 };
 
@@ -39,6 +42,9 @@ const defaultOptions: BabelLoaderOptions = {
    registerPlugins: [],
    registerPresets: [],
 };
+
+console.log(availablePlugins);
+
 
 interface BabelLoaderOptions {
    /**

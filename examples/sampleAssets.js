@@ -20,7 +20,10 @@ console.log(coolImg, logo);
 //console.log(v4());
 // import fs from "fs";
 // console.log(fs);
-
+export default class Circle {
+   constructor(public x: number) {
+   }
+}
 import "../styles/sampleSass1.scss";
 import "../react/main";
 import * as Vue from "vue";
