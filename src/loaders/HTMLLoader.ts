@@ -17,6 +17,8 @@ import { join } from "path-browserify";
 
 type HTMLNode = INode | IHTMLElement | ITextNode;
 function walk(AST: INode, fn: (node: HTMLNode) => void) {
+   if (!AST) return;
+
    fn(AST);
    for (let node of AST.childNodes) {
       if (node.nodeType == 1 || node.nodeType == 3) {
@@ -169,13 +171,17 @@ export default class HTMLLoader implements ToypackLoader {
          });
 
          // Add head and body element variables
-         chunk.prepend(
-            `var ${metadata.body.varId} = document.body || document.getElementsByTagName("body")[0];`
-         );
+         if (metadata.body) {
+            chunk.prepend(
+               `var ${metadata.body.varId} = document.body || document.getElementsByTagName("body")[0];`
+            );
+         }
 
-         chunk.prepend(
-            `var ${metadata.head.varId} = document.head || document.getElementsByTagName("head")[0];`
-         );
+         if (metadata.head) {
+            chunk.prepend(
+               `var ${metadata.head.varId} = document.head || document.getElementsByTagName("head")[0];`
+            );
+         }
 
          // Imports
          let dependencies = asset.loaderData.parse?.dependencies;
