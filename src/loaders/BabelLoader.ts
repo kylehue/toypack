@@ -11,17 +11,20 @@ import {
    transform,
    registerPlugin,
    registerPreset,
+   availablePlugins,
 } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import { TraverseOptions, Node } from "@babel/traverse";
 import { TransformOptions } from "@babel/core";
 import { merge, cloneDeep } from "lodash-es";
 import SourceMap from "@toypack/core/SourceMap";
+import addModuleExportsPlugin from "babel-plugin-add-module-exports";
 
 const defaultTransformOptions: TransformOptions = {
    sourceType: "module",
    compact: false,
    presets: ["typescript", "react", "env"],
+   plugins: [addModuleExportsPlugin],
    comments: false,
 };
 
@@ -34,7 +37,7 @@ const defaultOptions: BabelLoaderOptions = {
    transformOptions: defaultTransformOptions,
    parseOptions: defaultParseOptions,
    registerPlugins: [],
-   registerPresets: []
+   registerPresets: [],
 };
 
 interface BabelLoaderOptions {
@@ -103,6 +106,7 @@ export default class BabelLoader implements ToypackLoader {
 
          if (transpiled?.code) {
             let chunk = bundler._createMagicString(transpiled.code);
+
             result.content = chunk;
 
             if (transpiled.map) {

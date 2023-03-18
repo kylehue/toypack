@@ -12,6 +12,8 @@ console.log(confetti);
 import coolImg from "../assets/sample.jpg";
 import logo from "../public/logo.svg";
 console.log(coolImg, logo);
+import Matter, {Bodies} from "matter-js";
+console.log(Matter, Bodies.rectangle);
 //import path, { dirname } from "path";
 //console.log(path, dirname("path/to/some/file.txt"));
 //import { v4 } from "uuid";
@@ -21,7 +23,9 @@ console.log(coolImg, logo);
 
 import "../styles/sampleSass1.scss";
 import "../react/main";
-import { createApp } from "vue";
+import * as Vue from "vue";
+import {createApp} from "vue";
+console.log(Vue, createApp);
 import App from "../vue/App.vue";
 createApp(App).mount("#vueroot");
 (async() => {
