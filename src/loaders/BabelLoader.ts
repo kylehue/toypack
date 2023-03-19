@@ -11,7 +11,6 @@ import {
    transform,
    registerPlugin,
    registerPreset,
-   availablePlugins,
 } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import { TraverseOptions, Node } from "@babel/traverse";
@@ -20,14 +19,13 @@ import { merge, cloneDeep } from "lodash-es";
 import SourceMap from "@toypack/core/SourceMap";
 import addModuleExportsPlugin from "babel-plugin-add-module-exports";
 
+registerPlugin("add-module-exports", addModuleExportsPlugin);
+
 const defaultTransformOptions: TransformOptions = {
    sourceType: "module",
    compact: false,
    presets: ["typescript", "react", "env"],
-   plugins: [
-      availablePlugins["transform-typescript"],
-      addModuleExportsPlugin,
-   ],
+   plugins: ["transform-typescript", "add-module-exports"],
    comments: false,
 };
 
