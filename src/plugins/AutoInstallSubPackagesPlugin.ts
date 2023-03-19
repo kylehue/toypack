@@ -7,25 +7,29 @@ export default class AutoInstallSubPackagesPlugin implements ToypackPlugin {
    apply(bundler: Toypack) {
       bundler.hooks.failedResolve(async (descriptor) => {
          const currentDeps = bundler.packageManager.dependencies;
-         const pkg = parsePackageName(descriptor.target);
+         try {
+            const pkg = parsePackageName(descriptor.target);
 
-         // Only auto-install if there's a subpath
-         if (pkg.path) {
-            let mainPackageVersion = currentDeps[pkg.name];
+            // Only auto-install if there's a subpath
+            if (pkg.path) {
+               let mainPackageVersion = currentDeps[pkg.name];
 
-            // Install if main package is installed
-            if (mainPackageVersion) {
-               await bundler.packageManager.install(
-                  pkg.name + pkg.path,
-                  mainPackageVersion
-               );
+               // Install if main package is installed
+               if (mainPackageVersion) {
+                  await bundler.packageManager.install(
+                     pkg.name + pkg.path,
+                     mainPackageVersion
+                  );
 
-               let newResolved = await bundler.resolve(descriptor.target, {
-                  baseDir: dirname(descriptor.parent.source),
-               });
+                  let newResolved = await bundler.resolve(descriptor.target, {
+                     baseDir: dirname(descriptor.parent.source),
+                  });
 
-               descriptor.changeResolved(newResolved);
+                  descriptor.changeResolved(newResolved);
+               }
             }
+         } catch (error) {
+            console.warn(error);
          }
       });
    }

@@ -33,7 +33,10 @@ export default class PackageManager {
       this.providerRegex = new RegExp(this.provider.replace(/\./g, "\\."));
    }
 
-   public async _createGraph(name: string, entryURL: string) {
+   public async _createGraph(
+      pkg: ReturnType<typeof parsePackageName>,
+      entryURL: string
+   ) {
       const graph: Dependency[] = [];
       const bundlerAssets = Object.fromEntries(this.bundler.assets);
       const bundlerAssetSources = Object.keys(bundlerAssets);
@@ -48,11 +51,14 @@ export default class PackageManager {
             // Skip if not a core module
             if (!source.startsWith("/node_modules/")) continue;
 
+            let target = source.replace("/node_modules/", "");
             let subpath = getCoreModuleSubpath(source);
             let isSameSource = subpath === designatedSource;
 
-            if (isSameSource) {
-               let target = source.replace("/node_modules/", "");
+            // If the target sources are the same, refrain from deduplicating them as doing so will result in overwriting the original asset and causing the loss of the original content.
+            let hasSameTargetSource = path.join(pkg.name, subpath) === target;
+
+            if (isSameSource && !hasSameTargetSource) {
                let content = `export * from "${target}";\nexport {default} from "${target}";`;
                graph.push({
                   content,
@@ -111,7 +117,7 @@ export default class PackageManager {
                   dependencies.push(absolute);
                }
 
-               chunk.update(node.start, node.end, `"${name}${absolute}"`);
+               chunk.update(node.start, node.end, `"${pkg.name}${absolute}"`);
             }
 
             content = chunk.toString();
@@ -182,7 +188,7 @@ export default class PackageManager {
       if (cached) {
          graph = cached;
       } else {
-         graph = await this._createGraph(pkg.name, url);
+         graph = await this._createGraph(pkg, url);
       }
 
       // Fix entry's source

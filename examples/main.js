@@ -49,6 +49,7 @@ toypack.use(
    await toypack.packageManager.install("vue");
    await toypack.packageManager.install("matter-js");
    await toypack.packageManager.install("react");
+   await toypack.packageManager.install("react-dom");
    await toypack.packageManager.install("react-dom/client");
 
    await toypack.bundle();
