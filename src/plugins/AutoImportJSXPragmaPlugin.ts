@@ -10,5 +10,13 @@ export default class AutoImportJSXPragmaPlugin implements ToypackPlugin {
             );
          }
       });
+
+      bundler.hooks.parse((descriptor) => {
+         if (/\.[jt]sx$/.test(descriptor.asset.source)) {
+            descriptor.asset.loaderData.parse?.dependencies.push({
+               source: "react",
+            });
+         }
+      });
    }
 }
