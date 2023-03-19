@@ -16,7 +16,8 @@ export default class AutoInstallSubPackagesPlugin implements ToypackPlugin {
             // Install if main package is installed
             if (mainPackageVersion) {
                await bundler.packageManager.install(
-                  pkg.name + "@" + mainPackageVersion + pkg.path
+                  pkg.name + pkg.path,
+                  mainPackageVersion
                );
 
                let newResolved = await bundler.resolve(descriptor.target, {

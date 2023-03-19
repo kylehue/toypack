@@ -81,7 +81,7 @@ export default class PackageManager {
                AST = getAST(content, {
                   sourceType: "module",
                   sourceFilename: designatedSource,
-                  plugins: ["typescript"]
+                  plugins: ["typescript"],
                });
             }
          } catch (error) {
@@ -141,17 +141,17 @@ export default class PackageManager {
    /**
     * Adds a package to the bundler.
     *
-    * @param {string} source The package source. Format is `<name>@<version><subpath>`
+    * @param {string} source The package source.
+    * @param {string} [version="latest"] The package version.
     * @example
     *
     * install("bootstrap");
-    * install("bootstrap@5.2");
-    * install("bootstrap@5.2/dist/css/bootstrap.min.css");
+    * install("bootstrap", "5.2.0");
+    * install("bootstrap/dist/css/bootstrap.min.css", "5.2.0");
     */
-   public async install(source: string) {
+   public async install(source: string, version = "latest") {
       let pkg = parsePackageName(source);
       let name = pkg.name;
-      let version = pkg.version;
       let subpath = pkg.path;
 
       // Fetch
@@ -212,7 +212,7 @@ export default class PackageManager {
       if (typeof assetPackage?.content == "string") {
          let assetPackageParsed = JSON.parse(assetPackage.content);
          assetPackageParsed.dependencies = this.dependencies;
-         
+
          await this.bundler.addAsset(
             "/package.json",
             JSON.stringify(assetPackageParsed)
@@ -221,14 +221,14 @@ export default class PackageManager {
          let newPackage = JSON.stringify({
             dependencies: this.dependencies,
          });
-         
+
          await this.bundler.addAsset("/package.json", newPackage);
       }
 
       this.bundler.hooks.trigger("installPackage", {
          name: pkg.name,
-         version: pkg.version,
-         subpath: pkg.path
+         version: version,
+         subpath: pkg.path,
       } as InstallPackageDescriptor);
 
       if (this.bundler.options.bundleOptions?.logs) {
