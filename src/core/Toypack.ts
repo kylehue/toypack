@@ -163,15 +163,20 @@ export default class Toypack {
     * Bundles the assets starting from the entry point.
     *
     * @param {object} [options] - Bundle options.
+    * @param {boolean} [bundleType = "soft"] - When set to `soft`, it will only recompile assets that have been modified, whereas `hard` will recompile everything.
     * @returns {Promise<BundleResult>} A bundle result.
     */
-   public async bundle(options?: BundleOptions) {
+   public async bundle(options?: BundleOptions, bundleType: "soft" | "hard" = "soft") {
+      if (bundleType == "hard") {
+         this._assetCache.clear();
+      }
+
       return await bundle(this, options);
    }
 
    /**
     * Create a dependency graph starting from the entry point.
-    * 
+    *
     * @param source - The entry point of the graph.
     * @returns {Promise<BundleResult>} An array of assets.
     */
