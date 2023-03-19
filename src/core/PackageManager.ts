@@ -34,7 +34,7 @@ export default class PackageManager {
    }
 
    public async _createGraph(
-      pkg: ReturnType<typeof parsePackageName>,
+      pkgName: string,
       entryURL: string
    ) {
       const graph: Dependency[] = [];
@@ -56,7 +56,7 @@ export default class PackageManager {
             let isSameSource = subpath === designatedSource;
 
             // If the target sources are the same, refrain from deduplicating them as doing so will result in overwriting the original asset and causing the loss of the original content.
-            let hasSameTargetSource = path.join(pkg.name, subpath) === target;
+            let hasSameTargetSource = path.join(pkgName, subpath) === target;
 
             if (isSameSource && !hasSameTargetSource) {
                let content = `export * from "${target}";\nexport {default} from "${target}";`;
@@ -117,7 +117,7 @@ export default class PackageManager {
                   dependencies.push(absolute);
                }
 
-               chunk.update(node.start, node.end, `"${pkg.name}${absolute}"`);
+               chunk.update(node.start, node.end, `"${pkgName}${absolute}"`);
             }
 
             content = chunk.toString();
@@ -188,7 +188,7 @@ export default class PackageManager {
       if (cached) {
          graph = cached;
       } else {
-         graph = await this._createGraph(pkg, url);
+         graph = await this._createGraph(pkg.name, url);
       }
 
       // Fix entry's source
