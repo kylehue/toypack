@@ -20,10 +20,16 @@ console.log(coolImg, logo);
 //console.log(v4());
 // import fs from "fs";
 // console.log(fs);
+import { Bodies } from "matter-js";
+
 export default class Circle {
+   public body;
    constructor(public x: number) {
+      this.body = Bodies.rectangle(1, 2, 3, 4);
    }
 }
+
+console.log(new Circle(1), Bodies);
 import "../styles/sampleSass1.scss";
 import "../react/main";
 import * as Vue from "vue";
@@ -104,11 +110,8 @@ body {
    
    
 	"react/main.jsx": `
-import React from "react";
 import ReactDOM from 'react-dom/client';
 import App from "./App";
-const React2 = require("react");
-const {default: React3} = require("react");
 ReactDOM.createRoot(document.querySelector("#root")).render(
 	<App foo="bar"></App>
 );
