@@ -56,10 +56,6 @@ export default async function createGraph(
       throw new Error(`Graph Error: Cannot find asset ${source}`);
    }
 
-   await bundler.hooks.trigger("parse", {
-      asset,
-   } as ParseDescriptor);
-
    let loader = await bundler._getLoaderByAsset(asset);
 
    /* if (!loader) {
@@ -113,6 +109,10 @@ export default async function createGraph(
       // Update asset's loader data
       asset.loaderData.parse = parseData;
       asset.dependencyMap = {};
+
+      await bundler.hooks.trigger("parse", {
+         asset,
+      } as ParseDescriptor);
 
       // Add to graph
       graph.push(asset);
