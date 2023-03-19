@@ -1,5 +1,5 @@
 import { isLocal, isURL } from "@toypack/utils";
-import path from "path-browserify";
+import path, { parse } from "path-browserify";
 import Toypack, { textExtensions, resourceExtensions } from "./Toypack";
 import { ResolveOptions } from "./types";
 
@@ -83,17 +83,25 @@ function loadAsDirectory(bundler: Toypack, x: string, extensions: string[]) {
 }
 
 function loadAsFile(bundler: Toypack, x: string, extensions: string[]) {
-   let parsedPath = path.parse(x);
-   let noExt = path.join(parsedPath.dir, parsedPath.name);
-
-   for (let i = 0; i < extensions.length; i++) {
-      let extension = extensions[i];
-      let asset = bundler.assets.get(noExt + extension);
-
+   if (path.extname(x)) {
+      // Get exact match if there's a file extension
+      let asset = bundler.assets.get(x);
+      
       if (asset) {
          return asset.source;
       }
+   } else {
+      // If there's no extension, get matching paths while ignoring the extensions
+      for (let i = 0; i < extensions.length; i++) {
+         let extension = extensions[i];
+         let asset = bundler.assets.get(x + extension);
+
+         if (asset) {
+            return asset.source;
+         }
+      }
    }
+   
 
    return "";
 }
