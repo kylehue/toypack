@@ -118,14 +118,11 @@ export default class VueLoader implements ToypackLoader {
          ...extractDeps(scriptCompilation.scriptSetupAst)
       );
 
-      // Add "vue" dependency if template is compiled
-      // This is because we aren't using "extractDeps" on template compilation
-      if (result.metadata.needToCompileTemplate) {
-         if (!result.dependencies.some((d) => d.source === "vue")) {
-            result.dependencies.push({
-               source: "vue",
-            });
-         }
+      // Add "vue" dependency
+      if (!result.dependencies.some((d) => d.source === "vue")) {
+         result.dependencies.push({
+            source: "vue",
+         });
       }
 
       // Parse style
