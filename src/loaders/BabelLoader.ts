@@ -57,7 +57,7 @@ export interface ParseOptions {
 
 export default class BabelLoader implements ToypackLoader {
    public name = "BabelLoader";
-   public test = /\.([jt]sx?)$/;
+   public test = /\.([jt]sx?|[cm]js)$/;
 
    constructor(public options?: BabelLoaderOptions) {
       this.options = merge(cloneDeep(defaultOptions), options);

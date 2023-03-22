@@ -32,6 +32,8 @@ import createGraph from "./createGraph";
 export const styleExtensions = [".css", ".sass", ".scss", ".less"];
 export const appExtensions = [
    ".js",
+   ".mjs",
+   ".cjs",
    ".json",
    ".jsx",
    ".ts",
