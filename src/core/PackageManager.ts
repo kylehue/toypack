@@ -164,13 +164,13 @@ export default class PackageManager {
       let target = `${name}@${version}${subpath}`;
 
       // Dev mode
-      /* if (this.provider == packageProviders["esm.sh"]) {
+      if (this.provider == packageProviders["esm.sh"]) {
          if (this.bundler.options.bundleOptions?.mode === "development") {
             target += "?dev";
          } else {
             target += "?prod";
          }
-      } */
+      }
 
       let url = `${this.provider}${target}`;
 
