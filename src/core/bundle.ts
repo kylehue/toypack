@@ -56,7 +56,7 @@ async function compileStruct(
    const init = async (struct: UseLoader) => {
       for (let [lang, chunks] of Object.entries(struct)) {
          // Get loader
-         let mockName = "_loader_chunk_." + lang;
+         let mockName = asset.source + "." + lang;
          let loader = await bundler._getLoaderByAsset(createAsset(mockName));
 
          // Compile
