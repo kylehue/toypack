@@ -100,10 +100,10 @@ body {
 	
 	
 	
-	"styles/sampleSass2.scss": `
-@mixin bigRedText {
-	font-size: 50px;
-	color: red;
+	"vue/sampleSass2.scss": `
+@mixin bam {
+   font-weight: bold;
+   color: red;
 }
 `,
 
@@ -151,45 +151,22 @@ const stylesheet = {
      
 	"vue/App.vue": `
 <template>
-<h1 class="vue-theme">Hello vue!</h1>
-<button @click="increment">Click me!</button>
-<h3>{{counter}}</h3>
+   <button>{{hello || "default"}}</button>
 </template>
 
-<script lang="ts">
-export default {}
-console.log(456);
+<script setup>
+const props = defineProps({
+   hello: String
+});
 </script>
-
-<script setup lang="ts">
-import { ref } from "vue";
-var counter = ref(0);
-var hello: string = "Hello world!";
-function increment() {
-	counter.value += 1;
-}
-
-console.log(hello);
-</script>
-
-<style scoped>
-.vue-theme {
-	color: #24f05a;
-	background: #2a2b30;
-}
-</style>
 
 <style lang="scss" scoped>
-@import "../styles/sampleSass2.scss";
-@mixin coolText{
-	color: white;
-	border: 4px solid gold;
-	box-shadow: 0 0 8px 4px yellow;
-}
+@import "./sampleSass2.scss";
 
-h3 {
-	@include coolText;
-	@include bigRedText;
+button {
+   background: yellow;
+
+   @include bam;
 }
 </style>
 `,
