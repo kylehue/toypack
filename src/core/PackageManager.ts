@@ -210,8 +210,7 @@ export default class PackageManager {
       }
 
       // Update dependencies
-      let versionTag = version == "latest" ? version : "^" + version;
-      this.dependencies[name] = versionTag;
+      this.dependencies[name] = version;
 
       // Update package.json
       let assetPackage = this.bundler.assets.get("/package.json");
