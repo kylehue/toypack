@@ -82,6 +82,14 @@ export default class VueLoader implements ToypackLoader {
       let descriptor = parsedSFC.descriptor;
       result.metadata.descriptor = descriptor;
 
+      if (!descriptor.script && !descriptor.scriptSetup) {
+         descriptor.script = {
+            attrs: {},
+            content: "export default {}",
+            type: "script"
+         } as SFCScriptBlock;
+      }
+
       // Only compile template if there's no script setup
       // This is because template is inlined when there's script setup
       result.metadata.needToCompileTemplate =
