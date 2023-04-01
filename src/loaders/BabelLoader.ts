@@ -10,7 +10,9 @@ import {
    transformFromAst,
    transform,
    registerPlugin,
-   registerPreset
+   registerPreset,
+   availablePlugins,
+   availablePresets
 } from "@babel/standalone";
 import Toypack from "@toypack/core/Toypack";
 import { TraverseOptions, Node } from "@babel/traverse";
@@ -24,14 +26,14 @@ registerPlugin("add-module-exports", addModuleExportsPlugin);
 const defaultTransformOptions: TransformOptions = {
    sourceType: "module",
    compact: false,
-   presets: ["typescript", "react", "env"],
-   plugins: ["transform-typescript", "add-module-exports"],
+   presets: [],
+   plugins: ["add-module-exports"],
    comments: false,
 };
 
 const defaultParseOptions: ParserOptions = {
    sourceType: "module",
-   plugins: ["typescript", "jsx"],
+   plugins: [],
 };
 
 const defaultOptions: BabelLoaderOptions = {
@@ -59,12 +61,20 @@ export default class BabelLoader implements ToypackLoader {
       this.options = merge(cloneDeep(defaultOptions), options);
    }
 
-   public registerPlugin(name: string, plugin: object | (() => void)) {
+   static registerPlugin(name: string, plugin: object | (() => void)) {
       registerPlugin(name, plugin);
    }
 
-   public registerPreset(name: string, preset: object | (() => void)) {
+   static registerPreset(name: string, preset: object | (() => void)) {
       registerPreset(name, preset);
+   }
+
+   static getAvailablePlugins() {
+      return availablePlugins;
+   }
+
+   static getAvailablePresets() {
+      return availablePresets;
    }
 
    public compile(asset: Asset, bundler: Toypack) {
