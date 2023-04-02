@@ -27,7 +27,7 @@ const defaultTransformOptions: TransformOptions = {
    sourceType: "module",
    compact: false,
    presets: [],
-   plugins: ["add-module-exports"],
+   plugins: [],
    comments: false,
 };
 
