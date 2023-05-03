@@ -1,28 +1,28 @@
 {
+   "include": ["./src/**/*.ts"],
    "compilerOptions": {
-      "target": "ES6",
-      "module": "ES6",
-      "lib": ["ES6", "DOM"],
-      "moduleResolution": "Node",
-      "useDefineForClassFields": true,
-      "strict": true,
-      "isolatedModules": false,
-      "esModuleInterop": true,
-      "noEmit": false,
-      "noUnusedLocals": false,
-      "noUnusedParameters": false,
-      "noImplicitReturns": false,
-      "skipLibCheck": true,
-      "baseUrl": ".",
+      "lib": ["es2022", "dom"],
+      "module": "esnext",
+      "target": "es2022",
+      "moduleResolution": "nodenext",
       "rootDir": "./src",
-      "paths": {
-         "@toypack/*": ["./src/*"]
-      },
+      "outDir": "build",
+      "baseUrl": ".",
+      "strict": true,
       "sourceMap": true,
-      "outDir": "lib",
+      "esModuleInterop": true,
+      "allowSyntheticDefaultImports": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
       "declaration": true,
-      "declarationDir": "lib",
-      "noImplicitAny": false
+      "resolveJsonModule": true
    },
-   "include": ["./src/**/*.ts"]
+   "tsc-alias": {
+      "verbose": false,
+      "resolveFullPaths": true,
+      "fileExtensions": {
+         "inputGlob": "js,jsx,mjs",
+         "outputCheck": ["js", "json", "jsx", "mjs"]
+      }
+   }
 }

@@ -1,2 +1,7 @@
-node_modules
-/lib
+build/
+browser/
+example-build/
+node_modules/
+.nyc_output/
+coverage/
+.DS_Store
