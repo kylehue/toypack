@@ -4,7 +4,7 @@
       "lib": ["es2022", "dom"],
       "module": "esnext",
       "target": "es2022",
-      "moduleResolution": "nodenext",
+      "moduleResolution": "node",
       "rootDir": "./src",
       "outDir": "build",
       "baseUrl": ".",
@@ -16,13 +16,5 @@
       "forceConsistentCasingInFileNames": true,
       "declaration": true,
       "resolveJsonModule": true
-   },
-   "tsc-alias": {
-      "verbose": false,
-      "resolveFullPaths": true,
-      "fileExtensions": {
-         "inputGlob": "js,jsx,mjs",
-         "outputCheck": ["js", "json", "jsx", "mjs"]
-      }
    }
 }

@@ -1,7 +1,7 @@
 {
    "name": "toypack",
    "description": "A sandbox bundler for browsers.",
-   "version": "0.0.4-development",
+   "version": "1.0.0-development",
    "type": "module",
    "main": "./build/Toypack.js",
    "types": "./build/Toypack.d.ts",
@@ -12,14 +12,6 @@
       "url": "git+https://github.com/kylehue/toypack.git"
    },
    "homepage": "https://github.com/kylehue/toypack#readme",
-   "engines": {
-      "node": "^18.12.0",
-      "npm": "^9.6.5"
-   },
-   "volta": {
-      "node": "18.12.0",
-      "npm": "9.6.5"
-   },
    "publishConfig": {
       "access": "public"
    },
@@ -29,7 +21,7 @@
       "build:main": "swc ./src -d ./build",
       "build:example": "swc ./example -d ./example-build",
       "build:style": "sass ./styles/style.scss:./build/styles/style.css",
-      "build:bundle": "esbuild ./src/Toypack.ts --bundle --outdir=browser --format=iife --global-name=Toypack --platform=browser --sourcemap",
+      "build:bundle": "esbuild ./src/Toypack.ts --bundle --outdir=browser --format=esm --global-name=Toypack --platform=browser --sourcemap --external:@babel/plugin-syntax-unicode-sets-regex",
       "clean": "rimraf build example-build browser coverage nyc_output",
       "type:dts": "tsc --emitDeclarationOnly --project tsconfig.build.json",
       "type:check": "tsc --noEmit",
@@ -40,19 +32,18 @@
       "test": "vitest run",
       "test:watch": "vitest watch",
       "test:coverage": "vitest run --coverage",
-      "cz": "cz",
-      "semantic-release": "semantic-release"
+      "cz": "cz"
    },
    "devDependencies": {
       "@ryansonshine/commitizen": "^4.2.8",
       "@ryansonshine/cz-conventional-changelog": "^3.3.4",
-      "@semantic-release/changelog": "^6.0.3",
-      "@semantic-release/commit-analyzer": "^9.0.2",
-      "@semantic-release/github": "^8.0.7",
-      "@semantic-release/npm": "^10.0.0-beta.4",
-      "@semantic-release/release-notes-generator": "^10.0.3",
       "@swc/cli": "^0.1.62",
       "@swc/core": "^1.3.52",
+      "@types/babel__core": "^7.20.1",
+      "@types/babel__generator": "^7.6.4",
+      "@types/babel__standalone": "^7.1.4",
+      "@types/babel__traverse": "^7.20.0",
+      "@types/lodash-es": "^4.17.7",
       "@types/node": "^18.15.12",
       "@types/path-browserify": "^1.0.0",
       "@types/prompts": "^2.4.4",
@@ -72,8 +63,8 @@
       "prettier": "^2.8.7",
       "rimraf": "^4.4.1",
       "sass": "^1.62.0",
-      "semantic-release": "^21.0.1",
       "source-map-support": "^0.5.21",
+      "type-fest": "^3.11.1",
       "typescript": "^5.0.4",
       "vitest": "^0.29.8"
    },
@@ -82,10 +73,16 @@
       "./browser"
    ],
    "keywords": [
-      "build",
-      "build tool",
-      "bundle",
-      "bundler",
       "sandbox"
-   ]
+   ],
+   "dependencies": {
+      "@babel/generator": "^7.22.3",
+      "@babel/parser": "^7.22.3",
+      "@babel/standalone": "^7.22.4",
+      "@babel/traverse": "^7.22.4",
+      "lodash-es": "^4.17.21",
+      "magic-string": "^0.30.0",
+      "node-html-parser": "^6.1.5",
+      "path-browserify": "^1.0.1"
+   }
 }
