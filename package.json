@@ -16,7 +16,7 @@
       "access": "public"
    },
    "scripts": {
-      "dev": "concurrently \"set NODE_ENV=development\" \"npm run clean\" \"npm run build:main -- --watch\" \"npm run build:bundle -- --watch\" \"npm run type:dts -- --watch\" \"npm run build:style -- --watch\" \"npm run build:example -- --watch\"",
+      "dev": "concurrently \"set NODE_ENV=development\" \"npm run clean\" \"npm run build:main -- --watch\" \"npm run type:dts -- --watch\" \"npm run build:style -- --watch\" \"npm run build:example -- --watch\"",
       "build": "concurrently \"set NODE_ENV=production\" \"npm run clean\" \"npm run build:main\" \"npm run build:bundle\" \"npm run type:dts\" \"npm run build:style\"",
       "build:main": "swc ./src -d ./build",
       "build:example": "swc ./example -d ./example-build",

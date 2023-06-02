@@ -12,6 +12,12 @@ export function isURL(str: string) {
    return URL_RE.test(str) || DATA_URL_RE.test(str);
 }
 
+export function isJS(source: string) {
+   return [".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"].includes(
+      path.extname(source)
+   );
+}
+
 export function formatPath(from: string, to: string) {
    const parsed = path.parse(from);
    let result = to;

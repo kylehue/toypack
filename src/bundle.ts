@@ -9,119 +9,142 @@ import {
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node } from "@babel/traverse";
 import * as MagicString from "magic-string";
-import { IDependency } from "./graph.js";
+import { IApplicationDependency, IDependency } from "./graph.js";
 import { Toypack } from "./Toypack.js";
 import { createSafeName } from "./utils.js";
 console.log(availablePlugins, availablePresets);
 
-function compile(bundler: Toypack, dep: IDependency) {
+const indentPrefix = "  ";
+// prettier-ignore
+const requireFunctionString = 
+`// Require function
+function require(source) {
+   var module = __modules__[source];
+   if (!module) {
+      module = {};
+      __modules__[source] = module;
+   }
+   return module;
+}
+`.replaceAll("   ", indentPrefix);
+
+/**
+ * Transpiles and finalizes a dependency.
+ * @param {Toypack} bundler The bundler instance.
+ * @param {IDependency} dependency The dependency to transpiled and finalize.
+ * @returns
+ */
+function transpile(bundler: Toypack, dependency: IApplicationDependency) {
    const result = {
-      id: createSafeName(dep.asset.source),
-      data: {} as BabelFileResult,
+      code: "",
+      map: {},
    };
 
-   const { AST } = dep;
+   const { AST } = dependency;
 
    const format = bundler.options.bundleOptions.format;
-   if (format == "esm") {
-      /* traverseAST(AST, {
-         ImportDeclaration(scope) {
-            scope.remove();
-         },
-         ExportAllDeclaration(scope) {
-            scope.remove();
-         },
-         ExportDefaultDeclaration(scope) {
-            scope.replaceWith(scope.node.declaration);
-         },
-         ExportNamedDeclaration(scope) {
-            if (scope.node.declaration) {
-               scope.replaceWith(scope.node.declaration);
-            }
-         },
-      }); */
-      traverseAST(AST, {
-         ImportDeclaration(scope) {
-            const relativeSource = scope.node.source.value;
-            const absoluteSource = dep.dependencyMap[relativeSource].absolute;
-            scope.node.source.value = createSafeName(absoluteSource);
-         },
-         /* ExportAllDeclaration(scope) {
-            scope.remove();
-         },
-         ExportDefaultDeclaration(scope) {
-            scope.replaceWith(scope.node.declaration);
-         },
-         ExportNamedDeclaration(scope) {
-            if (scope.node.declaration) {
-               scope.replaceWith(scope.node.declaration);
-            }
-         }, */
-      });
-   } else {
-      /* traverseAST(AST, {
-         CallExpression(scope) {
-            let argNode = scope.node.arguments[0];
-            let callee = scope.node.callee;
-            if (
-               scope.node.callee.type === "Identifier" &&
-               scope.node.callee.name === "require" &&
-               scope.parentPath.isVariableDeclarator() &&
-               scope.parentPath.parentPath.isVariableDeclaration()
-            ) {
-               scope.remove();
-            }
-         },
-      }); */
+
+   function getSafeName(relativeSource: string) {
+      const absoluteSource = dependency.dependencyMap[relativeSource].absolute;
+      return createSafeName(absoluteSource);
    }
 
-   result.data = transformFromAst(AST, undefined, {
+   // Rename `import` or `require` paths to be compatible with the `require` function's algorithm
+   if (format == "esm") {
+      traverseAST(AST, {
+         ImportDeclaration(scope) {
+            scope.node.source.value = getSafeName(scope.node.source.value);
+         },
+         ExportAllDeclaration(scope) {
+            scope.node.source.value = getSafeName(scope.node.source.value);
+         },
+         ExportNamedDeclaration(scope) {
+            if (scope.node.source?.type == "StringLiteral") {
+               scope.node.source.value = getSafeName(scope.node.source.value);
+            }
+         },
+      });
+   } else {
+      traverseAST(AST, {
+         CallExpression(scope) {
+            const argNode = scope.node.arguments[0];
+            const callee = scope.node.callee;
+            const isRequire =
+               callee.type == "Identifier" && callee.name == "require";
+            const isDynamicImport = callee.type == "Import";
+            if (
+               (isRequire || isDynamicImport) &&
+               argNode.type == "StringLiteral"
+            ) {
+               argNode.value = getSafeName(argNode.value);
+            }
+         },
+      });
+   }
+
+   const transpiled = transformFromAst(AST, undefined, {
       sourceType: format == "esm" ? "module" : "script",
       compact: false,
       comments: false,
       presets: ["env"],
       plugins: [],
-      sourceFileName: dep.asset.source,
-      filename: dep.asset.source,
+      sourceFileName: dependency.source,
+      filename: dependency.source,
       sourceMaps: bundler.options.bundleOptions.sourceMap,
       envName: bundler.options.bundleOptions.mode,
    } as TransformOptions) as any as BabelFileResult;
+
+   result.code = transpiled.code || "";
+   result.map = transpiled.map || {};
 
    return result;
 }
 
 export function bundle(bundler: Toypack, graph: IDependency[]) {
    const result = new MagicString.Bundle();
-   const indentPrefix = "  ";
 
    /* Modules */
    for (let i = graph.length - 1; i >= 0; i--) {
       const dep = graph[i];
-      const compilation = compile(bundler, dep);
+      const id = createSafeName(dep.source);
+
+      let content = "";
+
+      if (dep.type == "application") {
+         const transpiled = transpile(bundler, dep);
+         content = transpiled.code;
+      } else {
+         // TODO: handle resource compilation
+      }
+
       const ms = new MagicString.default("");
       result.addSource({
-         filename: dep.asset.source,
+         filename: dep.source,
          content: ms,
       });
 
       ms
          /* code body */
          .append(`var exports = module.exports;`)
-         .append((compilation.data.code || "").replace(/^"use strict";/, ""))
+         .append((content || "").replace(/^"use strict";/, ""))
          .append(`\n\nreturn exports;`)
 
          /* code wrap (iife) */
          .indent(indentPrefix)
-         .prepend(`__modules__.${compilation.id} = (function (module) {\n`)
+         .prepend(`__modules__.${id} = (function (module) {\n`)
          .append(`\n})({ exports: {} });`)
 
          /* filename comment */
-         .prepend(`\n// ${dep.asset.source.replace(/^\//, "")}\n`);
+         .prepend(`\n// ${dep.source.replace(/^\//, "")}\n`);
+
+      if (dep.source == graph[0].source) {
+         result.append(`\n\nreturn __modules__.${id};`);
+      }
    }
 
    /* Main */
    /* code body */
-   result.prepend(`function require(source) { return __modules__[source]; }\n`);
+   result.prepend(requireFunctionString);
    result.prepend(`var __modules__ = {};\n\n`);
    result.prepend(`"use strict";\n\n`);
 
@@ -129,23 +152,3 @@ export function bundle(bundler: Toypack, graph: IDependency[]) {
    result.indent(indentPrefix).prepend("(function () {\n").append("\n })();");
    return result.toString();
 }
-
-// export function bundle(bundler: Toypack, graph: IDependency[]) {
-//    const result = new MagicString("");
-
-//    for (let i = graph.length - 1; i >= 0; i--) {
-//       const dep = graph[i];
-//       const compilation = compile(bundler, dep);
-//       /* console.log("------------------------------------");
-//       console.log(dep.asset.source + ":");
-//       console.log();
-//       console.log("------------------------------------");
-//        */
-
-//       result.append("// " + dep.asset.source.replace(/^\//, "") + "\n");
-//       result.append(compilation.code);
-//       result.append("\n\n");
-//    }
-
-//    return result.toString();
-// }

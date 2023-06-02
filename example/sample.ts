@@ -14,6 +14,8 @@ addFile(
 //import path from "path-browserify?raw&test=1";
 //console.log(path.join("src", "classes"));
 import {adder} from "../classes/adder?test";
+import pkgjson from "../package.json";
+console.log(pkgjson);
 console.log(adder(4,6));
 export const test = 452;
 `
@@ -22,6 +24,7 @@ export const test = 452;
 addFile(
    "classes/adder.js",
    `
+import "../styles/sample.scss";
 import {createNum as cool} from "./createNum.js";
 import {test} from "../src/main.js";
 console.log(test);
@@ -34,16 +37,49 @@ export function adder(numA, numB) {
 addFile(
    "classes/createNum.js",
    `
+export * from "./createNum2.js";
+`
+);
+
+addFile(
+   "classes/createNum2.js",
+   `
 export function createNum(num) {
    return num;
 }
 `
 );
 
+addFile("package.json", JSON.stringify({
+   main: "src/main.js",
+   test: 123,
+   dependencies: {
+      foo: "bar"
+   }
+}));
+
 addFile(
    "node_modules/path-browserify/index.js",
    `
 console.log("path-browserify test");
+`
+);
+
+/* addFile(
+   "styles/sample.css",
+   `
+body {
+   background: yellow;
+}
+`
+); */
+
+addFile(
+   "styles/sample.scss",
+   `
+body {
+   background: yellow;
+}
 `
 );
 

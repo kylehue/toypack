@@ -3,37 +3,40 @@ import traverseAST, { TraverseOptions, Node } from "@babel/traverse";
 import path from "path-browserify";
 import { Asset } from "./asset.js";
 import { Toypack } from "./Toypack.js";
-import { parseURLQuery } from "./utils.js";
+import { isJS, parseURLQuery } from "./utils.js";
+import { assetNotFound, assetStrictlyHTMLorJS } from "./errors.js";
 
-export interface IDependency {
-   asset: Asset;
+export interface IResourceDependency {
+   type: "resource";
+   source: string;
+   content: ArrayBuffer;
+   params: IModuleOptions;
+}
+
+export interface IApplicationDependency {
+   type: "application";
+   source: string;
+   content: string;
    params: IModuleOptions;
    AST: Node;
    dependencyMap: Record<string, { relative: string; absolute: string }>;
 }
 
-function isJS(source: string) {
-   return [".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"].includes(path.extname(source));
-}
+export type IDependency = IResourceDependency | IApplicationDependency;
 
-function parseModule(bundler: Toypack, asset: Asset) {
+function parseModule(bundler: Toypack, source: string, content: string) {
    const result = {
-      asset,
+      source,
+      content,
       dependencies: [] as string[],
       AST: {} as Node,
    };
 
-   if (typeof asset.content != "string") {
-      console.error("js assets only supports string content");
-      // TODO: trigger "only supports string content" error
-      return result;
-   }
-
    const format = bundler.options.bundleOptions.format;
 
-   const AST = getAST(asset.content, {
+   const AST = getAST(content, {
       sourceType: format == "esm" ? "module" : "script",
-      sourceFilename: asset.source,
+      sourceFilename: source,
    });
 
    result.AST = AST;
@@ -57,9 +60,11 @@ function parseModule(bundler: Toypack, asset: Asset) {
          CallExpression(scope) {
             const argNode = scope.node.arguments[0];
             const callee = scope.node.callee;
+            const isRequire =
+               callee.type == "Identifier" && callee.name == "require";
+            const isDynamicImport = callee.type == "Import";
             if (
-               ((callee.type == "Identifier" && callee.name == "require") ||
-                  callee.type == "Import") &&
+               (isRequire || isDynamicImport) &&
                argNode.type == "StringLiteral"
             ) {
                result.dependencies.push(argNode.value);
@@ -83,96 +88,92 @@ function getGraphRecursive(
    params: IModuleOptions = {},
    graph: IDependency[] = []
 ) {
-   const currentAsset = bundler.assets.get(path.join("/", entry));
-   if (!currentAsset) {
-      // TODO: trigger "file not found" error
-      console.error("file not found: " + entry);
+   const asset = bundler.assets.get(path.join("/", entry));
+   if (!asset) {
+      bundler.hooks.trigger("onError", assetNotFound(entry));
       return graph;
    }
 
-   if (graph.some((dep) => dep.asset.source == currentAsset.source)) {
-      return graph;
-   }
-
-   const currentDepParsed = parseModule(bundler, currentAsset);
-
-   const parentDep: IDependency = {
-      asset: currentAsset,
-      params,
-      AST: currentDepParsed.AST,
-      dependencyMap: {}
-   }
-
-   graph.push(parentDep);
-
-   for (const childDepRelativeSource of currentDepParsed.dependencies) {
-      if (params.raw) {
-         break;
-      }
-
-      const childDepURLQuery = parseURLQuery(childDepRelativeSource);
-
-      const childDepAbsoluteSource = bundler.resolve(childDepURLQuery.target, {
-         baseDir: path.dirname(currentAsset.source),
+   // We don't need to scan non-text assets for dependencies
+   if (typeof asset.content != "string") {
+      graph.push({
+         type: "resource",
+         source: asset.source,
+         content: asset.content,
+         params,
       });
 
-      parentDep.dependencyMap[childDepRelativeSource] = {
-         relative: childDepRelativeSource,
-         absolute: childDepAbsoluteSource
+      return graph;
+   }
+
+   // Avoid asset duplication in the graph
+   if (graph.some((dep) => dep.source == asset.source)) {
+      return graph;
+   }
+
+   // Get chunks of an asset
+   const chunks: { source: string; content: string }[] = [];
+   if (isJS(asset.source)) {
+      chunks.push({ source: asset.source, content: asset.content });
+   } else {
+      chunks.push(...asset.compile(params));
+   }
+
+   // 
+   for (const chunk of chunks) {
+      const parsed = parseModule(bundler, chunk.source, chunk.content);
+
+      const parentDep: IDependency = {
+         type: "application",
+         source: chunk.source,
+         content: chunk.content,
+         params,
+         AST: parsed.AST,
+         dependencyMap: {},
       };
 
-      getGraphRecursive(
-         bundler,
-         childDepAbsoluteSource,
-         childDepURLQuery.params,
-         graph
-      );
-   }
+      graph.push(parentDep);
 
-   /* const dep: IDependency = {
-      asset: currentAsset,
-      params,
-   };
+      for (const childDepRelativeSource of parsed.dependencies) {
+         if (params.raw) {
+            break;
+         }
 
-   const loader = bundler.loaders.find((ldr) =>
-      ldr.test.test(currentAsset.source)
-   );
-   if (!loader) {
-      // TODO: trigger "file has no loader" error
-      console.error("file has no loader: " + entry);
-      return graph;
-   } else {
-      dependencies = loader.parse(dep).dependencies;
-   }
+         const childDepURLQuery = parseURLQuery(childDepRelativeSource);
 
-   if (isJS(currentAsset.source) && typeof currentAsset.content == "string") {
-      dependencies = parseJS(bundler, currentAsset);
-   } else {
-      
-   }
-   
+         bundler.hooks.trigger("onBeforeResolve", {
+            parent: asset,
+            source: childDepRelativeSource,
+         });
 
-   graph.push(dep);
+         const childDepAbsoluteSource = bundler.resolve(
+            childDepURLQuery.target,
+            {
+               baseDir: path.dirname(asset.source),
+            }
+         );
 
-   for (let depRelativeSource of dependencies) {
-      // No need to get dependencies of a module if the requestor needs it raw
-      if (params.raw) {
-         break;
+         bundler.hooks.trigger("onAfterResolve", {
+            parent: asset,
+            source: {
+               relative: childDepRelativeSource,
+               absolute: childDepAbsoluteSource
+            }
+         });
+
+         parentDep.dependencyMap[childDepRelativeSource] = {
+            relative: childDepRelativeSource,
+            absolute: childDepAbsoluteSource,
+         };
+
+         getGraphRecursive(
+            bundler,
+            childDepAbsoluteSource,
+            childDepURLQuery.params,
+            graph
+         );
       }
-
-      let parsedSourceQuery = parseURLQuery(depRelativeSource);
-
-      let depAbsoluteSource = bundler.resolve(parsedSourceQuery.target, {
-         baseDir: path.dirname(currentAsset.source),
-      });
-
-      getGraphRecursive(
-         bundler,
-         depAbsoluteSource,
-         parsedSourceQuery.params,
-         graph
-      );
-   } */
+   }
 
    return graph;
 }
@@ -180,8 +181,7 @@ function getGraphRecursive(
 export function getDependencyGraph(bundler: Toypack) {
    const entrySource = bundler.options.bundleOptions.entry;
    if (![".js", ".html"].includes(path.extname(entrySource).toLowerCase())) {
-      // TODO: trigger "entry should only either be html or js" error
-      console.error("entry should only either be html or js");
+      bundler.hooks.trigger("onError", assetStrictlyHTMLorJS(entrySource));
       return [];
    }
 

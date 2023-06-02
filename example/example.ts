@@ -6,7 +6,8 @@ const toypack = new Toypack({
    bundleOptions: {
       entry: "src/main.js",
       format: "esm"
-   }
+   },
+   iframe
 });
 
 // entry should only either be html or js
@@ -18,6 +19,10 @@ const toypack = new Toypack({
 // prod mode - has to be seperated into multiple files, transpiled
 
 console.log(iframe);
+
+toypack.hooks.onError((e) => {
+   console.error(e.reason);
+});
 
 for (let [_, sampleFile] of Object.entries(sampleFiles)) {
    toypack.addOrUpdateAsset(sampleFile.source, sampleFile.content);
