@@ -59,6 +59,12 @@ export class Toypack {
       this.loaders.push(new CSSLoader(this));
       this.loaders.push(new SassLoader(this));
       this.loaders.push(new JSONLoader(this));
+
+      if (this.options.logLevel == "error") {
+         this.hooks.onError((error) => {
+            console.error(error.reason);
+         });
+      }
    }
 
    public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {

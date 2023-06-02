@@ -1,6 +1,7 @@
 
 type IFormat = "esm" | "cjs";
 type IMode = "production" | "development";
+type ILogLevel = "error" | "warn" | "info" | "none";
 
 const defaultOptions = {
    bundleOptions: {
@@ -13,11 +14,12 @@ const defaultOptions = {
       resolve: {
          alias: {},
          fallback: {},
-         extensions: []
+         extensions: [],
       },
-      sourceMap: true
+      sourceMap: true,
    },
    iframe: null as HTMLIFrameElement | null,
+   logLevel: "error" as ILogLevel,
 };
 
 type IOptions = typeof defaultOptions;
