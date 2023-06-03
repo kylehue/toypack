@@ -1,6 +1,6 @@
-import { ILoader, Toypack } from "./Toypack.js";
-import { loaderNotFound } from "./errors.js";
+import { loaderNotFoundError } from "./errors.js";
 import { IModuleOptions } from "./graph.js";
+import { ILoader, Toypack } from "./Toypack.js";
 
 export class Asset {
    constructor(
@@ -22,7 +22,7 @@ export class Asset {
          const loader = this.bundler.loaders.find((l) => l.test.test(source));
 
          if (!loader) {
-            this.bundler.hooks.trigger("onError", loaderNotFound(source));
+            this.bundler.hooks.trigger("onError", loaderNotFoundError(source));
             return;
          }
 
@@ -38,8 +38,8 @@ export class Asset {
                content: compilation.content,
             });
          } else {
-            for (let [lang, dataArr] of Object.entries(compilation.use)) {
-               for (let data of dataArr) {
+            for (const [lang, dataArr] of Object.entries(compilation.use)) {
+               for (const data of dataArr) {
                   const chunkSource = `${this.source}.chunk-${result.length}.${lang}`;
                   if (result.some((v) => v.source == chunkSource)) {
                      continue;

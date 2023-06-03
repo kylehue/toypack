@@ -9,12 +9,12 @@ import {
    styleExtensions,
 } from "./extensions.js";
 import { getDependencyGraph, IDependency, IModuleOptions } from "./graph.js";
-import { defaultOptions, IOptions } from "./options.js";
-import { resolve, ResolveOptions } from "./resolve.js";
 import { Hooks } from "./Hooks.js";
 import { CSSLoader } from "./loaders/CSSLoader.js";
-import { SassLoader } from "./loaders/SassLoader.js";
 import { JSONLoader } from "./loaders/JSONLoader.js";
+import { SassLoader } from "./loaders/SassLoader.js";
+import { defaultOptions, IOptions } from "./options.js";
+import { resolve, IResolveOptions } from "./resolve.js";
 
 (window as any).path = path;
 
@@ -31,9 +31,7 @@ export interface ICompileResult {
 
 export interface ICompileRecursive {
    type: "recurse";
-   use: {
-      [key: string]: ICompileData[];
-   };
+   use: Record<string, ICompileData[]>;
 }
 
 export interface ILoader {
@@ -42,23 +40,28 @@ export interface ILoader {
    compile: (data: ICompileData) => ICompileResult | ICompileRecursive;
 }
 
+export interface IPlugin {
+   name: string;
+   apply: (bundler: Toypack) => void;
+}
+
 export class Toypack {
    public options: IOptions;
    public assets: Map<string, Asset>;
    public loaders: ILoader[] = [];
    public extensions = {
-      resource: resourceExtensions,
-      style: styleExtensions,
-      application: appExtensions,
+      resource: [...resourceExtensions],
+      style: [...styleExtensions],
+      application: [...appExtensions],
    };
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
       this.options = merge(cloneDeep(defaultOptions), options);
 
       this.assets = new Map();
-      this.loaders.push(new CSSLoader(this));
-      this.loaders.push(new SassLoader(this));
-      this.loaders.push(new JSONLoader(this));
+      this.useLoader(new CSSLoader(this));
+      this.useLoader(new SassLoader(this));
+      this.useLoader(new JSONLoader(this));
 
       if (this.options.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -67,7 +70,15 @@ export class Toypack {
       }
    }
 
-   public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
+   public usePlugin(plugin: IPlugin) {
+      plugin.apply(this);
+   }
+
+   public useLoader(loader: ILoader) {
+      this.loaders.push(loader);
+   }
+
+   public resolve(relativeSource: string, options?: Partial<IResolveOptions>) {
       return resolve(this, relativeSource, options);
    }
 
@@ -79,6 +90,7 @@ export class Toypack {
       source = path.join("/", source);
       const asset = new Asset(this, source, content);
       this.assets.set(source, asset);
+      return asset;
    }
 
    public run() {
@@ -86,7 +98,7 @@ export class Toypack {
       const result = bundle(this, graph);
 
       console.log(graph);
-      console.log(result);
+      console.log({result});
 
       if (this.options.iframe) {
          this.options.iframe.srcdoc = `<!DOCTYPE html>
@@ -107,3 +119,8 @@ export class Toypack {
       }
    }
 }
+
+/* Other exports */
+export * as Babel from "@babel/standalone";
+export { Asset };
+export type { IDependency, IOptions };

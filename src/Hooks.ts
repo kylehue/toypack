@@ -1,9 +1,13 @@
+import { Node, TraverseOptions } from "@babel/traverse";
 import { Asset } from "./asset";
+import { ITraverseOptions } from "./bundle";
+import { IApplicationDependency } from "./graph";
 
 const eventMap = {
-   onError: (payload: IErrorEvent) => {},
-   onBeforeResolve: (payload: IBeforeResolveEvent) => {},
-   onAfterResolve: (payload: IAfterResolveEvent) => {},
+   onError: (event: IErrorEvent) => {},
+   onBeforeResolve: (event: IBeforeResolveEvent) => {},
+   onAfterResolve: (event: IAfterResolveEvent) => {},
+   onTranspile: (event: ITranspileEvent) => {},
 } as const;
 
 export type IEventMap = typeof eventMap;
@@ -25,6 +29,12 @@ export interface IBeforeResolveEvent {
 export interface IAfterResolveEvent {
    parent: Asset;
    source: { relative: string; absolute: string };
+}
+
+export interface ITranspileEvent {
+   AST: Node;
+   traverse: (traverseOptions: ITraverseOptions) => void;
+   dependency: IApplicationDependency;
 }
 
 export class Hooks implements IHooks {
@@ -72,7 +82,7 @@ export class Hooks implements IHooks {
 
       return () => {
          for (let i = 0; i < group.length; i++) {
-            let cb = group[i];
+            const cb = group[i];
             if (cb === callback) {
                group.splice(i, 1);
                break;
@@ -93,7 +103,7 @@ export class Hooks implements IHooks {
 
       return () => {
          for (let i = 0; i < group.length; i++) {
-            let cb = group[i];
+            const cb = group[i];
             if (cb === callback) {
                group.splice(i, 1);
                break;
@@ -114,7 +124,28 @@ export class Hooks implements IHooks {
 
       return () => {
          for (let i = 0; i < group.length; i++) {
-            let cb = group[i];
+            const cb = group[i];
+            if (cb === callback) {
+               group.splice(i, 1);
+               break;
+            }
+         }
+      };
+   }
+
+   /**
+    * An event emitted when a module is being transpiled.
+    *
+    * @param callback - The function to emit.
+    * @returns {Function} A dispose function.
+    */
+   onTranspile(callback: IEventMap["onTranspile"]): Function {
+      const group = this._getListeners("onTranspile");
+      group.push(callback);
+
+      return () => {
+         for (let i = 0; i < group.length; i++) {
+            const cb = group[i];
             if (cb === callback) {
                group.splice(i, 1);
                break;

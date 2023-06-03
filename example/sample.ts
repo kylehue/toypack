@@ -9,14 +9,25 @@ function addFile(source: string, content = "") {
 
 // ESM
 addFile(
-   "src/main.js",
+   "index.ts",
+   `
+console.log(123456);
+`
+);
+
+addFile(
+   "src/main.ts",
    `
 //import path from "path-browserify?raw&test=1";
 //console.log(path.join("src", "classes"));
-import {adder} from "../classes/adder?test";
+import {adder} from "@classes/adder?test";
+console.log(adder(4,6));
 import pkgjson from "../package.json";
 console.log(pkgjson);
-console.log(adder(4,6));
+import path from "path";
+console.log(path);
+const foo: string = "bar";
+console.log(foo);
 export const test = 452;
 `
 );
@@ -26,7 +37,7 @@ addFile(
    `
 import "../styles/sample.scss";
 import {createNum as cool} from "./createNum.js";
-import {test} from "../src/main.js";
+import {test} from "../src/main";
 console.log(test);
 export function adder(numA, numB) {
    return cool(numA) + cool(numB);
@@ -51,7 +62,7 @@ export function createNum(num) {
 );
 
 addFile("package.json", JSON.stringify({
-   main: "src/main.js",
+   main: "/src/main",
    test: 123,
    dependencies: {
       foo: "bar"

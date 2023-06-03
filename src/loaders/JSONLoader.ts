@@ -7,9 +7,11 @@ import {
 
 export class JSONLoader implements ILoader {
    public name = "JSONLoader";
-   public test: RegExp = /\.json$/;
+   public test = /\.json$/;
 
-   constructor(public bundler: Toypack) {}
+   constructor(public bundler: Toypack) {
+      bundler.extensions.application.push(".json");
+   }
 
    compile(data: ICompileData) {
       const result: ICompileResult = {
@@ -17,7 +19,7 @@ export class JSONLoader implements ILoader {
          content: "",
       };
 
-      const format = this.bundler.options.bundleOptions.format;
+      const format = this.bundler.options.bundleOptions.module;
 
       if (format == "esm") {
          result.content = "export default " + data.content;

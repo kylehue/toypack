@@ -1,4 +1,3 @@
-import { createSafeName } from "../utils.js";
 import {
    ICompileData,
    ICompileRecursive,
@@ -6,13 +5,14 @@ import {
    ILoader,
    Toypack,
 } from "../Toypack.js";
+import { getUniqueIdFromString } from "../utils.js";
 
 export class CSSLoader implements ILoader {
    public name = "CSSLoader";
-   public test: RegExp = /\.css$/;
+   public test = /\.css$/;
 
    constructor(public bundler: Toypack) {
-
+      bundler.extensions.style.push(".css");
    }
 
    compile(data: ICompileData) {
@@ -21,9 +21,9 @@ export class CSSLoader implements ILoader {
          content: ""
       };
 
-      const id = createSafeName(data.source);
+      const id = getUniqueIdFromString(data.source, true);
 
-      let code = `
+      const code = `
       if (!document.querySelector("[data-toypack-id~='${id}']")) {
          var head = document.head || document.getElementsByTagName("head")[0];
          var stylestr = \`${data.content}\`;

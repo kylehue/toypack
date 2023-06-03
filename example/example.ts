@@ -1,14 +1,36 @@
 import { sampleFiles } from "./sample.js";
-import { Toypack } from "../build/Toypack.js";
+import { Toypack, Babel } from "../build/Toypack.js";
+import { DefinePlugin } from "../build/plugins/DefinePlugin.js";
 
 const iframe = document.querySelector<HTMLIFrameElement>("#sandbox");
 const toypack = new Toypack({
    bundleOptions: {
-      entry: "src/main.js",
-      format: "esm"
+      entry: "",
+      module: "esm",
+      resolve: {
+         alias: {
+            "@classes": "/classes/"
+         },
+         fallback: {
+            "path": false
+         }
+      },
+      minified: false
+   },
+   babelOptions: {
+      transform: {
+         presets: ["typescript"]
+      },
+      parse: {
+         plugins: ["typescript"]
+      }
    },
    iframe
 });
+
+toypack.usePlugin(new DefinePlugin({
+   foo: "bar"
+}));
 
 // entry should only either be html or js
 

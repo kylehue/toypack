@@ -10,7 +10,9 @@ export class TemplateLoader implements ILoader {
    public name = "TemplateLoader";
    public test: RegExp = /\.css$/;
 
-   constructor(public bundler: Toypack) {}
+   constructor(public bundler: Toypack) {
+      bundler.extensions.application.push(".ext");
+   }
 
    compile(data: ICompileData) {
       const result: ICompileResult = {

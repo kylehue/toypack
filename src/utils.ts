@@ -76,10 +76,25 @@ export function parseURLQuery(url: string) {
 }
 
 /**
- * Create a safe variable name from a string.
- * @param source The string to transform.
- * @returns {string} The safe string.
+ * Generate a unique ID from a string.
+ * @param str The string to get the unique ID from.
+ * @returns
  */
-export function createSafeName(source: string): string {
-   return "$" + source.replace(/[\W_]+/g, "_");
+export function getUniqueIdFromString(str: string, shouldMinify = false): string {
+   if (str.length === 0) {
+      throw new Error("String must contain at least 1 character.");
+   }
+
+   if (!shouldMinify) {
+      return str.replace(/^\//, "").replace(/[\W_]+/g, "_");
+   }
+
+   let hash = 0;
+   for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0; // Convert to 32-bit integer
+   }
+   const uniqueId = (hash >>> 0).toString(16); // Convert to positive hexadecimal
+   return "m" + uniqueId;
 }

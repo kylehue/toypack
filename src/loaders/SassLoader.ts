@@ -8,9 +8,11 @@ import {
 
 export class SassLoader implements ILoader {
    public name = "SassLoader";
-   public test: RegExp = /\.(sass|scss)$/;
+   public test = /\.(sass|scss)$/;
 
-   constructor(public bundler: Toypack) {}
+   constructor(public bundler: Toypack) {
+      bundler.extensions.style.push(".scss", ".sass");
+   }
 
    compile(data: ICompileData) {
       const result: ICompileRecursive = {

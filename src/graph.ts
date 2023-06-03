@@ -2,9 +2,14 @@ import { parse as getAST, ParserOptions } from "@babel/parser";
 import traverseAST, { TraverseOptions, Node } from "@babel/traverse";
 import path from "path-browserify";
 import { Asset } from "./asset.js";
+import {
+   assetNotFoundError,
+   assetStrictlyHTMLorJSError,
+   entryPointNotFoundError,
+   resolveFailureError,
+} from "./errors.js";
 import { Toypack } from "./Toypack.js";
 import { isJS, parseURLQuery } from "./utils.js";
-import { assetNotFound, assetStrictlyHTMLorJS } from "./errors.js";
 
 export interface IResourceDependency {
    type: "resource";
@@ -32,11 +37,17 @@ function parseModule(bundler: Toypack, source: string, content: string) {
       AST: {} as Node,
    };
 
-   const format = bundler.options.bundleOptions.format;
+   const format = bundler.options.bundleOptions.module;
 
-   const AST = getAST(content, {
+   const userBabelOptions = bundler.options.babelOptions.parse;
+   const importantBabelOptions: ParserOptions = {
       sourceType: format == "esm" ? "module" : "script",
       sourceFilename: source,
+   };
+
+   const AST = getAST(content, {
+      ...userBabelOptions,
+      ...importantBabelOptions,
    });
 
    result.AST = AST;
@@ -90,7 +101,7 @@ function getGraphRecursive(
 ) {
    const asset = bundler.assets.get(path.join("/", entry));
    if (!asset) {
-      bundler.hooks.trigger("onError", assetNotFound(entry));
+      bundler.hooks.trigger("onError", assetNotFoundError(entry));
       return graph;
    }
 
@@ -119,7 +130,7 @@ function getGraphRecursive(
       chunks.push(...asset.compile(params));
    }
 
-   // 
+   // Scan
    for (const chunk of chunks) {
       const parsed = parseModule(bundler, chunk.source, chunk.content);
 
@@ -153,12 +164,20 @@ function getGraphRecursive(
             }
          );
 
+         if (!childDepAbsoluteSource) {
+            bundler.hooks.trigger(
+               "onError",
+               resolveFailureError(childDepRelativeSource, asset.source)
+            );
+            break;
+         }
+
          bundler.hooks.trigger("onAfterResolve", {
             parent: asset,
             source: {
                relative: childDepRelativeSource,
-               absolute: childDepAbsoluteSource
-            }
+               absolute: childDepAbsoluteSource,
+            },
          });
 
          parentDep.dependencyMap[childDepRelativeSource] = {
@@ -179,11 +198,37 @@ function getGraphRecursive(
 }
 
 export function getDependencyGraph(bundler: Toypack) {
-   const entrySource = bundler.options.bundleOptions.entry;
-   if (![".js", ".html"].includes(path.extname(entrySource).toLowerCase())) {
-      bundler.hooks.trigger("onError", assetStrictlyHTMLorJS(entrySource));
-      return [];
+   const entrySource = bundler.options.bundleOptions.entry
+      ? bundler.resolve(path.join("/", bundler.options.bundleOptions.entry))
+      : bundler.resolve("/");
+
+   let result: IDependency[] = [];
+
+   if (!entrySource) {
+      bundler.hooks.trigger("onError", entryPointNotFoundError());
+      return result;
    }
 
-   return getGraphRecursive(bundler, entrySource);
+   const supportedEntryExtensions = [
+      ".js",
+      ".mjs",
+      ".cjs",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".html",
+   ];
+
+   if (
+      !supportedEntryExtensions.includes(
+         path.extname(entrySource).toLowerCase()
+      )
+   ) {
+      bundler.hooks.trigger("onError", assetStrictlyHTMLorJSError(entrySource));
+      return result;
+   }
+
+   result = getGraphRecursive(bundler, entrySource);
+
+   return result;
 }

@@ -1,4 +1,4 @@
-export const resourceExtensions = [
+export const resourceExtensions: string[] = [
    ".png",
    ".jpg",
    ".jpeg",
@@ -27,10 +27,14 @@ export const resourceExtensions = [
    ".m4a",
    ".aac",
    ".ogg",
-];
-export const styleExtensions = [".css"];
-export const appExtensions = [
-   ".json",
-   ".html",
    ".map",
+];
+export const styleExtensions: string[] = [];
+export const appExtensions: string[] = [
+   ".js",
+   ".mjs",
+   ".cjs",
+   ".ts",
+   ".jsx",
+   ".tsx",
 ];
