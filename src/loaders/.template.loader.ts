@@ -11,7 +11,7 @@ export class TemplateLoader implements ILoader {
    public test: RegExp = /\.css$/;
 
    constructor(public bundler: Toypack) {
-      bundler.extensions.application.push(".ext");
+      bundler.extensions.script.push(".ext");
    }
 
    compile(data: ICompileData) {

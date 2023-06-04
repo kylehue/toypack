@@ -88,8 +88,8 @@ body {
 addFile(
    "styles/sample.scss",
    `
-body {
-   background: yellow;
+{
+   "background": "yellow"
 }
 `
 );

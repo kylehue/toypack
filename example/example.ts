@@ -40,7 +40,7 @@ toypack.usePlugin(new DefinePlugin({
 
 // prod mode - has to be seperated into multiple files, transpiled
 
-console.log(iframe);
+//console.log(iframe);
 
 toypack.hooks.onError((e) => {
    console.error(e.reason);

@@ -10,13 +10,20 @@ import {
 } from "./extensions.js";
 import { getDependencyGraph, IDependency, IModuleOptions } from "./graph.js";
 import { Hooks } from "./Hooks.js";
-import { CSSLoader } from "./loaders/CSSLoader.js";
 import { JSONLoader } from "./loaders/JSONLoader.js";
 import { SassLoader } from "./loaders/SassLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 
 (window as any).path = path;
+
+export interface ISourceMap {
+   version: 3;
+   names: string[];
+   sources: string[];
+   sourcesContent: string[];
+   mappings: string;
+}
 
 export interface ICompileData {
    source: string;
@@ -27,6 +34,7 @@ export interface ICompileData {
 export interface ICompileResult {
    type: "result";
    content: string;
+   map?: ISourceMap;
 }
 
 export interface ICompileRecursive {
@@ -52,14 +60,13 @@ export class Toypack {
    public extensions = {
       resource: [...resourceExtensions],
       style: [...styleExtensions],
-      application: [...appExtensions],
+      script: [...appExtensions],
    };
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
       this.options = merge(cloneDeep(defaultOptions), options);
 
       this.assets = new Map();
-      this.useLoader(new CSSLoader(this));
       this.useLoader(new SassLoader(this));
       this.useLoader(new JSONLoader(this));
 
@@ -95,10 +102,10 @@ export class Toypack {
 
    public run() {
       const graph = getDependencyGraph(this);
+      console.log("Graph:", graph);
       const result = bundle(this, graph);
+      console.log("Bundle:", result);
 
-      console.log(graph);
-      console.log({result});
 
       if (this.options.iframe) {
          this.options.iframe.srcdoc = `<!DOCTYPE html>
@@ -108,10 +115,13 @@ export class Toypack {
       <meta http-equiv="X-UA-Compatible" content="IE=edge" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Example</title>
+      <style type="text/css">
+         ${result.style}
+      </style>
    </head>
    <body>
       <script>
-         ${result}
+         ${result.script}
       </script>
    </body>
 </html>

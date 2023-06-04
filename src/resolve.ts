@@ -175,7 +175,7 @@ export function resolve(
 
    // Resolve.extensions
    const extensions = [
-      ...bundler.extensions.application,
+      ...bundler.extensions.script,
       ...bundler.extensions.style,
       ...bundler.extensions.resource,
    ].filter((ext) => {

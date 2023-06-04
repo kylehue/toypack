@@ -15,14 +15,21 @@ export class SassLoader implements ILoader {
    }
 
    compile(data: ICompileData) {
+      if (typeof data.content != "string") {
+         throw new Error("SassLoader currently doesn't support non-string content.");
+      }
+
+      /* const result: ICompileResult = {
+         type: "result",
+         content: data.content
+      }; */
+
       const result: ICompileRecursive = {
          type: "recurse",
          use: {
-            css: [],
+            json: [data],
          },
       };
-
-      result.use.css.push(data);
 
       return result;
    }

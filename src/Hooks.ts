@@ -1,7 +1,7 @@
 import { Node, TraverseOptions } from "@babel/traverse";
 import { Asset } from "./asset";
 import { ITraverseOptions } from "./bundle";
-import { IApplicationDependency } from "./graph";
+import { IDependency } from "./graph";
 
 const eventMap = {
    onError: (event: IErrorEvent) => {},
@@ -34,7 +34,7 @@ export interface IAfterResolveEvent {
 export interface ITranspileEvent {
    AST: Node;
    traverse: (traverseOptions: ITraverseOptions) => void;
-   dependency: IApplicationDependency;
+   dependency: IDependency;
 }
 
 export class Hooks implements IHooks {

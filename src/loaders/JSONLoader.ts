@@ -10,7 +10,7 @@ export class JSONLoader implements ILoader {
    public test = /\.json$/;
 
    constructor(public bundler: Toypack) {
-      bundler.extensions.application.push(".json");
+      bundler.extensions.script.push(".json");
    }
 
    compile(data: ICompileData) {

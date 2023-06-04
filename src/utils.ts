@@ -18,6 +18,12 @@ export function isJS(source: string) {
    );
 }
 
+export function isCSS(source: string) {
+   return [".css"].includes(
+      path.extname(source)
+   );
+}
+
 export function formatPath(from: string, to: string) {
    const parsed = path.parse(from);
    let result = to;
@@ -97,4 +103,25 @@ export function getUniqueIdFromString(str: string, shouldMinify = false): string
    }
    const uniqueId = (hash >>> 0).toString(16); // Convert to positive hexadecimal
    return "m" + uniqueId;
+}
+
+export function btoa(content: string | ArrayBuffer) {
+   if (typeof window !== "undefined" && typeof window.btoa === "function") {
+      if (content instanceof ArrayBuffer) {
+         return window.btoa(
+            new Uint8Array(content).reduce(
+               (data, byte) => data + String.fromCharCode(byte),
+               ""
+            )
+         );
+      }
+
+      return window.btoa(unescape(encodeURIComponent(content)));
+   } else {
+      if (content instanceof ArrayBuffer) {
+         return Buffer.from(new Uint8Array(content)).toString("base64");
+      }
+
+      return Buffer.from(content, "utf-8").toString("base64");
+   }
 }

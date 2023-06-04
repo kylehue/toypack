@@ -5,10 +5,13 @@ import {
    availablePresets,
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
+import postcss from "postcss";
 import * as MagicString from "magic-string";
-import { IApplicationDependency, IDependency } from "./graph.js";
+import {
+   IDependency, IScriptDependency, IStyleDependency,
+} from "./graph.js";
 import * as rt from "./runtime.js";
-import { Toypack } from "./Toypack.js";
+import { ISourceMap, Toypack } from "./Toypack.js";
 import { getUniqueIdFromString } from "./utils.js";
 console.log(availablePlugins, availablePresets);
 
@@ -61,18 +64,19 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
 }
 
 /**
- * Transpiles and finalizes a dependency.
- * @param {Toypack} bundler The bundler instance.
- * @param {IDependency} dependency The dependency to transpiled and finalize.
- * @returns
+ * Transpiles and finalizes a script dependency.
  */
-function transpile(bundler: Toypack, dependency: IApplicationDependency) {
+function transpileJS(bundler: Toypack, dependency: IScriptDependency) {
    const result = {
       code: "",
-      map: {},
+      map: null as ISourceMap | null,
    };
 
    const { AST } = dependency;
+
+   if (!AST) {
+      return result;
+   }
 
    const format = bundler.options.bundleOptions.module;
 
@@ -158,13 +162,29 @@ function transpile(bundler: Toypack, dependency: IApplicationDependency) {
    }) as any as BabelFileResult;
 
    result.code = transpiled.code || "";
-   result.map = transpiled.map || {};
+   result.map = transpiled.map
+      ? ({
+           version: 3,
+           sources: transpiled.map.sources,
+           sourcesContent: transpiled.map.sourcesContent,
+           names: transpiled.map.names,
+           mappings: transpiled.map.mappings,
+        } as ISourceMap)
+      : null;
 
    return result;
 }
 
-export function bundle(bundler: Toypack, graph: IDependency[]) {
+function bundleScript(bundler: Toypack, graph: IScriptDependency[]) {
    const result = new MagicString.Bundle();
+
+   /* const sourceMap: ISourceMap = {
+      version: 3,
+      sources: [],
+      sourcesContent: [],
+      names: [],
+      mappings: ""
+   }; */
 
    const shouldMinify =
       bundler.options.bundleOptions.minified ||
@@ -174,11 +194,13 @@ export function bundle(bundler: Toypack, graph: IDependency[]) {
    for (let i = graph.length - 1; i >= 0; i--) {
       const dep = graph[i];
       const id = getUniqueIdFromString(dep.source, shouldMinify);
+      /* sourceMap.sources.push(dep.source);
+      sourceMap.sourcesContent.push(dep.content); */
 
       let content = "";
 
-      if (dep.type == "application") {
-         const transpiled = transpile(bundler, dep);
+      if (dep.type == "script") {
+         const transpiled = transpileJS(bundler, dep);
          content = transpiled.code;
       } else {
          // TODO: handle resource compilation
@@ -224,4 +246,68 @@ export function bundle(bundler: Toypack, graph: IDependency[]) {
    result.prepend(`(function () {${rt.newLine(1, shouldMinify)}`);
    result.append(`${rt.newLine(1, shouldMinify)} })();`);
    return result.toString();
+}
+
+function compileCSS(bundler: Toypack, dependency: IStyleDependency) {
+   const result = {
+      code: "",
+      map: {},
+   };
+
+   if (!dependency.AST) {
+      return result;
+   }
+
+   const compiled = postcss([]).process(dependency.AST, {
+      from: dependency.source,
+   });
+
+   result.code = compiled.css;
+   result.map = compiled.map;
+
+   console.log(compiled);
+
+   return result;
+}
+
+function bundleStyle(bundler: Toypack, graph: IDependency[]) {
+   const result = new MagicString.Bundle();
+
+   const shouldMinify =
+      bundler.options.bundleOptions.minified ||
+      bundler.options.bundleOptions.mode == "production";
+
+   /* Modules */
+   for (let i = 0; i < graph.length; i++) {
+      const dep = graph[i];
+      if (dep.type != "style") continue;
+      
+      
+
+      let compiled = compileCSS(bundler, dep);
+      let content = compiled.code;
+
+      const ms = new MagicString.default(content);
+      result.addSource({
+         filename: dep.source,
+         content: ms,
+      });
+
+      /* filename comment */
+      if (!shouldMinify) {
+         ms.prepend(`\n/* ${dep.source.replace(/^\//, "")} */`);
+      }
+   }
+
+   return result.toString();
+}
+
+export function bundle(
+   bundler: Toypack,
+   { script, style }: { script: IScriptDependency[]; style: IStyleDependency[] }
+) {
+   return {
+      script: bundleScript(bundler, script),
+      style: bundleStyle(bundler, style),
+   };
 }
