@@ -2,57 +2,69 @@ import { sampleFiles } from "./sample.js";
 import { Toypack, Babel } from "../build/Toypack.js";
 import { DefinePlugin } from "../build/plugins/DefinePlugin.js";
 
-const iframe = document.querySelector<HTMLIFrameElement>("#sandbox");
+const iframe = document.querySelector<HTMLIFrameElement>("#sandbox")!;
 const toypack = new Toypack({
    bundleOptions: {
       entry: "",
       module: "esm",
       resolve: {
          alias: {
-            "@classes": "/classes/"
+            "@classes": "/classes/",
          },
          fallback: {
-            "path": false
-         }
+            path: false,
+         },
       },
-      minified: false
+      minified: false,
    },
    babelOptions: {
       transform: {
-         presets: ["typescript"]
+         presets: ["typescript"],
       },
       parse: {
-         plugins: ["typescript"]
-      }
+         plugins: ["typescript"],
+      },
    },
-   iframe
 });
 
-toypack.usePlugin(new DefinePlugin({
-   foo: "bar"
-}));
+(async () => {
+   const samplePic = await (
+      await fetch(
+         "https://cdn.discordapp.com/attachments/898027973272305674/1073582900991242260/image.png"
+      )
+   ).blob();
 
-// entry should only either be html or js
+   toypack.setIFrame(iframe);
 
-// should be able to pick whether to use esm or cjs
+   toypack.usePlugin(
+      new DefinePlugin({
+         foo: "bar",
+      })
+   );
 
-// dev mode - has to be bundled into one file, transpiled
+   toypack.addOrUpdateAsset("/images/cat.png", samplePic);
 
-// prod mode - has to be seperated into multiple files, transpiled
+   // entry should only either be html or js
 
-//console.log(iframe);
+   // should be able to pick whether to use esm or cjs
 
-toypack.hooks.onError((e) => {
-   console.error(e.reason);
-});
+   // dev mode - has to be bundled into one file, transpiled
 
-for (let [_, sampleFile] of Object.entries(sampleFiles)) {
-   toypack.addOrUpdateAsset(sampleFile.source, sampleFile.content);
-}
+   // prod mode - has to be seperated into multiple files, transpiled
 
-toypack.run();
+   //console.log(iframe);
 
-/* iframe!.srcdoc = `
+   toypack.hooks.onError((e) => {
+      console.error(e.reason);
+   });
+
+   for (let [_, sampleFile] of Object.entries(sampleFiles)) {
+      toypack.addOrUpdateAsset(sampleFile.source, sampleFile.content);
+   }
+
+   toypack.run();
+
+   /* iframe!.srcdoc = `
 <!DOCTYPE html>
 <html lang="en">
    <head>
@@ -70,4 +82,5 @@ toypack.run();
 </html>
 `; */
 
-console.log(toypack, sampleFiles);
+   console.log(toypack, sampleFiles);
+})();

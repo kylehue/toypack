@@ -16,7 +16,7 @@ import { isCSS, isJS, parseURLQuery } from "./utils.js";
 
 export interface IChunk {
    source: string;
-   content: string;
+   content: string | Blob;
 }
 
 export interface IModuleOptions {
@@ -29,24 +29,40 @@ interface ISimpleDependency {
    source: string;
    content: string;
    dependencyMap: IDependencyMap;
-   chunks?: {
-      AST: Node | Root;
-      source: string;
-      content: string;
-   }[];
 }
 
 export interface IScriptDependency extends ISimpleDependency {
    type: "script";
    AST?: Node;
+   chunks?: {
+      type: "script";
+      AST: Node;
+      source: string;
+      content: string;
+   }[];
 }
 
 export interface IStyleDependency extends ISimpleDependency {
    type: "style";
    AST?: Root;
+   chunks?: {
+      type: "style";
+      AST: Root;
+      source: string;
+      content: string;
+   }[];
 }
 
-export type IDependency = IScriptDependency | IStyleDependency;
+export interface IResourceDependency {
+   type: "resource";
+   source: string;
+   content: Blob;
+}
+
+export type IDependency =
+   | IScriptDependency
+   | IStyleDependency
+   | IResourceDependency;
 
 export interface IDependencyMapSource {
    relative: string;
@@ -178,6 +194,15 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
          // no need to add data urls to dependencies
          if (source.startsWith("data:")) return;
 
+         if (!bundler.extensions.resource.includes(path.extname(source))) {
+            // TODO: trigger 'You can't use a "url()" token to reference a non-resource file.' error
+            return;
+         }
+
+         valueNode.value = "123";
+
+         console.log(declNode.value);
+
          result.dependencies.push(source);
       });
    });
@@ -199,7 +224,7 @@ function compileAndGetChunks(
 ) {
    const result: IChunk[] = [];
 
-   const recursiveCompile = (source: string, content: string | ArrayBuffer) => {
+   const recursiveCompile = (source: string, content: string | Blob) => {
       const loader = bundler.loaders.find((l) => l.test.test(source));
 
       if (!loader) {
@@ -244,6 +269,10 @@ function scanChunkDeps(
    chunk: IChunk,
    callback: IScanCallback
 ) {
+   if (typeof chunk.content != "string") {
+      throw new Error(`Failed to scan '${chunk.source}'. The chunk's content has to be a type of string in order to be scanned for dependencies.`);
+   }
+
    const { source, content } = chunk;
 
    let parsed;
@@ -305,27 +334,34 @@ function getGraphRecursive(
    params: IModuleOptions = {},
    graph: IDependency[] = []
 ) {
-   const parentDep: IDependency = {
+   // Avoid dependency duplication in the graph
+   if (graph.some((dep) => dep.source == entryChunk.source)) {
+      return graph;
+   }
+
+   // No need to parse a resource dependency
+   if (typeof entryChunk.content != "string") {
+      graph.push({
+         type: "resource",
+         content: entryChunk.content,
+         source: entryChunk.source,
+      } as IResourceDependency);
+
+      return graph;
+   }
+
+   const parentDep: IScriptDependency | IStyleDependency = {
       type: isScriptDep(bundler, entryChunk.source) ? "script" : "style",
       source: entryChunk.source,
       content: entryChunk.content,
       dependencyMap: {},
    };
 
-   // Avoid dependency duplication in the graph
-   if (graph.some((dep) => dep.source == entryChunk.source)) {
-      return graph;
-   } else {
-      graph.push(parentDep);
-   }
+   graph.push(parentDep);
 
    const isSupported = isJS(entryChunk.source) || isCSS(entryChunk.source);
 
    const scanDeps: IScanCallback = (dep) => {
-      if (typeof dep.asset.content != "string") {
-         return;
-      }
-
       parentDep.dependencyMap[dep.mapSource.relative] = {
          relative: dep.mapSource.relative,
          absolute: dep.mapSource.absolute,
@@ -348,10 +384,11 @@ function getGraphRecursive(
          const parsed = scanChunkDeps(bundler, chunk, scanDeps);
 
          parentDep.chunks.push({
+            type: isScriptDep(bundler, chunk.source) ? "script" : "style",
             AST: parsed.AST,
             content: chunk.content,
             source: chunk.source,
-         });
+         } as any);
       }
    }
 
@@ -363,10 +400,7 @@ function getGraphRecursive(
  */
 function isScriptDep(bundler: Toypack, source: string) {
    const depExtension = path.extname(source);
-   return (
-      bundler.extensions.script.includes(depExtension) ||
-      bundler.extensions.resource.includes(depExtension)
-   );
+   return bundler.extensions.script.includes(depExtension);
 }
 
 /**
@@ -377,10 +411,7 @@ export function getDependencyGraph(bundler: Toypack) {
       ? bundler.resolve(path.join("/", bundler.options.bundleOptions.entry))
       : bundler.resolve("/");
 
-   let result = {
-      script: [] as IScriptDependency[],
-      style: [] as IStyleDependency[],
-   };
+   let result: IDependency[] = [];
 
    const entryAsset = entrySource ? bundler.assets.get(entrySource) : null;
 
@@ -420,13 +451,15 @@ export function getDependencyGraph(bundler: Toypack) {
       content: entryAsset.content,
    });
 
-   for (let dep of graph) {
+   result = graph;
+
+   /* for (let dep of graph) {
       if (isScriptDep(bundler, dep.source)) {
          result.script.push(dep as IScriptDependency);
       } else {
          result.style.push(dep as IStyleDependency);
       }
-   }
+   } */
 
    return result;
 }

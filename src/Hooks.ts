@@ -34,7 +34,7 @@ export interface IAfterResolveEvent {
 export interface ITranspileEvent {
    AST: Node;
    traverse: (traverseOptions: ITraverseOptions) => void;
-   dependency: IDependency;
+   source: string;
 }
 
 export class Hooks implements IHooks {

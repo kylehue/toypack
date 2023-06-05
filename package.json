@@ -43,6 +43,8 @@
       "@types/babel__generator": "^7.6.4",
       "@types/babel__standalone": "^7.1.4",
       "@types/babel__traverse": "^7.20.0",
+      "@types/combine-source-map": "^0.8.2",
+      "@types/convert-source-map": "^2.0.0",
       "@types/lodash-es": "^4.17.7",
       "@types/node": "^18.15.12",
       "@types/path-browserify": "^1.0.0",
@@ -59,6 +61,7 @@
       "eslint-plugin-eslint-comments": "^3.2.0",
       "eslint-plugin-import": "^2.27.5",
       "jsdom": "^21.1.1",
+      "merge-source-map": "^1.1.0",
       "nyc": "^15.1.0",
       "prettier": "^2.8.7",
       "rimraf": "^4.4.1",
@@ -84,11 +87,11 @@
       "convert-source-map": "^2.0.0",
       "lodash-es": "^4.17.21",
       "magic-string": "^0.30.0",
-      "merge-source-map": "^1.1.0",
       "node-html-parser": "^6.1.5",
       "path-browserify": "^1.0.1",
       "postcss": "^8.4.24",
       "postcss-value-parser": "^4.2.0",
+      "source-map-js": "^1.0.2",
       "vlq": "^2.0.4"
    }
 }

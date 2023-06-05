@@ -5,14 +5,26 @@ import {
    availablePresets,
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
-import postcss from "postcss";
+import postcss, { Root } from "postcss";
 import * as MagicString from "magic-string";
 import {
-   IDependency, IScriptDependency, IStyleDependency,
+   IDependency,
+   IDependencyMap,
+   IScriptDependency,
+   IStyleDependency,
 } from "./graph.js";
 import * as rt from "./runtime.js";
-import { ISourceMap, Toypack } from "./Toypack.js";
-import { getUniqueIdFromString } from "./utils.js";
+import { Toypack } from "./Toypack.js";
+import { btoa, getUniqueIdFromString, isJS } from "./utils.js";
+import path from "path-browserify";
+import {
+   SourceMapConsumer,
+   SourceMapGenerator,
+   RawSourceMap,
+} from "source-map-js";
+import MapCombiner from "combine-source-map";
+import MapConverter from "convert-source-map";
+import mergeSourceMap from "merge-source-map";
 console.log(availablePlugins, availablePresets);
 
 export type ITraverseFunction<T> = (
@@ -64,28 +76,19 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
 }
 
 /**
- * Transpiles and finalizes a script dependency.
+ * Transpile a Babel AST.
  */
-function transpileJS(bundler: Toypack, dependency: IScriptDependency) {
-   const result = {
-      code: "",
-      map: null as ISourceMap | null,
-   };
-
-   const { AST } = dependency;
-
-   if (!AST) {
-      return result;
-   }
-
+function transpileAST(
+   bundler: Toypack,
+   source: string,
+   AST: Node,
+   depMap: IDependencyMap,
+   shouldMinify = false
+) {
    const format = bundler.options.bundleOptions.module;
 
    function getSafeName(relativeSource: string) {
-      const absoluteSource = dependency.dependencyMap[relativeSource].absolute;
-
-      const shouldMinify =
-         bundler.options.bundleOptions.minified ||
-         bundler.options.bundleOptions.mode == "production";
+      const absoluteSource = depMap[relativeSource].absolute;
       return getUniqueIdFromString(absoluteSource, shouldMinify);
    }
 
@@ -98,20 +101,41 @@ function transpileJS(bundler: Toypack, dependency: IScriptDependency) {
    bundler.hooks.trigger("onTranspile", {
       AST,
       traverse: modifyTraverseOptions,
-      dependency,
+      source,
    });
+
+   function isStyleSource(relativeSource: string) {
+      const absoluteSource = depMap[relativeSource].absolute;
+      if (bundler.extensions.style.includes(path.extname(absoluteSource))) {
+         return true;
+      }
+
+      return false;
+   }
 
    // Rename `import` or `require` paths to be compatible with the `require` function's algorithm
    if (format == "esm") {
       modifyTraverseOptions({
          ImportDeclaration(scope) {
-            scope.node.source.value = getSafeName(scope.node.source.value);
+            if (isStyleSource(scope.node.source.value)) {
+               scope.remove();
+            } else {
+               scope.node.source.value = getSafeName(scope.node.source.value);
+            }
          },
          ExportAllDeclaration(scope) {
-            scope.node.source.value = getSafeName(scope.node.source.value);
+            if (isStyleSource(scope.node.source.value)) {
+               scope.remove();
+            } else {
+               scope.node.source.value = getSafeName(scope.node.source.value);
+            }
          },
          ExportNamedDeclaration(scope) {
-            if (scope.node.source?.type == "StringLiteral") {
+            if (scope.node.source?.type != "StringLiteral") return;
+
+            if (isStyleSource(scope.node.source.value)) {
+               scope.remove();
+            } else {
                scope.node.source.value = getSafeName(scope.node.source.value);
             }
          },
@@ -128,7 +152,11 @@ function transpileJS(bundler: Toypack, dependency: IScriptDependency) {
                (isRequire || isDynamicImport) &&
                argNode.type == "StringLiteral"
             ) {
-               argNode.value = getSafeName(argNode.value);
+               if (isStyleSource(argNode.value)) {
+                  scope.remove();
+               } else {
+                  argNode.value = getSafeName(argNode.value);
+               }
             }
          },
       });
@@ -149,11 +177,12 @@ function transpileJS(bundler: Toypack, dependency: IScriptDependency) {
          ...(userBabelOptions.presets?.filter((v) => v != "env") || []),
       ],
       plugins: userBabelOptions.plugins,
-      sourceFileName: dependency.source,
-      filename: dependency.source,
+      sourceFileName: source,
+      filename: source,
       sourceMaps: bundler.options.bundleOptions.sourceMap,
       envName: bundler.options.bundleOptions.mode,
       minified: bundler.options.bundleOptions.minified,
+      comments: bundler.options.bundleOptions.minified,
    } as TransformOptions;
 
    const transpiled = transformFromAst(AST, undefined, {
@@ -161,105 +190,224 @@ function transpileJS(bundler: Toypack, dependency: IScriptDependency) {
       ...importantBabelOptions,
    }) as any as BabelFileResult;
 
-   result.code = transpiled.code || "";
-   result.map = transpiled.map
-      ? ({
-           version: 3,
-           sources: transpiled.map.sources,
-           sourcesContent: transpiled.map.sourcesContent,
-           names: transpiled.map.names,
-           mappings: transpiled.map.mappings,
-        } as ISourceMap)
-      : null;
+   const result = {
+      code: transpiled.code || "",
+      map: transpiled.map
+         ? ({
+              version: "3",
+              sources: transpiled.map.sources,
+              sourcesContent: transpiled.map.sourcesContent,
+              names: transpiled.map.names,
+              mappings: transpiled.map.mappings,
+           } as RawSourceMap)
+         : null,
+   };
 
    return result;
 }
 
-function bundleScript(bundler: Toypack, graph: IScriptDependency[]) {
-   const result = new MagicString.Bundle();
+/**
+ * Convert a resource asset to a CommonJS module.
+ */
+async function resourceToCJSModule(
+   bundler: Toypack,
+   source: string,
+   content: Blob,
+   shouldMinify = false
+) {
+   let exportStr = "";
 
-   /* const sourceMap: ISourceMap = {
-      version: 3,
-      sources: [],
-      sourcesContent: [],
-      names: [],
-      mappings: ""
-   }; */
+   const mode = bundler.options.bundleOptions.mode;
+
+   if (mode == "production") {
+      /* let url = `data:${content.type};base64,`;
+      url += btoa(await content.arrayBuffer());
+
+      exportStr = url; */
+      exportStr = path.join("resources", source);
+   } else {
+      exportStr = URL.createObjectURL(content);
+      console.log(exportStr);
+
+      // test: production
+      // exportStr = path.join("resources", getUniqueIdFromString(source, shouldMinify) + path.extname(source));
+   }
+
+   let result = rt.wrapIIFE(
+      source,
+      `module.exports = "${exportStr}";`,
+      shouldMinify
+   );
+
+   return result;
+}
+
+/* 
+if (map) {
+   console.log(321);
+   bundleSourceMap.setSourceContent(dep.source, dep.content);
+   bundleSourceMap.addMapping({
+      source: dep.source,
+      original: {
+         line: 4,
+         column: 4,
+      },
+      generated: {
+         line: 1,
+         column: 5,
+      },
+      name: "test",
+   });
+
+   //bundleSourceMap.setSourceContent(dep.source, dep.content);
+   // const smc = new SourceMapConsumer(map);
+
+   // console.log(smc.);
+}
+*/
+
+/**
+ * Get the script bundle from graph.
+ */
+async function bundleScript(bundler: Toypack, graph: IDependency[]) {
+   const result = new MagicString.Bundle();
+   const bundleSourceMap: MapCombiner | null = bundler.options.bundleOptions
+      .sourceMap
+      ? MapCombiner.create()
+      : null;
 
    const shouldMinify =
       bundler.options.bundleOptions.minified ||
       bundler.options.bundleOptions.mode == "production";
 
+   let prevLineNumber = 0;
+
+   const addBabelASTToBundle = (
+      source: string,
+      AST: Node,
+      depMap: IDependencyMap,
+      isEntry = false
+   ) => {
+      let { code, map } = transpileAST(
+         bundler,
+         source,
+         AST,
+         depMap,
+         shouldMinify
+      );
+
+      code = code.replace(/^"use strict";/, "").trim();
+
+      const wrappedMSTR = rt.wrapIIFE(source, code, shouldMinify, isEntry);
+
+      result.addSource({
+         filename: source,
+         content: wrappedMSTR,
+      });
+
+      //bundleSourceMap.applySourceMap(new SourceMapConsumer(map!));
+
+      return { map, mstr: wrappedMSTR };
+   };
+
    /* Modules */
    for (let i = graph.length - 1; i >= 0; i--) {
       const dep = graph[i];
-      const id = getUniqueIdFromString(dep.source, shouldMinify);
-      /* sourceMap.sources.push(dep.source);
-      sourceMap.sourcesContent.push(dep.content); */
 
-      let content = "";
+      if (dep.type == "style" && !dep.chunks) continue;
 
-      if (dep.type == "script") {
-         const transpiled = transpileJS(bundler, dep);
-         content = transpiled.code;
+      if (dep.type != "resource" && dep.chunks && !dep.AST) {
+         /**
+          * Add chunks to the bundle if it's a script or style
+          * dependency without an AST.
+          */
+         for (const chunk of dep.chunks) {
+            // Extract script chunks from the dependency
+            if (chunk.type == "script") {
+               const { map, mstr } = addBabelASTToBundle(
+                  chunk.source,
+                  chunk.AST,
+                  dep.dependencyMap
+               );
+
+               prevLineNumber += mstr.toString().split("\n").length;
+            }
+         }
+      } else if (dep.type == "script" && dep.AST && !dep.chunks?.length) {
+         /**
+          * If it's a script dependency that has an AST and no
+          * chunks, add the dependency itself to the bundle.
+          */
+         const { map, mstr } = addBabelASTToBundle(
+            dep.source,
+            dep.AST,
+            dep.dependencyMap,
+            i == 0
+         );
+
+         if (map) {
+            map.sourcesContent = [dep.content];
+            bundleSourceMap?.addFile(
+               {
+                  sourceFile: dep.source,
+                  source: MapConverter.fromObject(map).toComment(),
+               },
+               {
+                  line: result.toString().split("\n").length,
+               }
+            );
+
+            prevLineNumber += mstr.toString().split("\n").length;
+         }
+      } else if (dep.type == "resource") {
+         /**
+          * If it's a resource, compile first, then add to the bundle.
+          */
+         const compiled = await resourceToCJSModule(
+            bundler,
+            dep.source,
+            dep.content,
+            shouldMinify
+         );
+         result.addSource({
+            filename: dep.source,
+            content: compiled,
+         });
+         prevLineNumber += compiled.toString().split("\n").length;
       } else {
-         // TODO: handle resource compilation
-      }
-
-      const ms = new MagicString.default("");
-      result.addSource({
-         filename: dep.source,
-         content: ms,
-      });
-
-      /* code body */
-      ms.append(`var exports = module.exports;`);
-      ms.append((content || "").replace(/^"use strict";/, ""));
-      ms.append(`${rt.newLine(2, shouldMinify)}return exports;`);
-
-      /* code wrap (iife) */
-      ms.indent(rt.indentPrefix(shouldMinify));
-      ms.prepend(
-         `_modules_.${id} = (function (module) {${rt.newLine(1, shouldMinify)}`
-      );
-      ms.append(`${rt.newLine(1, shouldMinify)}})({ exports: {} });`);
-
-      /* filename comment */
-      if (!shouldMinify) {
-         ms.prepend(`\n// ${dep.source.replace(/^\//, "")}\n`);
-      }
-
-      /* return entry module's exports */
-      if (dep.source == graph[0].source) {
-         result.append(`${rt.newLine(2, shouldMinify)}return _modules_.${id};`);
+         throw new Error(`Failed to compile '${dep.source}'.`);
       }
    }
 
    /* Main */
    /* code body */
    result.prepend(rt.requireFunction(shouldMinify));
-   result.prepend(`var _modules_ = {};${rt.newLine(2, shouldMinify)}`);
    result.prepend(`"use strict";${rt.newLine(2, shouldMinify)}`);
 
    /* code wrap */
    result.indent(rt.indentPrefix(shouldMinify));
    result.prepend(`(function () {${rt.newLine(1, shouldMinify)}`);
    result.append(`${rt.newLine(1, shouldMinify)} })();`);
-   return result.toString();
+
+   console.log(
+      MapConverter.fromComment(bundleSourceMap?.comment() || "").toObject()
+   );
+
+   return result.toString() + `\n\n${bundleSourceMap?.comment() || ""}`;
 }
 
-function compileCSS(bundler: Toypack, dependency: IStyleDependency) {
+function compileCSS(source: string, AST: Root) {
    const result = {
       code: "",
       map: {},
    };
 
-   if (!dependency.AST) {
+   if (!AST) {
       return result;
    }
 
-   const compiled = postcss([]).process(dependency.AST, {
-      from: dependency.source,
+   const compiled = postcss([]).process(AST, {
+      from: source,
    });
 
    result.code = compiled.css;
@@ -270,44 +418,77 @@ function compileCSS(bundler: Toypack, dependency: IStyleDependency) {
    return result;
 }
 
-function bundleStyle(bundler: Toypack, graph: IDependency[]) {
+async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
    const result = new MagicString.Bundle();
 
    const shouldMinify =
       bundler.options.bundleOptions.minified ||
       bundler.options.bundleOptions.mode == "production";
 
-   /* Modules */
-   for (let i = 0; i < graph.length; i++) {
-      const dep = graph[i];
-      if (dep.type != "style") continue;
-      
-      
+   const addPostCSSASTToBundle = (source: string, AST: Root) => {
+      const { code, map } = compileCSS(source, AST);
 
-      let compiled = compileCSS(bundler, dep);
-      let content = compiled.code;
-
-      const ms = new MagicString.default(content);
+      const magicStr = new MagicString.default(code);
       result.addSource({
-         filename: dep.source,
-         content: ms,
+         filename: source,
+         content: magicStr,
       });
 
       /* filename comment */
       if (!shouldMinify) {
-         ms.prepend(`\n/* ${dep.source.replace(/^\//, "")} */`);
+         magicStr.prepend(`\n/* ${source.replace(/^\//, "")} */`);
+      }
+   };
+
+   /* Modules */
+   for (let i = 0; i < graph.length; i++) {
+      const dep = graph[i];
+
+      if (dep.type == "script" && !dep.chunks) continue;
+
+      if (dep.type != "resource" && dep.chunks && !dep.AST) {
+         /**
+          * Add chunks to the bundle if it's a script or style
+          * dependency without an AST.
+          */
+         for (const chunk of dep.chunks) {
+            // Extract style chunks from the dependency
+            if (chunk.type == "style") {
+               addPostCSSASTToBundle(chunk.source, chunk.AST);
+               console.log(chunk);
+            }
+         }
+      } else if (dep.type == "style" && dep.AST && !dep.chunks?.length) {
+         /**
+          * If it's a style dependency that has an AST and no
+          * chunks, add the dependency itself to the bundle.
+          */
+         addPostCSSASTToBundle(dep.source, dep.AST);
+      } else if (dep.type == "resource") {
+         /**
+          * If it's a resource, compile first, then add to the bundle.
+          */
+         /* const compiled = await resourceToCJSModule(
+            bundler,
+            dep.source,
+            dep.content,
+            shouldMinify
+         );
+         result.addSource({
+            filename: dep.source,
+            content: compiled,
+         }); */
+      } else {
+         throw new Error(`Failed to compile '${dep.source}'.`);
       }
    }
 
    return result.toString();
 }
 
-export function bundle(
-   bundler: Toypack,
-   { script, style }: { script: IScriptDependency[]; style: IStyleDependency[] }
-) {
+export async function bundle(bundler: Toypack, graph: IDependency[]) {
    return {
-      script: bundleScript(bundler, script),
-      style: bundleStyle(bundler, style),
+      script: await bundleScript(bundler, graph),
+      style: await bundleStyle(bundler, graph),
    };
 }

@@ -1,4 +1,5 @@
 import { ParserOptions, TransformOptions } from "@babel/core";
+import { AcceptedPlugin, ProcessOptions } from "postcss";
 
 type IModule = "esm" | "cjs";
 type IMode = "production" | "development";
@@ -13,7 +14,8 @@ type IBabelTransformOptions = Omit<
    | "ast"
    | "minified"
    | "compact"
-   >;
+   | "comments"
+>;
 type IBabelParseOptions = Omit<ParserOptions, "sourceType" | "sourceFilename">;
 
 const defaultOptions = {
@@ -59,21 +61,31 @@ const defaultOptions = {
        * @default true
        */
       sourceMap: true,
-      minified: false
+      /**
+       * Whether to minify the output bundle or not. Sets to `true` when the mode is set to `production`.
+       * @default false
+       */
+      minified: false,
    },
+   /**
+    * Configuration for Babel.
+    */
    babelOptions: {
       transform: {
          presets: [],
          plugins: [],
       } as IBabelTransformOptions,
       parse: {
-         plugins: []
+         plugins: [],
       } as IBabelParseOptions,
    },
    /**
-    * The iframe element to use for running the bundled code.
+    * Configuration for PostCSS.
     */
-   iframe: null as HTMLIFrameElement | null,
+   postCSSOptions: {
+      plugins: [] as AcceptedPlugin[],
+      ...({} as Omit<ProcessOptions, "map" | "from" | "to">)
+   },
    /**
     * Log level.
     * @default "error"
