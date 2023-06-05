@@ -13,6 +13,7 @@ import {
 } from "./errors.js";
 import { Toypack } from "./Toypack.js";
 import { isCSS, isJS, parseURLQuery } from "./utils.js";
+import { RawSourceMap } from "source-map-js";
 
 export interface IChunk {
    source: string;
@@ -39,6 +40,7 @@ export interface IScriptDependency extends ISimpleDependency {
       AST: Node;
       source: string;
       content: string;
+      map?: RawSourceMap;
    }[];
 }
 
@@ -50,6 +52,7 @@ export interface IStyleDependency extends ISimpleDependency {
       AST: Root;
       source: string;
       content: string;
+      map?: RawSourceMap;
    }[];
 }
 

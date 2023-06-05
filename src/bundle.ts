@@ -1,5 +1,6 @@
 import { TransformOptions, BabelFileResult } from "@babel/core";
 import {
+   transform,
    transformFromAst,
    availablePlugins,
    availablePresets,
@@ -25,6 +26,7 @@ import {
 import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
 import mergeSourceMap from "merge-source-map";
+import lineColumn from "line-column";
 console.log(availablePlugins, availablePresets);
 
 export type ITraverseFunction<T> = (
@@ -82,14 +84,13 @@ function transpileAST(
    bundler: Toypack,
    source: string,
    AST: Node,
-   depMap: IDependencyMap,
-   shouldMinify = false
+   depMap: IDependencyMap
 ) {
    const format = bundler.options.bundleOptions.module;
 
    function getSafeName(relativeSource: string) {
       const absoluteSource = depMap[relativeSource].absolute;
-      return getUniqueIdFromString(absoluteSource, shouldMinify);
+      return getUniqueIdFromString(absoluteSource);
    }
 
    const traverseOptionsArray: ITraverseOptions[] = [];
@@ -212,8 +213,7 @@ function transpileAST(
 async function resourceToCJSModule(
    bundler: Toypack,
    source: string,
-   content: Blob,
-   shouldMinify = false
+   content: Blob
 ) {
    let exportStr = "";
 
@@ -233,54 +233,59 @@ async function resourceToCJSModule(
       // exportStr = path.join("resources", getUniqueIdFromString(source, shouldMinify) + path.extname(source));
    }
 
-   let result = rt.wrapIIFE(
-      source,
-      `module.exports = "${exportStr}";`,
-      shouldMinify
-   );
+   let result = rt.moduleWrap(source, `module.exports = "${exportStr}";`);
 
    return result;
 }
 
-/* 
-if (map) {
-   console.log(321);
-   bundleSourceMap.setSourceContent(dep.source, dep.content);
-   bundleSourceMap.addMapping({
-      source: dep.source,
-      original: {
-         line: 4,
-         column: 4,
-      },
-      generated: {
-         line: 1,
-         column: 5,
-      },
-      name: "test",
+function offsetLines(incomingSourceMap: RawSourceMap, lineOffset: number) {
+   var consumer = new SourceMapConsumer(incomingSourceMap);
+   var generator = new SourceMapGenerator({
+      file: incomingSourceMap.file,
+      sourceRoot: incomingSourceMap.sourceRoot,
    });
-
-   //bundleSourceMap.setSourceContent(dep.source, dep.content);
-   // const smc = new SourceMapConsumer(map);
-
-   // console.log(smc.);
+   consumer.eachMapping(function (m) {
+      // skip invalid (not-connected) mapping
+      // refs: https://github.com/mozilla/source-map/blob/182f4459415de309667845af2b05716fcf9c59ad/lib/source-map-generator.js#L268-L275
+      if (
+         typeof m.originalLine === "number" &&
+         0 < m.originalLine &&
+         typeof m.originalColumn === "number" &&
+         0 <= m.originalColumn &&
+         m.source
+      ) {
+         generator.addMapping({
+            source: m.source,
+            name: m.name,
+            original: { line: m.originalLine, column: m.originalColumn },
+            generated: {
+               line: m.generatedLine + lineOffset,
+               column: m.generatedColumn,
+            },
+         });
+      }
+   });
+   var outgoingSourceMap = JSON.parse(generator.toString()) as RawSourceMap;
+   if (typeof incomingSourceMap.sourcesContent !== "undefined") {
+      outgoingSourceMap.sourcesContent = incomingSourceMap.sourcesContent;
+   }
+   return outgoingSourceMap;
 }
-*/
+
+function getLineCount(str: string) {
+   return str.split("\n").length;
+}
 
 /**
  * Get the script bundle from graph.
  */
 async function bundleScript(bundler: Toypack, graph: IDependency[]) {
-   const result = new MagicString.Bundle();
-   const bundleSourceMap: MapCombiner | null = bundler.options.bundleOptions
-      .sourceMap
-      ? MapCombiner.create()
-      : null;
+   const bundleContent = new MagicString.Bundle();
+   const bundleSourceMap = new SourceMapGenerator();
 
    const shouldMinify =
       bundler.options.bundleOptions.minified ||
       bundler.options.bundleOptions.mode == "production";
-
-   let prevLineNumber = 0;
 
    const addBabelASTToBundle = (
       source: string,
@@ -288,26 +293,59 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
       depMap: IDependencyMap,
       isEntry = false
    ) => {
-      let { code, map } = transpileAST(
-         bundler,
-         source,
-         AST,
-         depMap,
-         shouldMinify
-      );
+      let { code, map } = transpileAST(bundler, source, AST, depMap);
 
-      code = code.replace(/^"use strict";/, "").trim();
+      const wrappedMSTR = rt.moduleWrap(source, code, isEntry);
 
-      const wrappedMSTR = rt.wrapIIFE(source, code, shouldMinify, isEntry);
-
-      result.addSource({
+      bundleContent.addSource({
          filename: source,
          content: wrappedMSTR,
       });
 
-      //bundleSourceMap.applySourceMap(new SourceMapConsumer(map!));
-
       return { map, mstr: wrappedMSTR };
+   };
+
+   const addMapToBundle = (
+      map: RawSourceMap,
+      source: string,
+      originalContent: string,
+      generatedContent: string
+   ) => {
+      const currentBundleResult = bundleContent.toString();
+
+      const contentIndex = currentBundleResult.indexOf(generatedContent);
+      const lineInfo = lineColumn(currentBundleResult).fromIndex(contentIndex);
+      if (!lineInfo) {
+         throw new Error("Mapping failed.");
+      }
+      const moduleLineGap = 2;
+
+      bundleSourceMap.setSourceContent(source, originalContent);
+      const smc = new SourceMapConsumer(map);
+
+      /**
+       * Bundle is indented 2 times.
+       * 1st indent is when `rt.moduleWrap` is used.
+       * 2nd indent is the whole bundle's function wrap (see below).
+       * TODO: add test on this
+       */
+      const bundleIndentCount = 2;
+      const bundleIndentSize = rt.indentPrefix().length * bundleIndentCount;
+
+      smc.eachMapping((map) => {
+         bundleSourceMap.addMapping({
+            source: source,
+            original: {
+               line: map.originalLine,
+               column: map.originalColumn,
+            },
+            generated: {
+               line: map.generatedLine + lineInfo!.line + moduleLineGap,
+               column: map.generatedColumn + bundleIndentSize,
+            },
+            name: map.name,
+         });
+      });
    };
 
    /* Modules */
@@ -330,7 +368,10 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
                   dep.dependencyMap
                );
 
-               prevLineNumber += mstr.toString().split("\n").length;
+               // Source map
+               if (map) {
+                  addMapToBundle(map, dep.source, dep.content, mstr.toString());
+               }
             }
          }
       } else if (dep.type == "script" && dep.AST && !dep.chunks?.length) {
@@ -345,19 +386,9 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
             i == 0
          );
 
+         // Source map
          if (map) {
-            map.sourcesContent = [dep.content];
-            bundleSourceMap?.addFile(
-               {
-                  sourceFile: dep.source,
-                  source: MapConverter.fromObject(map).toComment(),
-               },
-               {
-                  line: result.toString().split("\n").length,
-               }
-            );
-
-            prevLineNumber += mstr.toString().split("\n").length;
+            addMapToBundle(map, dep.source, dep.content, mstr.toString());
          }
       } else if (dep.type == "resource") {
          /**
@@ -366,14 +397,12 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
          const compiled = await resourceToCJSModule(
             bundler,
             dep.source,
-            dep.content,
-            shouldMinify
+            dep.content
          );
-         result.addSource({
+         bundleContent.addSource({
             filename: dep.source,
             content: compiled,
          });
-         prevLineNumber += compiled.toString().split("\n").length;
       } else {
          throw new Error(`Failed to compile '${dep.source}'.`);
       }
@@ -381,19 +410,26 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
    /* Main */
    /* code body */
-   result.prepend(rt.requireFunction(shouldMinify));
-   result.prepend(`"use strict";${rt.newLine(2, shouldMinify)}`);
+   const requireFunction = rt.requireFunction();
+   bundleContent.prepend(requireFunction);
 
    /* code wrap */
-   result.indent(rt.indentPrefix(shouldMinify));
-   result.prepend(`(function () {${rt.newLine(1, shouldMinify)}`);
-   result.append(`${rt.newLine(1, shouldMinify)} })();`);
+   bundleContent.indent(rt.indentPrefix());
+   const openingWrap = `(function () {\n`;
+   bundleContent.prepend(openingWrap);
+   bundleContent.append(`\n})();`);
 
-   console.log(
-      MapConverter.fromComment(bundleSourceMap?.comment() || "").toObject()
+   const wrapOffset =
+      getLineCount(requireFunction.trim()) + getLineCount(openingWrap.trim());
+
+   const finalizedMap = MapConverter.fromObject(
+      offsetLines(
+         MapConverter.fromJSON(bundleSourceMap.toString()).toObject(),
+         wrapOffset
+      )
    );
 
-   return result.toString() + `\n\n${bundleSourceMap?.comment() || ""}`;
+   return bundleContent.toString() + `\n\n${finalizedMap.toComment()}`;
 }
 
 function compileCSS(source: string, AST: Root) {
@@ -435,9 +471,7 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
       });
 
       /* filename comment */
-      if (!shouldMinify) {
-         magicStr.prepend(`\n/* ${source.replace(/^\//, "")} */`);
-      }
+      magicStr.prepend(`\n/* ${source.replace(/^\//, "")} */`);
    };
 
    /* Modules */

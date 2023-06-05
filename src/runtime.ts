@@ -1,8 +1,8 @@
 import * as MagicString from "magic-string";
 import { getUniqueIdFromString } from "./utils.js";
 
-export function indentPrefix(shouldMinify = false) {
-   return !shouldMinify ? "  " : "";
+export function indentPrefix() {
+   return "  ";
 }
 
 const identifiers = {
@@ -28,23 +28,12 @@ return `<!DOCTYPE html>
 </html>
 `.replaceAll("   ", indentPrefix());}
 
-export function newLine(count = 1, shouldMinify = false) {
-   let res = "";
-   if (!shouldMinify) {
-      for (let i = 0; i < count; i++) {
-         res += "\n";
-      }
-   }
-
-   return res;
-}
-
-export function requireFunction(minified = false) {
+export function requireFunction() {
    // prettier-ignore
    let result = `var ${identifiers.modules} = {};
 var _modules_cache_ = {};
 
-${!minified ? "// Require function" : ""}
+// Require function
 function ${identifiers.require}(path) {
    var init = ${identifiers.modules}[path];
    var module = { exports: {} };
@@ -68,37 +57,31 @@ function ${identifiers.require}(path) {
    init(module, module.exports, localRequire);
    return module.exports;
 }
-`.replaceAll("   ", indentPrefix(minified));
-
-   if (minified) {
-      result = result.replaceAll("\n", "").replace(/\s\s+/g, " ").trim();
-   }
+`.replaceAll("   ", indentPrefix());
 
    return result;
 }
 
-export function wrapIIFE(source: string, code: string, shouldMinify = false, isEntry = false) {
-   const id = getUniqueIdFromString(source, shouldMinify);
+export function moduleWrap(source: string, code: string, isEntry = false) {
+   const id = getUniqueIdFromString(source);
 
    const magicStr = new MagicString.default("");
+
+   /* code body */
    magicStr.append(code || "");
-   magicStr.append(`${newLine(2, shouldMinify)}return module.exports;`);
+   magicStr.append(`\n\nreturn module.exports;`);
 
-   /* code wrap (iife) */
-   magicStr.indent(indentPrefix(shouldMinify));
+   /* code wrap */
+   magicStr.indent(indentPrefix());
    magicStr.prepend(
-      `${identifiers.modules}.${id} = function (module, exports, require) {${newLine(1, shouldMinify)}`
+      `${identifiers.modules}.${id} = function (module, exports, require) {\n`
    );
-   magicStr.append(`\n}`);
+   magicStr.prepend(`\n// ${source.replace(/^\//, "")}\n`);
+   magicStr.append(`\n};`);
 
-   /* filename comment */
-   if (!shouldMinify) {
-      magicStr.prepend(`\n// ${source.replace(/^\//, "")}\n`);
-   }
-   
    /* return entry's exports */
    if (isEntry) {
-      magicStr.append(`${newLine(2, shouldMinify)}${identifiers.require}("${id}");`);
+      magicStr.append(`\n\n${identifiers.require}("${id}");`);
    }
 
    return magicStr;
