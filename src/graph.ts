@@ -167,13 +167,13 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
             valueNode.nodes.length
          ) {
             result.dependencies.push(valueNode.nodes[0].value);
-            atRuleNode.remove();
+            //atRuleNode.remove();
          }
 
          // @import "";
          else if (valueNode.value.length) {
             result.dependencies.push(valueNode.value);
-            atRuleNode.remove();
+            //atRuleNode.remove();
          }
       });
    });
@@ -202,9 +202,9 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
             return;
          }
 
-         valueNode.value = "123";
+         // valueNode.value = "123";
 
-         console.log(declNode.value);
+         // console.log(declNode.value);
 
          result.dependencies.push(source);
       });
@@ -243,14 +243,14 @@ function compileAndGetChunks(
 
       if (compilation.type == "result") {
          result.push({
-            source,
+            source: source,
             content: compilation.content,
             map: compilation.map
          });
       } else {
          for (const [lang, dataArr] of Object.entries(compilation.use)) {
+            const chunkSource = `${chunk.source}.chunk-${result.length}.${lang}`;
             for (const data of dataArr) {
-               const chunkSource = `${chunk.source}.chunk-${result.length}.${lang}`;
                if (result.some((v) => v.source == chunkSource)) {
                   continue;
                }

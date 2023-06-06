@@ -31,8 +31,12 @@ export class CodeComposer {
     * @param content The content to prepend.
     * @returns The updated CodeComposer instance.
     */
-   public prepend(content: string) {
-      this.lines.unshift(...content.split("\n"));
+   public prepend(content: string | CodeComposer) {
+      if (typeof content == "string") {
+         this.lines.unshift(...content.split("\n"));
+      } else {
+         this.lines.unshift(...content.lines);
+      }
 
       return this;
    }
@@ -42,8 +46,12 @@ export class CodeComposer {
     * @param content The content to append.
     * @returns The updated CodeComposer instance.
     */
-   public append(content: string) {
-      this.lines.push(...content.split("\n"));
+   public append(content: string | CodeComposer) {
+      if (typeof content == "string") {
+         this.lines.push(...content.split("\n"));
+      } else {
+         this.lines.push(...content.lines);
+      }
 
       return this;
    }
@@ -52,7 +60,7 @@ export class CodeComposer {
     * Wraps the code with the specified content. The content must
     * include the marker `<CODE_BODY>` to indicate where the composed
     * code should be placed.
-    * 
+    *
     * **Note**: The marker must have its own line.
     * @param content The content to append.
     * @returns The updated CodeComposer instance.

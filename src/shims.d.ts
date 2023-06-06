@@ -24,3 +24,6 @@ declare module "babel-minify" {
       overrides?: Overrides
    ): { code: string; map: RawSourceMap };
 }
+
+declare module "postcss-safe-parser";
+declare module "postcss-syntax";

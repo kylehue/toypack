@@ -1,4 +1,3 @@
-import * as MagicString from "magic-string";
 import { getUniqueIdFromString } from "./utils.js";
 import { CodeComposer } from "./CodeComposer.js";
 

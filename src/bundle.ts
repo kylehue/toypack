@@ -6,7 +6,6 @@ import {
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
 import postcss, { Root, parse } from "postcss";
-import * as MagicString from "magic-string";
 import { IDependency, IDependencyMap } from "./graph.js";
 import * as rt from "./runtime.js";
 import { Toypack } from "./Toypack.js";
@@ -20,7 +19,7 @@ import {
 import MapConverter from "convert-source-map";
 import babelMinify from "babel-minify";
 import { CodeComposer } from "./CodeComposer.js";
-import autoprefixer from "autoprefixer";
+import * as CSSTree from "css-tree";
 console.log(availablePlugins, availablePresets);
 
 export type ITraverseFunction<T> = (
@@ -422,6 +421,24 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
    return result;
 }
+   
+/* CSSTree.walk(CSSTree.parse(
+   `@import "test1.css";
+   @import url(test2.css);
+   
+   body {
+      background: url(cat.jpg);
+   }`
+   , {
+      positions: true
+   }), function(node, item, list) {
+   if (this.declaration !== null && node.type === "Url") {
+      console.log(node.value);
+   }
+   if (node.type === "Atrule" && node.name=="import") {
+      console.log(node);
+   }
+}) */
 
 function compileCSS(source: string, AST: Root, inputSourceMap?: RawSourceMap) {
    const result = {
@@ -433,44 +450,37 @@ function compileCSS(source: string, AST: Root, inputSourceMap?: RawSourceMap) {
       return result;
    }
 
-   const compiled = postcss([autoprefixer()]).process(
-      `.example {
-    display: grid;
-    transition: all .5s;
-    user-select: none;
-    background: linear-gradient(to bottom, white, black);
-}
-`,
-      {
-         from: source,
-         to: source,
-         map: true,
-      }
-   );
+   const compiled = AST.toResult({
+      from: source,
+      to: source,
+      map: true,
 
+   });
+
+   
    result.code = compiled.css;
    result.map = compiled.map;
-
    console.log(compiled);
 
    return result;
 }
 
 async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
-   const result = new MagicString.Bundle();
+   const result = new CodeComposer("");
    const bundleSourceMap = new SourceMapGenerator();
+
+   console.log(graph);
+   
 
    const addPostCSSASTToBundle = (source: string, AST: Root) => {
       const { code, map } = compileCSS(source, AST);
 
-      const magicStr = new MagicString.default(code);
-      result.addSource({
-         filename: source,
-         content: magicStr,
-      });
+      const comp = new CodeComposer(code);
 
       /* filename comment */
-      magicStr.prepend(`\n/* ${source.replace(/^\//, "")} */`);
+      //comp.prepend(`/* ${source.replace(/^\//, "")} */`);
+
+      result.append(comp);
    };
 
    /* Modules */
@@ -487,8 +497,8 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
          for (const chunk of dep.chunks) {
             // Extract style chunks from the dependency
             if (chunk.type == "style") {
-               addPostCSSASTToBundle(chunk.source, chunk.AST);
                console.log(chunk);
+               addPostCSSASTToBundle(chunk.source, chunk.AST);
             }
          }
       } else if (dep.type == "style" && dep.AST && !dep.chunks?.length) {

@@ -41,7 +41,7 @@ export const test = 452;
 addFile(
    "classes/adder.js",
    `
-import "../styles/sample.scss";
+import "../styles/sample";
 import {createNum as cool} from "./createNum.js";
 import {test} from "../src/main";
 console.log(test);
@@ -105,11 +105,9 @@ body {
 
 addFile(
    "styles/sample.scss",
-   `
-body {
-   background: /* url(../images/cat.png) */yellow;
-}
-`
+   `body {
+   background: yellow;
+}`
 );
 
 // CJS

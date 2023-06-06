@@ -58,9 +58,6 @@ export class Toypack {
    constructor(options?: PartialDeep<IOptions>) {
       this.options = mergeDeep(JSON.parse(JSON.stringify(defaultOptions)), options);
 
-      console.log(defaultOptions, this.options, options);
-      
-
       this.assets = new Map();
       this.useLoader(new SassLoader(this));
       this.useLoader(new JSONLoader(this));
