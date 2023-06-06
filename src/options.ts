@@ -15,12 +15,14 @@ type IBabelTransformOptions = Omit<
    | "minified"
    | "compact"
    | "comments"
+   | "inputSourceMap"
 >;
 type IBabelParseOptions = Omit<ParserOptions, "sourceType" | "sourceFilename">;
+type ISourceMap = boolean | "nosources";
 
 const defaultOptions = {
    /**
-    * The options for bundling the program.
+    * Configuration for the bundler.
     */
    bundleOptions: {
       /**
@@ -60,7 +62,7 @@ const defaultOptions = {
        * Indicates whether to generate source maps for the bundled code.
        * @default true
        */
-      sourceMap: true,
+      sourceMap: true as ISourceMap,
       /**
        * Whether to minify the output bundle or not. Sets to `true` when the mode is set to `production`.
        * @default false
@@ -84,7 +86,7 @@ const defaultOptions = {
     */
    postCSSOptions: {
       plugins: [] as AcceptedPlugin[],
-      ...({} as Omit<ProcessOptions, "map" | "from" | "to">)
+      ...({} as Omit<ProcessOptions, "map" | "from" | "to">),
    },
    /**
     * Log level.

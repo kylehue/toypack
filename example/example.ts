@@ -1,5 +1,5 @@
 import { sampleFiles } from "./sample.js";
-import { Toypack, Babel } from "../build/Toypack.js";
+import d, { Toypack, Babel,Utilities,  } from "../build/Toypack.js";
 import { DefinePlugin } from "../build/plugins/DefinePlugin.js";
 
 const iframe = document.querySelector<HTMLIFrameElement>("#sandbox")!;

@@ -1,32 +1,26 @@
 import { TransformOptions, BabelFileResult } from "@babel/core";
 import {
-   transform,
    transformFromAst,
    availablePlugins,
    availablePresets,
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
-import postcss, { Root } from "postcss";
+import postcss, { Root, parse } from "postcss";
 import * as MagicString from "magic-string";
-import {
-   IDependency,
-   IDependencyMap,
-   IScriptDependency,
-   IStyleDependency,
-} from "./graph.js";
+import { IDependency, IDependencyMap } from "./graph.js";
 import * as rt from "./runtime.js";
 import { Toypack } from "./Toypack.js";
-import { btoa, getUniqueIdFromString, isJS } from "./utils.js";
+import { findCodePosition, getUniqueIdFromString } from "./utils.js";
 import path from "path-browserify";
 import {
    SourceMapConsumer,
    SourceMapGenerator,
    RawSourceMap,
 } from "source-map-js";
-import MapCombiner from "combine-source-map";
 import MapConverter from "convert-source-map";
-import mergeSourceMap from "merge-source-map";
-import lineColumn from "line-column";
+import babelMinify from "babel-minify";
+import { CodeComposer } from "./CodeComposer.js";
+import autoprefixer from "autoprefixer";
 console.log(availablePlugins, availablePresets);
 
 export type ITraverseFunction<T> = (
@@ -84,7 +78,8 @@ function transpileAST(
    bundler: Toypack,
    source: string,
    AST: Node,
-   depMap: IDependencyMap
+   depMap: IDependencyMap,
+   inputSourceMap?: RawSourceMap
 ) {
    const format = bundler.options.bundleOptions.module;
 
@@ -180,10 +175,11 @@ function transpileAST(
       plugins: userBabelOptions.plugins,
       sourceFileName: source,
       filename: source,
-      sourceMaps: bundler.options.bundleOptions.sourceMap,
+      sourceMaps: !!bundler.options.bundleOptions.sourceMap,
       envName: bundler.options.bundleOptions.mode,
       minified: bundler.options.bundleOptions.minified,
       comments: bundler.options.bundleOptions.minified,
+      inputSourceMap: inputSourceMap,
    } as TransformOptions;
 
    const transpiled = transformFromAst(AST, undefined, {
@@ -238,100 +234,89 @@ async function resourceToCJSModule(
    return result;
 }
 
-function offsetLines(incomingSourceMap: RawSourceMap, lineOffset: number) {
-   var consumer = new SourceMapConsumer(incomingSourceMap);
-   var generator = new SourceMapGenerator({
-      file: incomingSourceMap.file,
-      sourceRoot: incomingSourceMap.sourceRoot,
-   });
-   consumer.eachMapping(function (m) {
-      // skip invalid (not-connected) mapping
-      // refs: https://github.com/mozilla/source-map/blob/182f4459415de309667845af2b05716fcf9c59ad/lib/source-map-generator.js#L268-L275
-      if (
-         typeof m.originalLine === "number" &&
-         0 < m.originalLine &&
-         typeof m.originalColumn === "number" &&
-         0 <= m.originalColumn &&
-         m.source
-      ) {
-         generator.addMapping({
-            source: m.source,
-            name: m.name,
-            original: { line: m.originalLine, column: m.originalColumn },
-            generated: {
-               line: m.generatedLine + lineOffset,
-               column: m.generatedColumn,
-            },
-         });
-      }
-   });
-   var outgoingSourceMap = JSON.parse(generator.toString()) as RawSourceMap;
-   if (typeof incomingSourceMap.sourcesContent !== "undefined") {
-      outgoingSourceMap.sourcesContent = incomingSourceMap.sourcesContent;
-   }
-   return outgoingSourceMap;
-}
-
-function getLineCount(str: string) {
-   return str.split("\n").length;
-}
-
 /**
  * Get the script bundle from graph.
  */
 async function bundleScript(bundler: Toypack, graph: IDependency[]) {
-   const bundleContent = new MagicString.Bundle();
-   const bundleSourceMap = new SourceMapGenerator();
+   const bundleContent = new CodeComposer("");
+   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   const bundleSourceMap = !!sourceMapOption ? new SourceMapGenerator() : null;
 
-   const shouldMinify =
-      bundler.options.bundleOptions.minified ||
-      bundler.options.bundleOptions.mode == "production";
-
+   /**
+    * Add a Babel AST to the bundle.
+    */
    const addBabelASTToBundle = (
       source: string,
       AST: Node,
       depMap: IDependencyMap,
-      isEntry = false
+      inputSourceMap?: RawSourceMap
    ) => {
-      let { code, map } = transpileAST(bundler, source, AST, depMap);
+      let { code, map } = transpileAST(
+         bundler,
+         source,
+         AST,
+         depMap,
+         inputSourceMap
+      );
 
-      const wrappedMSTR = rt.moduleWrap(source, code, isEntry);
+      const wrappedModule = rt.moduleWrap(
+         source,
+         code,
+         source === graph[0].source
+      );
 
-      bundleContent.addSource({
-         filename: source,
-         content: wrappedMSTR,
-      });
+      bundleContent.append(wrappedModule.trim() + "\n");
 
-      return { map, mstr: wrappedMSTR };
+      return { map, code };
    };
 
+   /**
+    * Finalizes and stringifies the bundle content. It adds the
+    * `require` function to the code and wraps the code in IIFE.
+    */
+   const finalizeBundleContent = () => {
+      const bundleClone = bundleContent.clone();
+      bundleClone.prepend(rt.requireFunction());
+      bundleClone.indent(rt.indentPrefix());
+      bundleClone.wrap(`
+      (function () {
+         <CODE_BODY>
+      })();
+      `);
+
+      return bundleClone.toString();
+   };
+
+   /**
+    * Add a source map to the bundle.
+    */
    const addMapToBundle = (
       map: RawSourceMap,
       source: string,
       originalContent: string,
       generatedContent: string
    ) => {
-      const currentBundleResult = bundleContent.toString();
+      if (!bundleSourceMap) return;
 
-      const contentIndex = currentBundleResult.indexOf(generatedContent);
-      const lineInfo = lineColumn(currentBundleResult).fromIndex(contentIndex);
-      if (!lineInfo) {
-         throw new Error("Mapping failed.");
+      const currentBundleResult = finalizeBundleContent();
+      const position = findCodePosition(currentBundleResult, generatedContent);
+
+      if (position.line == -1) {
+         if (
+            bundler.options.logLevel == "error" ||
+            bundler.options.logLevel == "warn"
+         ) {
+            console.warn(
+               `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
+            );
+         }
       }
-      const moduleLineGap = 2;
 
-      bundleSourceMap.setSourceContent(source, originalContent);
+      if (sourceMapOption != "nosources") {
+         bundleSourceMap.setSourceContent(source, originalContent);
+      }
+
       const smc = new SourceMapConsumer(map);
-
-      /**
-       * Bundle is indented 2 times.
-       * 1st indent is when `rt.moduleWrap` is used.
-       * 2nd indent is the whole bundle's function wrap (see below).
-       * TODO: add test on this
-       */
-      const bundleIndentCount = 2;
-      const bundleIndentSize = rt.indentPrefix().length * bundleIndentCount;
-
       smc.eachMapping((map) => {
          bundleSourceMap.addMapping({
             source: source,
@@ -340,8 +325,8 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
                column: map.originalColumn,
             },
             generated: {
-               line: map.generatedLine + lineInfo!.line + moduleLineGap,
-               column: map.generatedColumn + bundleIndentSize,
+               line: map.generatedLine + position.line,
+               column: map.generatedColumn + position.column,
             },
             name: map.name,
          });
@@ -362,15 +347,16 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
          for (const chunk of dep.chunks) {
             // Extract script chunks from the dependency
             if (chunk.type == "script") {
-               const { map, mstr } = addBabelASTToBundle(
+               const { map, code } = addBabelASTToBundle(
                   chunk.source,
                   chunk.AST,
-                  dep.dependencyMap
+                  dep.dependencyMap,
+                  chunk.map
                );
 
                // Source map
-               if (map) {
-                  addMapToBundle(map, dep.source, dep.content, mstr.toString());
+               if (bundleSourceMap && map) {
+                  addMapToBundle(map, dep.source, dep.content, code);
                }
             }
          }
@@ -379,16 +365,15 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
           * If it's a script dependency that has an AST and no
           * chunks, add the dependency itself to the bundle.
           */
-         const { map, mstr } = addBabelASTToBundle(
+         const { map, code } = addBabelASTToBundle(
             dep.source,
             dep.AST,
-            dep.dependencyMap,
-            i == 0
+            dep.dependencyMap
          );
 
          // Source map
-         if (map) {
-            addMapToBundle(map, dep.source, dep.content, mstr.toString());
+         if (bundleSourceMap && map) {
+            addMapToBundle(map, dep.source, dep.content, code);
          }
       } else if (dep.type == "resource") {
          /**
@@ -399,40 +384,46 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
             dep.source,
             dep.content
          );
-         bundleContent.addSource({
-            filename: dep.source,
-            content: compiled,
-         });
+
+         bundleContent.append(compiled + "\n");
       } else {
          throw new Error(`Failed to compile '${dep.source}'.`);
       }
    }
 
-   /* Main */
-   /* code body */
-   const requireFunction = rt.requireFunction();
-   bundleContent.prepend(requireFunction);
+   /* Finishing */
+   const finalizedMap = bundleSourceMap
+      ? MapConverter.fromJSON(bundleSourceMap.toString())
+      : null;
 
-   /* code wrap */
-   bundleContent.indent(rt.indentPrefix());
-   const openingWrap = `(function () {\n`;
-   bundleContent.prepend(openingWrap);
-   bundleContent.append(`\n})();`);
+   const result = {
+      code: finalizeBundleContent(),
+      map: finalizedMap,
+   };
 
-   const wrapOffset =
-      getLineCount(requireFunction.trim()) + getLineCount(openingWrap.trim());
+   const shouldMinify =
+      bundler.options.bundleOptions.minified ||
+      bundler.options.bundleOptions.mode == "production";
 
-   const finalizedMap = MapConverter.fromObject(
-      offsetLines(
-         MapConverter.fromJSON(bundleSourceMap.toString()).toObject(),
-         wrapOffset
-      )
-   );
+   if (shouldMinify) {
+      const { code, map } = babelMinify(
+         result.code,
+         {},
+         {
+            inputSourceMap: result.map?.toObject(),
+            sourceMaps: true,
+            comments: false,
+         }
+      );
 
-   return bundleContent.toString() + `\n\n${finalizedMap.toComment()}`;
+      result.code = code;
+      result.map = MapConverter.fromObject(map);
+   }
+
+   return result;
 }
 
-function compileCSS(source: string, AST: Root) {
+function compileCSS(source: string, AST: Root, inputSourceMap?: RawSourceMap) {
    const result = {
       code: "",
       map: {},
@@ -442,9 +433,20 @@ function compileCSS(source: string, AST: Root) {
       return result;
    }
 
-   const compiled = postcss([]).process(AST, {
-      from: source,
-   });
+   const compiled = postcss([autoprefixer()]).process(
+      `.example {
+    display: grid;
+    transition: all .5s;
+    user-select: none;
+    background: linear-gradient(to bottom, white, black);
+}
+`,
+      {
+         from: source,
+         to: source,
+         map: true,
+      }
+   );
 
    result.code = compiled.css;
    result.map = compiled.map;
@@ -456,10 +458,7 @@ function compileCSS(source: string, AST: Root) {
 
 async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
    const result = new MagicString.Bundle();
-
-   const shouldMinify =
-      bundler.options.bundleOptions.minified ||
-      bundler.options.bundleOptions.mode == "production";
+   const bundleSourceMap = new SourceMapGenerator();
 
    const addPostCSSASTToBundle = (source: string, AST: Root) => {
       const { code, map } = compileCSS(source, AST);
@@ -517,12 +516,37 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
       }
    }
 
+   const shouldMinify =
+      bundler.options.bundleOptions.minified ||
+      bundler.options.bundleOptions.mode == "production";
    return result.toString();
 }
 
 export async function bundle(bundler: Toypack, graph: IDependency[]) {
+   const result = {
+      resources: [] as Blob[],
+      script: "",
+      style: "",
+   };
+
+   const mode = bundler.options.bundleOptions.mode;
+   const script = await bundleScript(bundler, graph);
+   const style = await bundleStyle(bundler, graph);
+
+   result.script = script.code;
+   
+   // Inline everything if in development mode
+   if (mode == "development") {
+      if (script.map) {
+         result.script += `\n\n${script.map.toComment()}`;
+      }
+      //result.style = style.;
+   } else {
+
+   }
+
    return {
-      script: await bundleScript(bundler, graph),
+      script: result.script,
       style: await bundleStyle(bundler, graph),
    };
 }

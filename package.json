@@ -21,7 +21,7 @@
       "build:main": "swc ./src -d ./build",
       "build:example": "swc ./example -d ./example-build",
       "build:style": "sass ./styles/style.scss:./build/styles/style.css",
-      "build:bundle": "esbuild ./src/Toypack.ts --bundle --outdir=browser --format=esm --global-name=Toypack --platform=browser --sourcemap --external:@babel/plugin-syntax-unicode-sets-regex",
+      "build:bundle": "node ./esbuild.js",
       "clean": "rimraf build example-build browser coverage nyc_output",
       "type:dts": "tsc --emitDeclarationOnly --project tsconfig.build.json",
       "type:check": "tsc --noEmit",
@@ -40,21 +40,14 @@
       "@swc/cli": "^0.1.62",
       "@swc/core": "^1.3.52",
       "@types/babel__core": "^7.20.1",
-      "@types/babel__generator": "^7.6.4",
       "@types/babel__standalone": "^7.1.4",
       "@types/babel__traverse": "^7.20.0",
-      "@types/combine-source-map": "^0.8.2",
       "@types/convert-source-map": "^2.0.0",
-      "@types/line-column": "^1.0.0",
-      "@types/lodash-es": "^4.17.7",
-      "@types/node": "^18.15.12",
       "@types/path-browserify": "^1.0.0",
-      "@types/prompts": "^2.4.4",
       "@typescript-eslint/eslint-plugin": "^5.59.0",
       "@typescript-eslint/parser": "^5.59.0",
       "c8": "^7.13.0",
       "concurrently": "^8.0.1",
-      "edit-package-json": "^0.8.12",
       "esbuild": "^0.17.18",
       "eslint": "^8.38.0",
       "eslint-config-prettier": "^8.8.0",
@@ -62,7 +55,6 @@
       "eslint-plugin-eslint-comments": "^3.2.0",
       "eslint-plugin-import": "^2.27.5",
       "jsdom": "^21.1.1",
-      "merge-source-map": "^1.1.0",
       "nyc": "^15.1.0",
       "prettier": "^2.8.7",
       "rimraf": "^4.4.1",
@@ -76,25 +68,26 @@
       "./build",
       "./browser"
    ],
+   "browser": {
+      "path": "path-browserify"
+   },
    "keywords": [
       "sandbox"
    ],
    "dependencies": {
-      "@babel/generator": "^7.22.3",
       "@babel/parser": "^7.22.3",
       "@babel/standalone": "^7.22.4",
       "@babel/traverse": "^7.22.4",
+      "@types/less": "^3.0.3",
+      "autoprefixer": "^10.4.14",
       "babel-minify": "^0.5.2",
-      "combine-source-map": "^0.8.0",
       "convert-source-map": "^2.0.0",
-      "line-column": "^1.0.2",
-      "lodash-es": "^4.17.21",
+      "less": "^4.1.3",
       "magic-string": "^0.30.0",
       "node-html-parser": "^6.1.5",
       "path-browserify": "^1.0.1",
       "postcss": "^8.4.24",
       "postcss-value-parser": "^4.2.0",
-      "source-map-js": "^1.0.2",
-      "vlq": "^2.0.4"
+      "source-map-js": "^1.0.2"
    }
 }

@@ -46,19 +46,6 @@ export function formatPath(from: string, to: string) {
 
 /**
  * Get the target and the params of a URL.
- * @example
- * parseURLQuery("./src/classes/Book.js?raw&type=script");
- * 
- * // result
- * {
- *    target: "/src/classes/Book.js",
- *    params: {
- *       raw: true,
- *       type: "script"
- *    }
- * }
- * @param url The URL to extract the params from.
- * @returns {object}
  */
 export function parseURLQuery(url: string) {
    const result = {
@@ -86,13 +73,9 @@ export function parseURLQuery(url: string) {
  * @param str The string to get the unique ID from.
  * @returns
  */
-export function getUniqueIdFromString(str: string, shouldMinify = false): string {
+export function getUniqueIdFromString(str: string): string {
    if (str.length === 0) {
       throw new Error("String must contain at least 1 character.");
-   }
-
-   if (!shouldMinify) {
-      return str.replace(/^\//, "").replace(/[\W_]+/g, "_");
    }
 
    let hash = 0;
@@ -105,6 +88,9 @@ export function getUniqueIdFromString(str: string, shouldMinify = false): string
    return "m" + uniqueId;
 }
 
+/**
+ * Encodes the given content to base64 format.
+ */
 export function btoa(content: string | ArrayBuffer) {
    if (typeof window !== "undefined" && typeof window.btoa === "function") {
       if (content instanceof ArrayBuffer) {
@@ -124,4 +110,68 @@ export function btoa(content: string | ArrayBuffer) {
 
       return Buffer.from(content, "utf-8").toString("base64");
    }
+}
+
+/**
+ * Finds the position of a code snippet within a source code string
+ * while ignoring the whitespaces for each line.
+ * @param sourceStr The source code string to search within.
+ * @param searchStr The code snippet to search for.
+ * @returns {Object} An object containing the zero-based line and
+ * zero-based column position of the found code snippet. If the code
+ * snippet is not found, the line and column will be -1.
+ */
+export function findCodePosition(sourceStr: string, searchStr: string) {
+   const sourceLines = sourceStr.split("\n");
+   const searchLines = searchStr.split("\n");
+   let line = -1;
+   let column = -1;
+
+   for (let i = 0; i < sourceLines.length; i++) {
+      const sourceLine = sourceLines[i].trim();
+
+      if (line >= 0) {
+         if (
+            sourceLine != searchLines[i - line]?.trim() &&
+            i - line < searchLines.length
+         ) {
+            line = -1;
+         }
+      } else {
+         if (sourceLine == searchLines[0]?.trim()) {
+            line = i;
+            column = sourceLines[i].indexOf(searchLines[0]?.trim());
+         }
+      }
+   }
+
+   return { line, column };
+}
+
+/**
+ * Simple object check.
+ */
+function isObject(item: any) {
+  return (item && typeof item === 'object' && !Array.isArray(item));
+}
+
+/**
+ * Deep merge two objects.
+ */
+export function mergeDeep<T extends Object>(target: T, ...sources: T[]) {
+  if (!sources.length) return target;
+  const source = sources.shift();
+
+  if (isObject(target) && isObject(source)) {
+    for (const key in source) {
+      if (isObject(source[key])) {
+        if (!target[key]) Object.assign(target, { [key]: {} });
+        mergeDeep(target[key] as any, source[key]);
+      } else {
+        Object.assign(target, { [key]: source[key] });
+      }
+    }
+  }
+
+  return mergeDeep(target, ...sources);
 }

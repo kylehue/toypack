@@ -1,4 +1,3 @@
-import { cloneDeep, merge } from "lodash-es";
 import path from "path-browserify";
 import { PartialDeep, RequiredDeep } from "type-fest";
 import { Asset } from "./asset.js";
@@ -15,8 +14,7 @@ import { SassLoader } from "./loaders/SassLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { RawSourceMap } from "source-map-js";
-
-(window as any).path = path;
+import { mergeDeep } from "./utils.js";
 
 export interface ICompileData {
    source: string;
@@ -58,7 +56,10 @@ export class Toypack {
    };
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
-      this.options = merge(cloneDeep(defaultOptions), options);
+      this.options = mergeDeep(JSON.parse(JSON.stringify(defaultOptions)), options);
+
+      console.log(defaultOptions, this.options, options);
+      
 
       this.assets = new Map();
       this.useLoader(new SassLoader(this));
@@ -94,9 +95,7 @@ export class Toypack {
       return asset;
    }
 
-   public async getProductionOutput() {
-
-   }
+   public async getProductionOutput() {}
 
    public async run() {
       const graph = getDependencyGraph(this);
@@ -123,7 +122,22 @@ export class Toypack {
    }
 }
 
+export default Toypack;
+
 /* Other exports */
 export * as Babel from "@babel/standalone";
+export * as Utilities from "./utils.js";
 export { Asset };
-export type { IDependency, IOptions };
+export { CodeComposer } from "./CodeComposer.js";
+export type { IOptions };
+export type { RawSourceMap };
+export type {
+   IChunk,
+   IDependency,
+   IDependencyMap,
+   IDependencyMapSource,
+   IModuleOptions,
+   IResourceDependency,
+   IScriptDependency,
+   IStyleDependency,
+} from "./graph.js";

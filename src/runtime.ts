@@ -1,5 +1,6 @@
 import * as MagicString from "magic-string";
 import { getUniqueIdFromString } from "./utils.js";
+import { CodeComposer } from "./CodeComposer.js";
 
 export function indentPrefix() {
    return "  ";
@@ -43,7 +44,7 @@ function ${identifiers.require}(path) {
       if (!_modules_cache_[path]) {
          _modules_cache_[path] = module.exports;
          if (!path) {
-            throw new Error("Could not resolve " + path);
+            throw new Error("Could not resolve '" + path + "'.");
          }
          
          var exports = ${identifiers.require}(path);
@@ -56,8 +57,7 @@ function ${identifiers.require}(path) {
 
    init(module, module.exports, localRequire);
    return module.exports;
-}
-`.replaceAll("   ", indentPrefix());
+}`.replaceAll("   ", indentPrefix());
 
    return result;
 }
@@ -65,24 +65,17 @@ function ${identifiers.require}(path) {
 export function moduleWrap(source: string, code: string, isEntry = false) {
    const id = getUniqueIdFromString(source);
 
-   const magicStr = new MagicString.default("");
+   const composer = new CodeComposer(code);
+   composer.indent(indentPrefix()).wrap(
+      `// ${source.replace(/^\//, "")}
+      ${identifiers.modules}.${id} = function (module, exports, require) {
+         <CODE_BODY>
 
-   /* code body */
-   magicStr.append(code || "");
-   magicStr.append(`\n\nreturn module.exports;`);
+         return module.exports;
+      }
 
-   /* code wrap */
-   magicStr.indent(indentPrefix());
-   magicStr.prepend(
-      `${identifiers.modules}.${id} = function (module, exports, require) {\n`
+      ${isEntry ? `${identifiers.require}("${id}");` : ""}`
    );
-   magicStr.prepend(`\n// ${source.replace(/^\//, "")}\n`);
-   magicStr.append(`\n};`);
 
-   /* return entry's exports */
-   if (isEntry) {
-      magicStr.append(`\n\n${identifiers.require}("${id}");`);
-   }
-
-   return magicStr;
+   return composer.toString();
 }

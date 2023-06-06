@@ -1,9 +1,4 @@
-import {
-   ICompileData,
-   ICompileResult,
-   ILoader,
-   Toypack,
-} from "../Toypack.js";
+import { ICompileData, ICompileResult, ILoader, Toypack } from "../Toypack.js";
 
 export class JSONLoader implements ILoader {
    public name = "JSONLoader";
@@ -19,13 +14,19 @@ export class JSONLoader implements ILoader {
          content: "",
       };
 
+      if (typeof data.content != "string") {
+         throw new Error(
+            "JSONLoader only tolerates string contents. Received " +
+               typeof data.content
+         );
+      }
+
       const format = this.bundler.options.bundleOptions.module;
 
-      if (format == "esm") {
-         result.content = "export default " + data.content;
-      } else {
-         result.content = "module.exports = " + data.content;
-      }
+      const exportsSnippet =
+         format == "esm" ? "export default " : "module.exports = ";
+
+      result.content = exportsSnippet + data.content + ";";
 
       return result;
    }

@@ -1,13 +1,26 @@
 declare module "merge-source-map" {
-   export interface SourceMap {
-      version: string;
-      sources: string[];
-      names: string[];
-      sourceRoot?: string;
-      sourcesContent?: string[];
-      mappings: string;
-      file?: string;
+   import { RawSourceMap } from "source-map-js";
+
+   export default function (
+      oldMap: RawSourceMap,
+      newMap: RawSourceMap
+   ): RawSourceMap;
+}
+
+declare module "babel-minify" {
+   import { RawSourceMap } from "source-map-js";
+
+   export interface Overrides {
+      sourceMaps?: boolean;
+      inputSourceMap?: RawSourceMap;
+      comments?: Function | RegExp | boolean;
+      babel?: any;
+      minifyPreset?: any;
    }
-   
-   export default function (oldMap: SourceMap, newMap: SourceMap): SourceMap;
+
+   export default function (
+      code: string,
+      options?: Record<string, any>,
+      overrides?: Overrides
+   ): { code: string; map: RawSourceMap };
 }

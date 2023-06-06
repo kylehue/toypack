@@ -74,13 +74,18 @@ export function createNum(num) {
 `
 );
 
-addFile("package.json", JSON.stringify({
-   main: "/src/main",
-   test: 123,
-   dependencies: {
-      foo: "bar"
+addFile(
+   "package.json",
+   `
+{
+   "main": "/src/main",
+   "test": 123,
+   "dependencies": {
+      "foo": "bar"
    }
-}));
+}
+`
+);
 
 addFile(
    "node_modules/path-browserify/index.js",

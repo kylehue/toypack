@@ -225,7 +225,7 @@ function compileAndGetChunks(
    chunk: IChunk,
    options: IModuleOptions
 ) {
-   const result: IChunk[] = [];
+   const result = [] as (IChunk & {map?: RawSourceMap})[];
 
    const recursiveCompile = (source: string, content: string | Blob) => {
       const loader = bundler.loaders.find((l) => l.test.test(source));
@@ -245,6 +245,7 @@ function compileAndGetChunks(
          result.push({
             source,
             content: compilation.content,
+            map: compilation.map
          });
       } else {
          for (const [lang, dataArr] of Object.entries(compilation.use)) {
@@ -391,6 +392,7 @@ function getGraphRecursive(
             AST: parsed.AST,
             content: chunk.content,
             source: chunk.source,
+            map: chunk.map
          } as any);
       }
    }
