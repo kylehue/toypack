@@ -1,5 +1,5 @@
-import { getUniqueIdFromString } from "./utils.js";
 import { CodeComposer } from "./CodeComposer.js";
+import { getUniqueIdFromString } from "./utils.js";
 
 export function indentPrefix() {
    return "  ";

@@ -5,20 +5,20 @@ import {
    availablePresets,
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
-import { IDependency, IDependencyMap } from "./graph.js";
-import * as rt from "./runtime.js";
-import { Toypack } from "./Toypack.js";
-import { findCodePosition, getUniqueIdFromString } from "./utils.js";
+import babelMinify from "babel-minify";
+import MapConverter from "convert-source-map";
+import * as CSSTree from "css-tree";
 import path from "path-browserify";
 import {
    SourceMapConsumer,
    SourceMapGenerator,
    RawSourceMap,
 } from "source-map-js";
-import MapConverter from "convert-source-map";
-import babelMinify from "babel-minify";
 import { CodeComposer } from "./CodeComposer.js";
-import * as CSSTree from "css-tree";
+import { IDependency, IDependencyMap } from "./graph.js";
+import * as rt from "./runtime.js";
+import { Toypack } from "./Toypack.js";
+import { findCodePosition, getUniqueIdFromString } from "./utils.js";
 console.log(availablePlugins, availablePresets);
 
 export type ITraverseFunction<T> = (
@@ -219,7 +219,7 @@ async function resourceToCJSModule(
       // exportStr = path.join("resources", getUniqueIdFromString(source, shouldMinify) + path.extname(source));
    }
 
-   let result = rt.moduleWrap(source, `module.exports = "${exportStr}";`);
+   const result = rt.moduleWrap(source, `module.exports = "${exportStr}";`);
 
    return result;
 }
@@ -280,7 +280,7 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
       indentSize: 4,
    });
    const sourceMapOption = bundler.options.bundleOptions.sourceMap;
-   const bundleSourceMap = !!sourceMapOption ? new SourceMapGenerator() : null;
+   const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
    /**
     * Add a Babel AST to the bundle.
@@ -291,7 +291,7 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
       depMap: IDependencyMap,
       inputSourceMap?: RawSourceMap
    ) => {
-      let { code, map } = transpileAST(
+      const { code, map } = transpileAST(
          bundler,
          source,
          AST,
@@ -465,7 +465,7 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
       indentSize: 4,
    });
    const sourceMapOption = bundler.options.bundleOptions.sourceMap;
-   const bundleSourceMap = !!sourceMapOption ? new SourceMapGenerator() : null;
+   const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
    console.log(graph);
 

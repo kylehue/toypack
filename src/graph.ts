@@ -1,6 +1,8 @@
 import { parse as getASTFromJS, ParserOptions } from "@babel/parser";
-import traverseAST, { TraverseOptions, Node } from "@babel/traverse";
+import traverseAST, { Node } from "@babel/traverse";
+import * as CSSTree from "css-tree";
 import path from "path-browserify";
+import { RawSourceMap } from "source-map-js";
 import { Asset } from "./asset.js";
 import {
    assetNotFoundError,
@@ -12,8 +14,6 @@ import {
 } from "./errors.js";
 import { Toypack } from "./Toypack.js";
 import { isCSS, isJS, parseURLQuery } from "./utils.js";
-import { RawSourceMap } from "source-map-js";
-import * as CSSTree from "css-tree";
 
 export interface IChunk {
    source: string;
@@ -205,7 +205,7 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
 
          if (
             atImportValueNode &&
-            atImportValueNode?.type == "String" &&
+            atImportValueNode.type == "String" &&
             atImportValueNode.value
          ) {
             result.dependencies.push(atImportValueNode.value);
@@ -220,7 +220,7 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
 
          if (
             atImportURLValueNode &&
-            atImportURLValueNode?.type == "Url" &&
+            atImportURLValueNode.type == "Url" &&
             atImportURLValueNode.value
          ) {
             result.dependencies.push(atImportURLValueNode.value);
@@ -405,7 +405,7 @@ function getGraphRecursive(
       parentDep.AST = parsed.AST;
    } else {
       parentDep.chunks = [];
-      for (let chunk of compileAndGetChunks(bundler, parentDep, params)) {
+      for (const chunk of compileAndGetChunks(bundler, parentDep, params)) {
          const parsed = scanChunkDeps(bundler, chunk, scanDeps);
 
          parentDep.chunks.push({

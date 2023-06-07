@@ -1,5 +1,6 @@
 import path from "path-browserify";
-import { PartialDeep, RequiredDeep } from "type-fest";
+import { RawSourceMap } from "source-map-js";
+import { PartialDeep } from "type-fest";
 import { Asset } from "./asset.js";
 import { bundle } from "./bundle.js";
 import {
@@ -7,13 +8,12 @@ import {
    resourceExtensions,
    styleExtensions,
 } from "./extensions.js";
-import { getDependencyGraph, IDependency, IModuleOptions } from "./graph.js";
+import { getDependencyGraph, IModuleOptions } from "./graph.js";
 import { Hooks } from "./Hooks.js";
 import { JSONLoader } from "./loaders/JSONLoader.js";
 import { SassLoader } from "./loaders/SassLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
-import { RawSourceMap } from "source-map-js";
 import { mergeDeep } from "./utils.js";
 
 export interface ICompileData {

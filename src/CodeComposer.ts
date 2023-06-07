@@ -1,5 +1,3 @@
-import { findCodePosition } from "./utils.js";
-
 // https://github.com/jamiebuilds/min-indent
 function minIndent(content: string) {
    const match = content.match(/^[ \t]*(?=\S)/gm);
@@ -270,7 +268,7 @@ export class CodeComposer {
     */
    public wrap(content: string) {
       const marker = "<CODE_BODY>";
-      if (content.indexOf(marker) == -1) {
+      if (!content.includes(marker)) {
          throw new Error("The wrapping content must have a marker.");
       }
       this.indent();
