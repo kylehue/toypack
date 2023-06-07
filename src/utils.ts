@@ -1,4 +1,9 @@
 import path from "path-browserify";
+import {
+   RawSourceMap,
+   SourceMapConsumer,
+   SourceMapGenerator,
+} from "source-map-js";
 
 export function isLocal(pathStr: string) {
    return (
@@ -19,9 +24,7 @@ export function isJS(source: string) {
 }
 
 export function isCSS(source: string) {
-   return [".css"].includes(
-      path.extname(source)
-   );
+   return [".css"].includes(path.extname(source));
 }
 
 export function formatPath(from: string, to: string) {
@@ -36,7 +39,7 @@ export function formatPath(from: string, to: string) {
          value = `/${value}/`;
       }
 
-      result = result.replace(propertyRegex, value );
+      result = result.replace(propertyRegex, value);
    }
 
    result = path.join(result);
@@ -50,7 +53,7 @@ export function formatPath(from: string, to: string) {
 export function parseURLQuery(url: string) {
    const result = {
       target: "",
-      params: {} as Record<string, any>
+      params: {} as Record<string, any>,
    };
 
    const split = url.split("?");
@@ -152,30 +155,88 @@ export function findCodePosition(sourceStr: string, searchStr: string) {
  * Simple object check.
  */
 function isObject(item: any) {
-  return (item && typeof item === 'object' && !Array.isArray(item));
+   return item && typeof item === "object" && !Array.isArray(item);
 }
 
 /**
  * Deep merge two objects.
  */
 export function mergeDeep<T extends Object>(target: T, ...sources: T[]) {
-  if (!sources.length) return target;
-  const source = sources.shift();
+   if (!sources.length) return target;
+   const source = sources.shift();
 
-  if (isObject(target) && isObject(source)) {
-    for (const key in source) {
-      if (isObject(source[key])) {
-        if (!target[key]) Object.assign(target, { [key]: {} });
-        mergeDeep(target[key] as any, source[key]);
-      } else {
-        Object.assign(target, { [key]: source[key] });
+   if (isObject(target) && isObject(source)) {
+      for (const key in source) {
+         if (isObject(source[key])) {
+            if (!target[key]) Object.assign(target, { [key]: {} });
+            mergeDeep(target[key] as any, source[key]);
+         } else {
+            Object.assign(target, { [key]: source[key] });
+         }
       }
-    }
-  }
+   }
 
-  return mergeDeep(target, ...sources);
+   return mergeDeep(target, ...sources);
 }
 
 export function JSONToBlob(json: string) {
    return new Blob([json], { type: "application/json" });
+}
+
+/**
+ * Merge old source map and new source map and return merged.
+ * If old or new source map value is falsy, return another one as it is.
+ * 
+ * https://github.com/keik/merge-source-map
+ */
+export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
+   if (!oldMap) return newMap;
+   if (!newMap) return oldMap;
+
+   var oldMapConsumer = new SourceMapConsumer(oldMap);
+   var newMapConsumer = new SourceMapConsumer(newMap);
+   var mergedMapGenerator = new SourceMapGenerator();
+
+   // iterate on new map and overwrite original position of new map with one of old map
+   newMapConsumer.eachMapping(function (m) {
+      // pass when `originalLine` is null.
+      // It occurs in case that the node does not have origin in original code.
+      if (m.originalLine == null) return;
+
+      var origPosInOldMap = oldMapConsumer.originalPositionFor({
+         line: m.originalLine,
+         column: m.originalColumn,
+      });
+
+      if (origPosInOldMap.source == null) return;
+
+      mergedMapGenerator.addMapping({
+         original: {
+            line: origPosInOldMap.line,
+            column: origPosInOldMap.column,
+         },
+         generated: {
+            line: m.generatedLine,
+            column: m.generatedColumn,
+         },
+         source: origPosInOldMap.source,
+         name: origPosInOldMap.name,
+      });
+   });
+
+   var consumers = [oldMapConsumer, newMapConsumer];
+   consumers.forEach(function (consumer) {
+      (consumer as any).sources.forEach(function (sourceFile: any) {
+         (mergedMapGenerator as any)._sources.add(sourceFile);
+         var sourceContent = consumer.sourceContentFor(sourceFile);
+         if (sourceContent != null) {
+            mergedMapGenerator.setSourceContent(sourceFile, sourceContent);
+         }
+      });
+   });
+
+   (mergedMapGenerator as any)._sourceRoot = oldMap.sourceRoot;
+   (mergedMapGenerator as any)._file = oldMap.file;
+
+   return JSON.parse(mergedMapGenerator.toString());
 }

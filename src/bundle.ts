@@ -18,6 +18,7 @@ import {
    JSONToBlob,
    findCodePosition,
    getUniqueIdFromString,
+   mergeSourceMaps,
 } from "./utils.js";
 
 export type ITraverseFunction<T> = (
@@ -462,7 +463,9 @@ function compileCSS(
          : null;
    }
 
-   // TODO: merge input source map from the source map result
+   if (result.map && inputSourceMap) {
+      result.map = mergeSourceMaps(result.map, inputSourceMap);
+   }
 
    return result;
 }
@@ -507,7 +510,8 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
             if (chunk.type == "style") {
                const { code, map } = addPostCSSASTToBundle(
                   chunk.source,
-                  chunk.AST
+                  chunk.AST,
+                  chunk.map
                );
 
                if (bundleSourceMap && map) {
@@ -532,7 +536,10 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
           * If it's a style dependency that has an AST and no
           * chunks, add the dependency itself to the bundle.
           */
-         const { code, map } = addPostCSSASTToBundle(dep.source, dep.AST);
+         const { code, map } = addPostCSSASTToBundle(
+            dep.source,
+            dep.AST
+         );
 
          if (bundleSourceMap && map) {
             if (sourceMapOption != "nosources") {
