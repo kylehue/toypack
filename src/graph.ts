@@ -1,5 +1,5 @@
 import { parse as getASTFromJS, ParserOptions } from "@babel/parser";
-import traverseAST, { Node } from "@babel/traverse";
+import traverseAST, { Node, NodePath, Hub, Scope, Binding } from "@babel/traverse";
 import * as CSSTree from "css-tree";
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
@@ -81,13 +81,15 @@ export type IScanCallback = (dep: {
    params: IModuleOptions;
 }) => void;
 
+const dummyNodeAST = getASTFromJS("");
+
 /**
  * Get dependencies and AST of a script module.
  */
 function parseJSModule(bundler: Toypack, source: string, content: string) {
    const result = {
       dependencies: [] as string[],
-      AST: {} as Node,
+      AST: dummyNodeAST as Node,
    };
 
    const format = bundler.options.bundleOptions.module;
@@ -95,13 +97,21 @@ function parseJSModule(bundler: Toypack, source: string, content: string) {
    const userBabelOptions = bundler.options.babelOptions.parse;
    const importantBabelOptions: ParserOptions = {
       sourceType: format == "esm" ? "module" : "script",
-      sourceFilename: source
+      sourceFilename: source,
    };
 
-   const AST = getASTFromJS(content, {
-      ...userBabelOptions,
-      ...importantBabelOptions,
-   });
+   let AST;
+
+   try {
+      AST = getASTFromJS(content, {
+         ...userBabelOptions,
+         ...importantBabelOptions,
+      });
+   } catch (error) {
+      bundler.hooks.trigger("onError", parseError(error as any));
+      
+      return result;
+   }
 
    result.AST = AST;
 
@@ -201,7 +211,7 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
             const resolved = bundler.resolve(sourceValue, {
                baseDir: path.dirname(source),
             });
-            
+
             if (resolved) {
                if (bundler.options.bundleOptions.mode == "production") {
                   node.value =
