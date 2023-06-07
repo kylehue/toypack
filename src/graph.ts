@@ -1,6 +1,4 @@
 import { parse as getASTFromJS, ParserOptions } from "@babel/parser";
-import { Root, parse as getASTFromCSS } from "postcss";
-import parseCSSValue from "postcss-value-parser";
 import traverseAST, { TraverseOptions, Node } from "@babel/traverse";
 import path from "path-browserify";
 import { Asset } from "./asset.js";
@@ -9,11 +7,13 @@ import {
    assetStrictlyHTMLorJSError,
    entryPointNotFoundError,
    loaderNotFoundError,
+   parseError,
    resolveFailureError,
 } from "./errors.js";
 import { Toypack } from "./Toypack.js";
 import { isCSS, isJS, parseURLQuery } from "./utils.js";
 import { RawSourceMap } from "source-map-js";
+import * as CSSTree from "css-tree";
 
 export interface IChunk {
    source: string;
@@ -46,10 +46,10 @@ export interface IScriptDependency extends ISimpleDependency {
 
 export interface IStyleDependency extends ISimpleDependency {
    type: "style";
-   AST?: Root;
+   AST?: CSSTree.CssNode;
    chunks?: {
       type: "style";
-      AST: Root;
+      AST: CSSTree.CssNode;
       source: string;
       content: string;
       map?: RawSourceMap;
@@ -77,7 +77,7 @@ export type IDependencyMap = Record<string, IDependencyMapSource>;
 export type IScanCallback = (dep: {
    mapSource: IDependencyMapSource;
    asset: Asset;
-   AST: Node | Root;
+   AST: Node | CSSTree.CssNode;
    params: IModuleOptions;
 }) => void;
 
@@ -148,66 +148,85 @@ function parseJSModule(bundler: Toypack, source: string, content: string) {
 function parseCSSModule(bundler: Toypack, source: string, content: string) {
    const result = {
       dependencies: [] as string[],
-      AST: {} as Root,
+      AST: {} as CSSTree.CssNode,
    };
 
-   const AST = getASTFromCSS(content);
+   const AST = CSSTree.parse(content, {
+      positions: !!bundler.options.bundleOptions.sourceMap,
+      filename: source,
+      onParseError(error: any) {
+         let message = error.formattedMessage;
+         if (!message) {
+            message = `${error.name}: ${error.message}`;
+
+            if (error.line && error.column) {
+               message += ` at line ${error.line}, column ${error.column}`;
+            }
+         }
+
+         message += `\n\nSource file: ${source}`;
+
+         bundler.hooks.trigger("onError", parseError(message));
+      }
+   });
 
    result.AST = AST;
 
-   // Scan for `@import ""` or `@import url("")` dependencies
-   AST.walkAtRules((atRuleNode) => {
-      if (atRuleNode.name != "import") return;
-
-      parseCSSValue(atRuleNode.params).walk((valueNode) => {
-         // @import url("");
-         if (
-            valueNode.type == "function" &&
-            valueNode.value == "url" &&
-            valueNode.nodes.length
-         ) {
-            result.dependencies.push(valueNode.nodes[0].value);
-            //atRuleNode.remove();
-         }
-
-         // @import "";
-         else if (valueNode.value.length) {
-            result.dependencies.push(valueNode.value);
-            //atRuleNode.remove();
-         }
-      });
-   });
-
-   // Scan for `css-property: url("")` dependencies
-   AST.walkDecls((declNode) => {
-      if (!CSSUrlFunctionRegex.test(declNode.value)) return;
-      parseCSSValue(declNode.value).walk((valueNode) => {
-         if (
-            valueNode.type != "function" ||
-            valueNode.value != "url" ||
-            !valueNode.nodes.length
-         ) {
-            return;
-         }
-
-         let source = valueNode.nodes[0].value;
-
-         // scroll-to-element-id-urls are not a dependency
-         if (source.startsWith("#")) return;
+   CSSTree.walk(AST, function (node, item, list) {
+      // property: url(...);
+      if (this.declaration && node.type === "Url") {
+         const sourceValue = node.value;
+         let isValidDep = true;
+         // scroll-to-element-id urls are not a dependency
+         if (sourceValue.startsWith("#")) isValidDep = false;
          // no need to add data urls to dependencies
-         if (source.startsWith("data:")) return;
+         if (sourceValue.startsWith("data:")) isValidDep = false;
 
          if (!bundler.extensions.resource.includes(path.extname(source))) {
-            // TODO: trigger 'You can't use a "url()" token to reference a non-resource file.' error
-            return;
+            bundler.hooks.trigger(
+               "onError",
+               parseError(
+                  `'url()' tokens can only be used to reference resource files. '${source}' is not a valid resource file.`
+               )
+            );
+
+            isValidDep = false;
          }
 
-         // valueNode.value = "123";
+         if (isValidDep) result.dependencies.push(node.value);
+      }
 
-         // console.log(declNode.value);
+      if (node.type === "Atrule" && node.name == "import") {
+         // @import "...";
+         const atImportValueNode = CSSTree.find(
+            node,
+            (child) => child.type === "String"
+         );
 
-         result.dependencies.push(source);
-      });
+         if (
+            atImportValueNode &&
+            atImportValueNode?.type == "String" &&
+            atImportValueNode.value
+         ) {
+            result.dependencies.push(atImportValueNode.value);
+            list.remove(item);
+         }
+
+         // @import url("...");
+         const atImportURLValueNode = CSSTree.find(
+            node,
+            (child) => child.type === "Url"
+         );
+
+         if (
+            atImportURLValueNode &&
+            atImportURLValueNode?.type == "Url" &&
+            atImportURLValueNode.value
+         ) {
+            result.dependencies.push(atImportURLValueNode.value);
+            list.remove(item);
+         }
+      }
    });
 
    return result;
@@ -225,7 +244,7 @@ function compileAndGetChunks(
    chunk: IChunk,
    options: IModuleOptions
 ) {
-   const result = [] as (IChunk & {map?: RawSourceMap})[];
+   const result = [] as (IChunk & { map?: RawSourceMap })[];
 
    const recursiveCompile = (source: string, content: string | Blob) => {
       const loader = bundler.loaders.find((l) => l.test.test(source));
@@ -245,7 +264,7 @@ function compileAndGetChunks(
          result.push({
             source: source,
             content: compilation.content,
-            map: compilation.map
+            map: compilation.map,
          });
       } else {
          for (const [lang, dataArr] of Object.entries(compilation.use)) {
@@ -274,7 +293,9 @@ function scanChunkDeps(
    callback: IScanCallback
 ) {
    if (typeof chunk.content != "string") {
-      throw new Error(`Failed to scan '${chunk.source}'. The chunk's content has to be a type of string in order to be scanned for dependencies.`);
+      throw new Error(
+         `Failed to scan '${chunk.source}'. The chunk's content has to be a type of string in order to be scanned for dependencies.`
+      );
    }
 
    const { source, content } = chunk;
@@ -392,7 +413,7 @@ function getGraphRecursive(
             AST: parsed.AST,
             content: chunk.content,
             source: chunk.source,
-            map: chunk.map
+            map: chunk.map,
          } as any);
       }
    }

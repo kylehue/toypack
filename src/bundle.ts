@@ -5,7 +5,6 @@ import {
    availablePresets,
 } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
-import postcss, { Root, parse } from "postcss";
 import { IDependency, IDependencyMap } from "./graph.js";
 import * as rt from "./runtime.js";
 import { Toypack } from "./Toypack.js";
@@ -188,15 +187,7 @@ function transpileAST(
 
    const result = {
       code: transpiled.code || "",
-      map: transpiled.map
-         ? ({
-              version: "3",
-              sources: transpiled.map.sources,
-              sourcesContent: transpiled.map.sourcesContent,
-              names: transpiled.map.names,
-              mappings: transpiled.map.mappings,
-           } as RawSourceMap)
-         : null,
+      map: MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap,
    };
 
    return result;
@@ -234,11 +225,59 @@ async function resourceToCJSModule(
 }
 
 /**
+ * Merge a source map to the bundle.
+ */
+function mergeMapToBundle(
+   bundler: Toypack,
+   targetMap: SourceMapGenerator,
+   sourceMap: RawSourceMap,
+   source: string,
+   originalContent: string,
+   generatedContent: string,
+   bundleContent: string
+) {
+   if (!targetMap) return;
+   const position = findCodePosition(bundleContent, generatedContent);
+
+   if (position.line == -1) {
+      if (
+         bundler.options.logLevel == "error" ||
+         bundler.options.logLevel == "warn"
+      ) {
+         console.warn(
+            `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
+         );
+      }
+   }
+
+   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   if (sourceMapOption != "nosources") {
+      targetMap.setSourceContent(source, originalContent);
+   }
+
+   const smc = new SourceMapConsumer(sourceMap);
+   smc.eachMapping((map) => {
+      targetMap.addMapping({
+         source: source,
+         original: {
+            line: map.originalLine || 1,
+            column: map.originalColumn || 0,
+         },
+         generated: {
+            line: map.generatedLine + position.line,
+            column: map.generatedColumn + position.column,
+         },
+         name: map.name,
+      });
+   });
+}
+
+/**
  * Get the script bundle from graph.
  */
 async function bundleScript(bundler: Toypack, graph: IDependency[]) {
    const bundleContent = new CodeComposer(undefined, {
-      indentSize: 4
+      indentSize: 4,
    });
    const sourceMapOption = bundler.options.bundleOptions.sourceMap;
    const bundleSourceMap = !!sourceMapOption ? new SourceMapGenerator() : null;
@@ -287,52 +326,6 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
       return bundleClone.toString();
    };
 
-   /**
-    * Add a source map to the bundle.
-    */
-   const addMapToBundle = (
-      map: RawSourceMap,
-      source: string,
-      originalContent: string,
-      generatedContent: string
-   ) => {
-      if (!bundleSourceMap) return;
-
-      const currentBundleResult = finalizeBundleContent();
-      const position = findCodePosition(currentBundleResult, generatedContent);
-
-      if (position.line == -1) {
-         if (
-            bundler.options.logLevel == "error" ||
-            bundler.options.logLevel == "warn"
-         ) {
-            console.warn(
-               `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
-            );
-         }
-      }
-
-      if (sourceMapOption != "nosources") {
-         bundleSourceMap.setSourceContent(source, originalContent);
-      }
-
-      const smc = new SourceMapConsumer(map);
-      smc.eachMapping((map) => {
-         bundleSourceMap.addMapping({
-            source: source,
-            original: {
-               line: map.originalLine,
-               column: map.originalColumn,
-            },
-            generated: {
-               line: map.generatedLine + position.line,
-               column: map.generatedColumn + position.column,
-            },
-            name: map.name,
-         });
-      });
-   };
-
    /* Modules */
    for (let i = graph.length - 1; i >= 0; i--) {
       const dep = graph[i];
@@ -356,7 +349,15 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
                // Source map
                if (bundleSourceMap && map) {
-                  addMapToBundle(map, dep.source, dep.content, code);
+                  mergeMapToBundle(
+                     bundler,
+                     bundleSourceMap,
+                     map,
+                     dep.source,
+                     dep.content,
+                     code,
+                     finalizeBundleContent()
+                  );
                }
             }
          }
@@ -373,7 +374,15 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
          // Source map
          if (bundleSourceMap && map) {
-            addMapToBundle(map, dep.source, dep.content, code);
+            mergeMapToBundle(
+               bundler,
+               bundleSourceMap,
+               map,
+               dep.source,
+               dep.content,
+               code,
+               finalizeBundleContent()
+            );
          }
       } else if (dep.type == "resource") {
          /**
@@ -422,66 +431,59 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
    return result;
 }
-   
-/* CSSTree.walk(CSSTree.parse(
-   `@import "test1.css";
-   @import url(test2.css);
-   
-   body {
-      background: url(cat.jpg);
-   }`
-   , {
-      positions: true
-   }), function(node, item, list) {
-   if (this.declaration !== null && node.type === "Url") {
-      console.log(node.value);
-   }
-   if (node.type === "Atrule" && node.name=="import") {
-      console.log(node);
-   }
-}) */
 
-function compileCSS(source: string, AST: Root, inputSourceMap?: RawSourceMap) {
+interface CSSTreeGeneratedResult {
+   css: string;
+   map: SourceMapGenerator;
+}
+
+function compileCSS(
+   bundler: Toypack,
+   AST: CSSTree.CssNode,
+   inputSourceMap?: RawSourceMap
+) {
+   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+
+   const compiled = CSSTree.generate(AST, {
+      sourceMap: !!sourceMapOption,
+   }) as any as CSSTreeGeneratedResult;
+
    const result = {
-      code: "",
-      map: {},
+      code: compiled.css,
+      map: MapConverter.fromJSON(
+         compiled.map.toString()
+      ).toObject() as RawSourceMap,
    };
 
-   if (!AST) {
-      return result;
-   }
-
-   const compiled = AST.toResult({
-      from: source,
-      to: source,
-      map: true,
-
-   });
-
-   
-   result.code = compiled.css;
-   result.map = compiled.map;
-   console.log(compiled);
+   // TODO: merge input source map from the source map result
 
    return result;
 }
 
 async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
-   const result = new CodeComposer("");
-   const bundleSourceMap = new SourceMapGenerator();
+   const bundleContent = new CodeComposer(undefined, {
+      indentSize: 4,
+   });
+   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   const bundleSourceMap = !!sourceMapOption ? new SourceMapGenerator() : null;
 
    console.log(graph);
-   
 
-   const addPostCSSASTToBundle = (source: string, AST: Root) => {
-      const { code, map } = compileCSS(source, AST);
+   const addPostCSSASTToBundle = (
+      source: string,
+      AST: CSSTree.CssNode,
+      inputSourceMap?: RawSourceMap
+   ) => {
+      const { code, map } = compileCSS(bundler, AST, inputSourceMap);
 
-      const comp = new CodeComposer(code);
+      bundleContent.append(`/* ${source.replace(/^\//, "")} */`);
+      bundleContent.append(code).breakLine();
 
-      /* filename comment */
-      //comp.prepend(`/* ${source.replace(/^\//, "")} */`);
+      return { code, map };
+   };
 
-      result.append(comp);
+   const finalizeBundleContent = () => {
+      return bundleContent.toString();
    };
 
    /* Modules */
@@ -498,8 +500,23 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
          for (const chunk of dep.chunks) {
             // Extract style chunks from the dependency
             if (chunk.type == "style") {
-               console.log(chunk);
-               addPostCSSASTToBundle(chunk.source, chunk.AST);
+               const { code, map } = addPostCSSASTToBundle(
+                  chunk.source,
+                  chunk.AST
+               );
+
+               if (bundleSourceMap && map) {
+                  map.sourcesContent = [dep.content];
+                  mergeMapToBundle(
+                     bundler,
+                     bundleSourceMap,
+                     map,
+                     dep.source,
+                     dep.content,
+                     code,
+                     finalizeBundleContent()
+                  );
+               }
             }
          }
       } else if (dep.type == "style" && dep.AST && !dep.chunks?.length) {
@@ -507,7 +524,20 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
           * If it's a style dependency that has an AST and no
           * chunks, add the dependency itself to the bundle.
           */
-         addPostCSSASTToBundle(dep.source, dep.AST);
+         const { code, map } = addPostCSSASTToBundle(dep.source, dep.AST);
+
+         if (bundleSourceMap && map) {
+            map.sourcesContent = [dep.content];
+            mergeMapToBundle(
+               bundler,
+               bundleSourceMap,
+               map,
+               dep.source,
+               dep.content,
+               code,
+               finalizeBundleContent()
+            );
+         }
       } else if (dep.type == "resource") {
          /**
           * If it's a resource, compile first, then add to the bundle.
@@ -527,10 +557,17 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
       }
    }
 
-   const shouldMinify =
-      bundler.options.bundleOptions.minified ||
-      bundler.options.bundleOptions.mode == "production";
-   return result.toString();
+   /* Finishing */
+   const finalizedMap = bundleSourceMap
+      ? MapConverter.fromJSON(bundleSourceMap.toString())
+      : null;
+
+   const result = {
+      code: finalizeBundleContent(),
+      map: finalizedMap,
+   };
+
+   return result;
 }
 
 export async function bundle(bundler: Toypack, graph: IDependency[]) {
@@ -541,26 +578,24 @@ export async function bundle(bundler: Toypack, graph: IDependency[]) {
    };
 
    const mode = bundler.options.bundleOptions.mode;
-   const script = await bundleScript(bundler, graph);
    const style = await bundleStyle(bundler, graph);
+   const script = await bundleScript(bundler, graph);
 
    result.script = script.code;
+   result.style = style.code;
 
    //console.log(result.script);
-   
-   
+
    // Inline everything if in development mode
    if (mode == "development") {
       if (script.map) {
          result.script += `\n\n${script.map.toComment()}`;
       }
-      //result.style = style.;
+      if (style.map) {
+         result.style += `\n${style.map.toComment({ multiline: true })}`;
+      }
    } else {
-
    }
 
-   return {
-      script: result.script,
-      style: await bundleStyle(bundler, graph),
-   };
+   return result;
 }

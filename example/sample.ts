@@ -94,21 +94,37 @@ console.log("path-browserify test");
 `
 );
 
-/* addFile(
+addFile(
    "styles/sample.css",
    `
 body {
-   background: yellow;
+  background-color: red;
+  color: white;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.container {
+  width: 100%;
+  height: 200px;
+}
+
+.invalid-class {
+  border: 1px solid black;
+  padding: 10px;
 }
 `
-); */
+);
 
-addFile(
+/* addFile(
    "styles/sample.scss",
    `body {
    background: yellow;
 }`
-);
+); */
 
 // CJS
 /* addFile(
