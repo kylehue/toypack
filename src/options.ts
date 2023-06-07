@@ -4,20 +4,19 @@ import { AcceptedPlugin, ProcessOptions } from "postcss";
 type IModule = "esm" | "cjs";
 type IMode = "production" | "development";
 type ILogLevel = "error" | "warn" | "info" | "none";
-type IBabelTransformOptions = Omit<
+type IBabelTransformOptions = Pick<
    TransformOptions,
-   | "sourceType"
-   | "sourceFileName"
-   | "filename"
-   | "sourceMaps"
-   | "envName"
-   | "ast"
-   | "minified"
-   | "compact"
-   | "comments"
-   | "inputSourceMap"
+   | "plugins"
+   | "presets"
+   | "targets"
+   | "assumptions"
+   | "highlightCode"
+   | "shouldPrintComment"
 >;
-type IBabelParseOptions = Omit<ParserOptions, "sourceType" | "sourceFilename">;
+type IBabelParseOptions = Omit<
+   ParserOptions,
+   "sourceType" | "sourceFilename" | "strictMode"
+>;
 type ISourceMap = boolean | "nosources";
 
 const defaultOptions = {
@@ -63,11 +62,6 @@ const defaultOptions = {
        * @default true
        */
       sourceMap: true as ISourceMap,
-      /**
-       * Whether to minify the output bundle or not. Sets to `true` when the mode is set to `production`.
-       * @default false
-       */
-      minified: false,
    },
    /**
     * Configuration for Babel.

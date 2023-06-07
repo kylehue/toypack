@@ -31,9 +31,7 @@ const toypack = new Toypack({
             path: false,
          },
       },
-      minified: false,
       mode: "development",
-      sourceMap: "nosources"
    },
    babelOptions: {
       transform: {

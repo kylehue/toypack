@@ -95,7 +95,7 @@ function parseJSModule(bundler: Toypack, source: string, content: string) {
    const userBabelOptions = bundler.options.babelOptions.parse;
    const importantBabelOptions: ParserOptions = {
       sourceType: format == "esm" ? "module" : "script",
-      sourceFilename: source,
+      sourceFilename: source
    };
 
    const AST = getASTFromJS(content, {

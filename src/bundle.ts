@@ -1,9 +1,5 @@
 import { TransformOptions, BabelFileResult } from "@babel/core";
-import {
-   transformFromAst,
-   availablePlugins,
-   availablePresets,
-} from "@babel/standalone";
+import { transformFromAst } from "@babel/standalone";
 import traverseAST, { TraverseOptions, Node, NodePath } from "@babel/traverse";
 import babelMinify from "babel-minify";
 import MapConverter from "convert-source-map";
@@ -83,6 +79,7 @@ function transpileAST(
    inputSourceMap?: RawSourceMap
 ) {
    const format = bundler.options.bundleOptions.module;
+   const mode = bundler.options.bundleOptions.mode;
 
    function getSafeName(relativeSource: string) {
       const absoluteSource = depMap[relativeSource].absolute;
@@ -177,10 +174,11 @@ function transpileAST(
       sourceFileName: source,
       filename: source,
       sourceMaps: !!bundler.options.bundleOptions.sourceMap,
-      envName: bundler.options.bundleOptions.mode,
-      minified: bundler.options.bundleOptions.minified,
-      comments: bundler.options.bundleOptions.minified,
+      envName: mode,
+      minified: false,
+      comments: mode == "development",
       inputSourceMap: inputSourceMap,
+      cloneInputAst: false
    } as TransformOptions;
 
    const transpiled = transformFromAst(AST, undefined, {
@@ -256,11 +254,13 @@ function mergeMapToBundle(
 
    const smc = new SourceMapConsumer(sourceMap);
    smc.eachMapping((map) => {
+      if (map.originalLine === null) return;
+
       targetMap.addMapping({
          source: source,
          original: {
-            line: map.originalLine || 1,
-            column: map.originalColumn || 0,
+            line: map.originalLine,
+            column: map.originalColumn,
          },
          generated: {
             line: map.generatedLine + position.line,
@@ -410,7 +410,6 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
    };
 
    const shouldMinify =
-      bundler.options.bundleOptions.minified ||
       bundler.options.bundleOptions.mode == "production";
 
    if (shouldMinify) {
@@ -610,7 +609,10 @@ export async function bundle(bundler: Toypack, graph: IDependency[]) {
          })}`;
       }
 
-      result.html.content = rt.html(result.script.content, result.style.content);
+      result.html.content = rt.html(
+         result.script.content,
+         result.style.content
+      );
    } else {
       // Extract resources from graph
       for (const dep of graph) {
