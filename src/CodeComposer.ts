@@ -1,26 +1,195 @@
 import { findCodePosition } from "./utils.js";
 
+// https://github.com/jamiebuilds/min-indent
+function minIndent(content: string) {
+   const match = content.match(/^[ \t]*(?=\S)/gm);
+
+   if (!match) {
+      return 0;
+   }
+
+   return match.reduce((r, a) => Math.min(r, a.length), Infinity);
+}
+
+// https://github.com/sindresorhus/strip-indent
+function stripIndent(content: string) {
+   const indent = minIndent(content);
+
+   if (indent === 0) {
+      return content;
+   }
+
+   const regex = new RegExp(`^[ \\t]{${indent}}`, "gm");
+
+   return content.replace(regex, "");
+}
+
+const defaultOptions = {
+   indentSize: 2,
+};
+
+type ICodeComposerOptions = typeof defaultOptions;
+
 /**
  * A utility class for composing and manipulating code strings.
+ * It provides indent-aware functions for precise control
+ * over code formatting.
  */
 export class CodeComposer {
    private lines: string[];
+   private options: ICodeComposerOptions;
 
    /**
     * @param content The initial code content.
     */
-   constructor(content: string) {
-      this.lines = content.split("\n");
+   constructor(content?: string, options?: Partial<ICodeComposerOptions>) {
+      this.options = Object.assign(Object.assign({}, defaultOptions), options);
+      if (this.options.indentSize < 0) {
+         throw new RangeError(
+            "Indent size must be greater than or equal to zero."
+         );
+      }
+
+      this.lines = CodeComposer.getLines(content || "");
+   }
+
+   static getLines(content: string | CodeComposer) {
+      const lines = [];
+
+      if (typeof content == "string") {
+         const split = content.split("\n");
+         lines.push(...split);
+      } else {
+         lines.push(...content.lines);
+      }
+
+      return lines;
    }
 
    /**
-    * Indents each line of the code with the specified prefix.
-    * @param prefix The string to use for indentation.
-    * @returns The updated CodeComposer instance.
+    * Detects the indent size of a content.
     */
-   public indent(prefix = "  ") {
+   static detectIndentSize(content: string | CodeComposer) {
+      const lines = this.getLines(content);
+
+      let detectedIndentSize = -1;
+      let lastIndentSize = -1;
+
+      for (let index = 0; index < lines.length; index++) {
+         if (detectedIndentSize >= 0) break;
+         const line = lines[index];
+         const lineTrimmed = line.trim();
+
+         // Skip empty lines
+         const isLineEmpty = !lineTrimmed;
+         if (isLineEmpty) continue;
+
+         /**
+          * Search for change in indent size. If indent size is
+          * different from the last indent size, the detected
+          * indent size is gonna be `|lastSize - currentSize|`
+          */
+         const lineIndentSize = line.indexOf(lineTrimmed);
+         if (lineIndentSize != lastIndentSize && lastIndentSize != -1) {
+            detectedIndentSize = Math.abs(lineIndentSize - lastIndentSize);
+         }
+
+         /**
+          * The last indent size must be the indent size if
+          * there is no change.
+          */
+         const isLast = index == lines.length - 1;
+         if (isLast && detectedIndentSize == -1) {
+            detectedIndentSize = lastIndentSize;
+            break;
+         }
+
+         lastIndentSize = lineIndentSize;
+      }
+
+      detectedIndentSize = Math.max(0, detectedIndentSize);
+
+      return detectedIndentSize;
+   }
+
+   /**
+    * Removes leading or trailing whitespaces from the whole content
+    * and strips leading whitespaces from each line of the content.
+    */
+   static trim(content: string | CodeComposer) {
+      const lines = this.getLines(content);
+      let resultString = " ".repeat(minIndent(lines.join("\n")));
+
+      if (typeof content == "string") {
+         resultString += content.trim();
+      } else {
+         resultString += lines.join("\n").trim();
+      }
+
+      return stripIndent(resultString);
+   }
+
+   /**
+    * Change the indent size of a content.
+    */
+   static changeIndentSize(content: string | CodeComposer, size: number) {
+      size = Math.floor(size);
+      size = Math.max(0, size);
+
+      const lines = this.getLines(content);
+      const originalIndentSize = this.detectIndentSize(content);
+
+      return lines
+         .map((line) => {
+            const lineTrimmed = line.trimStart();
+            const lineIndent = line.indexOf(lineTrimmed);
+            const targetIndent = originalIndentSize
+               ? (lineIndent / originalIndentSize) * size
+               : 0;
+            return " ".repeat(targetIndent) + lineTrimmed;
+         })
+         .join("\n");
+   }
+
+   /**
+    * Fix the indentation of a content. This will remove the whitespace,
+    * strip the leading indent, and change the indent size.
+    */
+   static revampIndent(content: string | CodeComposer, size: number) {
+      size = Math.floor(size);
+      size = Math.max(0, size);
+
+      return this.changeIndentSize(this.trim(content), size);
+   }
+
+   static removeLineBreaks(content: string | CodeComposer) {
+      const lines = this.getLines(content);
+
+      return lines.filter((line) => !!line.trim()).join("\n");
+   }
+
+   /**
+    * Get the current indent size.
+    */
+   private getCurrentIndentSize() {
+      let currentIndentSize = 0;
+      for (const line of this.lines) {
+         const lineTrimmed = line.trim();
+         const isLineEmpty = !lineTrimmed;
+         if (isLineEmpty) continue;
+         currentIndentSize = line.indexOf(lineTrimmed);
+         break;
+      }
+
+      return currentIndentSize;
+   }
+
+   /**
+    * Indents each line of the code.
+    */
+   public indent() {
       this.lines.map((line, i) => {
-         this.lines[i] = prefix + line;
+         this.lines[i] = " ".repeat(this.options.indentSize) + line;
       });
 
       return this;
@@ -32,11 +201,19 @@ export class CodeComposer {
     * @returns The updated CodeComposer instance.
     */
    public prepend(content: string | CodeComposer) {
-      if (typeof content == "string") {
-         this.lines.unshift(...content.split("\n"));
-      } else {
-         this.lines.unshift(...content.lines);
-      }
+      const indentSize =
+         CodeComposer.detectIndentSize(this) || this.options.indentSize;
+      const revamped = CodeComposer.revampIndent(
+         content,
+         indentSize
+      );
+      const lines = CodeComposer.getLines(revamped);
+
+      lines.forEach((line, index) => {
+         lines[index] = " ".repeat(this.getCurrentIndentSize()) + line;
+      });
+
+      this.lines.unshift(...lines);
 
       return this;
    }
@@ -47,13 +224,25 @@ export class CodeComposer {
     * @returns The updated CodeComposer instance.
     */
    public append(content: string | CodeComposer) {
-      if (typeof content == "string") {
-         this.lines.push(...content.split("\n"));
-      } else {
-         this.lines.push(...content.lines);
-      }
+      const indentSize =
+         CodeComposer.detectIndentSize(this) || this.options.indentSize;
+      const revamped = CodeComposer.revampIndent(
+         content,
+         indentSize
+      );
+      const lines = CodeComposer.getLines(revamped);
+
+      lines.forEach((line, index) => {
+         lines[index] = " ".repeat(this.getCurrentIndentSize()) + line;
+      });
+
+      this.lines.push(...lines);
 
       return this;
+   }
+
+   public breakLine(amount = 1) {
+      this.lines.push("\n".repeat(amount - 1));
    }
 
    /**
@@ -77,35 +266,30 @@ export class CodeComposer {
     * // Result
     * `(function() {
     *    console.log('Hello World!');
-    * })()`;
+    * })();`
     */
    public wrap(content: string) {
       const marker = "<CODE_BODY>";
       if (content.indexOf(marker) == -1) {
          throw new Error("The wrapping content must have a marker.");
       }
+      this.indent();
 
-      let lines: string[] = [];
-      let targetColumn = findCodePosition(content, marker).column;
-      let currentIndentSize = this.lines[0].indexOf(this.lines[0].trim());
+      const [top, bottom] = content.split(marker);
 
-      const split = content.trim().split("\n");
-      split.map((line) => {
-         const lineTrimmed = line.trim();
-         if (lineTrimmed == marker) {
-            lines.push(...this.lines);
-            return;
-         }
+      const indentSize =
+         CodeComposer.detectIndentSize(this) || this.options.indentSize;
+      const polishedTop = CodeComposer.changeIndentSize(
+         CodeComposer.removeLineBreaks(stripIndent(top)),
+         indentSize
+      );
+      const polishedBottom = CodeComposer.changeIndentSize(
+         CodeComposer.removeLineBreaks(stripIndent(bottom)),
+         indentSize
+      );
 
-         let column = line.indexOf(lineTrimmed);
-         if (column === targetColumn) {
-            lines.push(" ".repeat(currentIndentSize) + lineTrimmed);
-         } else {
-            lines.push(lineTrimmed);
-         }
-      });
-
-      this.lines = [...lines];
+      this.lines.unshift(...CodeComposer.getLines(polishedTop));
+      this.lines.push(...CodeComposer.getLines(polishedBottom));
 
       return this;
    }
@@ -118,6 +302,8 @@ export class CodeComposer {
    }
 
    public clone() {
-      return new CodeComposer(this.toString());
+      const clone = new CodeComposer(undefined, this.options);
+      clone.lines = [...this.lines];
+      return clone;
    }
 }

@@ -237,7 +237,9 @@ async function resourceToCJSModule(
  * Get the script bundle from graph.
  */
 async function bundleScript(bundler: Toypack, graph: IDependency[]) {
-   const bundleContent = new CodeComposer("");
+   const bundleContent = new CodeComposer(undefined, {
+      indentSize: 4
+   });
    const sourceMapOption = bundler.options.bundleOptions.sourceMap;
    const bundleSourceMap = !!sourceMapOption ? new SourceMapGenerator() : null;
 
@@ -264,7 +266,7 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
          source === graph[0].source
       );
 
-      bundleContent.append(wrappedModule.trim() + "\n");
+      bundleContent.append(wrappedModule).breakLine();
 
       return { map, code };
    };
@@ -276,7 +278,6 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
    const finalizeBundleContent = () => {
       const bundleClone = bundleContent.clone();
       bundleClone.prepend(rt.requireFunction());
-      bundleClone.indent(rt.indentPrefix());
       bundleClone.wrap(`
       (function () {
          <CODE_BODY>
@@ -384,7 +385,7 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
             dep.content
          );
 
-         bundleContent.append(compiled + "\n");
+         bundleContent.append(compiled).breakLine();
       } else {
          throw new Error(`Failed to compile '${dep.source}'.`);
       }
@@ -544,6 +545,9 @@ export async function bundle(bundler: Toypack, graph: IDependency[]) {
    const style = await bundleStyle(bundler, graph);
 
    result.script = script.code;
+
+   //console.log(result.script);
+   
    
    // Inline everything if in development mode
    if (mode == "development") {
