@@ -52,7 +52,9 @@ export class CodeComposer {
    }
 
    static getLines(content: string | CodeComposer) {
-      const lines = [];
+      const lines: string[] = [];
+
+      if (!content) return lines;
 
       if (typeof content == "string") {
          const split = content.split("\n");

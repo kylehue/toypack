@@ -82,13 +82,6 @@ const defaultOptions = {
       } as IBabelParseOptions,
    },
    /**
-    * Configuration for PostCSS.
-    */
-   postCSSOptions: {
-      plugins: [] as AcceptedPlugin[],
-      ...({} as Omit<ProcessOptions, "map" | "from" | "to">),
-   },
-   /**
     * Log level.
     * @default "error"
     */

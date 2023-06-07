@@ -15,6 +15,7 @@ import { SassLoader } from "./loaders/SassLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { mergeDeep } from "./utils.js";
+import { CodeComposer } from "./CodeComposer.js";
 
 export interface ICompileData {
    source: string;
@@ -56,7 +57,10 @@ export class Toypack {
    };
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
-      this.options = mergeDeep(JSON.parse(JSON.stringify(defaultOptions)), options);
+      this.options = mergeDeep(
+         JSON.parse(JSON.stringify(defaultOptions)),
+         options
+      );
 
       this.assets = new Map();
       this.useLoader(new SassLoader(this));
@@ -85,6 +89,10 @@ export class Toypack {
       this.iframe = iframe;
    }
 
+   public unsetIFrame() {
+      this.iframe = null;
+   }
+
    public addOrUpdateAsset(source: string, content: string | Blob) {
       source = path.join("/", source);
       const asset = new Asset(this, source, content);
@@ -92,30 +100,22 @@ export class Toypack {
       return asset;
    }
 
+   public getAsset(source: string) {
+      source = path.join("/", source);
+      return this.assets.get(source) || null;
+   }
+
    public async getProductionOutput() {}
 
    public async run() {
       const graph = getDependencyGraph(this);
-      console.log("Graph:", graph);
       const result = await bundle(this, graph);
-      console.log("Bundle:", result);
 
       if (this.iframe) {
-         this.iframe.srcdoc = `<!DOCTYPE html>
-<html lang="en">
-   <head>
-      <meta charset="UTF-8" />
-      <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Example</title>
-      <style type="text/css">${result.style}</style>
-   </head>
-   <body>
-      <script>${result.script}</script>
-   </body>
-</html>
-`;
+         this.iframe.srcdoc = result.html.content;
       }
+
+      return result;
    }
 }
 

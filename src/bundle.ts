@@ -18,8 +18,11 @@ import { CodeComposer } from "./CodeComposer.js";
 import { IDependency, IDependencyMap } from "./graph.js";
 import * as rt from "./runtime.js";
 import { Toypack } from "./Toypack.js";
-import { findCodePosition, getUniqueIdFromString } from "./utils.js";
-console.log(availablePlugins, availablePresets);
+import {
+   JSONToBlob,
+   findCodePosition,
+   getUniqueIdFromString,
+} from "./utils.js";
 
 export type ITraverseFunction<T> = (
    path: NodePath<Extract<Node, { type: T }>>,
@@ -206,17 +209,13 @@ async function resourceToCJSModule(
    const mode = bundler.options.bundleOptions.mode;
 
    if (mode == "production") {
-      /* let url = `data:${content.type};base64,`;
-      url += btoa(await content.arrayBuffer());
-
-      exportStr = url; */
-      exportStr = path.join("resources", source);
+      exportStr = "./" + getUniqueIdFromString(source) + path.extname(source);
    } else {
-      exportStr = URL.createObjectURL(content);
-      console.log(exportStr);
+      const asset = bundler.getAsset(source);
 
-      // test: production
-      // exportStr = path.join("resources", getUniqueIdFromString(source, shouldMinify) + path.extname(source));
+      if (asset && asset.contentURL) {
+         exportStr = asset.contentURL;
+      }
    }
 
    const result = rt.moduleWrap(source, `module.exports = "${exportStr}";`);
@@ -432,10 +431,12 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
    return result;
 }
 
-interface CSSTreeGeneratedResult {
-   css: string;
-   map: SourceMapGenerator;
-}
+type CSSTreeGeneratedResult =
+   | {
+        css: string;
+        map: SourceMapGenerator;
+     }
+   | string;
 
 function compileCSS(
    bundler: Toypack,
@@ -449,11 +450,18 @@ function compileCSS(
    }) as any as CSSTreeGeneratedResult;
 
    const result = {
-      code: compiled.css,
-      map: MapConverter.fromJSON(
-         compiled.map.toString()
-      ).toObject() as RawSourceMap,
+      code: "",
+      map: null as RawSourceMap | null,
    };
+
+   if (typeof compiled == "string") {
+      result.code = compiled;
+   } else {
+      result.code = compiled.css;
+      result.map = !!sourceMapOption
+         ? MapConverter.fromJSON(compiled.map.toString()).toObject()
+         : null;
+   }
 
    // TODO: merge input source map from the source map result
 
@@ -466,8 +474,6 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
    });
    const sourceMapOption = bundler.options.bundleOptions.sourceMap;
    const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
-
-   console.log(graph);
 
    const addPostCSSASTToBundle = (
       source: string,
@@ -506,7 +512,10 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
                );
 
                if (bundleSourceMap && map) {
-                  map.sourcesContent = [dep.content];
+                  if (sourceMapOption != "nosources") {
+                     map.sourcesContent = [dep.content];
+                  }
+
                   mergeMapToBundle(
                      bundler,
                      bundleSourceMap,
@@ -527,7 +536,10 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
          const { code, map } = addPostCSSASTToBundle(dep.source, dep.AST);
 
          if (bundleSourceMap && map) {
-            map.sourcesContent = [dep.content];
+            if (sourceMapOption != "nosources") {
+               map.sourcesContent = [dep.content];
+            }
+
             mergeMapToBundle(
                bundler,
                bundleSourceMap,
@@ -538,22 +550,10 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
                finalizeBundleContent()
             );
          }
-      } else if (dep.type == "resource") {
-         /**
-          * If it's a resource, compile first, then add to the bundle.
-          */
-         /* const compiled = await resourceToCJSModule(
-            bundler,
-            dep.source,
-            dep.content,
-            shouldMinify
-         );
-         result.addSource({
-            filename: dep.source,
-            content: compiled,
-         }); */
       } else {
-         throw new Error(`Failed to compile '${dep.source}'.`);
+         if (dep.type != "resource") {
+            throw new Error(`Failed to compile '${dep.source}'.`);
+         }
       }
    }
 
@@ -570,31 +570,84 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
    return result;
 }
 
+export interface IResource {
+   source: string;
+   content: Blob;
+}
+
 export async function bundle(bundler: Toypack, graph: IDependency[]) {
    const result = {
-      resources: [] as Blob[],
-      script: "",
-      style: "",
+      resources: [] as IResource[],
+      script: {
+         source: "index.js",
+         content: "",
+      },
+      style: {
+         source: "index.css",
+         content: "",
+      },
+      html: {
+         source: "index.html",
+         content: "",
+      },
    };
 
    const mode = bundler.options.bundleOptions.mode;
    const style = await bundleStyle(bundler, graph);
    const script = await bundleScript(bundler, graph);
 
-   result.script = script.code;
-   result.style = style.code;
-
-   //console.log(result.script);
+   result.script.content = script.code;
+   result.style.content = style.code;
 
    // Inline everything if in development mode
    if (mode == "development") {
       if (script.map) {
-         result.script += `\n\n${script.map.toComment()}`;
+         result.script.content += `\n\n${script.map.toComment()}`;
       }
       if (style.map) {
-         result.style += `\n${style.map.toComment({ multiline: true })}`;
+         result.style.content += `\n${style.map.toComment({
+            multiline: true,
+         })}`;
       }
+
+      result.html.content = rt.html(result.script.content, result.style.content);
    } else {
+      // Extract resources from graph
+      for (const dep of graph) {
+         if (dep.type != "resource") continue;
+
+         result.resources.push({
+            source:
+               getUniqueIdFromString(dep.source) + path.extname(dep.source),
+            content: dep.content,
+         });
+      }
+
+      const sourceMapURLMarker = "# sourceMappingURL=";
+
+      // Put source maps in resources
+      if (script.map) {
+         const mapSource = result.script.source + ".map";
+         result.script.content += `\n\n//${sourceMapURLMarker}${mapSource}`;
+         result.resources.push({
+            source: mapSource,
+            content: JSONToBlob(script.map.toJSON()),
+         });
+      }
+      if (style.map) {
+         const mapSource = result.style.source + ".map";
+         result.style.content += `\n\n/*${sourceMapURLMarker}${mapSource} */`;
+         result.resources.push({
+            source: mapSource,
+            content: JSONToBlob(style.map.toJSON()),
+         });
+      }
+
+      result.html.content = rt.html(
+         result.script.source,
+         result.style.source,
+         true
+      );
    }
 
    return result;

@@ -98,23 +98,24 @@ addFile(
    "styles/sample.css",
    `
 body {
-  background-color: red;
-  color: white;
+   background: url(../images/cat.png);
+   background-color: red;
+   color: white;
 }
 
 h1 {
-  font-size: 24px;
-  font-weight: bold;
+   font-size: 24px;
+   font-weight: bold;
 }
 
 .container {
-  width: 100%;
-  height: 200px;
+   width: 100%;
+   height: 200px;
 }
 
 .invalid-class {
-  border: 1px solid black;
-  padding: 10px;
+   border: 1px solid black;
+   padding: 10px;
 }
 `
 );

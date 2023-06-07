@@ -2,7 +2,23 @@ import { sampleFiles } from "./sample.js";
 import d, { Toypack, Babel,Utilities,  } from "../build/Toypack.js";
 import { DefinePlugin } from "../build/plugins/DefinePlugin.js";
 
+var saveData = (function () {
+   var a = document.createElement("a");
+   document.body.appendChild(a);
+   a.style.display = "none";
+   return function (data, fileName, type) {
+      var blob = new Blob([data], { type }),
+         url = window.URL.createObjectURL(blob);
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+   };
+})();
+
 const iframe = document.querySelector<HTMLIFrameElement>("#sandbox")!;
+const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
+const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new Toypack({
    bundleOptions: {
       entry: "",
@@ -16,6 +32,8 @@ const toypack = new Toypack({
          },
       },
       minified: false,
+      mode: "development",
+      sourceMap: "nosources"
    },
    babelOptions: {
       transform: {
@@ -26,6 +44,32 @@ const toypack = new Toypack({
       },
    },
 });
+
+console.log(toypack, Babel.availablePlugins, Babel.availablePresets);
+
+runButton.onclick = async () => {
+   console.log(await toypack.run());
+}
+
+downloadButton.onclick = async () => {
+   toypack.options.bundleOptions.mode = "production";
+   let result = await toypack.run();
+   toypack.options.bundleOptions.mode = "development";
+
+   for (let resource of result.resources) {
+      saveData(resource.content, resource.source, resource.content.type)
+   }
+
+   saveData(
+      result.script.content,
+      result.script.source,
+      "application/javascript"
+   );
+
+   saveData(result.style.content, result.style.source, "text/css");
+
+   saveData(result.html.content, result.html.source, "text/html");
+}
 
 (async () => {
    const samplePic = await (
@@ -44,16 +88,6 @@ const toypack = new Toypack({
 
    toypack.addOrUpdateAsset("/images/cat.png", samplePic);
 
-   // entry should only either be html or js
-
-   // should be able to pick whether to use esm or cjs
-
-   // dev mode - has to be bundled into one file, transpiled
-
-   // prod mode - has to be seperated into multiple files, transpiled
-
-   //console.log(iframe);
-
    toypack.hooks.onError((e) => {
       console.error(e.reason);
    });
@@ -62,7 +96,7 @@ const toypack = new Toypack({
       toypack.addOrUpdateAsset(sampleFile.source, sampleFile.content);
    }
 
-   toypack.run();
+   console.log(await toypack.run());
 
    /* iframe!.srcdoc = `
 <!DOCTYPE html>
@@ -81,6 +115,4 @@ const toypack = new Toypack({
    </body>
 </html>
 `; */
-
-   console.log(toypack, sampleFiles);
 })();

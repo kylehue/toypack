@@ -13,7 +13,7 @@ import {
    resolveFailureError,
 } from "./errors.js";
 import { Toypack } from "./Toypack.js";
-import { isCSS, isJS, parseURLQuery } from "./utils.js";
+import { getUniqueIdFromString, isCSS, isJS, parseURLQuery } from "./utils.js";
 
 export interface IChunk {
    source: string;
@@ -80,8 +80,6 @@ export type IScanCallback = (dep: {
    AST: Node | CSSTree.CssNode;
    params: IModuleOptions;
 }) => void;
-
-const CSSUrlFunctionRegex = /url\s*\("?(?![a-z]+:)/;
 
 /**
  * Get dependencies and AST of a script module.
@@ -167,7 +165,7 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
          message += `\n\nSource file: ${source}`;
 
          bundler.hooks.trigger("onError", parseError(message));
-      }
+      },
    });
 
    result.AST = AST;
@@ -175,25 +173,51 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
    CSSTree.walk(AST, function (node, item, list) {
       // property: url(...);
       if (this.declaration && node.type === "Url") {
-         const sourceValue = node.value;
+         const sourceValue = "/" + node.value.replace(/^\//, "");
          let isValidDep = true;
-         // scroll-to-element-id urls are not a dependency
-         if (sourceValue.startsWith("#")) isValidDep = false;
-         // no need to add data urls to dependencies
-         if (sourceValue.startsWith("data:")) isValidDep = false;
-
-         if (!bundler.extensions.resource.includes(path.extname(source))) {
+         // Scroll-to-element-id urls are not a dependency
+         if (isValidDep && sourceValue.startsWith("#")) isValidDep = false;
+         // No need to add data urls to dependencies
+         if (isValidDep && sourceValue.startsWith("data:")) isValidDep = false;
+         // url()'s source path can't be .js or .css.
+         if (
+            isValidDep &&
+            !bundler.extensions.resource.includes(path.extname(sourceValue))
+         ) {
             bundler.hooks.trigger(
                "onError",
                parseError(
-                  `'url()' tokens can only be used to reference resource files. '${source}' is not a valid resource file.`
+                  `'url()' tokens can't be used to reference ${path.extname(
+                     sourceValue
+                  )} files. '${sourceValue}' is not a valid resource file.`
                )
             );
 
             isValidDep = false;
          }
 
-         if (isValidDep) result.dependencies.push(node.value);
+         if (isValidDep) {
+            // Change source path based on bundle mode
+            const resolved = bundler.resolve(sourceValue, {
+               baseDir: path.dirname(source),
+            });
+            
+            if (resolved) {
+               if (bundler.options.bundleOptions.mode == "production") {
+                  node.value =
+                     getUniqueIdFromString(resolved) + path.extname(resolved);
+               } else {
+                  const resolvedAsset = bundler.getAsset(resolved);
+
+                  if (resolvedAsset && resolvedAsset.contentURL) {
+                     node.value = resolvedAsset.contentURL;
+                  }
+               }
+            }
+
+            // Add
+            result.dependencies.push(sourceValue);
+         }
       }
 
       if (node.type === "Atrule" && node.name == "import") {
@@ -208,7 +232,7 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
             atImportValueNode.type == "String" &&
             atImportValueNode.value
          ) {
-            result.dependencies.push(atImportValueNode.value);
+            result.dependencies.push(path.join("/", atImportValueNode.value));
             list.remove(item);
          }
 
@@ -223,7 +247,9 @@ function parseCSSModule(bundler: Toypack, source: string, content: string) {
             atImportURLValueNode.type == "Url" &&
             atImportURLValueNode.value
          ) {
-            result.dependencies.push(atImportURLValueNode.value);
+            result.dependencies.push(
+               path.join("/", atImportURLValueNode.value)
+            );
             list.remove(item);
          }
       }

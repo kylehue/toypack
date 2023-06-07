@@ -175,3 +175,7 @@ export function mergeDeep<T extends Object>(target: T, ...sources: T[]) {
 
   return mergeDeep(target, ...sources);
 }
+
+export function JSONToBlob(json: string) {
+   return new Blob([json], { type: "application/json" });
+}

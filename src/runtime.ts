@@ -10,7 +10,7 @@ const identifiers = {
    require: "_require_",
 } as const;
 
-export function html(script = "", title = "") {
+export function html(script = "", style = "", asExternalURL = false) {
    return CodeComposer.revampIndent(
       `
    <!DOCTYPE html>
@@ -19,21 +19,29 @@ export function html(script = "", title = "") {
          <meta charset="UTF-8" />
          <meta http-equiv="X-UA-Compatible" content="IE=edge" />
          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-         <title>${title}</title>
+         <title>Something</title>
+         ${
+            asExternalURL
+               ? `<link rel="stylesheet" href="${style}"></link>`
+               : `<style>${style}</style>`
+         }
+         ${
+            asExternalURL
+               ? `<script defer type="application/javascript" src="${script}"></script>`
+               : ""
+         }
       </head>
       <body>
-         <script>
-            ${script}
-         </script>
+         ${!asExternalURL ? `<script>${script}</script>` : ""}
       </body>
    </html>
    `,
-      2
+      4
    );
 }
 
 export function requireFunction() {
-   const result = new CodeComposer(
+   const result = CodeComposer.revampIndent(
       `
       var ${identifiers.modules} = {};
       var _modules_cache_ = {};
@@ -61,10 +69,11 @@ export function requireFunction() {
 
          init(module, module.exports, localRequire);
          return module.exports;
-      }`
+      }`,
+      4
    );
 
-   return result.toString();
+   return result;
 }
 
 export function moduleWrap(source: string, code: string, isEntry = false) {
