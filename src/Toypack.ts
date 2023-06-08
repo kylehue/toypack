@@ -15,10 +15,11 @@ import {
    IParseJSResult,
 } from "./graph.js";
 import { Hooks } from "./Hooks.js";
-import JSONLoader from "./loaders/JSONLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { isChunk, isNodeModule, mergeDeep } from "./utils.js";
+import JSONLoader from "./loaders/JSONLoader.js";
+import HTMLLoader from "./loaders/HTMLLoader.js";
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -43,12 +44,18 @@ export class Toypack {
 
       this.assets = new Map();
       this.useLoader(JSONLoader());
-      // this.useLoader(new JSONLoader(this));
+      this.useLoader(HTMLLoader());
 
       if (this.options.logLevel == "error") {
          this.hooks.onError((error) => {
             console.error(error.reason);
          });
+      }
+   }
+
+   protected warn(message: string) {
+      if (this.options.logLevel == "error" || this.options.logLevel == "warn") {
+         console.warn(message);
       }
    }
 
@@ -72,7 +79,12 @@ export class Toypack {
     * @param {ILoader} loader The loader to add.
     */
    public useLoader(loader: ILoader) {
-      this.loaders.push(loader.call(this));
+      const loadedLoader = loader.call(this);
+      if (this.loaders.find(v => v.name == loadedLoader.name)) {
+         throw new Error(`${loadedLoader.name} already exists.`);
+      }
+
+      this.loaders.push(loadedLoader);
    }
 
    /**

@@ -55,11 +55,7 @@ export function getResolveAliasData(this: Toypack, moduleId: string) {
    }
 }
 
-function tryFileThenIndex(
-   this: Toypack,
-   source: string,
-   extensions: string[]
-) {
+function tryFileThenIndex(this: Toypack, source: string, extensions: string[]) {
    const file = loadAsFile.call(this, source, extensions);
 
    if (file) {
@@ -69,11 +65,7 @@ function tryFileThenIndex(
    }
 }
 
-function loadAsDirectory(
-   this: Toypack,
-   source: string,
-   extensions: string[]
-) {
+function loadAsDirectory(this: Toypack, source: string, extensions: string[]) {
    const pkg = this.assets.get(path.join(source, "package.json"));
    const mainFieldValue =
       typeof pkg?.content == "string"
@@ -118,11 +110,7 @@ function loadIndex(this: Toypack, source: string, extensions: string[]) {
    return loadAsFile.call(this, resolvedIndex, extensions);
 }
 
-function getResolved(
-   this: Toypack,
-   source: string,
-   opts: IResolveOptionsComp
-) {
+function getResolved(this: Toypack, source: string, opts: IResolveOptionsComp) {
    if (opts.includeCoreModules && !isLocal(source) && !isURL(source)) {
       const resolved = path.join("/", "node_modules", source);
       return loadAsDirectory.call(this, resolved, opts.extensions);

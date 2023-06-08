@@ -23,7 +23,7 @@ function stripIndent(content: string) {
 }
 
 const defaultOptions = {
-   indentSize: 2,
+   indentSize: 4,
 };
 
 /**

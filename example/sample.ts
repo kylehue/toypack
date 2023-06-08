@@ -9,9 +9,33 @@ function addFile(source: string, content = "") {
 
 // ESM
 addFile(
-   "index.ts",
+   "index.html",
    `
-console.log(123456);
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8" />
+      <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Example</title>
+      <link rel="stylesheet" href="./styles/sample" />
+      <script type="importmap">
+         {
+            "imports": {
+               "path-browserify": "https://esm.sh/path-browserify@1.0.1"
+            }
+         }
+      </script>
+      <script type="module" src="src/main"></script>
+   </head>
+   <body>
+      <div class="">
+         <button id="runSandbox">Run</button>
+         <button id="download">Download</button>
+      </div>
+      <iframe style="background:white;" id="sandbox" frameborder="0"></iframe>
+   </body>
+</html>
 `
 );
 

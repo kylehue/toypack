@@ -221,11 +221,9 @@ function mergeMapToBundle(
    const position = findCodePosition(bundleContent, generatedContent);
 
    if (position.line == -1) {
-      if (this.options.logLevel == "error" || this.options.logLevel == "warn") {
-         console.warn(
-            `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
-         );
-      }
+      this.warn(
+         `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
+      );
    }
 
    const sourceMapOption = this.options.bundleOptions.sourceMap;
@@ -256,9 +254,7 @@ function mergeMapToBundle(
  * Get the script bundle from graph.
  */
 async function bundleScript(this: Toypack, graph: IDependency[]) {
-   const bundleContent = new CodeComposer(undefined, {
-      indentSize: 4,
-   });
+   const bundleContent = new CodeComposer();
    const sourceMapOption = this.options.bundleOptions.sourceMap;
    const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
@@ -459,9 +455,7 @@ async function compileCSS(
 }
 
 async function bundleStyle(this: Toypack, graph: IDependency[]) {
-   const bundleContent = new CodeComposer(undefined, {
-      indentSize: 4,
-   });
+   const bundleContent = new CodeComposer();
    const sourceMapOption = this.options.bundleOptions.sourceMap;
    const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
@@ -676,7 +670,7 @@ type CSSTreeGeneratedResult =
         map: SourceMapGenerator;
      }
    | string;
-   
+
 export interface IResource {
    source: string;
    content: Blob;
