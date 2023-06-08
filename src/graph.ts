@@ -1,11 +1,10 @@
 import { parse as getASTFromJS, ParserOptions } from "@babel/parser";
-import traverseAST, { Node, NodePath, Hub, Scope, Binding } from "@babel/traverse";
+import traverseAST, { Node } from "@babel/traverse";
 import * as CSSTree from "css-tree";
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import { Asset } from "./asset.js";
 import {
-   assetNotFoundError,
    assetStrictlyHTMLorJSError,
    entryPointNotFoundError,
    loaderNotFoundError,
@@ -13,7 +12,7 @@ import {
    resolveFailureError,
 } from "./errors.js";
 import { ICompileData, Toypack } from "./Toypack.js";
-import { getUniqueIdFromString, isCSS, isJS, parseURLQuery } from "./utils.js";
+import { getHash, isCSS, isJS, parseURLQuery } from "./utils.js";
 
 export interface IChunk {
    source: string;
@@ -83,17 +82,40 @@ export type IScanCallback = (dep: {
 
 const dummyNodeAST = getASTFromJS("");
 
+export interface IParseJSResult {
+   type: "script";
+   dependencies: string[];
+   AST: Node;
+}
+
+export interface IParseCSSResult {
+   type: "style";
+   dependencies: string[];
+   AST: CSSTree.CssNode;
+}
+
 /**
  * Get dependencies and AST of a script module.
  */
-function parseJSModule(this: Toypack, source: string, content: string) {
-   const result = {
+export function parseJSModule(
+   this: Toypack,
+   source: string,
+   content: string
+): IParseJSResult {
+   const cached = this.cachedDeps.parsed.get(source);
+   if (cached && cached.type == "script") {
+      const asset = this.getAsset(source);
+
+      if (!asset?.modified) return cached;
+   }
+
+   const result: IParseJSResult = {
+      type: "script",
       dependencies: [] as string[],
       AST: dummyNodeAST as Node,
    };
 
    const format = this.options.bundleOptions.module;
-
    const userBabelOptions = this.options.babelOptions.parse;
    const importantBabelOptions: ParserOptions = {
       sourceType: format == "esm" ? "module" : "script",
@@ -109,7 +131,7 @@ function parseJSModule(this: Toypack, source: string, content: string) {
       });
    } catch (error) {
       this.hooks.trigger("onError", parseError(error as any));
-      
+
       return result;
    }
 
@@ -147,14 +169,28 @@ function parseJSModule(this: Toypack, source: string, content: string) {
       });
    }
 
+   this.cachedDeps.parsed.set(source, result);
+
    return result;
 }
 
 /**
  * Get dependencies and AST of a CSS module.
  */
-function parseCSSModule(this: Toypack, source: string, content: string) {
-   const result = {
+function parseCSSModule(
+   this: Toypack,
+   source: string,
+   content: string
+): IParseCSSResult {
+   const cached = this.cachedDeps.parsed.get(source);
+   if (cached && cached.type == "style") {
+      const asset = this.getAsset(source);
+
+      if (!asset?.modified) return cached;
+   }
+
+   const result: IParseCSSResult = {
+      type: "style",
       dependencies: [] as string[],
       AST: {} as CSSTree.CssNode,
    };
@@ -214,8 +250,7 @@ function parseCSSModule(this: Toypack, source: string, content: string) {
 
             if (resolved) {
                if (this.options.bundleOptions.mode == "production") {
-                  node.value =
-                     getUniqueIdFromString(resolved) + path.extname(resolved);
+                  node.value = getHash(resolved) + path.extname(resolved);
                } else {
                   const resolvedAsset = this.getAsset(resolved);
 
@@ -265,6 +300,8 @@ function parseCSSModule(this: Toypack, source: string, content: string) {
       }
    });
 
+   this.cachedDeps.parsed.set(source, result);
+
    return result;
 }
 
@@ -311,7 +348,9 @@ async function compileAndGetChunks(
          });
       } else {
          for (const [lang, dataArr] of Object.entries(compilation.use)) {
-            const chunkSource = `${chunk.source}.chunk-${result.length}.${lang}`;
+            const chunkSource = `${chunk.source}.chunk-${getHash(
+               chunk.source
+            )}-${result.length}.${lang}`;
             for (const data of dataArr) {
                if (result.some((v) => v.source == chunkSource)) {
                   continue;
@@ -345,15 +384,10 @@ async function scanChunkDeps(
 
    let parsed;
    if (this.hasExtension("script", source)) {
-      parsed = {
-         type: "script",
-         ...parseJSModule.call(this, source, content),
-      };
+      // Check cache
+      parsed = parseJSModule.call(this, source, content);
    } else if (this.hasExtension("style", source)) {
-      parsed = {
-         type: "style",
-         ...parseCSSModule.call(this, source, content),
-      };
+      parsed = parseCSSModule.call(this, source, content);
    } else {
       throw new Error(
          "A chunk can only either be an script type or style type."
@@ -413,8 +447,7 @@ async function getGraphRecursive(
          type: "resource",
          content: entryChunk.content,
          source: entryChunk.source,
-      } as IResourceDependency);
-
+      });
       return graph;
    }
 
@@ -448,11 +481,17 @@ async function getGraphRecursive(
       parentDep.AST = parsed.AST;
    } else {
       parentDep.chunks = [];
-      for (const chunk of await compileAndGetChunks.call(this, parentDep, params)) {
+      for (const chunk of await compileAndGetChunks.call(
+         this,
+         parentDep,
+         params
+      )) {
          const parsed = await scanChunkDeps.call(this, chunk, scanDeps);
 
          parentDep.chunks.push({
-            type: this.hasExtension("script", chunk.source) ? "script" : "style",
+            type: this.hasExtension("script", chunk.source)
+               ? "script"
+               : "style",
             AST: parsed.AST,
             content: chunk.content,
             source: chunk.source,

@@ -1,5 +1,5 @@
 import { CodeComposer } from "./CodeComposer.js";
-import { getUniqueIdFromString } from "./utils.js";
+import { getHash } from "./utils.js";
 
 export function indentPrefix() {
    return "  ";
@@ -78,7 +78,7 @@ export function requireFunction() {
 }
 
 export function moduleWrap(source: string, code: string, isEntry = false) {
-   const id = getUniqueIdFromString(source);
+   const id = getHash(source);
 
    const composer = new CodeComposer(code);
    composer.wrap(

@@ -5,10 +5,14 @@ import {
    SourceMapGenerator,
 } from "source-map-js";
 
-export function isLocal(pathStr: string) {
+export function isLocal(source: string) {
    return (
-      /^(?:\.\.?(?:\/|$)|\/|([A-Za-z]:)?[/\\])/.test(pathStr) && !isURL(pathStr)
+      /^(?:\.\.?(?:\/|$)|\/|([A-Za-z]:)?[/\\])/.test(source) && !isURL(source)
    );
+}
+
+export function isNodeModule(source: string) {
+   return /^\/?node_modules/.test(source);
 }
 
 const URL_RE = /https?:\/\/((?:[\w\d-]+\.)+[\w\d]{2,})/i;
@@ -72,11 +76,9 @@ export function parseURLQuery(url: string) {
 }
 
 /**
- * Generate a unique ID from a string.
- * @param str The string to get the unique ID from.
- * @returns
+ * Generate a hash from string.
  */
-export function getUniqueIdFromString(str: string): string {
+export function getHash(str: string): string {
    if (str.length === 0) {
       throw new Error("String must contain at least 1 character.");
    }
@@ -238,5 +240,5 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
    (mergedMapGenerator as any)._sourceRoot = oldMap.sourceRoot;
    (mergedMapGenerator as any)._file = oldMap.file;
 
-   return JSON.parse(mergedMapGenerator.toString());
+   return JSON.parse(mergedMapGenerator.toString()) as RawSourceMap;
 }

@@ -8,12 +8,17 @@ import {
    resourceExtensions,
    styleExtensions,
 } from "./extensions.js";
-import { getDependencyGraph, IChunk, IModuleOptions } from "./graph.js";
+import {
+   getDependencyGraph,
+   IModuleOptions,
+   IParseCSSResult,
+   IParseJSResult,
+} from "./graph.js";
 import { Hooks } from "./Hooks.js";
 import JSONLoader from "./loaders/JSONLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
-import { mergeDeep } from "./utils.js";
+import { isNodeModule, mergeDeep } from "./utils.js";
 
 export interface ICompileData {
    source: string;
@@ -52,9 +57,7 @@ interface ILoaderDataBase {
 interface ILoaderDataAsync extends ILoaderDataBase {
    async: true;
    /** Async function that handles the compilation of the matched files. */
-   compile: (
-      data: ICompileData
-   ) => Promise<ICompileResult | ICompileRecursive>;
+   compile: (data: ICompileData) => Promise<ICompileResult | ICompileRecursive>;
 }
 
 interface ILoaderDataSync extends ILoaderDataBase {
@@ -65,8 +68,22 @@ interface ILoaderDataSync extends ILoaderDataBase {
 
 type ILoaderData = ILoaderDataAsync | ILoaderDataSync;
 
+interface ICache {
+   parsed: Map<string, IParseJSResult | IParseCSSResult>;
+   compiled: Map<
+      string,
+      {
+         runtime: string;
+         code: string;
+         map?: RawSourceMap | null;
+      }
+   >;
+}
+
 export type ILoader = (this: Toypack) => ILoaderData;
 export type IPlugin = (this: Toypack) => any;
+
+const isChunk = (source: string) => new RegExp(".chunk-[a-zA-Z0-9]+-[0-9].[a-zA-Z]+$").test(source);
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -77,7 +94,10 @@ export class Toypack {
    };
    protected loaders: ILoaderData[] = [];
    protected assets: Map<string, Asset>;
-   protected cache = new Map<string, IChunk>();
+   protected cachedDeps: ICache = {
+      parsed: new Map(),
+      compiled: new Map(),
+   };
    public options: IOptions;
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
@@ -132,8 +152,16 @@ export class Toypack {
 
    public addOrUpdateAsset(source: string, content: string | Blob) {
       source = path.join("/", source);
-      const asset = new Asset(this, source, content);
-      this.assets.set(source, asset);
+      let asset = this.assets.get(source);
+
+      if (!asset) {
+         asset = new Asset(this, source, content);
+         this.assets.set(source, asset);
+      } else {
+         asset.content = content;
+      }
+      
+      asset.modified = true;
       return asset;
    }
 
@@ -142,9 +170,41 @@ export class Toypack {
       return this.assets.get(source) || null;
    }
 
+   public removeAsset(source: string) {
+      source = path.join("/", source);
+
+      this.assets.delete(source);
+      this.cachedDeps.parsed.delete(source);
+      this.cachedDeps.compiled.delete(source);
+
+      /**
+       * Remove chunks from cache that are associated with the deleted asset.
+       * @todo Find a better fix because this solution will not work if the
+       * user creates an asset with chunk source format which is -
+       * `/path/name.chunk-[hash]-1.ext`.
+       */
+      this.cachedDeps.parsed.forEach((cache, cacheSource) => {
+         if (source.startsWith(cacheSource) && isChunk(cacheSource)) {
+            this.cachedDeps.parsed.delete(cacheSource);
+         }
+      });
+
+      this.cachedDeps.compiled.forEach((cache, cacheSource) => {
+         if (source.startsWith(cacheSource) && isChunk(cacheSource)) {
+            this.cachedDeps.compiled.delete(cacheSource);
+         }
+      });
+   }
+
    public async run() {
       const graph = await getDependencyGraph.call(this);
       const result = await bundle.call(this, graph);
+
+      // Set modified flag to false for all assets except those in node_modules
+      this.assets.forEach(asset => {
+         if (isNodeModule(asset.source)) return;
+         asset.modified = false;
+      });
 
       if (this.iframe) {
          this.iframe.srcdoc = result.html.content;
