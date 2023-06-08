@@ -3,7 +3,7 @@
  */
 
 import path from "path-browserify";
-import { describe, expect, test, beforeEach } from "vitest";
+import { describe, expect, test, beforeAll } from "vitest";
 import { Toypack } from "../Toypack.js";
 
 const toypack = new Toypack({
@@ -20,7 +20,7 @@ const toypack = new Toypack({
    },
 });
 
-beforeEach(() => {
+beforeAll(() => {
    toypack.clearAsset();
    toypack.addOrUpdateAsset("src/main.js");
    toypack.addOrUpdateAsset("assets/image.jpg");
