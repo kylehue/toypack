@@ -21,19 +21,6 @@ import {
    mergeSourceMaps,
 } from "./utils.js";
 
-export type ITraverseFunction<T> = (
-   path: NodePath<Extract<Node, { type: T }>>,
-   node: Node
-) => void;
-
-export type ITraverseOptions = {
-   [Type in Node["type"]]?: ITraverseFunction<Type>;
-};
-
-export type ITraverseOptionGroups = {
-   [Type in Node["type"]]?: ITraverseFunction<Type>[];
-};
-
 function groupTraverseOptions(array: ITraverseOptions[]) {
    const groups: ITraverseOptionGroups = {};
 
@@ -198,10 +185,7 @@ async function transpileAST(
 /**
  * Convert a resource asset to a CommonJS module.
  */
-async function resourceToCJSModule(
-   this: Toypack,
-   source: string
-) {
+async function resourceToCJSModule(this: Toypack, source: string) {
    let exportStr = "";
 
    const mode = this.options.bundleOptions.mode;
@@ -211,7 +195,7 @@ async function resourceToCJSModule(
    } else {
       const asset = this.getAsset(source);
 
-      if (asset && asset.contentURL) {
+      if (asset?.type == "resource" && asset.contentURL) {
          exportStr = asset.contentURL;
       }
    }
@@ -404,10 +388,7 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
          /**
           * If it's a resource, compile first, then add to the bundle.
           */
-         const compiled = await resourceToCJSModule.call(
-            this,
-            dep.source
-         );
+         const compiled = await resourceToCJSModule.call(this, dep.source);
 
          bundleContent.breakLine().append(compiled);
       } else {
@@ -444,13 +425,6 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
 
    return result;
 }
-
-type CSSTreeGeneratedResult =
-   | {
-        css: string;
-        map: SourceMapGenerator;
-     }
-   | string;
 
 async function compileCSS(
    this: Toypack,
@@ -602,11 +576,6 @@ async function bundleStyle(this: Toypack, graph: IDependency[]) {
    return result;
 }
 
-export interface IResource {
-   source: string;
-   content: Blob;
-}
-
 export async function bundle(this: Toypack, graph: IDependency[]) {
    const result = {
       resources: [] as IResource[],
@@ -685,4 +654,30 @@ export async function bundle(this: Toypack, graph: IDependency[]) {
    }
 
    return result;
+}
+
+// Types
+export type ITraverseFunction<T> = (
+   path: NodePath<Extract<Node, { type: T }>>,
+   node: Node
+) => void;
+
+export type ITraverseOptions = {
+   [Type in Node["type"]]?: ITraverseFunction<Type>;
+};
+
+export type ITraverseOptionGroups = {
+   [Type in Node["type"]]?: ITraverseFunction<Type>[];
+};
+
+type CSSTreeGeneratedResult =
+   | {
+        css: string;
+        map: SourceMapGenerator;
+     }
+   | string;
+   
+export interface IResource {
+   source: string;
+   content: Blob;
 }

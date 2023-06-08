@@ -1,10 +1,5 @@
 import { ICompileResult, ILoader, Toypack } from "../Toypack.js";
 
-interface LoaderOptions {
-   foo: number;
-   bar: string;
-}
-
 export default function (options: LoaderOptions): ILoader {
    return function (this: Toypack) {
       this.addExtension("style", ".css");
@@ -23,4 +18,9 @@ export default function (options: LoaderOptions): ILoader {
          },
       };
    };
+}
+
+interface LoaderOptions {
+   foo: number;
+   bar: string;
 }

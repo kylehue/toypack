@@ -26,8 +26,6 @@ const defaultOptions = {
    indentSize: 2,
 };
 
-type ICodeComposerOptions = typeof defaultOptions;
-
 /**
  * A utility class for composing and manipulating code strings.
  * It provides indent-aware functions for precise control
@@ -309,3 +307,5 @@ export class CodeComposer {
       return clone;
    }
 }
+
+type ICodeComposerOptions = typeof defaultOptions;

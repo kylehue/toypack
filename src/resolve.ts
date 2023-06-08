@@ -2,15 +2,6 @@ import path from "path-browserify";
 import { Toypack } from "./Toypack.js";
 import { isLocal, isURL } from "./utils.js";
 
-export interface IResolveOptions {
-   baseDir: string;
-   includeCoreModules: boolean;
-}
-
-interface IResolveOptionsComp extends IResolveOptions {
-   extensions: string[];
-}
-
 /**
  * Searches for the fallback data of a module id in the `fallback` field of the `bundleOptions.resolve` object.
  *
@@ -228,4 +219,14 @@ export function resolve(
    }
 
    return result;
+}
+
+// Types
+export interface IResolveOptions {
+   baseDir: string;
+   includeCoreModules: boolean;
+}
+
+interface IResolveOptionsComp extends IResolveOptions {
+   extensions: string[];
 }

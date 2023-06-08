@@ -1,5 +1,5 @@
 import { Node, TraverseOptions } from "@babel/traverse";
-import { Asset } from "./asset";
+import { IAsset } from "./asset";
 import { ITraverseOptions } from "./bundle";
 
 const eventMap = {
@@ -8,44 +8,6 @@ const eventMap = {
    onAfterResolve: (event: IAfterResolveEvent) => {},
    onTranspile: (event: ITranspileEvent) => {},
 } as const;
-
-export type IEventMap<T extends boolean = false> = T extends false
-   ? typeof eventMap
-   : {
-        [K in keyof typeof eventMap]: (
-           ...args: Parameters<(typeof eventMap)[K]>
-        ) => Promise<void>;
-     };
-
-export type IHooks = {
-   [K in keyof IEventMap]: (callback: IEventMap[K], async: boolean) => Function;
-};
-
-export interface IErrorEvent {
-   code: number;
-   reason: string;
-}
-
-export interface IBeforeResolveEvent {
-   parent: Asset;
-   source: string;
-}
-
-export interface IAfterResolveEvent {
-   parent: Asset;
-   source: { relative: string; absolute: string };
-}
-
-export interface ITranspileEvent {
-   AST: Node;
-   traverse: (traverseOptions: ITraverseOptions) => void;
-   source: string;
-}
-
-interface IListener {
-   async: boolean;
-   callback: IEventMap[keyof IEventMap];
-}
 
 export class Hooks implements IHooks {
    private _listeners = new Map<keyof IEventMap, IListener[]>();
@@ -158,4 +120,42 @@ export class Hooks implements IHooks {
    ): Function {
       return this._createListener("onTranspile", callback, async);
    }
+}
+
+export type IEventMap<T extends boolean = false> = T extends false
+   ? typeof eventMap
+   : {
+        [K in keyof typeof eventMap]: (
+           ...args: Parameters<(typeof eventMap)[K]>
+        ) => Promise<void>;
+     };
+
+export type IHooks = {
+   [K in keyof IEventMap]: (callback: IEventMap[K], async: boolean) => Function;
+};
+
+export interface IErrorEvent {
+   code: number;
+   reason: string;
+}
+
+export interface IBeforeResolveEvent {
+   parent: IAsset;
+   source: string;
+}
+
+export interface IAfterResolveEvent {
+   parent: IAsset;
+   source: { relative: string; absolute: string };
+}
+
+export interface ITranspileEvent {
+   AST: Node;
+   traverse: (traverseOptions: ITraverseOptions) => void;
+   source: string;
+}
+
+interface IListener {
+   async: boolean;
+   callback: IEventMap[keyof IEventMap];
 }

@@ -1,7 +1,7 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import { PartialDeep } from "type-fest";
-import { Asset } from "./asset.js";
+import { IAsset, createAsset } from "./asset.js";
 import { bundle } from "./bundle.js";
 import {
    appExtensions,
@@ -16,72 +16,9 @@ import {
 } from "./graph.js";
 import { Hooks } from "./Hooks.js";
 import JSONLoader from "./loaders/JSONLoader.js";
-import { defaultOptions, IMode, IOptions } from "./options.js";
+import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { isChunk, isNodeModule, mergeDeep } from "./utils.js";
-
-export interface ICompileData {
-   source: string;
-   content: string | Blob;
-   options: IModuleOptions;
-}
-
-export interface ICompileResult {
-   type: "result";
-   content: string;
-   map?: RawSourceMap;
-}
-
-/**
- * Represents a recursive compile object, indicating that further
- * compilation is required.
- */
-export interface ICompileRecursive {
-   type: "recurse";
-   /**
-    * Specifies the usage of different formats for the asset.
-    * The key represents the format, such as 'less', 'scss', 'pug', etc.
-    * The value is an array of `ICompileData` objects representing
-    * the data to be compiled by other loaders.
-    */
-   use: Record<string, ICompileData[]>;
-}
-
-interface ILoaderDataBase {
-   /** The name of the loader. */
-   name: string;
-   /** Regular expression pattern used to match the asset source that the loader should be applied to. */
-   test: RegExp;
-}
-
-interface ILoaderDataAsync extends ILoaderDataBase {
-   async: true;
-   /** Async function that handles the compilation of the matched files. */
-   compile: (data: ICompileData) => Promise<ICompileResult | ICompileRecursive>;
-}
-
-interface ILoaderDataSync extends ILoaderDataBase {
-   async: false;
-   /** Function that handles the compilation of the matched files. */
-   compile: (data: ICompileData) => ICompileResult | ICompileRecursive;
-}
-
-type ILoaderData = ILoaderDataAsync | ILoaderDataSync;
-
-interface ICache {
-   parsed: Map<string, IParseJSResult | IParseCSSResult>;
-   compiled: Map<
-      string,
-      {
-         runtime: string;
-         code: string;
-         map?: RawSourceMap | null;
-      }
-   >;
-}
-
-export type ILoader = (this: Toypack) => ILoaderData;
-export type IPlugin = (this: Toypack) => any;
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -91,7 +28,7 @@ export class Toypack {
       script: [...appExtensions],
    };
    protected loaders: ILoaderData[] = [];
-   protected assets: Map<string, Asset>;
+   protected assets: Map<string, IAsset>;
    protected cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
@@ -184,13 +121,16 @@ export class Toypack {
       let asset = this.assets.get(source);
 
       if (!asset) {
-         asset = new Asset(this, source, content);
+         asset = createAsset(source, content);
          this.assets.set(source, asset);
       } else {
          asset.content = content;
       }
 
-      asset.modified = true;
+      if (asset.type == "text") {
+         asset.modified = true;
+      }
+
       return asset;
    }
 
@@ -220,7 +160,13 @@ export class Toypack {
     */
    public removeAsset(source: string) {
       source = path.join("/", source);
+      const asset = this.assets.get(source);
+      if (!asset) return;
 
+      if (asset.type == "resource" && asset.contentURL) {
+         URL.revokeObjectURL(asset.contentURL);
+      }
+      
       this.assets.delete(source);
       this.cachedDeps.parsed.delete(source);
       this.cachedDeps.compiled.delete(source);
@@ -260,7 +206,7 @@ export class Toypack {
 
       // Set modified flag to false for all assets except those in node_modules
       this.assets.forEach((asset) => {
-         if (isNodeModule(asset.source)) return;
+         if (isNodeModule(asset.source) || asset.type != "text") return;
          asset.modified = false;
       });
 
@@ -273,15 +219,12 @@ export class Toypack {
    }
 }
 
+// Lib exports & types
 export default Toypack;
-
-/* Other exports */
 export * as Babel from "@babel/standalone";
 export * as Utilities from "./utils.js";
-export { Asset };
 export { CodeComposer } from "./CodeComposer.js";
-export type { IOptions };
-export type { RawSourceMap };
+export type { IOptions, RawSourceMap, IAsset };
 export type {
    IChunk,
    IDependency,
@@ -292,3 +235,66 @@ export type {
    IScriptDependency,
    IStyleDependency,
 } from "./graph.js";
+
+export interface ICompileData {
+   source: string;
+   content: string | Blob;
+   options: IModuleOptions;
+}
+
+export interface ICompileResult {
+   type: "result";
+   content: string;
+   map?: RawSourceMap;
+}
+
+/**
+ * Represents a recursive compile object, indicating that further
+ * compilation is required.
+ */
+export interface ICompileRecursive {
+   type: "recurse";
+   /**
+    * Specifies the usage of different formats for the asset.
+    * The key represents the format, such as 'less', 'scss', 'pug', etc.
+    * The value is an array of `ICompileData` objects representing
+    * the data to be compiled by other loaders.
+    */
+   use: Record<string, ICompileData[]>;
+}
+
+interface ILoaderDataBase {
+   /** The name of the loader. */
+   name: string;
+   /** Regular expression pattern used to match the asset source that the loader should be applied to. */
+   test: RegExp;
+}
+
+interface ILoaderDataAsync extends ILoaderDataBase {
+   async: true;
+   /** Async function that handles the compilation of the matched files. */
+   compile: (data: ICompileData) => Promise<ICompileResult | ICompileRecursive>;
+}
+
+interface ILoaderDataSync extends ILoaderDataBase {
+   async: false;
+   /** Function that handles the compilation of the matched files. */
+   compile: (data: ICompileData) => ICompileResult | ICompileRecursive;
+}
+
+type ILoaderData = ILoaderDataAsync | ILoaderDataSync;
+
+interface ICache {
+   parsed: Map<string, IParseJSResult | IParseCSSResult>;
+   compiled: Map<
+      string,
+      {
+         runtime: string;
+         code: string;
+         map?: RawSourceMap | null;
+      }
+   >;
+}
+
+export type ILoader = (this: Toypack) => ILoaderData;
+export type IPlugin = (this: Toypack) => any;

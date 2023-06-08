@@ -1,14 +1,14 @@
 import { CodeComposer } from "./CodeComposer.js";
 import { getHash } from "./utils.js";
 
-export function indentPrefix() {
-   return "  ";
-}
-
 const identifiers = {
    modules: "_modules_",
    require: "_require_",
 } as const;
+
+export function indentPrefix() {
+   return "  ";
+}
 
 export function html(script = "", style = "", asExternalURL = false) {
    return CodeComposer.revampIndent(

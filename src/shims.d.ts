@@ -1,12 +1,3 @@
-declare module "merge-source-map" {
-   import { RawSourceMap } from "source-map-js";
-
-   export default function (
-      oldMap: RawSourceMap,
-      newMap: RawSourceMap
-   ): RawSourceMap;
-}
-
 declare module "babel-minify" {
    import { RawSourceMap } from "source-map-js";
 
@@ -24,6 +15,3 @@ declare module "babel-minify" {
       overrides?: Overrides
    ): { code: string; map: RawSourceMap };
 }
-
-declare module "postcss-safe-parser";
-declare module "postcss-syntax";

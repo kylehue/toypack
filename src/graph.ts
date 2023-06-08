@@ -3,7 +3,7 @@ import traverseAST, { Node } from "@babel/traverse";
 import * as CSSTree from "css-tree";
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import { Asset } from "./asset.js";
+import { IAsset } from "./asset.js";
 import {
    assetStrictlyHTMLorJSError,
    entryPointNotFoundError,
@@ -13,86 +13,6 @@ import {
 } from "./errors.js";
 import { ICompileData, Toypack } from "./Toypack.js";
 import { getHash, isCSS, isJS, parseURLQuery } from "./utils.js";
-
-export interface IChunk {
-   source: string;
-   content: string | Blob;
-}
-
-export interface IModuleOptions {
-   /** When enabled, module will be loaded as a literal string. */
-   raw?: boolean;
-   [key: string]: any;
-}
-
-interface ISimpleDependency {
-   source: string;
-   content: string;
-   dependencyMap: IDependencyMap;
-}
-
-export interface IScriptDependency extends ISimpleDependency {
-   type: "script";
-   AST?: Node;
-   chunks?: {
-      type: "script";
-      AST: Node;
-      source: string;
-      content: string;
-      map?: RawSourceMap;
-   }[];
-}
-
-export interface IStyleDependency extends ISimpleDependency {
-   type: "style";
-   AST?: CSSTree.CssNode;
-   chunks?: {
-      type: "style";
-      AST: CSSTree.CssNode;
-      source: string;
-      content: string;
-      map?: RawSourceMap;
-   }[];
-}
-
-export interface IResourceDependency {
-   type: "resource";
-   source: string;
-   content: Blob;
-}
-
-export type IDependency =
-   | IScriptDependency
-   | IStyleDependency
-   | IResourceDependency;
-
-export interface IDependencyMapSource {
-   relative: string;
-   absolute: string;
-}
-
-export type IDependencyMap = Record<string, IDependencyMapSource>;
-
-export type IScanCallback = (dep: {
-   mapSource: IDependencyMapSource;
-   asset: Asset;
-   AST: Node | CSSTree.CssNode;
-   params: IModuleOptions;
-}) => Promise<void>;
-
-const dummyNodeAST = getASTFromJS("");
-
-export interface IParseJSResult {
-   type: "script";
-   dependencies: string[];
-   AST: Node;
-}
-
-export interface IParseCSSResult {
-   type: "style";
-   dependencies: string[];
-   AST: CSSTree.CssNode;
-}
 
 /**
  * Get dependencies and AST of a script module.
@@ -254,7 +174,10 @@ function parseCSSModule(
                } else {
                   const resolvedAsset = this.getAsset(resolved);
 
-                  if (resolvedAsset && resolvedAsset.contentURL) {
+                  if (
+                     resolvedAsset?.type == "resource" &&
+                     resolvedAsset.contentURL
+                  ) {
                      node.value = resolvedAsset.contentURL;
                   }
                }
@@ -554,4 +477,85 @@ export async function getDependencyGraph(this: Toypack) {
    result = graph;
 
    return result;
+}
+
+// Types
+export interface IChunk {
+   source: string;
+   content: string | Blob;
+}
+
+export interface IModuleOptions {
+   /** When enabled, module will be loaded as a literal string. */
+   raw?: boolean;
+   [key: string]: any;
+}
+
+interface ISimpleDependency {
+   source: string;
+   content: string;
+   dependencyMap: IDependencyMap;
+}
+
+export interface IScriptDependency extends ISimpleDependency {
+   type: "script";
+   AST?: Node;
+   chunks?: {
+      type: "script";
+      AST: Node;
+      source: string;
+      content: string;
+      map?: RawSourceMap;
+   }[];
+}
+
+export interface IStyleDependency extends ISimpleDependency {
+   type: "style";
+   AST?: CSSTree.CssNode;
+   chunks?: {
+      type: "style";
+      AST: CSSTree.CssNode;
+      source: string;
+      content: string;
+      map?: RawSourceMap;
+   }[];
+}
+
+export interface IResourceDependency {
+   type: "resource";
+   source: string;
+   content: Blob;
+}
+
+export type IDependency =
+   | IScriptDependency
+   | IStyleDependency
+   | IResourceDependency;
+
+export interface IDependencyMapSource {
+   relative: string;
+   absolute: string;
+}
+
+export type IDependencyMap = Record<string, IDependencyMapSource>;
+
+export type IScanCallback = (dep: {
+   mapSource: IDependencyMapSource;
+   asset: IAsset;
+   AST: Node | CSSTree.CssNode;
+   params: IModuleOptions;
+}) => Promise<void>;
+
+const dummyNodeAST = getASTFromJS("");
+
+export interface IParseJSResult {
+   type: "script";
+   dependencies: string[];
+   AST: Node;
+}
+
+export interface IParseCSSResult {
+   type: "style";
+   dependencies: string[];
+   AST: CSSTree.CssNode;
 }

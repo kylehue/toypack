@@ -1,24 +1,6 @@
 import { ParserOptions, TransformOptions } from "@babel/core";
 
-export type IModule = "esm" | "cjs";
-export type IMode = "production" | "development";
-export type ILogLevel = "error" | "warn" | "info" | "none";
-export type IBabelTransformOptions = Pick<
-   TransformOptions,
-   | "plugins"
-   | "presets"
-   | "targets"
-   | "assumptions"
-   | "highlightCode"
-   | "shouldPrintComment"
->;
-export type IBabelParseOptions = Omit<
-   ParserOptions,
-   "sourceType" | "sourceFilename" | "strictMode"
->;
-export type ISourceMap = boolean | "nosources";
-
-const defaultOptions = {
+export const defaultOptions = {
    /**
     * Configuration for the bundler.
     */
@@ -81,6 +63,23 @@ const defaultOptions = {
    logLevel: "error" as ILogLevel,
 };
 
-type IOptions = typeof defaultOptions;
+export type IOptions = typeof defaultOptions;
+export type IModule = "esm" | "cjs";
+export type IMode = "production" | "development";
+export type ILogLevel = "error" | "warn" | "info" | "none";
+export type IBabelTransformOptions = Pick<
+   TransformOptions,
+   | "plugins"
+   | "presets"
+   | "targets"
+   | "assumptions"
+   | "highlightCode"
+   | "shouldPrintComment"
+>;
 
-export { defaultOptions, IOptions };
+export type IBabelParseOptions = Omit<
+   ParserOptions,
+   "sourceType" | "sourceFilename" | "strictMode"
+>;
+
+export type ISourceMap = boolean | "nosources";

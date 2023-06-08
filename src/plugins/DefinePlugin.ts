@@ -1,7 +1,5 @@
 import { Toypack } from "../Toypack.js";
 
-type IDefinePluginOptions = Record<string, string>;
-
 export default function (options: IDefinePluginOptions = {}) {
    return function (this: Toypack) {
       this.hooks.onTranspile((event) => {
@@ -27,3 +25,5 @@ export default function (options: IDefinePluginOptions = {}) {
       };
    };
 }
+
+type IDefinePluginOptions = Record<string, string>;
