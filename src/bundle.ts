@@ -478,7 +478,7 @@ async function compileCSS(
    }
 
    if (result.map && inputSourceMap) {
-      result.map = mergeSourceMaps(result.map, inputSourceMap);
+      result.map = mergeSourceMaps(inputSourceMap, result.map);
    }
 
    return result;
