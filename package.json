@@ -68,9 +68,6 @@
       "./build",
       "./browser"
    ],
-   "browser": {
-      "path": "path-browserify"
-   },
    "keywords": [
       "sandbox",
       "bundler",
