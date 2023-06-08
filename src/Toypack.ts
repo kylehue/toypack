@@ -150,7 +150,7 @@ export class Toypack {
       this.iframe = null;
    }
 
-   public addOrUpdateAsset(source: string, content: string | Blob) {
+   public addOrUpdateAsset(source: string, content: string | Blob = "") {
       source = path.join("/", source);
       let asset = this.assets.get(source);
 
@@ -160,7 +160,7 @@ export class Toypack {
       } else {
          asset.content = content;
       }
-      
+
       asset.modified = true;
       return asset;
    }
@@ -168,6 +168,16 @@ export class Toypack {
    public getAsset(source: string) {
       source = path.join("/", source);
       return this.assets.get(source) || null;
+   }
+
+   public clearAsset() {
+      this.assets.clear();
+      this.clearCache();
+   }
+
+   public clearCache() {
+      this.cachedDeps.compiled.clear();
+      this.cachedDeps.parsed.clear();
    }
 
    public removeAsset(source: string) {
@@ -201,7 +211,7 @@ export class Toypack {
       const result = await bundle.call(this, graph);
 
       // Set modified flag to false for all assets except those in node_modules
-      this.assets.forEach(asset => {
+      this.assets.forEach((asset) => {
          if (isNodeModule(asset.source)) return;
          asset.modified = false;
       });
