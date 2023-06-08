@@ -15,6 +15,7 @@ const toypack = new Toypack({
             react: "reactlib",
             "react-dom": "reactlib-dom",
             "react/css": "/node_modules/reactlib/test/hello.css",
+            "../local": "/assets/image.jpg",
          },
       },
    },
@@ -22,6 +23,7 @@ const toypack = new Toypack({
 
 beforeAll(() => {
    toypack.clearAsset();
+   toypack.addOrUpdateAsset("local/index.js");
    toypack.addOrUpdateAsset("src/main.js");
    toypack.addOrUpdateAsset("assets/image.jpg");
    toypack.addOrUpdateAsset("someFile.js");
@@ -109,6 +111,11 @@ describe("Resolve", () => {
       expect(res7).toBe(
          path.normalize("/node_modules/reactlib/test/hello.css")
       );
+
+      let res8 = toypack.resolve("../local", {
+         baseDir: path.dirname("/src/main.js")
+      });
+      expect(res8).toBe("/assets/image.jpg");
    });
 
    test("Core modules", () => {
