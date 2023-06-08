@@ -73,35 +73,35 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
  * Transpile a Babel AST.
  */
 function transpileAST(
-   bundler: Toypack,
+   this: Toypack,
    source: string,
    AST: Node,
    depMap: IDependencyMap,
    inputSourceMap?: RawSourceMap
 ) {
-   const format = bundler.options.bundleOptions.module;
-   const mode = bundler.options.bundleOptions.mode;
+   const format = this.options.bundleOptions.module;
+   const mode = this.options.bundleOptions.mode;
 
-   function getSafeName(relativeSource: string) {
+   const getSafeName = (relativeSource: string) => {
       const absoluteSource = depMap[relativeSource].absolute;
       return getUniqueIdFromString(absoluteSource);
    }
 
    const traverseOptionsArray: ITraverseOptions[] = [];
 
-   function modifyTraverseOptions(traverseOptions: ITraverseOptions) {
+   const modifyTraverseOptions = (traverseOptions: ITraverseOptions) => {
       traverseOptionsArray.push(traverseOptions);
    }
 
-   bundler.hooks.trigger("onTranspile", {
+   this.hooks.trigger("onTranspile", {
       AST,
       traverse: modifyTraverseOptions,
       source,
    });
 
-   function isStyleSource(relativeSource: string) {
+   const isStyleSource = (relativeSource: string) => {
       const absoluteSource = depMap[relativeSource].absolute;
-      if (bundler.extensions.style.includes(path.extname(absoluteSource))) {
+      if (this.extensions.style.includes(path.extname(absoluteSource))) {
          return true;
       }
 
@@ -163,7 +163,7 @@ function transpileAST(
 
    traverseAST(AST, traverseOptions);
 
-   const userBabelOptions = bundler.options.babelOptions.transform;
+   const userBabelOptions = this.options.babelOptions.transform;
 
    const importantBabelOptions = {
       sourceType: format == "esm" ? "module" : "script",
@@ -174,7 +174,7 @@ function transpileAST(
       plugins: userBabelOptions.plugins,
       sourceFileName: source,
       filename: source,
-      sourceMaps: !!bundler.options.bundleOptions.sourceMap,
+      sourceMaps: !!this.options.bundleOptions.sourceMap,
       envName: mode,
       minified: false,
       comments: mode == "development",
@@ -199,18 +199,18 @@ function transpileAST(
  * Convert a resource asset to a CommonJS module.
  */
 async function resourceToCJSModule(
-   bundler: Toypack,
+   this: Toypack,
    source: string,
    content: Blob
 ) {
    let exportStr = "";
 
-   const mode = bundler.options.bundleOptions.mode;
+   const mode = this.options.bundleOptions.mode;
 
    if (mode == "production") {
       exportStr = "./" + getUniqueIdFromString(source) + path.extname(source);
    } else {
-      const asset = bundler.getAsset(source);
+      const asset = this.getAsset(source);
 
       if (asset && asset.contentURL) {
          exportStr = asset.contentURL;
@@ -226,7 +226,7 @@ async function resourceToCJSModule(
  * Merge a source map to the bundle.
  */
 function mergeMapToBundle(
-   bundler: Toypack,
+   this: Toypack,
    targetMap: SourceMapGenerator,
    sourceMap: RawSourceMap,
    source: string,
@@ -239,8 +239,8 @@ function mergeMapToBundle(
 
    if (position.line == -1) {
       if (
-         bundler.options.logLevel == "error" ||
-         bundler.options.logLevel == "warn"
+         this.options.logLevel == "error" ||
+         this.options.logLevel == "warn"
       ) {
          console.warn(
             `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
@@ -248,7 +248,7 @@ function mergeMapToBundle(
       }
    }
 
-   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   const sourceMapOption = this.options.bundleOptions.sourceMap;
    if (sourceMapOption != "nosources") {
       targetMap.setSourceContent(source, originalContent);
    }
@@ -275,11 +275,11 @@ function mergeMapToBundle(
 /**
  * Get the script bundle from graph.
  */
-async function bundleScript(bundler: Toypack, graph: IDependency[]) {
+async function bundleScript(this: Toypack, graph: IDependency[]) {
    const bundleContent = new CodeComposer(undefined, {
       indentSize: 4,
    });
-   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   const sourceMapOption = this.options.bundleOptions.sourceMap;
    const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
    /**
@@ -291,8 +291,8 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
       depMap: IDependencyMap,
       inputSourceMap?: RawSourceMap
    ) => {
-      const { code, map } = transpileAST(
-         bundler,
+      const { code, map } = transpileAST.call(
+         this,
          source,
          AST,
          depMap,
@@ -305,7 +305,7 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
          source === graph[0].source
       );
 
-      bundleContent.append(wrappedModule).breakLine();
+      bundleContent.breakLine().append(wrappedModule);
 
       return { map, code };
    };
@@ -349,8 +349,8 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
                // Source map
                if (bundleSourceMap && map) {
-                  mergeMapToBundle(
-                     bundler,
+                  mergeMapToBundle.call(
+                     this,
                      bundleSourceMap,
                      map,
                      dep.source,
@@ -374,8 +374,8 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
 
          // Source map
          if (bundleSourceMap && map) {
-            mergeMapToBundle(
-               bundler,
+            mergeMapToBundle.call(
+               this,
                bundleSourceMap,
                map,
                dep.source,
@@ -388,13 +388,13 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
          /**
           * If it's a resource, compile first, then add to the bundle.
           */
-         const compiled = await resourceToCJSModule(
-            bundler,
+         const compiled = await resourceToCJSModule.call(
+            this,
             dep.source,
             dep.content
          );
 
-         bundleContent.append(compiled).breakLine();
+         bundleContent.breakLine().append(compiled);
       } else {
          throw new Error(`Failed to compile '${dep.source}'.`);
       }
@@ -411,7 +411,7 @@ async function bundleScript(bundler: Toypack, graph: IDependency[]) {
    };
 
    const shouldMinify =
-      bundler.options.bundleOptions.mode == "production";
+      this.options.bundleOptions.mode == "production";
 
    if (shouldMinify) {
       const { code, map } = babelMinify(
@@ -439,11 +439,11 @@ type CSSTreeGeneratedResult =
    | string;
 
 function compileCSS(
-   bundler: Toypack,
+   this: Toypack,
    AST: CSSTree.CssNode,
    inputSourceMap?: RawSourceMap
 ) {
-   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   const sourceMapOption = this.options.bundleOptions.sourceMap;
 
    const compiled = CSSTree.generate(AST, {
       sourceMap: !!sourceMapOption,
@@ -470,11 +470,11 @@ function compileCSS(
    return result;
 }
 
-async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
+async function bundleStyle(this: Toypack, graph: IDependency[]) {
    const bundleContent = new CodeComposer(undefined, {
       indentSize: 4,
    });
-   const sourceMapOption = bundler.options.bundleOptions.sourceMap;
+   const sourceMapOption = this.options.bundleOptions.sourceMap;
    const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
    const addPostCSSASTToBundle = (
@@ -482,7 +482,7 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
       AST: CSSTree.CssNode,
       inputSourceMap?: RawSourceMap
    ) => {
-      const { code, map } = compileCSS(bundler, AST, inputSourceMap);
+      const { code, map } = compileCSS.call(this, AST, inputSourceMap);
 
       bundleContent.append(`/* ${source.replace(/^\//, "")} */`);
       bundleContent.append(code).breakLine();
@@ -519,8 +519,8 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
                      map.sourcesContent = [dep.content];
                   }
 
-                  mergeMapToBundle(
-                     bundler,
+                  mergeMapToBundle.call(
+                     this,
                      bundleSourceMap,
                      map,
                      dep.source,
@@ -546,8 +546,8 @@ async function bundleStyle(bundler: Toypack, graph: IDependency[]) {
                map.sourcesContent = [dep.content];
             }
 
-            mergeMapToBundle(
-               bundler,
+            mergeMapToBundle.call(
+               this,
                bundleSourceMap,
                map,
                dep.source,
@@ -581,7 +581,7 @@ export interface IResource {
    content: Blob;
 }
 
-export async function bundle(bundler: Toypack, graph: IDependency[]) {
+export async function bundle(this: Toypack, graph: IDependency[]) {
    const result = {
       resources: [] as IResource[],
       script: {
@@ -598,9 +598,9 @@ export async function bundle(bundler: Toypack, graph: IDependency[]) {
       },
    };
 
-   const mode = bundler.options.bundleOptions.mode;
-   const style = await bundleStyle(bundler, graph);
-   const script = await bundleScript(bundler, graph);
+   const mode = this.options.bundleOptions.mode;
+   const style = await bundleStyle.call(this, graph);
+   const script = await bundleScript.call(this, graph);
 
    result.script.content = script.code;
    result.style.content = style.code;

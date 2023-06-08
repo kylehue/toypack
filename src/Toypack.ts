@@ -8,7 +8,7 @@ import {
    resourceExtensions,
    styleExtensions,
 } from "./extensions.js";
-import { getDependencyGraph, IModuleOptions } from "./graph.js";
+import { getDependencyGraph, IChunk, IModuleOptions } from "./graph.js";
 import { Hooks } from "./Hooks.js";
 import { JSONLoader } from "./loaders/JSONLoader.js";
 import { SassLoader } from "./loaders/SassLoader.js";
@@ -46,15 +46,16 @@ export interface IPlugin {
 }
 
 export class Toypack {
-   public options: IOptions;
-   public assets: Map<string, Asset>;
-   public loaders: ILoader[] = [];
    private iframe: HTMLIFrameElement | null = null;
-   public extensions = {
+   protected assets: Map<string, Asset>;
+   protected loaders: ILoader[] = [];
+   protected cache = new Map<string, IChunk>();
+   protected extensions = {
       resource: [...resourceExtensions],
       style: [...styleExtensions],
       script: [...appExtensions],
    };
+   public options: IOptions;
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
       this.options = mergeDeep(
@@ -108,8 +109,8 @@ export class Toypack {
    public async getProductionOutput() {}
 
    public async run() {
-      const graph = getDependencyGraph(this);
-      const result = await bundle(this, graph);
+      const graph = getDependencyGraph.call(this);
+      const result = await bundle.call(this, graph);
 
       if (this.iframe) {
          this.iframe.srcdoc = result.html.content;

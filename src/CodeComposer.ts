@@ -243,6 +243,8 @@ export class CodeComposer {
 
    public breakLine(amount = 1) {
       this.lines.push("\n".repeat(amount - 1));
+
+      return this;
    }
 
    /**
