@@ -15,6 +15,10 @@ export function isNodeModule(source: string) {
    return /^\/?node_modules/.test(source);
 }
 
+export function isChunk(source: string) {
+   return new RegExp(".chunk-[a-zA-Z0-9]+-[0-9].[a-zA-Z]+$").test(source);
+}
+
 const URL_RE = /https?:\/\/((?:[\w\d-]+\.)+[\w\d]{2,})/i;
 const DATA_URL_RE = /^(data:)([\w\/\+-]*)(;charset=[\w-]+|;base64){0,1},(.*)/gi;
 export function isURL(str: string) {
@@ -188,7 +192,7 @@ export function JSONToBlob(json: string) {
 /**
  * Merge old source map and new source map and return merged.
  * If old or new source map value is falsy, return another one as it is.
- * 
+ *
  * https://github.com/keik/merge-source-map
  */
 export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {

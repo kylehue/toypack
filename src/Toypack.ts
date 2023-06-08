@@ -18,7 +18,7 @@ import { Hooks } from "./Hooks.js";
 import JSONLoader from "./loaders/JSONLoader.js";
 import { defaultOptions, IMode, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
-import { isNodeModule, mergeDeep } from "./utils.js";
+import { isChunk, isNodeModule, mergeDeep } from "./utils.js";
 
 export interface ICompileData {
    source: string;
@@ -83,9 +83,6 @@ interface ICache {
 export type ILoader = (this: Toypack) => ILoaderData;
 export type IPlugin = (this: Toypack) => any;
 
-const isChunk = (source: string) =>
-   new RegExp(".chunk-[a-zA-Z0-9]+-[0-9].[a-zA-Z]+$").test(source);
-
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
    private extensions = {
@@ -123,7 +120,9 @@ export class Toypack {
    }
 
    protected addExtension(type: keyof typeof this.extensions, ext: string) {
-      this.getExtensions(type).push(ext);
+      if (!this.hasExtension(type, "h" + ext)) {
+         this.getExtensions(type).push(ext);
+      }
    }
 
    protected hasExtension(type: keyof typeof this.extensions, source: string) {
@@ -131,26 +130,55 @@ export class Toypack {
       return this.getExtensions(type).includes(extension);
    }
 
+   /**
+    * Adds a loader to the list of loaders.
+    * @param {ILoader} loader The loader to add.
+    */
    public useLoader(loader: ILoader) {
       this.loaders.push(loader.call(this));
    }
 
+   /**
+    * Adds a plugin to Toypack.
+    * @param {IPlugin} plugin The plugin to add.
+    * @returns {ReturnType<IPlugin>}
+    */
    public usePlugin<T extends IPlugin>(plugin: T): ReturnType<T> {
       return plugin.call(this);
    }
 
+   /**
+    * Resolves a relative source path.
+    * @param {string} relativeSource The relative source path to resolve.
+    * @param {Partial<IResolveOptions>} [options] Optional resolve options.
+    * @returns {string} The resolved absolute path.
+    */
    public resolve(relativeSource: string, options?: Partial<IResolveOptions>) {
       return resolve.call(this, relativeSource, options);
    }
 
+   /**
+    * Sets the HTML iframe element to be used for displaying the
+    * result in development mode.
+    * @param {HTMLIFrameElement} iframe The HTML iframe element.
+    */
    public setIFrame(iframe: HTMLIFrameElement) {
       this.iframe = iframe;
    }
 
+   /**
+    * Unsets the HTML iframe element.
+    */
    public unsetIFrame() {
       this.iframe = null;
    }
 
+   /**
+    * Adds or updates an asset with the given source and content.
+    * @param {string} source The source file path of the asset.
+    * @param {string | Blob} [content=""] The content of the asset.
+    * @returns {Asset} The created or updated Asset object.
+    */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
       source = path.join("/", source);
       let asset = this.assets.get(source);
@@ -166,6 +194,11 @@ export class Toypack {
       return asset;
    }
 
+   /**
+    * Retrieves the Asset object associated with the given source.
+    * @param {string} source The source file path of the asset.
+    * @returns {Asset | null} The Asset object if found, otherwise null.
+    */
    public getAsset(source: string) {
       source = path.join("/", source);
       return this.assets.get(source) || null;
@@ -181,6 +214,10 @@ export class Toypack {
       this.cachedDeps.parsed.clear();
    }
 
+   /**
+    * Removes the asset with the given source.
+    * @param {string} source The source file path of the asset to remove.
+    */
    public removeAsset(source: string) {
       source = path.join("/", source);
 
@@ -207,6 +244,13 @@ export class Toypack {
       });
    }
 
+   /**
+    * Runs the compilation process.
+    * @param {boolean} [isProd=false] Indicates whether to run in
+    * production mode.
+    * @returns {Promise} A promise that resolves with the result
+    * of the bundling process.
+    */
    public async run(isProd = false) {
       const oldMode = this.options.bundleOptions.mode;
       this.options.bundleOptions.mode = isProd ? "production" : "development";
