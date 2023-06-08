@@ -9,10 +9,16 @@ const eventMap = {
    onTranspile: (event: ITranspileEvent) => {},
 } as const;
 
-export type IEventMap = typeof eventMap;
+export type IEventMap<T extends boolean = false> = T extends false
+   ? typeof eventMap
+   : {
+        [K in keyof typeof eventMap]: (
+           ...args: Parameters<(typeof eventMap)[K]>
+        ) => Promise<void>;
+     };
 
 export type IHooks = {
-   [K in keyof IEventMap]: (callback: IEventMap[K]) => Function;
+   [K in keyof IEventMap]: (callback: IEventMap[K], async: boolean) => Function;
 };
 
 export interface IErrorEvent {
@@ -36,14 +42,38 @@ export interface ITranspileEvent {
    source: string;
 }
 
-export class Hooks implements IHooks {
-   private _listeners = new Map<
-      keyof IEventMap,
-      IEventMap[keyof IEventMap][]
-   >();
+interface IListener {
+   async: boolean;
+   callback: IEventMap[keyof IEventMap];
+}
 
-   private _getListeners<K extends keyof IEventMap>(key: K): IEventMap[K][] {
-      return this._listeners.get(key) as IEventMap[K][];
+export class Hooks implements IHooks {
+   private _listeners = new Map<keyof IEventMap, IListener[]>();
+
+   private _getListeners<K extends keyof IEventMap>(key: K): IListener[] {
+      return this._listeners.get(key) as IListener[];
+   }
+
+   private _createListener<T extends keyof IEventMap>(
+      key: T,
+      callback: IEventMap[T],
+      async = false
+   ) {
+      const group = this._getListeners(key);
+      group.push({
+         async,
+         callback,
+      });
+
+      return () => {
+         for (let i = 0; i < group.length; i++) {
+            const cb = group[i];
+            if (cb.callback === callback) {
+               group.splice(i, 1);
+               break;
+            }
+         }
+      };
    }
 
    constructor() {
@@ -59,97 +89,73 @@ export class Hooks implements IHooks {
     * @param eventName - The name of the event to trigger.
     * @param args - The arguments to pass to the event listeners.
     */
-   trigger<K extends keyof IEventMap>(
+   async trigger<K extends keyof IEventMap>(
       eventName: K,
       ...args: Parameters<IEventMap[K]>
    ) {
       const group = this._getListeners(eventName);
       for (const evt of group) {
-         (evt as any)(...args);
+         if (evt.async) {
+            await (evt.callback as any)(...args);
+         } else {
+            (evt.callback as any)(...args);
+         }
       }
    }
 
    /**
     * An event emitted when an error occurs.
     *
-    * @param callback - The function to emit.
+    * @param callback The function to emit.
+    * @param async Set to true to make the callback asynchronous.
     * @returns {Function} A dispose function.
     */
-   onError(callback: IEventMap["onError"]): Function {
-      const group = this._getListeners("onError");
-      group.push(callback);
-
-      return () => {
-         for (let i = 0; i < group.length; i++) {
-            const cb = group[i];
-            if (cb === callback) {
-               group.splice(i, 1);
-               break;
-            }
-         }
-      };
+   onError<T extends boolean>(
+      callback: IEventMap<T>["onError"],
+      async?: T
+   ): Function {
+      return this._createListener("onError", callback, async);
    }
 
    /**
     * An event emitted when a module is being resolved.
     *
     * @param callback - The function to emit.
+    * @param async Set to true to make the callback asynchronous.
     * @returns {Function} A dispose function.
     */
-   onBeforeResolve(callback: IEventMap["onBeforeResolve"]): Function {
-      const group = this._getListeners("onBeforeResolve");
-      group.push(callback);
-
-      return () => {
-         for (let i = 0; i < group.length; i++) {
-            const cb = group[i];
-            if (cb === callback) {
-               group.splice(i, 1);
-               break;
-            }
-         }
-      };
+   onBeforeResolve<T extends boolean>(
+      callback: IEventMap<T>["onBeforeResolve"],
+      async?: T
+   ): Function {
+      return this._createListener("onBeforeResolve", callback, async);
    }
 
    /**
     * An event emitted when a module is resolved.
     *
     * @param callback - The function to emit.
+    * @param async Set to true to make the callback asynchronous.
     * @returns {Function} A dispose function.
     */
-   onAfterResolve(callback: IEventMap["onAfterResolve"]): Function {
-      const group = this._getListeners("onAfterResolve");
-      group.push(callback);
-
-      return () => {
-         for (let i = 0; i < group.length; i++) {
-            const cb = group[i];
-            if (cb === callback) {
-               group.splice(i, 1);
-               break;
-            }
-         }
-      };
+   onAfterResolve<T extends boolean>(
+      callback: IEventMap<T>["onAfterResolve"],
+      async?: T
+   ): Function {
+      return this._createListener("onAfterResolve", callback, async);
    }
 
    /**
     * An event emitted when a module is being transpiled.
     *
     * @param callback - The function to emit.
+    * @param async Set to true to make the callback asynchronous.
     * @returns {Function} A dispose function.
     */
-   onTranspile(callback: IEventMap["onTranspile"]): Function {
-      const group = this._getListeners("onTranspile");
-      group.push(callback);
-
-      return () => {
-         for (let i = 0; i < group.length; i++) {
-            const cb = group[i];
-            if (cb === callback) {
-               group.splice(i, 1);
-               break;
-            }
-         }
-      };
+   onTranspile<T extends boolean>(
+      callback: IEventMap<T>["onTranspile"],
+      async?: T
+   ): Function {
+      return this._createListener("onTranspile", callback, async);
    }
 }

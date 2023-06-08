@@ -1,24 +1,29 @@
-import { IPlugin, Toypack } from "../Toypack.js";
+import { Toypack } from "../Toypack.js";
 
-export class DefinePlugin implements IPlugin {
-   public name = "DefinePlugin";
+type IDefinePluginOptions = Record<string, string>;
 
-   constructor(public options: Record<string, string> = {}) {
-
-   }
-
-   apply(bundler: Toypack) {
-      bundler.hooks.onTranspile((event) => {
-         const replacementKeys = Object.keys(this.options);
+export default function (options: IDefinePluginOptions = {}) {
+   return function (this: Toypack) {
+      this.hooks.onTranspile((event) => {
+         const replacementKeys = Object.keys(options);
          if (!replacementKeys.length) return;
 
          event.traverse({
             Identifier: ({ node }) => {
                if (replacementKeys.includes(node.name)) {
-                  node.name = this.options[node.name].toString();
+                  node.name = options[node.name].toString();
                }
             }
          });
       });
-   }
+
+      return {
+         remove: (key: string) => {
+            delete options[key];
+         },
+         add: (find: string, replacement: string) => {
+            options[find] = replacement;
+         }
+      };
+   };
 }

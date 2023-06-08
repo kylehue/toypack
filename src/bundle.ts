@@ -72,7 +72,7 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
 /**
  * Transpile a Babel AST.
  */
-function transpileAST(
+async function transpileAST(
    this: Toypack,
    source: string,
    AST: Node,
@@ -93,7 +93,7 @@ function transpileAST(
       traverseOptionsArray.push(traverseOptions);
    }
 
-   this.hooks.trigger("onTranspile", {
+   await this.hooks.trigger("onTranspile", {
       AST,
       traverse: modifyTraverseOptions,
       source,
@@ -101,7 +101,7 @@ function transpileAST(
 
    const isStyleSource = (relativeSource: string) => {
       const absoluteSource = depMap[relativeSource].absolute;
-      if (this.extensions.style.includes(path.extname(absoluteSource))) {
+      if (this.hasExtension("style", absoluteSource)) {
          return true;
       }
 
@@ -285,13 +285,13 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
    /**
     * Add a Babel AST to the bundle.
     */
-   const addBabelASTToBundle = (
+   const addBabelASTToBundle = async (
       source: string,
       AST: Node,
       depMap: IDependencyMap,
       inputSourceMap?: RawSourceMap
    ) => {
-      const { code, map } = transpileAST.call(
+      const { code, map } = await transpileAST.call(
          this,
          source,
          AST,
@@ -340,7 +340,7 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
          for (const chunk of dep.chunks) {
             // Extract script chunks from the dependency
             if (chunk.type == "script") {
-               const { map, code } = addBabelASTToBundle(
+               const { map, code } = await addBabelASTToBundle(
                   chunk.source,
                   chunk.AST,
                   dep.dependencyMap,
@@ -366,7 +366,7 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
           * If it's a script dependency that has an AST and no
           * chunks, add the dependency itself to the bundle.
           */
-         const { map, code } = addBabelASTToBundle(
+         const { map, code } = await addBabelASTToBundle(
             dep.source,
             dep.AST,
             dep.dependencyMap
@@ -438,7 +438,7 @@ type CSSTreeGeneratedResult =
      }
    | string;
 
-function compileCSS(
+async function compileCSS(
    this: Toypack,
    AST: CSSTree.CssNode,
    inputSourceMap?: RawSourceMap
@@ -477,12 +477,12 @@ async function bundleStyle(this: Toypack, graph: IDependency[]) {
    const sourceMapOption = this.options.bundleOptions.sourceMap;
    const bundleSourceMap = sourceMapOption ? new SourceMapGenerator() : null;
 
-   const addPostCSSASTToBundle = (
+   const addPostCSSASTToBundle = async (
       source: string,
       AST: CSSTree.CssNode,
       inputSourceMap?: RawSourceMap
    ) => {
-      const { code, map } = compileCSS.call(this, AST, inputSourceMap);
+      const { code, map } = await compileCSS.call(this, AST, inputSourceMap);
 
       bundleContent.append(`/* ${source.replace(/^\//, "")} */`);
       bundleContent.append(code).breakLine();
@@ -508,7 +508,7 @@ async function bundleStyle(this: Toypack, graph: IDependency[]) {
          for (const chunk of dep.chunks) {
             // Extract style chunks from the dependency
             if (chunk.type == "style") {
-               const { code, map } = addPostCSSASTToBundle(
+               const { code, map } = await addPostCSSASTToBundle(
                   chunk.source,
                   chunk.AST,
                   chunk.map
@@ -536,7 +536,7 @@ async function bundleStyle(this: Toypack, graph: IDependency[]) {
           * If it's a style dependency that has an AST and no
           * chunks, add the dependency itself to the bundle.
           */
-         const { code, map } = addPostCSSASTToBundle(
+         const { code, map } = await addPostCSSASTToBundle(
             dep.source,
             dep.AST
          );

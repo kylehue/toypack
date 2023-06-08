@@ -1,25 +1,26 @@
-import {
-   ICompileData,
-   ICompileRecursive,
-   ICompileResult,
-   ILoader,
-   Toypack,
-} from "../Toypack.js";
+import { ICompileResult, ILoader, Toypack } from "../Toypack.js";
 
-export class TemplateLoader implements ILoader {
-   public name = "TemplateLoader";
-   public test: RegExp = /\.css$/;
+interface LoaderOptions {
+   foo: number;
+   bar: string;
+}
 
-   constructor(public bundler: Toypack) {
-      bundler.extensions.script.push(".ext");
-   }
+export default function (options: LoaderOptions): ILoader {
+   return function (this: Toypack) {
+      this.addExtension("style", ".css");
 
-   compile(data: ICompileData) {
-      const result: ICompileResult = {
-         type: "result",
-         content: "",
+      return {
+         name: "TemplateLoader",
+         test: /\.css$/,
+         async: false,
+         compile: (data) => {
+            const result: ICompileResult = {
+               type: "result",
+               content: "",
+            };
+
+            return result;
+         },
       };
-
-      return result;
-   }
+   };
 }

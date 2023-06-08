@@ -32,6 +32,9 @@ console.log(path);
 const foo: string = "bar";
 console.log(foo);
 export const test = 452;
+
+const bingbong = "beepboop";
+console.log(bingbong);
 `
 );
 
@@ -98,6 +101,7 @@ body {
    background: url(../images/cat.png);
    background-color: red;
    color: white;
+   color: url(#test);
 }
 
 h1 {

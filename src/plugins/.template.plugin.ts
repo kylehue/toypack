@@ -1,7 +1,13 @@
-import { IPlugin, Toypack } from "../Toypack.js";
+import { Toypack } from "../Toypack.js";
 
-export class TemplatePlugin implements IPlugin {
-   public name = "TemplatePlugin";
+interface PluginOptions {
+   foo: number;
+   bar: string;
+}
 
-   apply(bundler: Toypack) {}
+export default function (options: PluginOptions) {
+   return function (this: Toypack) {
+      
+      
+   };
 }

@@ -49,15 +49,16 @@ export function requireFunction() {
       // Require function
       function ${identifiers.require}(path) {
          var init = ${identifiers.modules}[path];
+         if (!init) {
+            return {};
+         }
+
          var module = { exports: {} };
          _modules_cache_[path] = module.exports;
 
          function localRequire(path) {
             if (!_modules_cache_[path]) {
                _modules_cache_[path] = module.exports;
-               if (!path) {
-                  throw new Error("Could not resolve '" + path + "'.");
-               }
                
                var exports = ${identifiers.require}(path);
                _modules_cache_[path] = exports;

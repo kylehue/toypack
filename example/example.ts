@@ -1,6 +1,6 @@
 import { sampleFiles } from "./sample.js";
-import d, { Toypack, Babel,Utilities,  } from "../build/Toypack.js";
-import { DefinePlugin } from "../build/plugins/DefinePlugin.js";
+import d, { Toypack, Babel, Utilities } from "../build/Toypack.js";
+import DefinePlugin from "../build/plugins/DefinePlugin.js";
 
 var saveData = (function () {
    var a = document.createElement("a");
@@ -47,7 +47,7 @@ console.log(toypack, Babel.availablePlugins, Babel.availablePresets);
 
 runButton.onclick = async () => {
    console.log(await toypack.run());
-}
+};
 
 downloadButton.onclick = async () => {
    toypack.options.bundleOptions.mode = "production";
@@ -55,7 +55,7 @@ downloadButton.onclick = async () => {
    toypack.options.bundleOptions.mode = "development";
 
    for (let resource of result.resources) {
-      saveData(resource.content, resource.source, resource.content.type)
+      saveData(resource.content, resource.source, resource.content.type);
    }
 
    saveData(
@@ -67,7 +67,21 @@ downloadButton.onclick = async () => {
    saveData(result.style.content, result.style.source, "text/css");
 
    saveData(result.html.content, result.html.source, "text/html");
-}
+};
+
+toypack.hooks.onError((e) => {
+   console.error(e.reason);
+});
+
+toypack.setIFrame(iframe);
+
+const definePlugin = toypack.usePlugin(
+   DefinePlugin({
+      foo: "bar",
+   })
+);
+
+definePlugin.add("bingbong", "beepboop");
 
 (async () => {
    const samplePic = await (
@@ -75,20 +89,7 @@ downloadButton.onclick = async () => {
          "https://cdn.discordapp.com/attachments/898027973272305674/1073582900991242260/image.png"
       )
    ).blob();
-
-   toypack.setIFrame(iframe);
-
-   toypack.usePlugin(
-      new DefinePlugin({
-         foo: "bar",
-      })
-   );
-
    toypack.addOrUpdateAsset("/images/cat.png", samplePic);
-
-   toypack.hooks.onError((e) => {
-      console.error(e.reason);
-   });
 
    for (let [_, sampleFile] of Object.entries(sampleFiles)) {
       toypack.addOrUpdateAsset(sampleFile.source, sampleFile.content);

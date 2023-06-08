@@ -10,12 +10,10 @@ import {
 } from "./extensions.js";
 import { getDependencyGraph, IChunk, IModuleOptions } from "./graph.js";
 import { Hooks } from "./Hooks.js";
-import { JSONLoader } from "./loaders/JSONLoader.js";
-import { SassLoader } from "./loaders/SassLoader.js";
+import JSONLoader from "./loaders/JSONLoader.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { mergeDeep } from "./utils.js";
-import { CodeComposer } from "./CodeComposer.js";
 
 export interface ICompileData {
    source: string;
@@ -29,32 +27,57 @@ export interface ICompileResult {
    map?: RawSourceMap;
 }
 
+/**
+ * Represents a recursive compile object, indicating that further
+ * compilation is required.
+ */
 export interface ICompileRecursive {
    type: "recurse";
+   /**
+    * Specifies the usage of different formats for the asset.
+    * The key represents the format, such as 'less', 'scss', 'pug', etc.
+    * The value is an array of `ICompileData` objects representing
+    * the data to be compiled by other loaders.
+    */
    use: Record<string, ICompileData[]>;
 }
 
-export interface ILoader {
+interface ILoaderDataBase {
+   /** The name of the loader. */
    name: string;
+   /** Regular expression pattern used to match the asset source that the loader should be applied to. */
    test: RegExp;
+}
+
+interface ILoaderDataAsync extends ILoaderDataBase {
+   async: true;
+   /** Async function that handles the compilation of the matched files. */
+   compile: (
+      data: ICompileData
+   ) => Promise<ICompileResult | ICompileRecursive>;
+}
+
+interface ILoaderDataSync extends ILoaderDataBase {
+   async: false;
+   /** Function that handles the compilation of the matched files. */
    compile: (data: ICompileData) => ICompileResult | ICompileRecursive;
 }
 
-export interface IPlugin {
-   name: string;
-   apply: (bundler: Toypack) => void;
-}
+type ILoaderData = ILoaderDataAsync | ILoaderDataSync;
+
+export type ILoader = (this: Toypack) => ILoaderData;
+export type IPlugin = (this: Toypack) => any;
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
-   protected assets: Map<string, Asset>;
-   protected loaders: ILoader[] = [];
-   protected cache = new Map<string, IChunk>();
-   protected extensions = {
+   private extensions = {
       resource: [...resourceExtensions],
       style: [...styleExtensions],
       script: [...appExtensions],
    };
+   protected loaders: ILoaderData[] = [];
+   protected assets: Map<string, Asset>;
+   protected cache = new Map<string, IChunk>();
    public options: IOptions;
    public hooks = new Hooks();
    constructor(options?: PartialDeep<IOptions>) {
@@ -64,8 +87,8 @@ export class Toypack {
       );
 
       this.assets = new Map();
-      this.useLoader(new SassLoader(this));
-      this.useLoader(new JSONLoader(this));
+      this.useLoader(JSONLoader());
+      // this.useLoader(new JSONLoader(this));
 
       if (this.options.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -74,16 +97,29 @@ export class Toypack {
       }
    }
 
-   public usePlugin(plugin: IPlugin) {
-      plugin.apply(this);
+   protected getExtensions(type: keyof typeof this.extensions) {
+      return this.extensions[type];
+   }
+
+   protected addExtension(type: keyof typeof this.extensions, ext: string) {
+      this.getExtensions(type).push(ext);
+   }
+
+   protected hasExtension(type: keyof typeof this.extensions, source: string) {
+      const extension = path.extname(source);
+      return this.getExtensions(type).includes(extension);
    }
 
    public useLoader(loader: ILoader) {
-      this.loaders.push(loader);
+      this.loaders.push(loader.call(this));
+   }
+
+   public usePlugin<T extends IPlugin>(plugin: T): ReturnType<T> {
+      return plugin.call(this);
    }
 
    public resolve(relativeSource: string, options?: Partial<IResolveOptions>) {
-      return resolve(this, relativeSource, options);
+      return resolve.call(this, relativeSource, options);
    }
 
    public setIFrame(iframe: HTMLIFrameElement) {
@@ -106,10 +142,8 @@ export class Toypack {
       return this.assets.get(source) || null;
    }
 
-   public async getProductionOutput() {}
-
    public async run() {
-      const graph = getDependencyGraph.call(this);
+      const graph = await getDependencyGraph.call(this);
       const result = await bundle.call(this, graph);
 
       if (this.iframe) {

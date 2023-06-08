@@ -1,33 +1,35 @@
-import { ICompileData, ICompileResult, ILoader, Toypack } from "../Toypack.js";
+import { ICompileResult, ILoader, Toypack } from "../Toypack.js";
 
-export class JSONLoader implements ILoader {
-   public name = "JSONLoader";
-   public test = /\.json$/;
+export default function (): ILoader {
+   return function (this: Toypack) {
+      this.addExtension("script", ".json");
 
-   constructor(public bundler: Toypack) {
-      bundler.extensions.script.push(".json");
-   }
+      return {
+         name: "JSONLoader",
+         test: /\.json$/,
+         async: true,
+         compile: async (data) => {
+            let contentToCompile;
+            const result: ICompileResult = {
+               type: "result",
+               content: "",
+            };
 
-   compile(data: ICompileData) {
-      const result: ICompileResult = {
-         type: "result",
-         content: "",
+            if (typeof data.content != "string") {
+               contentToCompile = await data.content.text();
+            } else {
+               contentToCompile = data.content;
+            }
+
+            const format = this.options.bundleOptions.module;
+
+            const exportsSnippet =
+               format == "esm" ? "export default " : "module.exports = ";
+
+            result.content = exportsSnippet + data.content + ";";
+
+            return result;
+         },
       };
-
-      if (typeof data.content != "string") {
-         throw new Error(
-            "JSONLoader only tolerates string contents. Received " +
-               typeof data.content
-         );
-      }
-
-      const format = this.bundler.options.bundleOptions.module;
-
-      const exportsSnippet =
-         format == "esm" ? "export default " : "module.exports = ";
-
-      result.content = exportsSnippet + data.content + ";";
-
-      return result;
-   }
+   };
 }

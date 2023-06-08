@@ -14,12 +14,12 @@ interface IResolveOptionsComp extends IResolveOptions {
 /**
  * Searches for the fallback data of a module id in the `fallback` field of the `bundleOptions.resolve` object.
  *
- * @param {object} bundler - The bundler instance.
+ * @param {object} this - The bundler instance.
  * @param {string} moduleId - The module id.
  * @returns {object} The fallback data.
  */
-export function getResolveFallbackData(bundler: Toypack, moduleId: string) {
-   const fallbacks = bundler.options.bundleOptions.resolve.fallback;
+export function getResolveFallbackData(this: Toypack, moduleId: string) {
+   const fallbacks = this.options.bundleOptions.resolve.fallback;
    if (fallbacks) {
       for (const [id, fallback] of Object.entries(fallbacks)) {
          if (moduleId.startsWith(id)) {
@@ -35,12 +35,12 @@ export function getResolveFallbackData(bundler: Toypack, moduleId: string) {
 /**
  * Searches for the alias data of a module id in the `alias` field of the `bundleOptions.resolve` object.
  *
- * @param {Toypack} bundler The bundler instance.
+ * @param {Toypack} this The bundler instance.
  * @param {string} moduleId The module id.
  * @returns {object} The alias data.
  */
-export function getResolveAliasData(bundler: Toypack, moduleId: string) {
-   const aliases = bundler.options.bundleOptions.resolve.alias;
+export function getResolveAliasData(this: Toypack, moduleId: string) {
+   const aliases = this.options.bundleOptions.resolve.alias;
    if (aliases) {
       // Find strict equals first
       for (const [alias, replacement] of Object.entries(aliases)) {
@@ -65,44 +65,44 @@ export function getResolveAliasData(bundler: Toypack, moduleId: string) {
 }
 
 function tryFileThenIndex(
-   bundler: Toypack,
+   this: Toypack,
    source: string,
    extensions: string[]
 ) {
-   const file = loadAsFile(bundler, source, extensions);
+   const file = loadAsFile.call(this, source, extensions);
 
    if (file) {
       return file;
    } else {
-      return loadIndex(bundler, source, extensions);
+      return loadIndex.call(this, source, extensions);
    }
 }
 
 function loadAsDirectory(
-   bundler: Toypack,
+   this: Toypack,
    source: string,
    extensions: string[]
 ) {
-   const pkg = bundler.assets.get(path.join(source, "package.json"));
+   const pkg = this.assets.get(path.join(source, "package.json"));
    const mainFieldValue =
       typeof pkg?.content == "string"
          ? (JSON.parse(pkg.content).main as string)
          : null;
    if (mainFieldValue) {
       const absolutePath = path.join(source, mainFieldValue);
-      const res = tryFileThenIndex(bundler, absolutePath, extensions);
+      const res = tryFileThenIndex.call(this, absolutePath, extensions);
       if (res) {
          return res;
       }
    }
 
-   return tryFileThenIndex(bundler, source, extensions);
+   return tryFileThenIndex.call(this, source, extensions);
 }
 
-function loadAsFile(bundler: Toypack, source: string, extensions: string[]) {
+function loadAsFile(this: Toypack, source: string, extensions: string[]) {
    if (path.extname(source)) {
       // Get exact match if there's a file extension
-      const asset = bundler.assets.get(source);
+      const asset = this.assets.get(source);
 
       if (asset) {
          return asset.source;
@@ -111,7 +111,7 @@ function loadAsFile(bundler: Toypack, source: string, extensions: string[]) {
       // If there's no extension, get matching paths while ignoring the extensions
       for (let i = 0; i < extensions.length; i++) {
          const extension = extensions[i];
-         const asset = bundler.assets.get(source + extension);
+         const asset = this.assets.get(source + extension);
 
          if (asset) {
             return asset.source;
@@ -122,28 +122,28 @@ function loadAsFile(bundler: Toypack, source: string, extensions: string[]) {
    return null;
 }
 
-function loadIndex(bundler: Toypack, source: string, extensions: string[]) {
+function loadIndex(this: Toypack, source: string, extensions: string[]) {
    const resolvedIndex = path.join(source, "index");
-   return loadAsFile(bundler, resolvedIndex, extensions);
+   return loadAsFile.call(this, resolvedIndex, extensions);
 }
 
 function getResolved(
-   bundler: Toypack,
+   this: Toypack,
    source: string,
    opts: IResolveOptionsComp
 ) {
    if (opts.includeCoreModules && !isLocal(source) && !isURL(source)) {
       const resolved = path.join("/", "node_modules", source);
-      return loadAsDirectory(bundler, resolved, opts.extensions);
+      return loadAsDirectory.call(this, resolved, opts.extensions);
    } else if (isURL(source)) {
       return source;
    } else {
       const resolved = path.join("/", opts.baseDir, source);
-      const file = loadAsFile(bundler, resolved, opts.extensions);
+      const file = loadAsFile.call(this, resolved, opts.extensions);
       if (file) {
          return file;
       } else {
-         return loadAsDirectory(bundler, resolved, opts.extensions);
+         return loadAsDirectory.call(this, resolved, opts.extensions);
       }
    }
 }
@@ -151,13 +151,13 @@ function getResolved(
 /**
  * Resolves a module path to its absolute path.
  *
- * @param {Toypack} bundler The bundler instance.
+ * @param {Toypack} this The bundler instance.
  * @param {string} source The module path to resolve.
  * @param {IResolveOptions} options Resolving options.
  * @returns {string} The absolute path of the module.
  */
 export function resolve(
-   bundler: Toypack,
+   this: Toypack,
    source: string,
    options: Partial<IResolveOptions> = {}
 ) {
@@ -166,7 +166,7 @@ export function resolve(
       {
          baseDir: ".",
          includeCoreModules: true,
-         extensions: bundler.options.bundleOptions.resolve.extensions,
+         extensions: this.options.bundleOptions.resolve.extensions,
       },
       options
    );
@@ -175,9 +175,9 @@ export function resolve(
 
    // Resolve.extensions
    const extensions = [
-      ...bundler.extensions.script,
-      ...bundler.extensions.style,
-      ...bundler.extensions.resource,
+      ...this.getExtensions("script"),
+      ...this.getExtensions("style"),
+      ...this.getExtensions("resource"),
    ].filter((ext) => {
       return !opts.extensions.includes(ext);
    });
@@ -185,7 +185,7 @@ export function resolve(
    opts.extensions.push(...extensions);
 
    // Resolve.alias
-   const aliasData = getResolveAliasData(bundler, source);
+   const aliasData = getResolveAliasData.call(this, source);
    if (aliasData) {
       let aliased = path.join(
          aliasData.replacement,
@@ -201,20 +201,20 @@ export function resolve(
       source = aliased;
    }
 
-   result = getResolved(bundler, source, opts);
+   result = getResolved.call(this, source, opts);
 
    // Resolve.fallback
    if (!result) {
-      const fallbackData = getResolveFallbackData(bundler, origSource);
+      const fallbackData = getResolveFallbackData.call(this, origSource);
       if (fallbackData) {
          if (fallbackData.fallback === false) {
             // Add module with empty object for fallbacks with no polyfill
             const emptyFallbackModuleSource =
                "/node_modules/toypack/empty/index.js";
-            let empty = bundler.assets.get(emptyFallbackModuleSource);
+            let empty = this.assets.get(emptyFallbackModuleSource);
 
             if (!empty) {
-               empty = bundler.addOrUpdateAsset(
+               empty = this.addOrUpdateAsset(
                   emptyFallbackModuleSource,
                   "module.exports = {};"
                );
@@ -222,7 +222,7 @@ export function resolve(
 
             result = empty.source;
          } else {
-            result = getResolved(bundler, fallbackData.fallback, opts);
+            result = getResolved.call(this, fallbackData.fallback, opts);
          }
       }
    }

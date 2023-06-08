@@ -12,7 +12,7 @@ import {
    parseError,
    resolveFailureError,
 } from "./errors.js";
-import { Toypack } from "./Toypack.js";
+import { ICompileData, Toypack } from "./Toypack.js";
 import { getUniqueIdFromString, isCSS, isJS, parseURLQuery } from "./utils.js";
 
 export interface IChunk {
@@ -79,7 +79,7 @@ export type IScanCallback = (dep: {
    asset: Asset;
    AST: Node | CSSTree.CssNode;
    params: IModuleOptions;
-}) => void;
+}) => Promise<void>;
 
 const dummyNodeAST = getASTFromJS("");
 
@@ -183,17 +183,14 @@ function parseCSSModule(this: Toypack, source: string, content: string) {
    CSSTree.walk(AST, (node, item, list) => {
       // property: url(...);
       if (node.type === "Url") {
-         const sourceValue = "/" + node.value.replace(/^\//, "");
+         const sourceValue = node.value;
          let isValidDep = true;
          // Scroll-to-element-id urls are not a dependency
          if (isValidDep && sourceValue.startsWith("#")) isValidDep = false;
          // No need to add data urls to dependencies
          if (isValidDep && sourceValue.startsWith("data:")) isValidDep = false;
          // url()'s source path can't be .js or .css.
-         if (
-            isValidDep &&
-            !this.extensions.resource.includes(path.extname(sourceValue))
-         ) {
+         if (isValidDep && !this.hasExtension("resource", sourceValue)) {
             this.hooks.trigger(
                "onError",
                parseError(
@@ -208,9 +205,12 @@ function parseCSSModule(this: Toypack, source: string, content: string) {
 
          if (isValidDep) {
             // Change source path based on bundle mode
-            const resolved = this.resolve(sourceValue, {
-               baseDir: path.dirname(source),
-            });
+            const resolved = this.resolve(
+               "/" + sourceValue.replace(/^\//, ""),
+               {
+                  baseDir: path.dirname(source),
+               }
+            );
 
             if (resolved) {
                if (this.options.bundleOptions.mode == "production") {
@@ -275,26 +275,33 @@ function parseCSSModule(this: Toypack, source: string, content: string) {
  *
  * `.vue -> [.scss, .ts] -> [.css, .js]`
  */
-function compileAndGetChunks(
+async function compileAndGetChunks(
    this: Toypack,
    chunk: IChunk,
    options: IModuleOptions
 ) {
    const result = [] as (IChunk & { map?: RawSourceMap })[];
 
-   const recursiveCompile = (source: string, content: string | Blob) => {
+   const recursiveCompile = async (source: string, content: string | Blob) => {
       const loader = this.loaders.find((l) => l.test.test(source));
 
       if (!loader) {
-         this.hooks.trigger("onError", loaderNotFoundError(source));
+         await this.hooks.trigger("onError", loaderNotFoundError(source));
          return;
       }
 
-      const compilation = loader.compile({
+      let compilation;
+      const compilationData: ICompileData = {
          source,
          content,
          options,
-      });
+      };
+
+      if (loader.async) {
+         compilation = await loader.compile(compilationData);
+      } else {
+         compilation = loader.compile(compilationData);
+      }
 
       if (compilation.type == "result") {
          result.push({
@@ -309,13 +316,13 @@ function compileAndGetChunks(
                if (result.some((v) => v.source == chunkSource)) {
                   continue;
                }
-               recursiveCompile(chunkSource, data.content);
+               await recursiveCompile(chunkSource, data.content);
             }
          }
       }
    };
 
-   recursiveCompile(chunk.source, chunk.content);
+   await recursiveCompile(chunk.source, chunk.content);
 
    return result;
 }
@@ -323,7 +330,7 @@ function compileAndGetChunks(
 /**
  * Scan chunk for dependencies.
  */
-function scanChunkDeps(
+async function scanChunkDeps(
    this: Toypack,
    chunk: IChunk,
    callback: IScanCallback
@@ -337,12 +344,12 @@ function scanChunkDeps(
    const { source, content } = chunk;
 
    let parsed;
-   if (this.extensions.script.includes(path.extname(source))) {
+   if (this.hasExtension("script", source)) {
       parsed = {
          type: "script",
          ...parseJSModule.call(this, source, content),
       };
-   } else if (this.extensions.style.includes(path.extname(source))) {
+   } else if (this.hasExtension("style", source)) {
       parsed = {
          type: "style",
          ...parseCSSModule.call(this, source, content),
@@ -365,14 +372,14 @@ function scanChunkDeps(
          : null;
 
       if (!childDepAsset) {
-         this.hooks.trigger(
+         await this.hooks.trigger(
             "onError",
             resolveFailureError(childDepRelativeSource, source)
          );
          break;
       }
 
-      callback({
+      await callback({
          mapSource: {
             relative: childDepRelativeSource,
             absolute: childDepAsset.source,
@@ -389,7 +396,7 @@ function scanChunkDeps(
 /**
  * Recursively gets the dependency graph of a chunk.
  */
-function getGraphRecursive(
+async function getGraphRecursive(
    this: Toypack,
    entryChunk: IChunk,
    params: IModuleOptions = {},
@@ -412,7 +419,7 @@ function getGraphRecursive(
    }
 
    const parentDep: IScriptDependency | IStyleDependency = {
-      type: isScriptDep.call(this, entryChunk.source) ? "script" : "style",
+      type: this.hasExtension("script", entryChunk.source) ? "script" : "style",
       source: entryChunk.source,
       content: entryChunk.content,
       dependencyMap: {},
@@ -422,7 +429,7 @@ function getGraphRecursive(
 
    const isSupported = isJS(entryChunk.source) || isCSS(entryChunk.source);
 
-   const scanDeps: IScanCallback = (dep) => {
+   const scanDeps: IScanCallback = async (dep) => {
       parentDep.dependencyMap[dep.mapSource.relative] = {
          relative: dep.mapSource.relative,
          absolute: dep.mapSource.absolute,
@@ -433,19 +440,19 @@ function getGraphRecursive(
          content: dep.asset.content,
       };
 
-      getGraphRecursive.call(this, childDepChunk, dep.params, graph);
+      await getGraphRecursive.call(this, childDepChunk, dep.params, graph);
    };
 
    if (isSupported) {
-      const parsed = scanChunkDeps.call(this, parentDep, scanDeps);
+      const parsed = await scanChunkDeps.call(this, parentDep, scanDeps);
       parentDep.AST = parsed.AST;
    } else {
       parentDep.chunks = [];
-      for (const chunk of compileAndGetChunks.call(this, parentDep, params)) {
-         const parsed = scanChunkDeps.call(this, chunk, scanDeps);
+      for (const chunk of await compileAndGetChunks.call(this, parentDep, params)) {
+         const parsed = await scanChunkDeps.call(this, chunk, scanDeps);
 
          parentDep.chunks.push({
-            type: isScriptDep.call(this, chunk.source) ? "script" : "style",
+            type: this.hasExtension("script", chunk.source) ? "script" : "style",
             AST: parsed.AST,
             content: chunk.content,
             source: chunk.source,
@@ -458,17 +465,9 @@ function getGraphRecursive(
 }
 
 /**
- * Checks if source is a type of script dependency.
- */
-function isScriptDep(this: Toypack, source: string) {
-   const depExtension = path.extname(source);
-   return this.extensions.script.includes(depExtension);
-}
-
-/**
  * Get the dependency graph of the bundler starting from the entry point.
  */
-export function getDependencyGraph(this: Toypack) {
+export async function getDependencyGraph(this: Toypack) {
    const entrySource = this.options.bundleOptions.entry
       ? this.resolve(path.join("/", this.options.bundleOptions.entry))
       : this.resolve("/");
@@ -478,7 +477,7 @@ export function getDependencyGraph(this: Toypack) {
    const entryAsset = entrySource ? this.assets.get(entrySource) : null;
 
    if (!entryAsset) {
-      this.hooks.trigger("onError", entryPointNotFoundError());
+      await this.hooks.trigger("onError", entryPointNotFoundError());
       return result;
    }
 
@@ -497,7 +496,7 @@ export function getDependencyGraph(this: Toypack) {
          path.extname(entryAsset.source).toLowerCase()
       )
    ) {
-      this.hooks.trigger(
+      await this.hooks.trigger(
          "onError",
          assetStrictlyHTMLorJSError(entryAsset.source)
       );
@@ -508,7 +507,7 @@ export function getDependencyGraph(this: Toypack) {
       throw new Error("Entry asset's content must be a string.");
    }
 
-   const graph = getGraphRecursive.call(this, {
+   const graph = await getGraphRecursive.call(this, {
       source: entryAsset.source,
       content: entryAsset.content,
    });
