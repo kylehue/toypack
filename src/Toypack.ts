@@ -16,7 +16,7 @@ import {
 } from "./graph.js";
 import { Hooks } from "./Hooks.js";
 import JSONLoader from "./loaders/JSONLoader.js";
-import { defaultOptions, IOptions } from "./options.js";
+import { defaultOptions, IMode, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { isNodeModule, mergeDeep } from "./utils.js";
 
@@ -83,7 +83,8 @@ interface ICache {
 export type ILoader = (this: Toypack) => ILoaderData;
 export type IPlugin = (this: Toypack) => any;
 
-const isChunk = (source: string) => new RegExp(".chunk-[a-zA-Z0-9]+-[0-9].[a-zA-Z]+$").test(source);
+const isChunk = (source: string) =>
+   new RegExp(".chunk-[a-zA-Z0-9]+-[0-9].[a-zA-Z]+$").test(source);
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -206,9 +207,12 @@ export class Toypack {
       });
    }
 
-   public async run() {
+   public async run(isProd = false) {
+      const oldMode = this.options.bundleOptions.mode;
+      this.options.bundleOptions.mode = isProd ? "production" : "development";
       const graph = await getDependencyGraph.call(this);
       const result = await bundle.call(this, graph);
+      this.options.bundleOptions.mode = oldMode;
 
       // Set modified flag to false for all assets except those in node_modules
       this.assets.forEach((asset) => {
@@ -216,7 +220,8 @@ export class Toypack {
          asset.modified = false;
       });
 
-      if (this.iframe) {
+      // IFrame
+      if (!isProd && this.iframe) {
          this.iframe.srcdoc = result.html.content;
       }
 

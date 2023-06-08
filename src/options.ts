@@ -1,10 +1,9 @@
 import { ParserOptions, TransformOptions } from "@babel/core";
-import { AcceptedPlugin, ProcessOptions } from "postcss";
 
-type IModule = "esm" | "cjs";
-type IMode = "production" | "development";
-type ILogLevel = "error" | "warn" | "info" | "none";
-type IBabelTransformOptions = Pick<
+export type IModule = "esm" | "cjs";
+export type IMode = "production" | "development";
+export type ILogLevel = "error" | "warn" | "info" | "none";
+export type IBabelTransformOptions = Pick<
    TransformOptions,
    | "plugins"
    | "presets"
@@ -13,11 +12,11 @@ type IBabelTransformOptions = Pick<
    | "highlightCode"
    | "shouldPrintComment"
 >;
-type IBabelParseOptions = Omit<
+export type IBabelParseOptions = Omit<
    ParserOptions,
    "sourceType" | "sourceFilename" | "strictMode"
 >;
-type ISourceMap = boolean | "nosources";
+export type ISourceMap = boolean | "nosources";
 
 const defaultOptions = {
    /**
