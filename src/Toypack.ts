@@ -44,7 +44,7 @@ export class Toypack {
 
       this.assets = new Map();
       this.useLoader(JSONLoader());
-      this.useLoader(HTMLLoader({ sourceMap: false }));
+      this.useLoader(HTMLLoader());
 
       if (this.options.logLevel == "error") {
          this.hooks.onError((error) => {

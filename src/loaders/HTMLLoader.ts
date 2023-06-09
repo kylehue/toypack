@@ -101,12 +101,7 @@ function getAttributeIndexInLine(str: string, content: string) {
    return -1;
 }
 
-function compile(
-   this: Toypack,
-   source: string,
-   content: string,
-   produceSourceMap = false
-) {
+function compile(this: Toypack, source: string, content: string) {
    let lastNodeId = 0;
    const dependencies: {
       value: string;
@@ -121,7 +116,7 @@ function compile(
    const bodyAST = htmlAST.querySelector("body");
    const headAST = htmlAST.querySelector("head");
 
-   const smg: SourceMapGenerator | null = produceSourceMap
+   const smg: SourceMapGenerator | null = !!this.options.bundleOptions.sourceMap
       ? new SourceMapGenerator()
       : null;
    smg?.setSourceContent(source, content);
@@ -293,16 +288,7 @@ function compile(
    };
 }
 
-const defaultOptions = {
-   sourceMap: false,
-};
-
-export default function (options?: IHTMLLoaderOptions): ILoader {
-   const opts = mergeDeep(
-      JSON.parse(JSON.stringify(defaultOptions)) as IHTMLLoaderOptions,
-      options || ({} as IHTMLLoaderOptions)
-   );
-
+export default function (): ILoader {
    return function (this: Toypack) {
       this.addExtension("script", ".html");
 
@@ -323,12 +309,7 @@ export default function (options?: IHTMLLoaderOptions): ILoader {
                contentToCompile = data.content;
             }
 
-            const compiled = compile.call(
-               this,
-               data.source,
-               contentToCompile,
-               opts.sourceMap
-            );
+            const compiled = compile.call(this, data.source, contentToCompile);
 
             result.content = compiled.content;
             result.map = compiled.map;
@@ -339,6 +320,5 @@ export default function (options?: IHTMLLoaderOptions): ILoader {
    };
 }
 
-type IHTMLLoaderOptions = typeof defaultOptions;
 type AST = HTMLElement | Node;
 type ITraverseCallback = (node: HTMLElement | Node) => void;
