@@ -222,19 +222,19 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
    if (!oldMap) return newMap;
    if (!newMap) return oldMap;
 
-   var oldMapConsumer = new SourceMapConsumer(oldMap);
-   var newMapConsumer = new SourceMapConsumer(newMap);
-   var mergedMapGenerator = new SourceMapGenerator();
+   const oldMapConsumer = new SourceMapConsumer(oldMap);
+   const newMapConsumer = new SourceMapConsumer(newMap);
+   const mergedMapGenerator = new SourceMapGenerator();
 
    // iterate on new map and overwrite original position of new map with one of old map
-   newMapConsumer.eachMapping(function (m) {
+   newMapConsumer.eachMapping(function (map) {
       // pass when `originalLine` is null.
       // It occurs in case that the node does not have origin in original code.
-      if (m.originalLine == null) return;
+      if (map.originalLine == null) return;
 
-      var origPosInOldMap = oldMapConsumer.originalPositionFor({
-         line: m.originalLine,
-         column: m.originalColumn,
+      const origPosInOldMap = oldMapConsumer.originalPositionFor({
+         line: map.originalLine,
+         column: map.originalColumn,
       });
 
       if (origPosInOldMap.source == null) return;
@@ -245,19 +245,20 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
             column: origPosInOldMap.column,
          },
          generated: {
-            line: m.generatedLine,
-            column: m.generatedColumn,
+            line: map.generatedLine,
+            column: map.generatedColumn,
          },
          source: origPosInOldMap.source,
          name: origPosInOldMap.name,
       });
    });
 
-   var consumers = [oldMapConsumer, newMapConsumer];
+   const consumers = [oldMapConsumer, newMapConsumer];
    consumers.forEach(function (consumer) {
-      (consumer as any).sources.forEach(function (sourceFile: any) {
+      (consumer as any).sources.forEach(function (sourceFile: string) {
+         if (sourceFile == "unknown") return;
          (mergedMapGenerator as any)._sources.add(sourceFile);
-         var sourceContent = consumer.sourceContentFor(sourceFile);
+         const sourceContent = consumer.sourceContentFor(sourceFile);
          if (sourceContent != null) {
             mergedMapGenerator.setSourceContent(sourceFile, sourceContent);
          }
