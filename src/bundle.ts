@@ -500,15 +500,18 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
    const shouldMinify = this.options.bundleOptions.mode == "production";
 
    if (shouldMinify) {
-      const { code, map } = babelMinify(
+      let { code, map } = babelMinify(
          result.code,
          {},
          {
-            inputSourceMap: result.map?.toObject(),
             sourceMaps: true,
             comments: false,
          }
       );
+
+      if (result.map && map) {
+         map = mergeSourceMaps(result.map.toObject(), map);
+      }
 
       result.code = code;
       result.map = MapConverter.fromObject(map);
