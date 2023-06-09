@@ -11,9 +11,9 @@ import {
    RawSourceMap,
 } from "source-map-js";
 import { CodeComposer } from "./CodeComposer.js";
-import { IDependency, IDependencyMap } from "./graph.js";
+import { IDependency, IDependencyChunk, IDependencyMap } from "./graph.js";
 import * as rt from "./runtime.js";
-import { Toypack } from "./Toypack.js";
+import { IChunk, IScriptDependency, Toypack } from "./Toypack.js";
 import {
    JSONToBlob,
    findCodePosition,
@@ -165,7 +165,7 @@ async function transpileAST(
       envName: mode,
       minified: false,
       comments: mode == "development",
-      inputSourceMap: inputSourceMap,
+      inputSourceMap: inputSourceMap || undefined,
       cloneInputAst: false,
    } as TransformOptions;
 
@@ -206,7 +206,13 @@ async function resourceToCJSModule(this: Toypack, source: string) {
 }
 
 /**
- * Merge a source map to the bundle.
+ * Merge map to bundle.
+ * @param targetMap The source map generator to merge the source map from.
+ * @param sourceMap The source map to merge to the target source map.
+ * @param source The file source path.
+ * @param originalContent The original content of the file.
+ * @param generatedContent The compiled content of the file.
+ * @param bundleContent The current content of the bundle.
  */
 function mergeMapToBundle(
    this: Toypack,
@@ -250,6 +256,39 @@ function mergeMapToBundle(
    });
 }
 
+function mergeScriptChunks(this: Toypack, source: string, chunks: IDependencyChunk[]) {
+   let merged = new CodeComposer();
+   const smg = new SourceMapGenerator();
+
+   for (const chunk of chunks) {
+      if (chunk.type != "script") continue;
+      const chunkCode = new CodeComposer(chunk.content);
+      chunkCode.wrap(`
+         (function () {
+            <CODE_BODY>
+         })();
+      `);
+      merged.append(chunkCode).breakLine();
+
+      if (chunk.map) {
+         mergeMapToBundle.call(
+            this,
+            smg,
+            chunk.map,
+            source,
+            chunk.content,
+            chunkCode.toString(),
+            merged.toString()
+         );
+      }
+   }
+
+   return {
+      code: merged.toString(),
+      map: MapConverter.fromJSON(smg.toString()).toObject() as RawSourceMap
+   };
+}
+
 /**
  * Get the script bundle from graph.
  */
@@ -265,6 +304,7 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
       source: string,
       AST: Node,
       depMap: IDependencyMap,
+      isEntry: boolean,
       inputSourceMap?: RawSourceMap
    ) => {
       let code, map;
@@ -289,11 +329,7 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
          map = transpiled.map;
       }
 
-      const wrappedModule = rt.moduleWrap(
-         source,
-         code,
-         source === graph[0].source
-      );
+      const wrappedModule = rt.moduleWrap(source, code, isEntry);
 
       bundleContent.breakLine().append(wrappedModule);
 
@@ -330,32 +366,58 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
 
       if (dep.type != "resource" && dep.chunks && !dep.AST) {
          /**
-          * Add chunks to the bundle if it's a script or style
-          * dependency without an AST.
+          * Add chunks to the bundle if it's a script dependency
+          * without an AST.
           */
-         for (const chunk of dep.chunks) {
+         const compiledScriptChunks: IDependencyChunk<"script">[] = [];
+
+         for (let i = dep.chunks.length - 1; i >= 0; i--) {
+            const chunk = dep.chunks[i];
             // Extract script chunks from the dependency
             if (chunk.type == "script") {
-               const { map, code } = await addBabelASTToBundle(
+               /** @todo Needs caching */
+               const transpiled = await transpileAST.call(
+                  this,
                   chunk.source,
                   chunk.AST,
                   dep.dependencyMap,
                   chunk.map
                );
 
-               // Source map
-               if (bundleSourceMap && map) {
-                  mergeMapToBundle.call(
-                     this,
-                     bundleSourceMap,
-                     map,
-                     dep.source,
-                     dep.content,
-                     code,
-                     finalizeBundleContent()
-                  );
-               }
+               compiledScriptChunks.push({
+                  type: chunk.type,
+                  AST: chunk.AST,
+                  source: chunk.source,
+                  content: transpiled.code,
+                  map: transpiled.map,
+               });
             }
+         }
+
+         const merged = mergeScriptChunks.call(
+            this,
+            dep.source,
+            compiledScriptChunks
+         );
+         
+         const wrappedModule = rt.moduleWrap(
+            dep.source,
+            merged.code,
+            dep.source == graph[0].source
+         );
+
+         bundleContent.breakLine().append(wrappedModule);
+
+         if (bundleSourceMap && merged.map) {
+            mergeMapToBundle.call(
+               this,
+               bundleSourceMap,
+               merged.map,
+               dep.source,
+               dep.content,
+               merged.code,
+               finalizeBundleContent()
+            );
          }
       } else if (dep.type == "script" && dep.AST && !dep.chunks?.length) {
          /**
@@ -365,7 +427,8 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
          const { map, code } = await addBabelASTToBundle(
             dep.source,
             dep.AST,
-            dep.dependencyMap
+            dep.dependencyMap,
+            dep.source == graph[0].source
          );
 
          // Source map

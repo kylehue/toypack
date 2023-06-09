@@ -16,7 +16,15 @@ export function isNodeModule(source: string) {
 }
 
 export function isChunk(source: string) {
-   return new RegExp(".chunk-[a-zA-Z0-9]+-[0-9].[a-zA-Z]+$").test(source);
+   return new RegExp(".chunk-[a-zA-Z0-9]+.[a-zA-Z]+$").test(source);
+}
+
+export function createChunkSource(
+   from: string,
+   lang: string,
+   id: string | number
+) {
+   return `${from}.chunk-${getHash(from + id)}.${lang}`;
 }
 
 const URL_RE = /https?:\/\/((?:[\w\d-]+\.)+[\w\d]{2,})/i;
@@ -126,8 +134,8 @@ export function btoa(content: string | ArrayBuffer) {
  * while ignoring the whitespaces for each line.
  * @param sourceStr The source code string to search within.
  * @param searchStr The code snippet to search for.
- * @returns {Object} An object containing the zero-based line and
- * zero-based column position of the found code snippet. If the code
+ * @returns {Object} An object containing the 1-based line and
+ * 0-based column position of the found code snippet. If the code
  * snippet is not found, the line and column will be -1.
  */
 export function findCodePosition(sourceStr: string, searchStr: string) {
@@ -136,8 +144,8 @@ export function findCodePosition(sourceStr: string, searchStr: string) {
    let line = -1;
    let column = -1;
 
-   for (let i = 0; i < sourceLines.length; i++) {
-      const sourceLine = sourceLines[i].trim();
+   for (let i = 1; i < sourceLines.length + 1; i++) {
+      const sourceLine = sourceLines[i - 1].trim();
 
       if (line >= 0) {
          if (
@@ -149,11 +157,26 @@ export function findCodePosition(sourceStr: string, searchStr: string) {
       } else {
          if (sourceLine == searchLines[0]?.trim()) {
             line = i;
-            column = sourceLines[i].indexOf(searchLines[0]?.trim());
+            column = sourceLines[i - 1].indexOf(searchLines[0]?.trim());
          }
       }
    }
 
+   return { line, column };
+}
+
+/**
+ * Convert index to position object.
+ * Line is 1-based and column is 0-based.
+ */
+export function indexToPosition(content: string, index: number) {
+   if (index < 0) {
+      throw new RangeError("The index must be greater than or equal to 0.");
+   }
+
+   let lines = content.substring(0, index).split("\n");
+   let line = lines.length;
+   let column = lines[lines.length - 1].length;
    return { line, column };
 }
 

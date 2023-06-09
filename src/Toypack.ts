@@ -44,7 +44,7 @@ export class Toypack {
 
       this.assets = new Map();
       this.useLoader(JSONLoader());
-      this.useLoader(HTMLLoader());
+      this.useLoader(HTMLLoader({ sourceMap: false }));
 
       if (this.options.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -80,7 +80,7 @@ export class Toypack {
     */
    public useLoader(loader: ILoader) {
       const loadedLoader = loader.call(this);
-      if (this.loaders.find(v => v.name == loadedLoader.name)) {
+      if (this.loaders.find((v) => v.name == loadedLoader.name)) {
          throw new Error(`${loadedLoader.name} already exists.`);
       }
 
@@ -178,7 +178,7 @@ export class Toypack {
       if (asset.type == "resource" && asset.contentURL) {
          URL.revokeObjectURL(asset.contentURL);
       }
-      
+
       this.assets.delete(source);
       this.cachedDeps.parsed.delete(source);
       this.cachedDeps.compiled.delete(source);
@@ -227,6 +227,7 @@ export class Toypack {
          this.iframe.srcdoc = result.html.content;
       }
 
+      console.log(graph);
       return result;
    }
 }
@@ -254,7 +255,7 @@ export interface ICompileData {
    options: IModuleOptions;
 }
 
-export interface ICompileResult {
+interface ICompileBaseResult {
    type: "result";
    content: string;
    map?: RawSourceMap;
@@ -264,16 +265,18 @@ export interface ICompileResult {
  * Represents a recursive compile object, indicating that further
  * compilation is required.
  */
-export interface ICompileRecursive {
+interface ICompileRecursiveResult {
    type: "recurse";
    /**
     * Specifies the usage of different formats for the asset.
-    * The key represents the format, such as 'less', 'scss', 'pug', etc.
+    * The key represents the format, such as 'less', 'scss', 'ts', etc.
     * The value is an array of `ICompileData` objects representing
     * the data to be compiled by other loaders.
     */
-   use: Record<string, ICompileData[]>;
+   chunks: Record<string, Omit<ICompileBaseResult, "type">[]>;
 }
+
+export type ICompileResult = ICompileBaseResult | ICompileRecursiveResult;
 
 interface ILoaderDataBase {
    /** The name of the loader. */
@@ -285,13 +288,13 @@ interface ILoaderDataBase {
 interface ILoaderDataAsync extends ILoaderDataBase {
    async: true;
    /** Async function that handles the compilation of the matched files. */
-   compile: (data: ICompileData) => Promise<ICompileResult | ICompileRecursive>;
+   compile: (data: ICompileData) => Promise<ICompileResult>;
 }
 
 interface ILoaderDataSync extends ILoaderDataBase {
    async: false;
    /** Function that handles the compilation of the matched files. */
-   compile: (data: ICompileData) => ICompileResult | ICompileRecursive;
+   compile: (data: ICompileData) => ICompileResult;
 }
 
 type ILoaderData = ILoaderDataAsync | ILoaderDataSync;

@@ -23,7 +23,7 @@ function stripIndent(content: string) {
 }
 
 const defaultOptions = {
-   indentSize: 4,
+   indentSize: 2,
 };
 
 /**
@@ -180,6 +180,13 @@ export class CodeComposer {
       }
 
       return currentIndentSize;
+   }
+
+   /**
+    * Get the total amount of lines.
+    */
+   public getTotalLines() {
+      return this.lines.length;
    }
 
    /**

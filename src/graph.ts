@@ -11,8 +11,15 @@ import {
    parseError,
    resolveFailureError,
 } from "./errors.js";
-import { ICompileData, Toypack } from "./Toypack.js";
-import { getHash, isCSS, isJS, parseURLQuery } from "./utils.js";
+import { ICompileData, ICompileResult, Toypack } from "./Toypack.js";
+import {
+   createChunkSource,
+   getHash,
+   isCSS,
+   isJS,
+   parseURLQuery,
+} from "./utils.js";
+import { IModule } from "./options.js";
 
 /**
  * Get dependencies and AST of a script module.
@@ -40,6 +47,7 @@ export function parseJSModule(
    const importantBabelOptions: ParserOptions = {
       sourceType: format == "esm" ? "module" : "script",
       sourceFilename: source,
+      allowImportExportEverywhere: true,
    };
 
    let AST;
@@ -228,6 +236,22 @@ function parseCSSModule(
    return result;
 }
 
+function getImportCode(
+   type: IDependency["type"],
+   source: string,
+   module: IModule
+) {
+   if (type == "script") {
+      if (module == "esm") {
+         return `import "${"./" + source.replace(/^\//, "")}";`;
+      } else {
+         return `require("${"./" + source.replace(/^\//, "")}");`;
+      }
+   } else {
+      return `@import "${"./" + source.replace(/^\//, "")}";`;
+   }
+}
+
 /**
  * Recursively compiles a chunk using loaders.
  *
@@ -237,30 +261,47 @@ function parseCSSModule(
  */
 async function compileAndGetChunks(
    this: Toypack,
-   chunk: IChunk,
+   dep: IDependency,
    options: IModuleOptions
 ) {
    const result = [] as (IChunk & { map?: RawSourceMap })[];
 
-   const recursiveCompile = async (source: string, content: string | Blob) => {
+   const recursiveCompile = async (
+      source: string,
+      content: string | Blob,
+      map?: RawSourceMap
+   ) => {
       const loader = this.loaders.find((l) => l.test.test(source));
 
       if (!loader) {
-         await this.hooks.trigger("onError", loaderNotFoundError(source));
-         return;
+         if (
+            this.hasExtension("resource", source) ||
+            this.hasExtension("script", source) ||
+            this.hasExtension("style", source)
+         ) {
+            result.push({
+               source,
+               content,
+               map,
+            });
+            return;
+         } else {
+            await this.hooks.trigger("onError", loaderNotFoundError(source));
+            return;
+         }
       }
 
-      let compilation;
-      const compilationData: ICompileData = {
+      let compilation: ICompileResult;
+      const compilerData: ICompileData = {
          source,
          content,
          options,
       };
 
-      if (loader.async) {
-         compilation = await loader.compile(compilationData);
+      if (loader && loader.async) {
+         compilation = await loader.compile(compilerData);
       } else {
-         compilation = loader.compile(compilationData);
+         compilation = loader.compile(compilerData);
       }
 
       if (compilation.type == "result") {
@@ -270,21 +311,21 @@ async function compileAndGetChunks(
             map: compilation.map,
          });
       } else {
-         for (const [lang, dataArr] of Object.entries(compilation.use)) {
-            const chunkSource = `${chunk.source}.chunk-${getHash(
-               chunk.source
-            )}-${result.length}.${lang}`;
-            for (const data of dataArr) {
+         for (const [lang, chunks] of Object.entries(compilation.chunks)) {
+            for (let i = 0; i < chunks.length; i++) {
+               const chunk = chunks[i];
+               const chunkSource = createChunkSource(dep.source, lang, i);
                if (result.some((v) => v.source == chunkSource)) {
                   continue;
                }
-               await recursiveCompile(chunkSource, data.content);
+
+               await recursiveCompile(chunkSource, chunk.content, chunk.map);
             }
          }
       }
    };
 
-   await recursiveCompile(chunk.source, chunk.content);
+   await recursiveCompile(dep.source, dep.content);
 
    return result;
 }
@@ -404,11 +445,9 @@ async function getGraphRecursive(
       parentDep.AST = parsed.AST;
    } else {
       parentDep.chunks = [];
-      for (const chunk of await compileAndGetChunks.call(
-         this,
-         parentDep,
-         params
-      )) {
+      const chunks = await compileAndGetChunks.call(this, parentDep, params);
+
+      for (const chunk of chunks) {
          const parsed = await scanChunkDeps.call(this, chunk, scanDeps);
 
          parentDep.chunks.push({
@@ -497,28 +536,32 @@ interface ISimpleDependency {
    dependencyMap: IDependencyMap;
 }
 
+export interface IDependencyChunk<T = "script" | "style"> {
+   type: T extends "script"
+      ? "script"
+      : T extends "style"
+      ? "style"
+      : "script" | "style";
+   AST: T extends "script"
+      ? Node
+      : T extends "style"
+      ? CSSTree.CssNode
+      : Node | CSSTree.CssNode;
+   source: string;
+   content: string;
+   map?: RawSourceMap;
+}
+
 export interface IScriptDependency extends ISimpleDependency {
    type: "script";
    AST?: Node;
-   chunks?: {
-      type: "script";
-      AST: Node;
-      source: string;
-      content: string;
-      map?: RawSourceMap;
-   }[];
+   chunks?: IDependencyChunk<"script">[];
 }
 
 export interface IStyleDependency extends ISimpleDependency {
    type: "style";
    AST?: CSSTree.CssNode;
-   chunks?: {
-      type: "style";
-      AST: CSSTree.CssNode;
-      source: string;
-      content: string;
-      map?: RawSourceMap;
-   }[];
+   chunks?: IDependencyChunk<"style">[];
 }
 
 export interface IResourceDependency {
