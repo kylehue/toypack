@@ -6,6 +6,9 @@ import {
    NodeType,
    TextNode,
 } from "node-html-parser";
+import { SourceMapGenerator } from "source-map-js";
+import MapConverter from "convert-source-map";
+import { indexToPosition, mergeDeep } from "../utils.js";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 
@@ -24,24 +27,24 @@ function extractDependency(this: Toypack, node: AST) {
    if (!(node instanceof HTMLElement)) return extractedDep;
 
    // Script tags that has `src` attribute
-   if (node.tagName == "SCRIPT" && node.attrs?.src?.length) {
-      extractedDep = node.attrs.src;
+   if (node.tagName == "SCRIPT" && node.attributes?.src?.length) {
+      extractedDep = node.attributes.src;
    }
 
    // Link tags that has `href` attribute
    if (
       node.tagName == "LINK" &&
-      linkTagRelDeps.includes(node.attrs?.rel) &&
-      node.attrs?.href?.length
+      linkTagRelDeps.includes(node.attributes?.rel) &&
+      node.attributes?.href?.length
    ) {
-      extractedDep = node.attrs.href;
+      extractedDep = node.attributes.href;
    }
 
    return extractedDep;
 }
 
 function isImportMap(node: HTMLElement) {
-   return node.tagName == "SCRIPT" && node.attrs?.type == "importmap";
+   return node.tagName == "SCRIPT" && node.attributes?.type == "importmap";
 }
 
 function getImportMap(this: Toypack, node: AST) {
@@ -64,14 +67,10 @@ function getImportMap(this: Toypack, node: AST) {
    return importMap;
 }
 
-function importCode(this: Toypack, source: string) {
+function getImportCode(this: Toypack, source: string) {
    return this.options.bundleOptions.module == "esm"
       ? `import "${source}";`
       : `require("${source}")`;
-}
-
-function toJS(node: Node) {
-   const code = "";
 }
 
 function hasDescendantNode(parent: Node, node: Node) {
@@ -91,9 +90,28 @@ function hasDescendantNode(parent: Node, node: Node) {
    return hasDescendantNode(parent, parentNode);
 }
 
-function compile(this: Toypack, content: string) {
+function getAttributeIndexInLine(str: string, content: string) {
+   const regex = new RegExp(str.replace(/['\"]/g, "[\"']"), "i");
+
+   const match = content.match(regex);
+   if (match) {
+      return match.index || -1;
+   }
+
+   return -1;
+}
+
+function compile(
+   this: Toypack,
+   source: string,
+   content: string,
+   produceSourceMap = false
+) {
    let lastNodeId = 0;
-   const dependencies: string[] = [];
+   const dependencies: {
+      value: string;
+      node: Node;
+   }[] = [];
    const htmlAST = parseHTML(content);
    const compilation = new CodeComposer();
    const varIdMap = new Map<string, Node>();
@@ -103,27 +121,63 @@ function compile(this: Toypack, content: string) {
    const bodyAST = htmlAST.querySelector("body");
    const headAST = htmlAST.querySelector("head");
 
+   const smg: SourceMapGenerator | null = produceSourceMap
+      ? new SourceMapGenerator()
+      : null;
+   smg?.setSourceContent(source, content);
+
    const getNodeId = (node: Node) => {
       if (node === bodyAST) return bodyVarId;
       if (node === headAST) return headVarId;
       for (const [id, _node] of varIdMap) {
          if (node === _node) return id;
       }
-   }
+   };
 
    const addElement = (node: HTMLElement) => {
       const tagName = node.tagName?.toLowerCase();
       if (!tagName) return;
       if (tagName == "body" || tagName == "head") return;
+      const originalPosition = indexToPosition(content, node.range[0]);
+      const line = content.split("\n")[originalPosition.line - 1];
       const varId = "n" + lastNodeId++;
-
       compilation.append(
          `var ${varId} = document.createElement("${tagName}");`
       );
 
+      smg?.addMapping({
+         source,
+         original: {
+            line: originalPosition.line,
+            column: originalPosition.column,
+         },
+         generated: {
+            line: compilation.getTotalLines(),
+            column: 0,
+         },
+         name: node.tagName.toLowerCase(),
+      });
+
       // Add attributes
-      for (let [key, value] of Object.entries(node.attrs || {})) {
+      for (let [key, value] of Object.entries(node.attributes || {})) {
          compilation.append(`${varId}.setAttribute("${key}", "${value}");`);
+         const attributeIndex = getAttributeIndexInLine(
+            `${key}="${value}"`,
+            line
+         );
+
+         smg?.addMapping({
+            source,
+            original: {
+               line: originalPosition.line,
+               column: attributeIndex >= 0 ? attributeIndex : 0,
+            },
+            generated: {
+               line: compilation.getTotalLines(),
+               column: 0,
+            },
+            name: key,
+         });
       }
 
       varIdMap.set(varId, node);
@@ -133,28 +187,47 @@ function compile(this: Toypack, content: string) {
       const varId = "n" + lastNodeId++;
       const textContent = node.rawText;
       if (!textContent.trim()) return;
-      compilation.append(
-         `var ${varId} = document.createTextNode(\`${textContent}\`);`
-      );
+      const originalPosition = indexToPosition(content, node.range[0]);
+      const codeToAppend = `var ${varId} = document.createTextNode(\`${textContent}\`);`;
+      compilation.append(codeToAppend);
+
+      const lines = codeToAppend.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+         smg?.addMapping({
+            source,
+            original: {
+               line: originalPosition.line,
+               column: originalPosition.column,
+            },
+            generated: {
+               line: compilation.getTotalLines() + 1 - lines.length + i,
+               column: 0,
+            },
+         });
+      }
+
       varIdMap.set(varId, node);
    };
 
    const traverseCallback: ITraverseCallback = (node) => {
       const extractedDep = extractDependency.call(this, node);
       if (extractedDep) {
-         dependencies.push("./" + extractedDep.replace(/^\//, ""));
+         dependencies.push({
+            value: "./" + extractedDep.replace(/^\//, ""),
+            node,
+         });
          node.remove();
       }
 
       // Put import maps to alias
-      if (this.options.bundleOptions.module == "cjs") {
-         this.options.bundleOptions.resolve.alias = {
-            ...this.options.bundleOptions.resolve.alias,
-            ...getImportMap.call(this, node),
-         };
-      }
-
       if (node instanceof HTMLElement && isImportMap(node)) {
+         if (this.options.bundleOptions.module == "cjs") {
+            this.options.bundleOptions.resolve.alias = {
+               ...this.options.bundleOptions.resolve.alias,
+               ...getImportMap.call(this, node),
+            };
+         }
+
          node.remove();
       }
 
@@ -168,30 +241,68 @@ function compile(this: Toypack, content: string) {
       }
    };
 
-   if (bodyAST) {
-      traverse(bodyAST, traverseCallback);
-   }
+   traverse(htmlAST, traverseCallback);
 
-   if (headAST) {
-      traverse(headAST, traverseCallback);
-   }
-
-   // Appending
+   // Appending the nodes
    varIdMap.forEach((node, id) => {
       let parentId = getNodeId(node.parentNode);
       if (!parentId) return;
-
+      const originalPosition = indexToPosition(content, node.range[0]);
       compilation.append(`${parentId}.appendChild(${id});`);
+      smg?.addMapping({
+         source,
+         original: {
+            line: originalPosition.line,
+            column: originalPosition.column,
+         },
+         generated: {
+            line: compilation.getTotalLines(),
+            column: 0,
+         },
+         name:
+            node instanceof HTMLElement
+               ? node.tagName.toLowerCase()
+               : undefined,
+      });
    });
 
+   // Deps
    for (const dep of dependencies) {
-      compilation.prepend(importCode.call(this, dep)).breakLine();
+      const originalPosition = indexToPosition(content, dep.node.range[0]);
+      const importCode = getImportCode.call(this, dep.value);
+      compilation.append(importCode);
+
+      smg?.addMapping({
+         source,
+         original: {
+            line: originalPosition.line,
+            column: originalPosition.column,
+         },
+         generated: {
+            line: compilation.getTotalLines(),
+            column: 0,
+         },
+      });
+
+      compilation.breakLine();
    }
 
-   return compilation.toString();
+   return {
+      map: smg ? MapConverter.fromJSON(smg.toString()).toObject() : null,
+      content: compilation.toString(),
+   };
 }
 
-export default function (): ILoader {
+const defaultOptions = {
+   sourceMap: false,
+};
+
+export default function (options?: IHTMLLoaderOptions): ILoader {
+   const opts = mergeDeep(
+      JSON.parse(JSON.stringify(defaultOptions)) as IHTMLLoaderOptions,
+      options || ({} as IHTMLLoaderOptions)
+   );
+
    return function (this: Toypack) {
       this.addExtension("script", ".html");
 
@@ -212,8 +323,15 @@ export default function (): ILoader {
                contentToCompile = data.content;
             }
 
-            const compiled = compile.call(this, contentToCompile);
-            result.content = compiled;
+            const compiled = compile.call(
+               this,
+               data.source,
+               contentToCompile,
+               opts.sourceMap
+            );
+
+            result.content = compiled.content;
+            result.map = compiled.map;
 
             return result;
          },
@@ -221,5 +339,6 @@ export default function (): ILoader {
    };
 }
 
+type IHTMLLoaderOptions = typeof defaultOptions;
 type AST = HTMLElement | Node;
 type ITraverseCallback = (node: HTMLElement | Node) => void;
