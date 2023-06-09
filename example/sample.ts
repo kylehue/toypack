@@ -25,27 +25,7 @@ addFile(
             }
          }
       </script>
-      <!-- <script type="module" src="src/main"></script> -->
-      <script>
-         
-/* console.log(44);       console.log(3);
-console.log(123456);
-// import path from "path-browserify?raw&test=1";
-// console.log(path.join("src", "classes"));
-import {adder} from "@classes/adder?test";
-console.log(adder(4,6));
-import pkgjson from "../package.json";
-console.log(pkgjson);
-import path from "path";
-console.log(path);
-const foo: string = "bar";
-console.log(foo);
-export const test = 452; */
-
-const bingbong = "beepboop";
-console.log(bingbong);
-
-      </script>
+      <script type="module" src="src/main"></script>
    </head>
    <body>
       <div class="">

@@ -248,7 +248,7 @@ function mergeMapToBundle(
             column: map.originalColumn,
          },
          generated: {
-            line: map.generatedLine + position.line,
+            line: map.generatedLine + position.line - 1,
             column: map.generatedColumn + position.column,
          },
          name: map.name,
@@ -256,36 +256,63 @@ function mergeMapToBundle(
    });
 }
 
-function mergeScriptChunks(this: Toypack, source: string, chunks: IDependencyChunk[]) {
-   let merged = new CodeComposer();
+/**
+ * Merges script chunks into a single chunk.
+ * @param {string} source The source of the chunks.
+ * @param {IDependencyChunk[]} chunks The array of chunks to merge.
+ * @returns The merged code and source map.
+ */
+function mergeScriptChunks(
+   this: Toypack,
+   source: string,
+   chunks: IDependencyChunk[]
+) {
+   let mergedChunks = new CodeComposer();
    const smg = new SourceMapGenerator();
 
    for (const chunk of chunks) {
       if (chunk.type != "script") continue;
+
+      /**
+       * Wrap the chunk code within an IIFE so that its variables
+       * don't get leaked to other chunks' code.
+       */
       const chunkCode = new CodeComposer(chunk.content);
       chunkCode.wrap(`
          (function () {
             <CODE_BODY>
          })();
       `);
-      merged.append(chunkCode).breakLine();
+      mergedChunks.append(chunkCode).breakLine();
 
-      if (chunk.map) {
-         mergeMapToBundle.call(
-            this,
-            smg,
-            chunk.map,
-            source,
-            chunk.content,
-            chunkCode.toString(),
-            merged.toString()
-         );
-      }
+      if (!chunk.map) continue;
+      const smgChunk = new SourceMapGenerator();
+      // We first merge the chunk's map to its wrapped version (look above)
+      mergeMapToBundle.call(
+         this,
+         smgChunk,
+         chunk.map,
+         source,
+         chunk.content,
+         chunk.content,
+         chunkCode.toString()
+      );
+
+      // Then we merge the updated chunk map to the `mergedChunks` (final) map
+      mergeMapToBundle.call(
+         this,
+         smg,
+         MapConverter.fromJSON(smgChunk.toString()).toObject(),
+         source,
+         chunk.content,
+         chunkCode.toString(),
+         mergedChunks.toString()
+      );
    }
 
    return {
-      code: merged.toString(),
-      map: MapConverter.fromJSON(smg.toString()).toObject() as RawSourceMap
+      code: mergedChunks.toString(),
+      map: MapConverter.fromJSON(smg.toString()).toObject() as RawSourceMap,
    };
 }
 
@@ -399,7 +426,7 @@ async function bundleScript(this: Toypack, graph: IDependency[]) {
             dep.source,
             compiledScriptChunks
          );
-         
+
          const wrappedModule = rt.moduleWrap(
             dep.source,
             merged.code,
