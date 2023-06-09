@@ -165,7 +165,6 @@ async function transpileAST(
       envName: mode,
       minified: false,
       comments: mode == "development",
-      inputSourceMap: inputSourceMap || undefined,
       cloneInputAst: false,
    } as TransformOptions;
 
@@ -174,9 +173,15 @@ async function transpileAST(
       ...importantBabelOptions,
    }) as any as BabelFileResult;
 
+   let map = MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap;
+
+   if (inputSourceMap) {
+      map = mergeSourceMaps(inputSourceMap, map);
+   }
+
    const result = {
       code: transpiled.code || "",
-      map: MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap,
+      map,
    };
 
    return result;
