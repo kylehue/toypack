@@ -236,7 +236,13 @@ function compile(this: Toypack, source: string, content: string) {
       }
    };
 
-   traverse(htmlAST, traverseCallback);
+   if (headAST) {
+      traverse(headAST, traverseCallback);
+   }
+
+   if (bodyAST) {
+      traverse(bodyAST, traverseCallback);
+   }
 
    // Appending the nodes
    varIdMap.forEach((node, id) => {
