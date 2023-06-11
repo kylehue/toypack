@@ -41,25 +41,29 @@ addFile(
 addFile(
    "src/main.ts",
    `
-
+import rawHTML from "../index.html";
+console.log(rawHTML);
 console.log(44);       console.log(3);
 console.log(123456);
 // import path from "path-browserify?raw&test=1";
 // console.log(path.join("src", "classes"));
+// import path from "path";
+// console.log(path);
 import {adder} from "@classes/adder?test";
 console.log(adder(4,6));
 import pkgjson from "../package.json";
 console.log(pkgjson);
-import path from "path";
-console.log(path);
 const foo: string = "bar";
 console.log(foo);
 export const test = 452;
+import vue from "./hello.vue";
 
 const bingbong = "beepboop";
 console.log(bingbong);
 `
 );
+
+addFile("src/hello.vue", "console.log('vuevuevue!');");
 
 addFile(
    "classes/adder.js",
@@ -78,11 +82,11 @@ addFile(
    "classes/createNum.js",
    `
    
-import cat from "../images/cat.png";
+/* import cat from "../images/cat.png";
 const img = document.createElement("img");
 img.src = cat;
 console.log(cat);
-document.body.append(img);
+document.body.append(img); */
 
 export * from "./createNum2.js";
 `
@@ -121,7 +125,7 @@ addFile(
    "styles/sample.css",
    `
 body {
-   background: url(../images/cat.png);
+   /* background: url(../images/cat.png); */
    background-color: red;
    color: white;
    color: url(#test);

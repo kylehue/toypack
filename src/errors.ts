@@ -19,24 +19,24 @@ export function assetNotFoundError(source: string) {
    };
 }
 
-export function assetStrictlyHTMLorJSError(source: string) {
-   return {
-      code: 3,
-      reason: `Invalid entry asset '${source}'. Entry can only either be HTML or JS.`,
-   };
-}
-
 export function resolveFailureError(source: string, parentSource: string) {
    return {
-      code: 4,
+      code: 3,
       reason: `Could not resolve '${source}' at '${parentSource}'`,
    };
 }
 
-export function entryPointNotFoundError() {
+export function entryNotFoundError() {
+   return {
+      code: 4,
+      reason: `Entry point not found.`,
+   };
+}
+
+export function invalidEntryError(source: string) {
    return {
       code: 5,
-      reason: `Entry point not found.`,
+      reason: `Invalid entry asset '${source}'. Make sure that it's a script or a stylesheet.`,
    };
 }
 

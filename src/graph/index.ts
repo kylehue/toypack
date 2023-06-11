@@ -8,110 +8,159 @@ import {
 import { Toypack } from "../Toypack.js";
 import { parseURL } from "../utils.js";
 import { createDependency, IDependency } from "./createDependency.js";
-import { parseAsset } from "./parseAsset.js";
+import { IParsedScript, IParsedStyle, parseAsset } from "./parseAsset.js";
+import { loadAsset } from "./loadAsset.js";
 
 /**
  * Recursively get the dependency graph of an asset.
  * @returns An array of dependency objects.
  */
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
-   const graph: IDependency[] = [];
+   const graph: IDependencyGraph = {};
+
    const recurse = async (
-      asset: IAsset,
+      source: string,
+      content: string | Blob,
       params: IDependencyImportParams = {}
    ) => {
-      // Avoid dependency duplication in the graph
-      if (graph.some((dep) => dep.asset.source == asset.source)) {
+      if (graph[source]) {
          return;
       }
 
-      // No need to parse a resource dependency
-      if (asset.type == "resource") {
-         graph.push(
-            createDependency("resource", {
-               asset,
-            })
-         );
-
-         return;
-      }
-
-      // Parse and get dependencies
-      const parsed = await parseAsset.call(
-         this,
-         asset.source,
-         asset.content,
-         params
-      );
-
+      const parsed = await parseAsset.call(this, source, content, params);
       const dependencyMap: Record<string, string> = {};
+      for (const script of parsed.scripts) {
+         graph[script.chunkSource] = script;
+      }
 
-      graph.push(
-         createDependency(parsed.type, {
-            asset,
-            dependencyMap,
-            parsed: parsed as any,
-         })
-      );
+      for (const style of parsed.styles) {
+         graph[style.chunkSource] = style;
+      }
 
-      // Scan those dependencies for dependencies
+      if (this.hasExtension("script", source)) {
+         graph[source] = parsed.scripts[0];
+      } else if (this.hasExtension("style", source)) {
+         graph[source] = parsed.styles[0];
+      }
+      
+      // Recursively scan dependency for dependencies
       for (const rawDepSource of parsed.dependencies) {
-         const parsedURL = parseURL(rawDepSource);
-         const relativeSource = parsedURL.target;
-
+         const parsedDepSource = parseURL(rawDepSource);
+         const relativeSource = parsedDepSource.target;
          const depAsset = this.getAsset(
             this.resolve(relativeSource, {
-               baseDir: path.dirname(asset.source),
+               baseDir: path.dirname(source),
             }) || ""
          );
-
          if (!depAsset) {
             this.hooks.trigger(
                "onError",
-               resolveFailureError(relativeSource, asset.source)
+               resolveFailureError(relativeSource, source)
             );
             break;
          }
-
-         dependencyMap[relativeSource] = depAsset.source;
-
-         await recurse(depAsset, parsedURL.params);
+         dependencyMap[rawDepSource] = depAsset.source;
+         await recurse(
+            depAsset.source,
+            depAsset.content,
+            parsedDepSource.params
+         );
       }
    };
 
-   await recurse(entry);
+   await recurse(entry.source, entry.content);
+
+   // const recurse = async (
+   //    asset: IAsset,
+   //    params: IDependencyImportParams = {}
+   // ) => {
+   //    // Avoid dependency duplication in the graph
+   //    if (graph[asset.source]) {
+   //       return;
+   //    }
+
+   //    // Parse and get dependencies
+   //    const parsed = await parseAsset.call(
+   //       this,
+   //       asset.source,
+   //       asset.content,
+   //       params
+   //    );
+
+   //    // No need to parse a resource dependency
+   //    if (asset.type == "resource") {
+   //       graph[asset.source] = createDependency("resource", {
+   //          asset,
+   //       });
+
+   //       return;
+   //    }
+
+   //    const dependencyMap: Record<string, string> = {};
+
+   //    graph[asset.source] = createDependency(parsed.type, {
+   //       asset,
+   //       dependencyMap,
+   //       parsed: parsed,
+   //    });
+
+   //    // Scan asset's dependencies for dependencies
+   //    for (const rawDepSource of parsed.dependencies) {
+   //       const parsedURL = parseURL(rawDepSource);
+   //       const relativeSource = parsedURL.target;
+
+   //       const depAsset = this.getAsset(
+   //          this.resolve(relativeSource, {
+   //             baseDir: path.dirname(asset.source),
+   //          }) || ""
+   //       );
+
+   //       if (!depAsset) {
+   //          this.hooks.trigger(
+   //             "onError",
+   //             resolveFailureError(relativeSource, asset.source)
+   //          );
+   //          continue;
+   //       }
+
+   //       dependencyMap[rawDepSource] = depAsset.source;
+
+   //       await recurse(depAsset, parsedURL.params);
+   //    }
+   // };
+
+   // await recurse(entry);
 
    return graph;
 }
 
 /**
  * Get the dependency graph of the bundler starting from the entry point.
- * @returns An array of dependency objects.
+ * @returns An array of dependency objects. The first item in the array
+ * is the entry.
  */
 export async function getDependencyGraph(this: Toypack) {
+   let graph: IDependencyGraph = {};
    const entrySource = this.options.bundleOptions.entry
       ? this.resolve(path.join("/", this.options.bundleOptions.entry))
       : this.resolve("/");
-
-   const result: any[] = [];
 
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;
 
    if (!entryAsset) {
       this.hooks.trigger("onError", entryNotFoundError());
-      return result;
+      return graph;
    }
 
    if (entryAsset.type != "text") {
       this.hooks.trigger("onError", invalidEntryError(entryAsset.source));
-      return;
+      return graph;
    }
 
-   const graph = await getGraphRecursive.call(this, entryAsset);
+   graph = await getGraphRecursive.call(this, entryAsset);
 
-   result.push(...graph);
-
-   return result;
+   return graph;
 }
 
 export type IDependencyImportParams = Record<string, string | boolean>;
+export type IDependencyGraph = Record<string, IParsedScript | IParsedStyle>;

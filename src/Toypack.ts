@@ -2,7 +2,7 @@ import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import { PartialDeep } from "type-fest";
 import { IAsset, createAsset } from "./asset.js";
-import { bundle } from "./bundle.js";
+import { bundle } from "./bundle/index.js";
 import {
    appExtensions,
    resourceExtensions,
@@ -10,16 +10,20 @@ import {
 } from "./extensions.js";
 import {
    getDependencyGraph,
-   IModuleOptions,
+   IDependencyImportParams,
    IParseCSSResult,
    IParseJSResult,
-} from "./graph.js";
+} from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
 import { defaultOptions, IOptions } from "./options.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import { isChunk, isNodeModule, mergeDeep } from "./utils.js";
 import JSONLoader from "./loaders/JSONLoader.js";
 import HTMLLoader from "./loaders/HTMLLoader.js";
+import RawLoader from "./loaders/RawLoader.js";
+import VueLoader from "./loaders/VueLoader.js";
+import SassLoader from "./loaders/SassLoader.js";
+import ChainLoader from "./loaders/ChainLoader.js";
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -43,8 +47,14 @@ export class Toypack {
       );
 
       this.assets = new Map();
-      this.useLoader(JSONLoader());
-      this.useLoader(HTMLLoader());
+      this.useLoader(
+         RawLoader(),
+         JSONLoader(),
+         HTMLLoader(),
+         ChainLoader(),
+         VueLoader(),
+         SassLoader()
+      );
 
       if (this.options.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -59,14 +69,28 @@ export class Toypack {
       }
    }
 
-   protected getExtensions(type: keyof typeof this.extensions) {
-      return this.extensions[type];
+   /**
+    * Add an extension to the bundler. The bundler uses the extensions
+    * to divide the dependencies into script, style, and resource.
+    * @param type Where the extension would fall into.
+    * @param ext The extension.
+    */
+   protected addExtension(type: keyof typeof this.extensions, ext: string | string[]) {
+      if (Array.isArray(ext)) {
+         for (let x of ext) {
+            if (!this.hasExtension(type, "h" + x)) {
+               this.getExtensions(type).push(x);
+            }
+         }
+      } else {
+         if (!this.hasExtension(type, "h" + ext)) {
+            this.getExtensions(type).push(ext);
+         }
+      }
    }
 
-   protected addExtension(type: keyof typeof this.extensions, ext: string) {
-      if (!this.hasExtension(type, "h" + ext)) {
-         this.getExtensions(type).push(ext);
-      }
+   protected getExtensions(type: keyof typeof this.extensions) {
+      return this.extensions[type];
    }
 
    protected hasExtension(type: keyof typeof this.extensions, source: string) {
@@ -75,16 +99,24 @@ export class Toypack {
    }
 
    /**
-    * Adds a loader to the list of loaders.
-    * @param {ILoader} loader The loader to add.
+    * Adds loaders to the list of loaders.
+    * @param {ILoader} loaders The loaders to add.
     */
-   public useLoader(loader: ILoader) {
-      const loadedLoader = loader.call(this);
-      if (this.loaders.find((v) => v.name == loadedLoader.name)) {
-         throw new Error(`${loadedLoader.name} already exists.`);
-      }
+   public useLoader(...loaders: ILoader[]) {
+      for (const loader of loaders) {
+         const loadedLoader = Object.assign(
+            {
+               chaining: true,
+            } as ILoaderData,
+            loader.call(this)
+         );
 
-      this.loaders.push(loadedLoader);
+         if (this.loaders.find((v) => v.name == loadedLoader.name)) {
+            throw new Error(`${loadedLoader.name} already exists.`);
+         }
+
+         this.loaders.push(loadedLoader);
+      }
    }
 
    /**
@@ -130,6 +162,7 @@ export class Toypack {
     */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
       source = path.join("/", source);
+
       let asset = this.assets.get(source);
 
       if (!asset) {
@@ -172,6 +205,7 @@ export class Toypack {
     */
    public removeAsset(source: string) {
       source = path.join("/", source);
+
       const asset = this.assets.get(source);
       if (!asset) return;
 
@@ -185,9 +219,8 @@ export class Toypack {
 
       /**
        * Remove chunks from cache that are associated with the deleted asset.
-       * @todo Find a better fix because this solution will not work if the
-       * user creates an asset with chunk source format which is -
-       * `/path/name.chunk-[hash]-1.ext`.
+       * @todo Find a better fix because this solution will create a bug if
+       * the user creates an asset with chunk source format.
        */
       this.cachedDeps.parsed.forEach((cache, cacheSource) => {
          if (source.startsWith(cacheSource) && isChunk(cacheSource)) {
@@ -213,22 +246,24 @@ export class Toypack {
       const oldMode = this.options.bundleOptions.mode;
       this.options.bundleOptions.mode = isProd ? "production" : "development";
       const graph = await getDependencyGraph.call(this);
+      console.log(graph);
+
       const result = await bundle.call(this, graph);
       this.options.bundleOptions.mode = oldMode;
 
-      // Set modified flag to false for all assets except those in node_modules
-      this.assets.forEach((asset) => {
-         if (isNodeModule(asset.source) || asset.type != "text") return;
-         asset.modified = false;
-      });
+      // // Set modified flag to false for all assets except those in node_modules
+      // this.assets.forEach((asset) => {
+      //    if (isNodeModule(asset.source) || asset.type != "text") return;
+      //    asset.modified = false;
+      // });
 
-      // IFrame
-      if (!isProd && this.iframe) {
-         this.iframe.srcdoc = result.html.content;
-      }
+      // // IFrame
+      // if (!isProd && this.iframe) {
+      //    this.iframe.srcdoc = result.html.content;
+      // }
 
-      console.log(graph);
-      return result;
+      // console.log(graph);
+      // return result;
    }
 }
 
@@ -237,67 +272,60 @@ export default Toypack;
 export * as Babel from "@babel/standalone";
 export * as Utilities from "./utils.js";
 export { CodeComposer } from "./CodeComposer.js";
-export type { IOptions, RawSourceMap, IAsset };
-export type {
+//export type { IOptions, RawSourceMap, IAsset };
+/* export type {
    IChunk,
    IDependency,
    IDependencyMap,
    IDependencyMapSource,
-   IModuleOptions,
+   IDependencyImportParams as IModuleOptions,
    IResourceDependency,
    IScriptDependency,
    IStyleDependency,
-} from "./graph.js";
+} from "./graph/index.js"; */
 
-export interface ICompileData {
+export interface IRawDependencyData {
    source: string;
    content: string | Blob;
-   options: IModuleOptions;
+   params: IDependencyImportParams;
 }
 
-interface ICompileBaseResult {
-   type: "result";
+export interface IChunk {
    content: string;
    map?: RawSourceMap;
 }
 
-/**
- * Represents a recursive compile object, indicating that further
- * compilation is required.
- */
-interface ICompileRecursiveResult {
-   type: "recurse";
+export interface ILoaderResult {
    /**
-    * Specifies the usage of different formats for the asset.
-    * The key represents the format, such as 'less', 'scss', 'ts', etc.
-    * The value is an array of `ICompileData` objects representing
-    * the data to be compiled by other loaders.
+    * The main language to use in the contents.
     */
-   chunks: Record<string, Omit<ICompileBaseResult, "type">[]>;
+   mainLang: string;
+   /**
+    * Record of compiled contents. The key is the language and the value
+    * is an array of compiled contents.
+    */
+   contents: Record<string, IChunk[]>;
 }
 
-export type ICompileResult = ICompileBaseResult | ICompileRecursiveResult;
-
-interface ILoaderDataBase {
+export interface ILoaderData {
    /** The name of the loader. */
    name: string;
-   /** Regular expression pattern used to match the asset source that the loader should be applied to. */
-   test: RegExp;
-}
-
-interface ILoaderDataAsync extends ILoaderDataBase {
-   async: true;
-   /** Async function that handles the compilation of the matched files. */
-   compile: (data: ICompileData) => Promise<ICompileResult>;
-}
-
-interface ILoaderDataSync extends ILoaderDataBase {
-   async: false;
+   /**
+    * A regular expression pattern or function used to match the asset
+    * source that the loader should be applied to.
+    */
+   test:
+      | RegExp
+      | ((source: string, params: IDependencyImportParams) => boolean);
+   /**
+    * Determines if the loader is chainable with other loaders.
+    * If set to false, the bundler will exclude other loaders and
+    * exclusively use this loader. Defaults to true.
+    */
+   chaining?: boolean;
    /** Function that handles the compilation of the matched files. */
-   compile: (data: ICompileData) => ICompileResult;
+   compile: (data: IRawDependencyData) => ILoaderResult | Promise<ILoaderResult>;
 }
-
-type ILoaderData = ILoaderDataAsync | ILoaderDataSync;
 
 interface ICache {
    parsed: Map<string, IParseJSResult | IParseCSSResult>;

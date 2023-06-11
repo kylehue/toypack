@@ -1,4 +1,4 @@
-import { CodeComposer, ICompileResult, ILoader, Toypack } from "../Toypack.js";
+import { CodeComposer, ILoader, ILoaderResult, Toypack } from "../Toypack.js";
 import {
    parse as parseHTML,
    Node,
@@ -8,7 +8,7 @@ import {
 } from "node-html-parser";
 import { SourceMapGenerator } from "source-map-js";
 import MapConverter from "convert-source-map";
-import { indexToPosition, mergeDeep } from "../utils.js";
+import { indexToPosition } from "../utils.js";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 
@@ -68,7 +68,7 @@ function getImportMap(this: Toypack, node: AST) {
 }
 
 function getImportCode(this: Toypack, source: string) {
-   return this.options.bundleOptions.module == "esm"
+   return this.options.bundleOptions.moduleType == "esm"
       ? `import "${source}";`
       : `require("${source}")`;
 }
@@ -90,10 +90,10 @@ function hasDescendantNode(parent: Node, node: Node) {
    return hasDescendantNode(parent, parentNode);
 }
 
-function getAttributeIndexInLine(str: string, content: string) {
-   const regex = new RegExp(str.replace(/['\"]/g, "[\"']"), "i");
+function getAttrIndexInLine(attr: string, lineContent: string) {
+   const regex = new RegExp(attr.replace(/['\"]/g, "[\"']"), "i");
 
-   const match = content.match(regex);
+   const match = lineContent.match(regex);
    if (match) {
       return match.index || -1;
    }
@@ -154,12 +154,10 @@ function compile(this: Toypack, source: string, content: string) {
       });
 
       // Add attributes
-      for (let [key, value] of Object.entries(node.attributes || {})) {
-         compilation.append(`${varId}.setAttribute("${key}", "${value}");`);
-         const attributeIndex = getAttributeIndexInLine(
-            `${key}="${value}"`,
-            line
-         );
+      for (let [attr, value] of Object.entries(node.attributes || {})) {
+         compilation.append(`${varId}.setAttribute("${attr}", "${value}");`);
+         /** @todo find a better way to find the index of an attribute in a line */
+         const attributeIndex = getAttrIndexInLine(`${attr}="${value}"`, line);
 
          smg?.addMapping({
             source,
@@ -171,7 +169,7 @@ function compile(this: Toypack, source: string, content: string) {
                line: compilation.getTotalLines(),
                column: 0,
             },
-            name: key,
+            name: attr,
          });
       }
 
@@ -216,7 +214,7 @@ function compile(this: Toypack, source: string, content: string) {
 
       // Put import maps to alias
       if (node instanceof HTMLElement && isImportMap(node)) {
-         if (this.options.bundleOptions.module == "cjs") {
+         if (this.options.bundleOptions.moduleType == "cjs") {
             this.options.bundleOptions.resolve.alias = {
                ...this.options.bundleOptions.resolve.alias,
                ...getImportMap.call(this, node),
@@ -301,14 +299,8 @@ export default function (): ILoader {
       return {
          name: "HTMLLoader",
          test: /\.html$/,
-         async: true,
          compile: async (data) => {
             let contentToCompile;
-            const result: ICompileResult = {
-               type: "result",
-               content: "",
-            };
-
             if (typeof data.content != "string") {
                contentToCompile = await data.content.text();
             } else {
@@ -317,8 +309,17 @@ export default function (): ILoader {
 
             const compiled = compile.call(this, data.source, contentToCompile);
 
-            result.content = compiled.content;
-            result.map = compiled.map;
+            const result: ILoaderResult = {
+               mainLang: "js",
+               contents: {
+                  js: [
+                     {
+                        content: compiled.content,
+                        map: compiled.map,
+                     },
+                  ],
+               },
+            };
 
             return result;
          },
@@ -327,4 +328,4 @@ export default function (): ILoader {
 }
 
 type AST = HTMLElement | Node;
-type ITraverseCallback = (node: HTMLElement | Node) => void;
+type ITraverseCallback = (node: AST) => void;

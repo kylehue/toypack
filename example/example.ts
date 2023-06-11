@@ -21,8 +21,8 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new Toypack({
    bundleOptions: {
-      entry: "/index.html",
-      module: "esm",
+      entry: "",
+      moduleType: "esm",
       resolve: {
          alias: {
             "@classes": "/classes/",
@@ -70,7 +70,7 @@ downloadButton.onclick = async () => {
 };
 
 toypack.hooks.onError((e) => {
-   console.error(e.reason);
+   //console.error(e.reason);
 });
 
 toypack.setIFrame(iframe);

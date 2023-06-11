@@ -3,6 +3,7 @@ import { IParseScriptResult, parseScriptAsset } from "./parseScriptAsset.js";
 import { IParseStyleResult, parseStyleAsset } from "./parseStyleAsset.js";
 import { IAssetChunk, loadAsset } from "./loadAsset.js";
 import { IDependencyImportParams } from "./index.js";
+import { RawSourceMap } from "source-map-js";
 
 /**
  * Loads and parses an asset.
@@ -11,57 +12,78 @@ import { IDependencyImportParams } from "./index.js";
 export async function parseAsset(
    this: Toypack,
    source: string,
-   content: string,
+   content: string | Blob,
    params: IDependencyImportParams
 ) {
-   const result = {
-      type: this.hasExtension("script", source)
-         ? "script"
-         : ("style" as "script" | "style"),
+   const result: IParsedAsset = {
+      type: (this.hasExtension("script", source) ? "script" : "style") as
+         | "script"
+         | "style",
       source,
-      scripts: [] as IParsedScript[],
-      styles: [] as IParsedStyle[],
-      dependencies: [] as string[],
+      scripts: [],
+      styles: [],
+      dependencies: [],
    };
 
    const loadedAsset = await loadAsset.call(this, source, content, params);
 
    // Scripts
    for (const script of loadedAsset.scripts) {
-      const parsedScript = await parseScriptAsset.call(
+      if (typeof script.content != "string") continue;
+      const { dependencies, AST } = await parseScriptAsset.call(
          this,
-         script.source,
-         script.content
+         script.chunkSource,
+         script.content,
       );
 
-      result.dependencies.push(...parsedScript.dependencies);
+      result.dependencies.push(...dependencies);
       result.scripts.push({
-         ...parsedScript,
-         source: script.source,
+         chunkSource: script.chunkSource,
          content: script.content,
          map: script.map,
+         dependencies,
+         AST,
       });
    }
 
    // Styles
-   for (const script of loadedAsset.styles) {
-      const parsedStyle = await parseStyleAsset.call(
+   for (const style of loadedAsset.styles) {
+      if (typeof style.content != "string") continue;
+      const { dependencies, AST } = await parseStyleAsset.call(
          this,
-         script.source,
-         script.content
+         style.chunkSource,
+         style.content
       );
 
-      result.dependencies.push(...parsedStyle.dependencies);
+      result.dependencies.push(...dependencies);
       result.styles.push({
-         ...parsedStyle,
-         source: script.source,
-         content: script.content,
-         map: script.map,
+         chunkSource: style.chunkSource,
+         content: style.content,
+         map: style.map,
+         dependencies,
+         AST,
       });
    }
 
    return result;
 }
 
-export type IParsedScript = IParseScriptResult & IAssetChunk;
-export type IParsedStyle = IParseStyleResult & IAssetChunk;
+export interface IParsedScript extends IParseScriptResult {
+   chunkSource: string;
+   content: string;
+   map?: RawSourceMap;
+}
+
+export interface IParsedStyle extends IParseStyleResult {
+   chunkSource: string;
+   content: string;
+   map?: RawSourceMap;
+}
+
+export interface IParsedAsset {
+   type: "script" | "style";
+   source: string;
+   scripts: IParsedScript[];
+   styles: IParsedStyle[];
+   dependencies: string[];
+}

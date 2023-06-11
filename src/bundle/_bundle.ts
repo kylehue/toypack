@@ -10,16 +10,20 @@ import {
    SourceMapGenerator,
    RawSourceMap,
 } from "source-map-js";
-import { CodeComposer } from "./CodeComposer.js";
-import { IDependency, IDependencyChunk, IDependencyMap } from "./graph.js";
-import * as rt from "./runtime.js";
-import { IChunk, IScriptDependency, Toypack } from "./Toypack.js";
+import { CodeComposer } from "../CodeComposer.js";
+import {
+   IDependency,
+   IDependencyChunk,
+   IDependencyMap,
+} from "../graph/index.js";
+import * as rt from "../runtime.js";
+import { IChunk, IScriptDependency, Toypack } from "../Toypack.js";
 import {
    JSONToBlob,
    findCodePosition,
    getHash,
    mergeSourceMaps,
-} from "./utils.js";
+} from "../utils.js";
 
 function groupTraverseOptions(array: ITraverseOptions[]) {
    const groups: ITraverseOptionGroups = {};
@@ -66,7 +70,7 @@ async function transpileAST(
    depMap: IDependencyMap,
    inputSourceMap?: RawSourceMap
 ) {
-   const format = this.options.bundleOptions.module;
+   const moduleType = this.options.bundleOptions.moduleType;
    const mode = this.options.bundleOptions.mode;
 
    const getSafeName = (relativeSource: string) => {
@@ -96,7 +100,7 @@ async function transpileAST(
    };
 
    // Rename `import` or `require` paths to be compatible with the `require` function's algorithm
-   if (format == "esm") {
+   if (moduleType == "esm") {
       modifyTraverseOptions({
          ImportDeclaration(scope) {
             if (isStyleSource(scope.node.source.value)) {
@@ -153,7 +157,7 @@ async function transpileAST(
    const userBabelOptions = this.options.babelOptions.transform;
 
    const importantBabelOptions = {
-      sourceType: format == "esm" ? "module" : "script",
+      sourceType: moduleType == "esm" ? "module" : "script",
       presets: [
          "env",
          ...(userBabelOptions.presets?.filter((v) => v != "env") || []),

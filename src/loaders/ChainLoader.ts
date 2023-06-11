@@ -2,11 +2,10 @@ import { ILoaderResult, ILoader, Toypack } from "../Toypack.js";
 
 export default function (): ILoader {
    return function (this: Toypack) {
-      this.addExtension("script", ".json");
-
+      this.addExtension("script", ".ext");
       return {
-         name: "JSONLoader",
-         test: /\.json$/,
+         name: "ExtLoader",
+         test: /\.ext$/,
          compile: async (data) => {
             let contentToCompile;
             if (typeof data.content != "string") {
@@ -15,16 +14,12 @@ export default function (): ILoader {
                contentToCompile = data.content;
             }
 
-            const moduleType = this.options.bundleOptions.moduleType;
-            const exportsSnippet =
-               moduleType == "esm" ? "export default " : "module.exports = ";
-
             const result: ILoaderResult = {
                mainLang: "js",
                contents: {
                   js: [
                      {
-                        content: exportsSnippet + data.content + ";",
+                        content: "/* bing bong */\n\n" + contentToCompile,
                      },
                   ],
                },

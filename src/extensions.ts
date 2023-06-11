@@ -29,7 +29,9 @@ export const resourceExtensions: string[] = [
    ".ogg",
    ".map",
 ];
+
 export const styleExtensions: string[] = [".css"];
+
 export const appExtensions: string[] = [
    ".js",
    ".mjs",
@@ -37,4 +39,10 @@ export const appExtensions: string[] = [
    ".ts",
    ".jsx",
    ".tsx",
+];
+
+export const supportedExtensions = [
+   ...appExtensions,
+   ...styleExtensions,
+   ...resourceExtensions,
 ];

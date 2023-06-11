@@ -4,14 +4,16 @@ build({
    bundle: true,
    sourcemap: true,
    outdir: "./browser",
-   format: "esm",
+   format: "iife",
    globalName: "Toypack",
    platform: "browser",
    external: [
       "fs",
       "assert",
+      "process",
       "path",
       "@babel/plugin-syntax-unicode-sets-regex",
+      "@babel/types",
    ],
-   logLevel: "info"
+   logLevel: "info",
 }).catch(() => process.exit());

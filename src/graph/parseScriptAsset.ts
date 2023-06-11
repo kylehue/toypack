@@ -1,6 +1,5 @@
 import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { Node } from "@babel/traverse";
-import { IAssetText } from "../asset.js";
 import { parseError } from "../errors.js";
 import { Toypack } from "../Toypack.js";
 
@@ -14,7 +13,7 @@ const emptyAST: Node = babelParse("");
 export async function parseScriptAsset(
    this: Toypack,
    source: string,
-   content: IAssetText["content"]
+   content: string
 ): Promise<IParseScriptResult> {
    /** @todo fix and test caching */
    // Check cache before parsing

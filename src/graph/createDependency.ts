@@ -1,5 +1,5 @@
 import { RawSourceMap } from "source-map-js";
-import { IParsedScript, IParsedStyle } from "./parseAsset";
+import { IParsedAsset, IParsedScript, IParsedStyle } from "./parseAsset.js";
 import { IAssetResource, IAssetText } from "../asset.js";
 
 /**
@@ -17,7 +17,7 @@ export function createDependency<T extends IDependencyType>(
    return dependency;
 }
 
-interface IDependencyResource {
+export interface IDependencyResource {
    type: "resource";
    asset: IAssetResource;
 }
@@ -26,16 +26,15 @@ interface IDependencyTextBase {
    map?: RawSourceMap;
    dependencyMap: Record<string, string>;
    asset: IAssetText;
+   parsed: IParsedAsset;
 }
 
-interface IDependencyScript extends IDependencyTextBase {
+export interface IDependencyScript extends IDependencyTextBase {
    type: "script";
-   parsed: IParsedScript;
 }
 
-interface IDependencyStyle extends IDependencyTextBase {
+export interface IDependencyStyle extends IDependencyTextBase {
    type: "style";
-   parsed: IParsedStyle;
 }
 
 export type IDependency<T extends IDependencyType = any> = T extends "resource"

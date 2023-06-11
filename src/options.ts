@@ -10,10 +10,10 @@ export const defaultOptions = {
        */
       entry: "",
       /**
-       * The module format of the program.
+       * The module type of the program.
        * @default "esm"
        */
-      module: "esm" as IModule,
+      moduleType: "esm" as IModuleType,
       /**
        * The mode of the bundle. `development` is optimized for a fast and flexible workflow during the development process. `production` is optimized for performance and efficiency in a live production environment.
        * @default "development"
@@ -64,7 +64,7 @@ export const defaultOptions = {
 };
 
 export type IOptions = typeof defaultOptions;
-export type IModule = "esm" | "cjs";
+export type IModuleType = "esm" | "cjs";
 export type IMode = "production" | "development";
 export type ILogLevel = "error" | "warn" | "info" | "none";
 export type IBabelTransformOptions = Pick<

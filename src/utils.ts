@@ -66,7 +66,7 @@ export function formatPath(from: string, to: string) {
 /**
  * Get the target and the params of a URL.
  */
-export function parseURLQuery(url: string) {
+export function parseURL(url: string) {
    const result = {
       target: "",
       params: {} as Record<string, any>,
