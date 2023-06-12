@@ -24,5 +24,7 @@ export async function bundle(this: Toypack, graph: IDependencyGraph) {
    const mode = this.options.bundleOptions.mode;
    const script = await bundleScript.call(this, graph);
 
+   console.log(script);
+   
    return result;
 }

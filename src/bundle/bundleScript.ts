@@ -1,45 +1,63 @@
-import { parse } from "@babel/parser";
+import { SourceMapGenerator } from "source-map-js";
 import { CodeComposer, Toypack } from "../Toypack.js";
 import { IDependencyGraph } from "../graph/index.js";
 import { compileScript } from "./compileScript.js";
-import { IParsedScript, IParsedStyle } from "../graph/parseAsset.js";
+import { mergeMapToBundle } from "./mergeMapToBundle.js";
+import * as rt from "./runtime.js";
+import MapConverter from "convert-source-map";
 
 export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
    const bundle = new CodeComposer();
+   const smg = this.options.bundleOptions.sourceMap
+      ? new SourceMapGenerator()
+      : null;
 
-   for (const dep of Object.values(graph)) {
-      /** @todo create a better way to typeguard this */
-      if (!this.hasExtension("script", dep.chunkSource)) continue;
-      const dependency = dep as IParsedScript;
-      
+   const finalizeBundleContent = () => {
+      const bundleClone = bundle.clone();
+      bundleClone.prepend(rt.requireFunction());
+
+      const entry = Object.values(graph).find(
+         (g) => g.type == "script" && g.isEntry
+      );
+      if (entry) {
+         bundleClone.breakLine().append(rt.requireCall(entry.chunkSource));
+      }
+
+      bundleClone.wrap(`
+      (function () {
+         <CODE_BODY>
+      })();
+      `);
+
+      return bundleClone.toString();
+   };
+
+   for (const source in graph) {
+      const script = graph[source];
+      if (script.type != "script") continue;
+      const isChunk = script.chunkSource == source;
+      if (!isChunk) continue;
+
+      const compiled = await compileScript.call(this, source, graph);
+
+      const wrapped = rt.moduleWrap(source, compiled.content);
+      bundle.breakLine().append(wrapped);
+
+      if (smg && compiled.map) {
+         mergeMapToBundle.call(
+            this,
+            smg,
+            compiled.map,
+            script.original.source,
+            script.original.content,
+            compiled.content,
+            finalizeBundleContent()
+         );
+      }
    }
 
-   // for (const dep of Object.values(graph)) {
-   //    if (dep.type == "resource") continue;
-   //    const entryScript = dep.parsed.scripts[0];
-
-   //    for (let i = dep.parsed.scripts.length - 1; i >= 0; i--) {
-   //       const script = dep.parsed.scripts[i];
-
-   //       if (true) {
-   //          (entryScript.AST as any).program.body.unshift(parse(`import * as a from 'tesfesfasft';`, {
-   //             sourceType: "module"
-   //          }).program.body[0]);
-   //       }
-
-   //       const compiledScript = await compileScript.call(
-   //          this,
-   //          script.chunkSource,
-   //          script.AST,
-   //          dep.dependencyMap,
-   //          script.map
-   //       );
-
-   //       console.log(compiledScript);
-         
-   //       //bundle.append(transpiled.code).breakLine();
-   //    }
-   // }
-
-   console.log(bundle.toString());
+   return {
+      content: finalizeBundleContent(),
+      map: smg ? MapConverter.fromJSON(smg.toString()) : null
+   }
 }

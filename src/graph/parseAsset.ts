@@ -1,8 +1,7 @@
 import { Toypack } from "../Toypack.js";
 import { IParseScriptResult, parseScriptAsset } from "./parseScriptAsset.js";
 import { IParseStyleResult, parseStyleAsset } from "./parseStyleAsset.js";
-import { IAssetChunk, loadAsset } from "./loadAsset.js";
-import { IDependencyImportParams } from "./index.js";
+import { loadAsset } from "./loadAsset.js";
 import { RawSourceMap } from "source-map-js";
 
 /**
@@ -12,8 +11,7 @@ import { RawSourceMap } from "source-map-js";
 export async function parseAsset(
    this: Toypack,
    source: string,
-   content: string | Blob,
-   params: IDependencyImportParams
+   content: string | Blob
 ) {
    const result: IParsedAsset = {
       type: (this.hasExtension("script", source) ? "script" : "style") as
@@ -23,9 +21,13 @@ export async function parseAsset(
       scripts: [],
       styles: [],
       dependencies: [],
+      original: {
+         source,
+         content,
+      },
    };
 
-   const loadedAsset = await loadAsset.call(this, source, content, params);
+   const loadedAsset = await loadAsset.call(this, source, content);
 
    // Scripts
    for (const script of loadedAsset.scripts) {
@@ -33,7 +35,7 @@ export async function parseAsset(
       const { dependencies, AST } = await parseScriptAsset.call(
          this,
          script.chunkSource,
-         script.content,
+         script.content
       );
 
       result.dependencies.push(...dependencies);
@@ -86,4 +88,8 @@ export interface IParsedAsset {
    scripts: IParsedScript[];
    styles: IParsedStyle[];
    dependencies: string[];
+   original: {
+      source: string;
+      content: string | Blob;
+   };
 }

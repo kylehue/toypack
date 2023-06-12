@@ -1,28 +1,54 @@
-import { Toypack } from "../Toypack.js";
-import { getHash, mergeSourceMaps } from "../utils.js";
+import type { TransformOptions, BabelFileResult } from "@babel/core";
 import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
-import { TransformOptions, BabelFileResult } from "@babel/core";
 import { transformFromAst } from "@babel/standalone";
-import { RawSourceMap } from "source-map-js";
+import babelTypes from "@babel/types";
 import MapConverter from "convert-source-map";
+import { RawSourceMap } from "source-map-js";
+import { Toypack } from "../Toypack.js";
+import { mergeSourceMaps, parseURL } from "../utils.js";
+import { IDependencyGraph } from "../graph/index.js";
 
 export async function compileScript(
    this: Toypack,
    source: string,
-   AST: Node,
-   dependencyMap: Record<string, string>,
-   inputSourceMap?: RawSourceMap
+   graph: IDependencyGraph
 ) {
+   const script = graph[source];
+   if (script.type != "script") {
+      throw new Error("The source to compile must be a valid script.");
+   }
+
    const moduleType = this.options.bundleOptions.moduleType;
    const mode = this.options.bundleOptions.mode;
+   const { dependencyMap, AST, map: inputSourceMap } = script;
 
-   const getSafeName = (relativeSource: string) => {
-      const absoluteSource = dependencyMap[relativeSource];
-      return absoluteSource;
+   const getChunkSourceFromRelativeSource = (relativeSource: string) => {
+      const parsed = parseURL(relativeSource);
+      const absoluteSource = dependencyMap[parsed.target + parsed.query];
+      let chunkSource = graph[absoluteSource + parsed.query]?.chunkSource;
+
+      if (!chunkSource && graph[relativeSource]) {
+         chunkSource = relativeSource;
+      }
+
+      return chunkSource;
+   };
+
+   const isStyleSource = (relativeSource: string) => {
+      let absoluteSource = dependencyMap[relativeSource];
+
+      if (!absoluteSource && graph[relativeSource]) {
+         absoluteSource = relativeSource;
+      }
+
+      if (this.hasExtension("style", absoluteSource)) {
+         return true;
+      }
+
+      return false;
    };
 
    const traverseOptionsArray: ITraverseOptions[] = [];
-
    const modifyTraverseOptions = (traverseOptions: ITraverseOptions) => {
       traverseOptionsArray.push(traverseOptions);
    };
@@ -33,14 +59,28 @@ export async function compileScript(
       source,
    });
 
-   const isStyleSource = (relativeSource: string) => {
-      const absoluteSource = dependencyMap[relativeSource];
-      if (this.hasExtension("style", absoluteSource)) {
-         return true;
-      }
-
-      return false;
-   };
+   // Import chunks to main chunk
+   modifyTraverseOptions({
+      Program(scope) {
+         for (const rawChunkSource of script.rawChunkSources) {
+            if (rawChunkSource == script.chunkSource) continue;
+            if (moduleType == "esm") {
+               const importDeclaration = babelTypes.importDeclaration(
+                  [],
+                  babelTypes.stringLiteral(rawChunkSource)
+               );
+               scope.unshiftContainer("body", importDeclaration);
+            } else {
+               const requireStatement = babelTypes.expressionStatement(
+                  babelTypes.callExpression(babelTypes.identifier("require"), [
+                     babelTypes.stringLiteral(rawChunkSource),
+                  ])
+               );
+               scope.unshiftContainer("body", requireStatement);
+            }
+         }
+      },
+   });
 
    // Rename `import` or `require` paths
    if (moduleType == "esm") {
@@ -49,23 +89,29 @@ export async function compileScript(
             if (isStyleSource(scope.node.source.value)) {
                scope.remove();
             } else {
-               scope.node.source.value = getSafeName(scope.node.source.value);
+               scope.node.source.value = getChunkSourceFromRelativeSource(
+                  scope.node.source.value
+               );
             }
          },
          ExportAllDeclaration(scope) {
             if (isStyleSource(scope.node.source.value)) {
                scope.remove();
             } else {
-               scope.node.source.value = getSafeName(scope.node.source.value);
+               scope.node.source.value = getChunkSourceFromRelativeSource(
+                  scope.node.source.value
+               );
             }
          },
          ExportNamedDeclaration(scope) {
             if (scope.node.source?.type != "StringLiteral") return;
-            
+
             if (isStyleSource(scope.node.source.value)) {
                scope.remove();
             } else {
-               scope.node.source.value = getSafeName(scope.node.source.value);
+               scope.node.source.value = getChunkSourceFromRelativeSource(
+                  scope.node.source.value
+               );
             }
          },
       });
@@ -84,7 +130,9 @@ export async function compileScript(
                if (isStyleSource(argNode.value)) {
                   scope.remove();
                } else {
-                  argNode.value = getSafeName(argNode.value);
+                  argNode.value = getChunkSourceFromRelativeSource(
+                     argNode.value
+                  );
                }
             }
          },
@@ -128,7 +176,7 @@ export async function compileScript(
 
    const result = {
       source,
-      code: transpiled.code || "",
+      content: transpiled.code || "",
       map,
    };
 

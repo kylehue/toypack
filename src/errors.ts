@@ -8,7 +8,7 @@ export function anyError(reason: string) {
 export function loaderNotFoundError(source: string) {
    return {
       code: 1,
-      reason: `'${source}' is not supported. You might want to add a loader for this file type.`,
+      reason: `'${source}' contains contents that are not supported.`,
    };
 }
 
