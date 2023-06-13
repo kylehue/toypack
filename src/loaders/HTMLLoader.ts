@@ -6,9 +6,9 @@ import {
    NodeType,
    TextNode,
 } from "node-html-parser";
-import { SourceMapGenerator } from "source-map-js";
+import { RawSourceMap, SourceMapGenerator } from "source-map-js";
 import MapConverter from "convert-source-map";
-import { indexToPosition } from "../utils.js";
+import { getHash, indexToPosition } from "../utils.js";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 
@@ -91,7 +91,13 @@ function hasDescendantNode(parent: Node, node: Node) {
 }
 
 function getAttrIndexInLine(attr: string, value: string, lineContent: string) {
-   const regex = new RegExp(`${attr}\\s*=\\s*['\"]${value}['\"]`, "i");
+   const regex = new RegExp(
+      `${attr}\\s*=\\s*['\"]${value.replace(
+         /[-[\]{}()*+?.,\\^$|#\s]/g,
+         "\\$&"
+      )}['\"]`,
+      "i"
+   );
    const match = lineContent.match(regex);
    if (match) {
       return match.index || -1;
@@ -115,6 +121,15 @@ function compile(this: Toypack, source: string, content: string) {
    const bodyAST = htmlAST.querySelector("body");
    const headAST = htmlAST.querySelector("head");
 
+   const cssChunks: {
+      content: string;
+      range: [number, number];
+      inline?: {
+         id: string;
+         tagName: string;
+      };
+   }[] = [];
+
    const smg: SourceMapGenerator | null = !!this.config.bundle.sourceMap
       ? new SourceMapGenerator()
       : null;
@@ -128,7 +143,10 @@ function compile(this: Toypack, source: string, content: string) {
       }
    };
 
-   const addElement = (node: HTMLElement) => {
+   const addElement = (
+      node: HTMLElement,
+      attributes: Record<string, string>
+   ) => {
       const tagName = node.tagName?.toLowerCase();
       if (!tagName) return;
       if (tagName == "body" || tagName == "head") return;
@@ -153,9 +171,8 @@ function compile(this: Toypack, source: string, content: string) {
       });
 
       // Add attributes
-      for (let [attr, value] of Object.entries(node.attributes || {})) {
+      for (let [attr, value] of Object.entries(attributes || {})) {
          compilation.append(`${varId}.setAttribute("${attr}", "${value}");`);
-         /** @todo find a better way to find the index of an attribute in a line */
          const attributeIndex = getAttrIndexInLine(attr, value, line);
 
          smg?.addMapping({
@@ -223,10 +240,47 @@ function compile(this: Toypack, source: string, content: string) {
          node.remove();
       }
 
+      // Put style tags in css chunks
+      if (node instanceof HTMLElement && node.tagName == "STYLE") {
+         cssChunks.push({
+            content: node.textContent,
+            range: [...node.range],
+         });
+
+         node.remove();
+      }
+
+      // Put inline styles in css chunks
+      const attrsCopy =
+         node instanceof HTMLElement ? Object.assign({}, node.attributes) : {};
+      if (node instanceof HTMLElement && typeof attrsCopy.style == "string") {
+         const styleAttrIndex = getAttrIndexInLine(
+            "style",
+            attrsCopy.style,
+            node.outerHTML.trim().split("\n").join(" ")
+         );
+         const attrRange: [number, number] = [
+            node.range[0] + styleAttrIndex,
+            node.range[1],
+         ];
+         const id = getHash(attrRange.toString());
+         attrsCopy[id] = "";
+         cssChunks.push({
+            content: attrsCopy.style,
+            range: attrRange,
+            inline: {
+               id,
+               tagName: node.tagName.toLowerCase(),
+            },
+         });
+
+         delete attrsCopy.style;
+      }
+
       const stillExists = hasDescendantNode(htmlAST, node);
       if (stillExists) {
          if (node instanceof HTMLElement) {
-            addElement(node);
+            addElement(node, attrsCopy);
          }
 
          if (node instanceof TextNode) addText(node);
@@ -288,12 +342,61 @@ function compile(this: Toypack, source: string, content: string) {
    return {
       map: smg ? MapConverter.fromJSON(smg.toString()).toObject() : null,
       content: compilation.toString(),
+      cssChunks,
    };
+}
+
+function compileCSSChunks(
+   cssChunks: ReturnType<typeof compile>["cssChunks"],
+   config: {
+      sourceMaps: boolean;
+      originalSource: string;
+      originalContent: string;
+   }
+) {
+   const chunks: { content: string; map?: RawSourceMap }[] = [];
+   for (const cssChunk of cssChunks) {
+      const smg = config.sourceMaps ? new SourceMapGenerator() : null;
+      if (cssChunk.inline) {
+         cssChunk.content = `${cssChunk.inline.tagName}[${cssChunk.inline.id}] { ${cssChunk.content} }`;
+      }
+
+      if (smg) {
+         const cssChunkLines = cssChunk.content.split("\n");
+         const original = indexToPosition(config.originalContent, cssChunk.range[0]);
+
+         smg.setSourceContent(config.originalSource, config.originalContent);
+
+         for (let i = 0; i < cssChunkLines.length; i++) {
+            const line = cssChunkLines[i];
+            const linePos = line.indexOf(line.trim());
+            smg.addMapping({
+               original: {
+                  line: original.line + i,
+                  column: !cssChunk.inline ? linePos : original.column,
+               },
+               generated: {
+                  line: i + 1,
+                  column: linePos,
+               },
+               source: config.originalSource,
+            });
+         }
+      }
+
+      chunks.push({
+         content: cssChunk.content,
+         map: smg ? MapConverter.fromJSON(smg.toString()).toObject() : null,
+      });
+   }
+
+   return chunks;
 }
 
 export default function (): ILoader {
    return function (this: Toypack) {
       this.addExtension("script", ".html");
+      const sourceMapConfig = this.config.bundle.sourceMap;
 
       return {
          name: "HTMLLoader",
@@ -307,6 +410,11 @@ export default function (): ILoader {
             }
 
             const compiled = compile.call(this, data.source, contentToCompile);
+            const compiledCSSChunks = compileCSSChunks(compiled.cssChunks, {
+               sourceMaps: !!sourceMapConfig,
+               originalSource: data.source,
+               originalContent: contentToCompile
+            });
 
             const result: ILoaderResult = {
                mainLang: "js",
@@ -317,6 +425,7 @@ export default function (): ILoader {
                         map: compiled.map,
                      },
                   ],
+                  css: compiledCSSChunks,
                },
             };
 

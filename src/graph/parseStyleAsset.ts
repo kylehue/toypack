@@ -2,7 +2,6 @@ import path from "path-browserify";
 import * as cssTree from "css-tree";
 import { Toypack } from "../Toypack.js";
 import { parseError } from "../errors.js";
-import { getHash } from "../utils.js";
 
 /**
  * Parses and extracts the dependencies of a CSS asset.

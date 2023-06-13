@@ -66,9 +66,8 @@ export async function bundle(this: Toypack, graph: IDependencyGraph) {
             dep.asset.source
          );
          if (!useableSource) continue;
-
          result.resources.push({
-            source: useableSource,
+            source: useableSource.replace(/^\.*\//g, ""),
             content: dep.asset.content,
          });
       }

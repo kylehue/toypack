@@ -107,6 +107,7 @@ export async function loadAsset(
             : [];
 
          for (const [lang, chunks] of chunkCollection) {
+            if (!chunks.length) break;
             const dummyChunkSource =
                parsedSource.target + "." + lang + parsedSource.query;
             for (const chunk of chunks) {
@@ -114,7 +115,7 @@ export async function loadAsset(
                   map && chunk.map
                      ? mergeSourceMaps(map, chunk.map)
                      : chunk.map;
-
+               
                await loadRecursively(
                   dummyChunkSource,
                   chunk.content,

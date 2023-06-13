@@ -2,11 +2,6 @@ import { sampleFiles } from "./sample.js";
 import { Toypack as ToypackESM, Babel } from "../build/Toypack.js";
 import DefinePlugin from "../build/plugins/DefinePlugin.js";
 
-const ToypackUMD = (window as any).Toypack.Toypack;
-
-console.log(ToypackUMD);
-
-
 var saveData = (function () {
    var a = document.createElement("a");
    document.body.appendChild(a);
@@ -24,7 +19,7 @@ var saveData = (function () {
 const iframe = document.querySelector<HTMLIFrameElement>("#sandbox")!;
 const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
-const toypack = new ToypackUMD({
+const toypack = new ToypackESM({
    bundle: {
       entry: "",
       moduleType: "esm",

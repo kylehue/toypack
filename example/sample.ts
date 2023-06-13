@@ -32,10 +32,15 @@ addFile(
 
          console.log(test);
       </script>
+      <style>
+         body {
+            background: url(./images/cat.png);
+         }
+      </style>
       <script type="module" src="src/main"></script>
    </head>
    <body>
-      <div class="">
+      <div class="" style="background: url(./images/cat.png);">
          <button id="runSandbox">Run</button>
          <button id="download">Download</button>
       </div>
@@ -128,7 +133,7 @@ addFile(
    "styles/sample.css",
    `
 body {
-   background: url(../images/cat.png);
+   /* background: url(../images/cat.png); */
    background-color: red;
    color: white;
    color: url(#test);
