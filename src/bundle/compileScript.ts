@@ -119,6 +119,20 @@ export async function compileScript(
                );
             }
          },
+         CallExpression(scope) {
+            const argNode = scope.node.arguments[0];
+            const callee = scope.node.callee;
+            const isDynamicImport = callee.type == "Import";
+            if (isDynamicImport && argNode.type == "StringLiteral") {
+               if (isStyleSource(argNode.value)) {
+                  scope.remove();
+               } else {
+                  argNode.value = getChunkSourceFromRelativeSource(
+                     argNode.value
+                  );
+               }
+            }
+         },
       });
    } else {
       modifyTraverseOptions({
@@ -127,11 +141,7 @@ export async function compileScript(
             const callee = scope.node.callee;
             const isRequire =
                callee.type == "Identifier" && callee.name == "require";
-            const isDynamicImport = callee.type == "Import";
-            if (
-               (isRequire || isDynamicImport) &&
-               argNode.type == "StringLiteral"
-            ) {
+            if (isRequire && argNode.type == "StringLiteral") {
                if (isStyleSource(argNode.value)) {
                   scope.remove();
                } else {
