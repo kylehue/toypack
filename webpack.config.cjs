@@ -1,27 +1,44 @@
+const webpack = require("webpack");
 const path = require("path");
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
 module.exports = {
+   mode: "production",
    entry: "./src/Toypack.ts",
+   resolve: {
+      extensions: [".js"],
+      fallback: {
+         "@babel/plugin-syntax-unicode-sets-regex": false,
+         path: require.resolve("path-browserify"),
+         fs: false,
+      },
+      extensionAlias: {
+         ".js": [".js", ".ts"],
+      },
+   },
    module: {
       rules: [
          {
-            test: /\.tsx?$/,
+            test: /\.ts$/,
             use: "ts-loader",
             exclude: /node_modules/,
          },
       ],
    },
-   resolve: {
-      extensions: [".tsx", ".ts", ".js"],
-   },
    output: {
       filename: "Toypack.js",
-      path: path.resolve(__dirname, "browser"),
+      path: path.resolve(__dirname, "./browser"),
       library: {
          name: "Toypack",
          type: "umd",
-         export: "default",
       },
-      clean: true
+      clean: true,
    },
+   devtool: "source-map",
+   plugins: [
+      new NodePolyfillPlugin(),
+      new webpack.ContextReplacementPlugin(
+         /(.+)?(@babel(\\|\/)standalone)(.+)?/
+      ),
+   ],
 };

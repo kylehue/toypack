@@ -1,5 +1,5 @@
 import { Node } from "@babel/traverse";
-import { IAsset } from "./asset";
+import { IAsset } from "./asset.js";
 import type { ITraverseOptions } from "./bundle/compileScript.js";
 
 const eventMap = {
