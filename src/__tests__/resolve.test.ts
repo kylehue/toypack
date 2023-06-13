@@ -7,7 +7,7 @@ import { describe, expect, test, beforeAll } from "vitest";
 import { Toypack } from "../Toypack.js";
 
 const toypack = new Toypack({
-   bundleOptions: {
+   bundle: {
       entry: "src/main.js",
       resolve: {
          alias: {

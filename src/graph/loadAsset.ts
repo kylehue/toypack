@@ -3,7 +3,7 @@ import { RawSourceMap } from "source-map-js";
 import { loaderNotFoundError } from "../errors.js";
 import { ILoaderData, Toypack } from "../Toypack.js";
 import { supportedExtensions } from "../extensions.js";
-import { createChunkSource, mergeSourceMaps, parseURL } from "../utils.js";
+import { mergeSourceMaps, parseURL } from "../utils.js";
 
 /**
  * Loads an asset's content using loaders.
@@ -21,25 +21,29 @@ export async function loadAsset(
    };
 
    const addToResult = (
-      sourceToAdd: string,
+      parsedSource: ReturnType<typeof parseURL>,
       contentToAdd: string | Blob,
       map?: RawSourceMap
    ) => {
       let key: "scripts" | "styles" | null = null;
-      if (this.hasExtension("script", sourceToAdd)) {
+      if (this.hasExtension("script", parsedSource.target)) {
          key = "scripts";
-      } else if (this.hasExtension("style", sourceToAdd)) {
+      } else if (this.hasExtension("style", parsedSource.target)) {
          key = "styles";
       }
 
       if (key) {
+         let chunkSource = parsedSource.target + parsedSource.query;
          const group = loadedAssetResult[key];
-         const extname = path.extname(sourceToAdd);
-         const chunkSource = createChunkSource(
-            sourceToAdd.replace(new RegExp(extname + "$"), ""),
-            extname.replace(/^\./, ""),
-            group.length
-         );
+         if (group.length >= 1) {
+            const extname = path.extname(parsedSource.target);
+            chunkSource = parsedSource.target.replace(
+               new RegExp(extname + "$", "gi"),
+               ""
+            );
+            chunkSource += "-" + group.length + extname + parsedSource.query;
+         }
+
          group.push({
             chunkSource: chunkSource,
             content: contentToAdd,
@@ -56,7 +60,7 @@ export async function loadAsset(
       const parsedSource = parseURL(rawSource);
       // No need to load if source is already supported
       if (supportedExtensions.includes(path.extname(parsedSource.target))) {
-         addToResult(rawSource, contentToLoad, map);
+         addToResult(parsedSource, contentToLoad, map);
          return;
       }
 
@@ -83,7 +87,7 @@ export async function loadAsset(
          !loaders.length &&
          !supportedExtensions.includes(path.extname(parsedSource.target))
       ) {
-         this.hooks.trigger("onError", loaderNotFoundError(source));
+         this.hooks.trigger("onError", loaderNotFoundError(parsedSource.target));
          return;
       }
 
@@ -103,7 +107,8 @@ export async function loadAsset(
             : [];
 
          for (const [lang, chunks] of chunkCollection) {
-            const dummyChunkSource = parsedSource.target + "." + lang;
+            const dummyChunkSource =
+               parsedSource.target + "." + lang + parsedSource.query;
             for (const chunk of chunks) {
                const chunkSourceMap =
                   map && chunk.map

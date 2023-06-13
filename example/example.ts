@@ -1,5 +1,5 @@
 import { sampleFiles } from "./sample.js";
-import d, { Toypack, Babel, Utilities } from "../build/Toypack.js";
+import { Toypack, Babel } from "../build/Toypack.js";
 import DefinePlugin from "../build/plugins/DefinePlugin.js";
 
 var saveData = (function () {
@@ -20,7 +20,7 @@ const iframe = document.querySelector<HTMLIFrameElement>("#sandbox")!;
 const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new Toypack({
-   bundleOptions: {
+   bundle: {
       entry: "",
       moduleType: "esm",
       resolve: {
@@ -33,7 +33,7 @@ const toypack = new Toypack({
       },
       mode: "development",
    },
-   babelOptions: {
+   babel: {
       transform: {
          presets: ["typescript"],
       },
@@ -50,21 +50,21 @@ runButton.onclick = async () => {
 };
 
 downloadButton.onclick = async () => {
-   toypack.options.bundleOptions.mode = "production";
+   toypack.config.bundle.mode = "production";
    let result = await toypack.run();
-   toypack.options.bundleOptions.mode = "development";
+   toypack.config.bundle.mode = "development";
 
    for (let resource of result.resources) {
       saveData(resource.content, resource.source, resource.content.type);
    }
 
    saveData(
-      result.script.content,
-      result.script.source,
+      result.js.content,
+      result.js.source,
       "application/javascript"
    );
 
-   saveData(result.style.content, result.style.source, "text/css");
+   saveData(result.css.content, result.css.source, "text/css");
 
    saveData(result.html.content, result.html.source, "text/html");
 };

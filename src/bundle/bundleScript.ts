@@ -5,10 +5,12 @@ import { compileScript } from "./compileScript.js";
 import { mergeMapToBundle } from "./mergeMapToBundle.js";
 import * as rt from "./runtime.js";
 import MapConverter from "convert-source-map";
+import babelMinify from "babel-minify";
+import { mergeSourceMaps } from "../utils.js";
 
 export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
    const bundle = new CodeComposer();
-   const smg = this.options.bundleOptions.sourceMap
+   const smg = this.config.bundle.sourceMap
       ? new SourceMapGenerator()
       : null;
 
@@ -19,7 +21,7 @@ export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
       const entry = Object.values(graph).find(
          (g) => g.type == "script" && g.isEntry
       );
-      if (entry) {
+      if (entry && entry.type == "script") {
          bundleClone.breakLine().append(rt.requireCall(entry.chunkSource));
       }
 
@@ -33,31 +35,62 @@ export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
    };
 
    for (const source in graph) {
-      const script = graph[source];
-      if (script.type != "script") continue;
-      const isChunk = script.chunkSource == source;
-      if (!isChunk) continue;
+      const dep = graph[source];
+      if (dep.chunkSource != source) continue;
 
-      const compiled = await compileScript.call(this, source, graph);
+      if (dep.type == "script") {
+         const compiled = await compileScript.call(this, source, graph);
+         if (!compiled.content) continue;
 
-      const wrapped = rt.moduleWrap(source, compiled.content);
-      bundle.breakLine().append(wrapped);
+         const wrapped = rt.moduleWrap(source, compiled.content);
+         bundle.breakLine().append(wrapped);
 
-      if (smg && compiled.map) {
-         mergeMapToBundle.call(
-            this,
-            smg,
-            compiled.map,
-            script.original.source,
-            script.original.content,
-            compiled.content,
-            finalizeBundleContent()
+         if (smg && compiled.map) {
+            mergeMapToBundle.call(
+               this,
+               smg,
+               compiled.map,
+               dep.original.source,
+               dep.original.content,
+               compiled.content,
+               finalizeBundleContent()
+            );
+         }
+      } else if (dep.type == "resource") {
+         const cjsModuleContents = rt.moduleWrap(
+            dep.asset.source,
+            `module.exports = "${this.resourceSourceToUseableSource(
+               dep.asset.source
+            )}";`
          );
+
+         bundle.breakLine().append(cjsModuleContents);
       }
    }
 
-   return {
+   const result = {
       content: finalizeBundleContent(),
-      map: smg ? MapConverter.fromJSON(smg.toString()) : null
+      map: smg ? MapConverter.fromJSON(smg.toString()) : null,
+   };
+
+   const shouldMinify = this.config.bundle.mode == "production";
+   if (shouldMinify) {
+      let { code, map } = babelMinify(
+         result.content,
+         {},
+         {
+            sourceMaps: true,
+            comments: false,
+         }
+      );
+
+      if (result.map && map) {
+         map = mergeSourceMaps(result.map.toObject(), map);
+      }
+
+      result.content = code;
+      result.map = MapConverter.fromObject(map);
    }
+
+   return result;
 }

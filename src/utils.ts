@@ -76,6 +76,11 @@ export function parseURL(url: string) {
    const [target, queryString] = url.split("?");
    result.target = target;
    const params = queryString?.split("&") || [];
+
+   if (!params.length) {
+      return result;
+   }
+
    for (const param of params) {
       const [paramKey, paramValue] = param.split("=");
       result.params[paramKey] = paramValue || true;
@@ -247,10 +252,6 @@ export function mergeDeep<T extends Object>(target: T, ...sources: T[]) {
    }
 
    return mergeDeep(target, ...sources);
-}
-
-export function JSONToBlob(json: string) {
-   return new Blob([json], { type: "application/json" });
 }
 
 /**

@@ -1,5 +1,5 @@
 import path from "path-browserify";
-import { IAssetText } from "../asset.js";
+import { IAssetResource, IAssetText } from "../asset.js";
 import {
    invalidEntryError,
    entryNotFoundError,
@@ -9,9 +9,6 @@ import { Toypack } from "../Toypack.js";
 import { parseURL } from "../utils.js";
 import { createDependency, IDependency } from "./createDependency.js";
 import { parseAsset } from "./parseAsset.js";
-import MapConverter from "convert-source-map";
-
-(window as any).MapConverter = MapConverter;
 
 /**
  * Recursively get the dependency graph of an asset.
@@ -20,7 +17,18 @@ import MapConverter from "convert-source-map";
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
    const graph: IDependencyGraph = {};
    const recurse = async (source: string, content: string | Blob) => {
+      // Avoid dependency duplication in the graph
       if (graph[source]) {
+         return;
+      }
+
+      // No need to parse a resource dependency
+      if (this.hasExtension("resource", source)) {
+         const asset = this.getAsset(source) as IAssetResource;
+         graph[source] = createDependency("resource", {
+            asset,
+            chunkSource: source
+         });
          return;
       }
 
@@ -111,8 +119,8 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
  */
 export async function getDependencyGraph(this: Toypack) {
    let graph: IDependencyGraph = {};
-   const entrySource = this.options.bundleOptions.entry
-      ? this.resolve(path.join("/", this.options.bundleOptions.entry))
+   const entrySource = this.config.bundle.entry
+      ? this.resolve(path.join("/", this.config.bundle.entry))
       : this.resolve("/");
 
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;

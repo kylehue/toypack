@@ -16,7 +16,7 @@ export default function (): ILoader {
                contentToCompile = data.content;
             }
             
-            const moduleType = this.options.bundleOptions.moduleType;
+            const moduleType = this.config.bundle.moduleType;
             const exportsSnippet =
                moduleType == "esm" ? "export default " : "module.exports = ";
             

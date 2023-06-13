@@ -1,10 +1,10 @@
 import { ParserOptions, TransformOptions } from "@babel/core";
 
-export const defaultOptions = {
+export const defaultConfig = {
    /**
     * Configuration for the bundler.
     */
-   bundleOptions: {
+   bundle: {
       /**
        * The entry point of the program. If not specified, entry will be `/index.js` or `/index.html`. If those files doesn't exist, entry will be the path specified in the `main` field of `/package.json`.
        */
@@ -13,12 +13,12 @@ export const defaultOptions = {
        * The module type of the program.
        * @default "esm"
        */
-      moduleType: "esm" as IModuleType,
+      moduleType: "esm" as IModuleTypeConfig,
       /**
        * The mode of the bundle. `development` is optimized for a fast and flexible workflow during the development process. `production` is optimized for performance and efficiency in a live production environment.
        * @default "development"
        */
-      mode: "development" as IMode,
+      mode: "development" as IModeConfig,
       /**
        * Configuration for resolving module imports.
        */
@@ -42,12 +42,12 @@ export const defaultOptions = {
        * Indicates whether to generate source maps for the bundled code.
        * @default true
        */
-      sourceMap: true as ISourceMap,
+      sourceMap: true as ISourceMapConfig,
    },
    /**
     * Configuration for Babel.
     */
-   babelOptions: {
+   babel: {
       transform: {
          presets: [],
          plugins: [],
@@ -60,13 +60,13 @@ export const defaultOptions = {
     * Log level.
     * @default "error"
     */
-   logLevel: "error" as ILogLevel,
+   logLevel: "error" as ILogLevelConfig,
 };
 
-export type IOptions = typeof defaultOptions;
-export type IModuleType = "esm" | "cjs";
-export type IMode = "production" | "development";
-export type ILogLevel = "error" | "warn" | "info" | "none";
+export type IToypackConfig = typeof defaultConfig;
+export type IModuleTypeConfig = "esm" | "cjs";
+export type IModeConfig = "production" | "development";
+export type ILogLevelConfig = "error" | "warn" | "info" | "none";
 export type IBabelTransformOptions = Pick<
    TransformOptions,
    | "plugins"
@@ -82,4 +82,4 @@ export type IBabelParseOptions = Omit<
    "sourceType" | "sourceFilename" | "strictMode"
 >;
 
-export type ISourceMap = boolean | "nosources";
+export type ISourceMapConfig = boolean | "nosources";

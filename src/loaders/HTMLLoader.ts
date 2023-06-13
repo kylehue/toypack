@@ -68,7 +68,7 @@ function getImportMap(this: Toypack, node: AST) {
 }
 
 function getImportCode(this: Toypack, source: string) {
-   return this.options.bundleOptions.moduleType == "esm"
+   return this.config.bundle.moduleType == "esm"
       ? `import "${source}";`
       : `require("${source}")`;
 }
@@ -90,9 +90,8 @@ function hasDescendantNode(parent: Node, node: Node) {
    return hasDescendantNode(parent, parentNode);
 }
 
-function getAttrIndexInLine(attr: string, lineContent: string) {
-   const regex = new RegExp(attr.replace(/['\"]/g, "[\"']"), "i");
-
+function getAttrIndexInLine(attr: string, value: string, lineContent: string) {
+   const regex = new RegExp(`${attr}\\s*=\\s*['\"]${value}['\"]`, "i");
    const match = lineContent.match(regex);
    if (match) {
       return match.index || -1;
@@ -116,7 +115,7 @@ function compile(this: Toypack, source: string, content: string) {
    const bodyAST = htmlAST.querySelector("body");
    const headAST = htmlAST.querySelector("head");
 
-   const smg: SourceMapGenerator | null = !!this.options.bundleOptions.sourceMap
+   const smg: SourceMapGenerator | null = !!this.config.bundle.sourceMap
       ? new SourceMapGenerator()
       : null;
    smg?.setSourceContent(source, content);
@@ -157,7 +156,7 @@ function compile(this: Toypack, source: string, content: string) {
       for (let [attr, value] of Object.entries(node.attributes || {})) {
          compilation.append(`${varId}.setAttribute("${attr}", "${value}");`);
          /** @todo find a better way to find the index of an attribute in a line */
-         const attributeIndex = getAttrIndexInLine(`${attr}="${value}"`, line);
+         const attributeIndex = getAttrIndexInLine(attr, value, line);
 
          smg?.addMapping({
             source,
@@ -214,9 +213,9 @@ function compile(this: Toypack, source: string, content: string) {
 
       // Put import maps to alias
       if (node instanceof HTMLElement && isImportMap(node)) {
-         if (this.options.bundleOptions.moduleType == "cjs") {
-            this.options.bundleOptions.resolve.alias = {
-               ...this.options.bundleOptions.resolve.alias,
+         if (this.config.bundle.moduleType == "cjs") {
+            this.config.bundle.resolve.alias = {
+               ...this.config.bundle.resolve.alias,
                ...getImportMap.call(this, node),
             };
          }

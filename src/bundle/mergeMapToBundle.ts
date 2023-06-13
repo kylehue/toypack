@@ -33,7 +33,7 @@ export function mergeMapToBundle(
       );
    }
 
-   const sourceMapOption = this.options.bundleOptions.sourceMap;
+   const sourceMapOption = this.config.bundle.sourceMap;
    if (sourceMapOption != "nosources") {
       targetMap.setSourceContent(source, originalContent);
    }

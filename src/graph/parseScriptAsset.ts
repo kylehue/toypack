@@ -17,22 +17,22 @@ export async function parseScriptAsset(
 ): Promise<IParseScriptResult> {
    /** @todo fix and test caching */
    // Check cache before parsing
-   const cachedResult = this.cachedDeps.parsed.get(source);
-   if (cachedResult && cachedResult.type == "script") {
-      const cachedAsset = this.getAsset(source);
-      if (cachedAsset && !cachedAsset.modified) return cachedResult;
-   }
+   // const cachedResult = this.cachedDeps.parsed.get(source);
+   // if (cachedResult && cachedResult.type == "script") {
+   //    const cachedAsset = this.getAsset(source);
+   //    if (cachedAsset && !cachedAsset.modified) return cachedResult;
+   // }
 
    const result: IParseScriptResult = {
       dependencies: [] as string[],
       AST: emptyAST,
    };
 
-   const moduleType = this.options.bundleOptions.moduleType;
+   const moduleType = this.config.bundle.moduleType;
 
    // Parse
    try {
-      const userBabelOptions = this.options.babelOptions.parse;
+      const userBabelOptions = this.config.babel.parse;
       const importantBabelOptions: ParserOptions = {
          sourceType: moduleType == "esm" ? "module" : "script",
          sourceFilename: source,
@@ -82,7 +82,7 @@ export async function parseScriptAsset(
    }
 
    // Cache
-   this.cachedDeps.parsed.set(source, result);
+   //this.cachedDeps.parsed.set(source, result);
 
    return result;
 }

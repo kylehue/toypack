@@ -15,11 +15,11 @@ export async function parseStyleAsset(
 ): Promise<IParseStyleResult> {
    /** @todo fix and test caching */
    // Check cache before parsing
-   const cachedResult = this.cachedDeps.parsed.get(source);
-   if (cachedResult && cachedResult.type == "style") {
-      const cachedAsset = this.getAsset(source);
-      if (cachedAsset && !cachedAsset.modified) return cachedResult;
-   }
+   // const cachedResult = this.cachedDeps.parsed.get(source);
+   // if (cachedResult && cachedResult.type == "style") {
+   //    const cachedAsset = this.getAsset(source);
+   //    if (cachedAsset && !cachedAsset.modified) return cachedResult;
+   // }
 
    const result: IParseStyleResult = {
       dependencies: [] as string[],
@@ -28,7 +28,7 @@ export async function parseStyleAsset(
 
    // Parse
    const AST = cssTree.parse(content, {
-      positions: !!this.options.bundleOptions.sourceMap,
+      positions: !!this.config.bundle.sourceMap,
       filename: source,
       onParseError: (error: any) => {
          let message = error.formattedMessage;
@@ -78,29 +78,15 @@ export async function parseStyleAsset(
              * Development mode is gonna use Blob urls for resources.
              * Production mode is gonna use external urls.
              */
-            const resolved = this.resolve(
+            const resourceUseableSource = this.resourceSourceToUseableSource(
                "./" + sourceValue.replace(/^\//, ""),
-               {
-                  baseDir: path.dirname(source),
-               }
+               path.dirname(source)
             );
 
-            if (resolved) {
-               if (this.options.bundleOptions.mode == "production") {
-                  node.value = getHash(resolved) + path.extname(resolved);
-               } else {
-                  const resolvedAsset = this.getAsset(resolved);
-
-                  if (
-                     resolvedAsset?.type == "resource" &&
-                     resolvedAsset.contentURL
-                  ) {
-                     node.value = resolvedAsset.contentURL;
-                  }
-               }
+            if (resourceUseableSource) {
+               node.value = resourceUseableSource;
             }
 
-            //
             result.dependencies.push(sourceValue);
          }
       }
@@ -140,7 +126,7 @@ export async function parseStyleAsset(
       }
    });
 
-   this.cachedDeps.parsed.set(source, result);
+   //this.cachedDeps.parsed.set(source, result);
 
    return result;
 }

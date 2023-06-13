@@ -1,6 +1,6 @@
-import { Node, TraverseOptions } from "@babel/traverse";
+import { Node } from "@babel/traverse";
 import { IAsset } from "./asset";
-import { ITraverseOptions } from "./bundle/index.js";
+import type { ITraverseOptions } from "./bundle/compileScript.js";
 
 const eventMap = {
    onError: (event: IErrorEvent) => {},

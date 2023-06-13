@@ -8,22 +8,23 @@ import {
    resourceExtensions,
    styleExtensions,
 } from "./extensions.js";
-import {
-   getDependencyGraph,
-   IDependencyImportParams,
-   IParseCSSResult,
-   IParseJSResult,
-} from "./graph/index.js";
+import { getDependencyGraph, IDependencyImportParams } from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
-import { defaultOptions, IOptions } from "./options.js";
+import { defaultConfig, IToypackConfig } from "./config.js";
 import { resolve, IResolveOptions } from "./resolve.js";
-import { isChunk, isNodeModule, mergeDeep } from "./utils.js";
+import {
+   getHash,
+   isChunk,
+   isNodeModule,
+   isValidSource,
+   mergeDeep,
+   parseURL,
+} from "./utils.js";
 import JSONLoader from "./loaders/JSONLoader.js";
 import HTMLLoader from "./loaders/HTMLLoader.js";
 import RawLoader from "./loaders/RawLoader.js";
-import VueLoader from "./loaders/VueLoader.js";
-import SassLoader from "./loaders/SassLoader.js";
-import ChainLoader from "./loaders/ChainLoader.js";
+import { IParseScriptResult } from "./graph/parseScriptAsset.js";
+import { IParseStyleResult } from "./graph/parseStyleAsset.js";
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -38,25 +39,18 @@ export class Toypack {
       parsed: new Map(),
       compiled: new Map(),
    };
-   public options: IOptions;
+   public config: IToypackConfig;
    public hooks = new Hooks();
-   constructor(options?: PartialDeep<IOptions>) {
-      this.options = mergeDeep(
-         JSON.parse(JSON.stringify(defaultOptions)),
-         options
+   constructor(config?: PartialDeep<IToypackConfig>) {
+      this.config = mergeDeep(
+         JSON.parse(JSON.stringify(defaultConfig)),
+         config
       );
 
       this.assets = new Map();
-      this.useLoader(
-         RawLoader(),
-         JSONLoader(),
-         HTMLLoader(),
-         ChainLoader(),
-         VueLoader(),
-         SassLoader()
-      );
+      this.useLoader(RawLoader(), JSONLoader(), HTMLLoader());
 
-      if (this.options.logLevel == "error") {
+      if (this.config.logLevel == "error") {
          this.hooks.onError((error) => {
             console.error(error.reason);
          });
@@ -64,7 +58,7 @@ export class Toypack {
    }
 
    protected warn(message: string) {
-      if (this.options.logLevel == "error" || this.options.logLevel == "warn") {
+      if (this.config.logLevel == "error" || this.config.logLevel == "warn") {
          console.warn(message);
       }
    }
@@ -75,7 +69,10 @@ export class Toypack {
     * @param type Where the extension would fall into.
     * @param ext The extension.
     */
-   protected addExtension(type: keyof typeof this.extensions, ext: string | string[]) {
+   protected addExtension(
+      type: keyof typeof this.extensions,
+      ext: string | string[]
+   ) {
       if (Array.isArray(ext)) {
          for (let x of ext) {
             if (!this.hasExtension(type, "h" + x)) {
@@ -94,8 +91,34 @@ export class Toypack {
    }
 
    protected hasExtension(type: keyof typeof this.extensions, source: string) {
-      const extension = path.extname(source);
+      if (!source) {
+         throw new Error("Source must be string. Received " + source);
+      }
+
+      const parsed = parseURL(source);
+      const extension = path.extname(parsed.target);
       return this.getExtensions(type).includes(extension);
+   }
+
+   /**
+    * Convert a resource's source path to a useable source path.
+    * If in development mode, the resource path will become a blob url.
+    * If in production mode, the resource path will have a unique hash as
+    * its basename.
+    * @returns The useable source path string.
+    */
+   protected resourceSourceToUseableSource(
+      source: string,
+      baseDir: string = "."
+   ) {
+      const resolvedSource = this.resolve(source, { baseDir });
+      const asset = resolvedSource ? this.getAsset(resolvedSource) : null;
+      if (!asset || asset?.type != "resource") return null;
+      if (this.config.bundle.mode == "production") {
+         return "./" + getHash(asset.source) + path.extname(asset.source);
+      } else {
+         return asset.contentURL;
+      }
    }
 
    /**
@@ -161,6 +184,12 @@ export class Toypack {
     * @returns {Asset} The created or updated Asset object.
     */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
+      if (!isValidSource(source)) {
+         throw new Error(
+            `The source '${source}' is invalid because it contains characters that are not allowed.`
+         );
+      }
+
       source = path.join("/", source);
 
       let asset = this.assets.get(source);
@@ -243,34 +272,31 @@ export class Toypack {
     * of the bundling process.
     */
    public async run(isProd = false) {
-      const oldMode = this.options.bundleOptions.mode;
-      this.options.bundleOptions.mode = isProd ? "production" : "development";
+      const oldMode = this.config.bundle.mode;
+      //this.options.bundleOptions.mode = isProd ? "production" : "development";
       const graph = await getDependencyGraph.call(this);
-      console.log(graph);
-
       const result = await bundle.call(this, graph);
-      this.options.bundleOptions.mode = oldMode;
+      this.config.bundle.mode = oldMode;
 
-      // // Set modified flag to false for all assets except those in node_modules
-      // this.assets.forEach((asset) => {
-      //    if (isNodeModule(asset.source) || asset.type != "text") return;
-      //    asset.modified = false;
-      // });
+      // Set modified flag to false for all assets except those in node_modules
+      this.assets.forEach((asset) => {
+         if (isNodeModule(asset.source) || asset.type != "text") return;
+         asset.modified = false;
+      });
 
-      // // IFrame
-      // if (!isProd && this.iframe) {
-      //    this.iframe.srcdoc = result.html.content;
-      // }
+      // IFrame
+      if (!isProd && this.iframe) {
+         this.iframe.srcdoc = result.html.content;
+      }
 
-      // console.log(graph);
-      // return result;
+      console.log(graph);
+      return result;
    }
 }
 
 // Lib exports & types
 export default Toypack;
 export * as Babel from "@babel/standalone";
-export * as Utilities from "./utils.js";
 export { CodeComposer } from "./CodeComposer.js";
 //export type { IOptions, RawSourceMap, IAsset };
 /* export type {
@@ -324,11 +350,13 @@ export interface ILoaderData {
     */
    chaining?: boolean;
    /** Function that handles the compilation of the matched files. */
-   compile: (data: IRawDependencyData) => ILoaderResult | Promise<ILoaderResult>;
+   compile: (
+      data: IRawDependencyData
+   ) => ILoaderResult | Promise<ILoaderResult>;
 }
 
 interface ICache {
-   parsed: Map<string, IParseJSResult | IParseCSSResult>;
+   parsed: Map<string, IParseScriptResult | IParseStyleResult>;
    compiled: Map<
       string,
       {

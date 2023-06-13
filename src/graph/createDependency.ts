@@ -21,6 +21,7 @@ export function createDependency<T extends IDependencyType>(
 
 export interface IDependencyResource {
    type: "resource";
+   asset: IAssetResource;
    chunkSource: string;
 }
 

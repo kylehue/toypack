@@ -10,7 +10,7 @@ import { isLocal, isURL } from "./utils.js";
  * @returns {object} The fallback data.
  */
 export function getResolveFallbackData(this: Toypack, moduleId: string) {
-   const fallbacks = this.options.bundleOptions.resolve.fallback;
+   const fallbacks = this.config.bundle.resolve.fallback;
    if (fallbacks) {
       for (const [id, fallback] of Object.entries(fallbacks)) {
          if (moduleId.startsWith(id)) {
@@ -31,7 +31,7 @@ export function getResolveFallbackData(this: Toypack, moduleId: string) {
  * @returns {object} The alias data.
  */
 export function getResolveAliasData(this: Toypack, moduleId: string) {
-   const aliases = this.options.bundleOptions.resolve.alias;
+   const aliases = this.config.bundle.resolve.alias;
    if (aliases) {
       // Find strict equals first
       for (const [alias, replacement] of Object.entries(aliases)) {
@@ -145,7 +145,7 @@ export function resolve(
       {
          baseDir: ".",
          includeCoreModules: true,
-         extensions: this.options.bundleOptions.resolve.extensions,
+         extensions: this.config.bundle.resolve.extensions,
       },
       options
    );

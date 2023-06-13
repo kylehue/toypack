@@ -18,20 +18,21 @@ export async function compileScript(
       throw new Error("The source to compile must be a valid script.");
    }
 
-   const moduleType = this.options.bundleOptions.moduleType;
-   const mode = this.options.bundleOptions.mode;
    const { dependencyMap, AST, map: inputSourceMap } = script;
+   const moduleType = this.config.bundle.moduleType;
+   const mode = this.config.bundle.mode;
 
    const getChunkSourceFromRelativeSource = (relativeSource: string) => {
-      const parsed = parseURL(relativeSource);
-      const absoluteSource = dependencyMap[parsed.target + parsed.query];
-      let chunkSource = graph[absoluteSource + parsed.query]?.chunkSource;
-
-      if (!chunkSource && graph[relativeSource]) {
-         chunkSource = relativeSource;
+      const fromGraph = graph[relativeSource];
+      if (fromGraph) {
+         return fromGraph.chunkSource;
       }
 
-      return chunkSource;
+      const parsed = parseURL(relativeSource);
+      const absoluteSource = dependencyMap[relativeSource];
+
+      const from = graph[absoluteSource + parsed.query];
+      return from.chunkSource;
    };
 
    const isStyleSource = (relativeSource: string) => {
@@ -60,27 +61,31 @@ export async function compileScript(
    });
 
    // Import chunks to main chunk
-   modifyTraverseOptions({
-      Program(scope) {
-         for (const rawChunkSource of script.rawChunkSources) {
-            if (rawChunkSource == script.chunkSource) continue;
-            if (moduleType == "esm") {
-               const importDeclaration = babelTypes.importDeclaration(
-                  [],
-                  babelTypes.stringLiteral(rawChunkSource)
-               );
-               scope.unshiftContainer("body", importDeclaration);
-            } else {
-               const requireStatement = babelTypes.expressionStatement(
-                  babelTypes.callExpression(babelTypes.identifier("require"), [
-                     babelTypes.stringLiteral(rawChunkSource),
-                  ])
-               );
-               scope.unshiftContainer("body", requireStatement);
+   if (script.rawChunkSources.length > 1) {
+      modifyTraverseOptions({
+         Program(scope) {
+            for (let i = script.rawChunkSources.length - 1; i >= 0; i--) {
+               const rawChunkSource = script.rawChunkSources[i];
+               if (rawChunkSource == script.chunkSource) continue;
+               if (moduleType == "esm") {
+                  const importDeclaration = babelTypes.importDeclaration(
+                     [],
+                     babelTypes.stringLiteral(rawChunkSource)
+                  );
+                  scope.unshiftContainer("body", importDeclaration);
+               } else {
+                  const requireStatement = babelTypes.expressionStatement(
+                     babelTypes.callExpression(
+                        babelTypes.identifier("require"),
+                        [babelTypes.stringLiteral(rawChunkSource)]
+                     )
+                  );
+                  scope.unshiftContainer("body", requireStatement);
+               }
             }
-         }
-      },
-   });
+         },
+      });
+   }
 
    // Rename `import` or `require` paths
    if (moduleType == "esm") {
@@ -145,7 +150,7 @@ export async function compileScript(
 
    traverseAST(AST, traverseOptions);
 
-   const userBabelOptions = this.options.babelOptions.transform;
+   const userBabelOptions = this.config.babel.transform;
 
    const importantBabelOptions = {
       sourceType: moduleType == "esm" ? "module" : "script",
@@ -156,7 +161,7 @@ export async function compileScript(
       plugins: userBabelOptions.plugins,
       sourceFileName: source,
       filename: source,
-      sourceMaps: !!this.options.bundleOptions.sourceMap,
+      sourceMaps: !!this.config.bundle.sourceMap,
       envName: mode,
       minified: false,
       comments: mode == "development",

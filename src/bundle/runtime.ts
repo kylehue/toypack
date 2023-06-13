@@ -1,5 +1,4 @@
 import { CodeComposer } from "../CodeComposer.js";
-import { getHash } from "../utils.js";
 
 const identifiers = {
    modules: "_modules_",
@@ -10,24 +9,15 @@ export function indentPrefix() {
    return "  ";
 }
 
-export function html(script = "", style = "", asExternalURL = false) {
+export function html(scriptSrc = "", linkHref = "") {
    return `
    <!DOCTYPE html>
    <html lang="en">
       <head>
-         ${
-            asExternalURL
-               ? `<link rel="stylesheet" href="${style}"></link>`
-               : `<style>${style}</style>`
-         }
-         ${
-            asExternalURL
-               ? `<script defer type="application/javascript" src="${script}"></script>`
-               : ""
-         }
+         <link rel="stylesheet" href="${linkHref}"></link>
+         <script defer type="application/javascript" src="${scriptSrc}"></script>
       </head>
       <body>
-         ${!asExternalURL ? `<script>${script}</script>` : ""}
       </body>
    </html>
    `;
