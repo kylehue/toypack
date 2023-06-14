@@ -21,10 +21,11 @@ export async function loadAsset(
    };
 
    const addToResult = (
-      parsedSource: ReturnType<typeof parseURL>,
+      rawSource: string,
       contentToAdd: string | Blob,
       map?: RawSourceMap
    ) => {
+      const parsedSource = parseURL(rawSource);
       let key: "scripts" | "styles" | null = null;
       if (this.hasExtension("script", parsedSource.target)) {
          key = "scripts";
@@ -58,11 +59,6 @@ export async function loadAsset(
       map?: RawSourceMap
    ) => {
       const parsedSource = parseURL(rawSource);
-      // No need to load if source is already supported
-      if (supportedExtensions.includes(path.extname(parsedSource.target))) {
-         addToResult(parsedSource, contentToLoad, map);
-         return;
-      }
 
       // Get loaders
       const loaders: ILoaderData[] = [];
@@ -83,11 +79,22 @@ export async function loadAsset(
          }
       }
 
-      if (
-         !loaders.length &&
-         !supportedExtensions.includes(path.extname(parsedSource.target))
-      ) {
-         this.hooks.trigger("onError", loaderNotFoundError(parsedSource.target));
+      const isSupported = supportedExtensions.includes(
+         path.extname(parsedSource.target)
+      );
+
+      // If no loader found and not supported, throw an error
+      if (!loaders.length && !isSupported) {
+         this.hooks.trigger(
+            "onError",
+            loaderNotFoundError(parsedSource.target)
+         );
+         return;
+      }
+
+      // If no loader found but is already supported, just add
+      if (!loaders.length && isSupported) {
+         addToResult(rawSource, contentToLoad, map);
          return;
       }
 
@@ -108,19 +115,28 @@ export async function loadAsset(
 
          for (const [lang, chunks] of chunkCollection) {
             if (!chunks.length) break;
-            const dummyChunkSource =
+            const chunkSource =
                parsedSource.target + "." + lang + parsedSource.query;
             for (const chunk of chunks) {
                const chunkSourceMap =
                   map && chunk.map
                      ? mergeSourceMaps(map, chunk.map)
                      : chunk.map;
-               
-               await loadRecursively(
-                  dummyChunkSource,
-                  chunk.content,
-                  chunkSourceMap
+
+               // Test lang if it's already supported
+               // If it's already supported, then we don't need to recurse
+               const isAlreadySupported = supportedExtensions.includes(
+                  "." + lang
                );
+               if (isAlreadySupported) {
+                  addToResult(chunkSource, chunk.content, chunkSourceMap);
+               } else {
+                  await loadRecursively(
+                     chunkSource,
+                     chunk.content,
+                     chunkSourceMap
+                  );
+               }
             }
          }
       }

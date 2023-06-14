@@ -17,7 +17,11 @@ import { IParsedAsset, parseAsset } from "./parseAsset.js";
  */
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
    const graph: IDependencyGraph = {};
-   const recurse = async (rawSource: string, content: string | Blob) => {
+   const recurse = async (
+      rawSource: string,
+      content: string | Blob,
+      isEntry = false
+   ) => {
       // Avoid dependency duplication in the graph
       if (graph[rawSource]) {
          return;
@@ -34,20 +38,23 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
       if (asset.type == "resource") {
          graph[rawSource] = createDependency("resource", {
             asset,
-            chunkSource: rawSource
+            chunkSource: rawSource,
          });
          return;
       }
-      
+
       let parsed: IParsedAsset;
 
       // Cache
       const cached = this.cachedDeps.parsed.get(rawSource);
       if (cached && !asset.modified) {
-         parsed = cached;
+         parsed = cached.parsed;
       } else {
          parsed = await parseAsset.call(this, rawSource, content);
-         this.cachedDeps.parsed.set(rawSource, parsed);
+         this.cachedDeps.parsed.set(rawSource, {
+            asset,
+            parsed,
+         });
       }
 
       const dependencyMap: Record<string, string> = {};
@@ -62,8 +69,8 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             map: script.map,
             dependencyMap,
             rawChunkSources: script == parsed.scripts[0] ? rawChunkSources : [],
-            isEntry: asset.source == entry.source,
-            asset
+            isEntry,
+            asset,
          });
 
          rawChunkSources.push(script.chunkSource);
@@ -87,7 +94,9 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
       // Add the main. main = first item in the chunks array
       if (this.hasExtension("script", rawSource)) {
          graph[rawSource] = graph[parsed.scripts[0].chunkSource];
-      } else if (this.hasExtension("style", rawSource)) {
+      } else if (this.hasExtension("style", rawSource) && parsed.styles[0]) {
+         console.log(rawSource);
+
          graph[rawSource] = graph[parsed.styles[0].chunkSource];
       }
 
@@ -107,16 +116,14 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             );
             break;
          }
-         dependencyMap[rawDepSource] = depAsset.source;
 
-         await recurse(
-            depAsset.source + parsedDepSource.query,
-            depAsset.content
-         );
+         const absoluteSourceQuery = depAsset.source + parsedDepSource.query;
+         dependencyMap[rawDepSource] = absoluteSourceQuery;
+         await recurse(absoluteSourceQuery, depAsset.content);
       }
    };
 
-   await recurse(entry.source, entry.content);
+   await recurse(entry.source, entry.content, true);
 
    return graph;
 }
