@@ -15,6 +15,16 @@ export function compileStyle(
       throw new Error("The source to compile must be a valid style.");
    }
 
+   // Check cache
+   const cached = this.cachedDeps.compiled.get(source);
+   if (cached && !style.asset.modified) {
+      return {
+         source,
+         content: cached.content,
+         map: cached.map,
+      };
+   }
+
    const { AST, map: inputSourceMap } = style;
 
    const sourceMapOption = this.config.bundle.sourceMap;
@@ -40,6 +50,14 @@ export function compileStyle(
 
    if (result.map && inputSourceMap) {
       result.map = mergeSourceMaps(inputSourceMap, result.map);
+   }
+
+   if (!cached || style.asset.modified) {
+      this.cachedDeps.compiled.set(source, {
+         content: result.content,
+         map: result.map,
+         asset: style.asset,
+      });
    }
 
    return result;

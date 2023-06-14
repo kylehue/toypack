@@ -26,8 +26,8 @@ export async function bundleStyle(this: Toypack, graph: IDependencyGraph) {
             this,
             smg,
             compiled.map,
-            dep.original.source,
-            dep.original.content,
+            dep.asset.source,
+            dep.asset.content,
             compiled.content,
             bundle.toString()
          );

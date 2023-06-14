@@ -23,8 +23,7 @@ import {
 import JSONLoader from "./loaders/JSONLoader.js";
 import HTMLLoader from "./loaders/HTMLLoader.js";
 import RawLoader from "./loaders/RawLoader.js";
-import { IParseScriptResult } from "./graph/parseScriptAsset.js";
-import { IParseStyleResult } from "./graph/parseStyleAsset.js";
+import { IParsedAsset } from "./graph/parseAsset.js";
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -356,12 +355,12 @@ export interface ILoaderData {
 }
 
 interface ICache {
-   parsed: Map<string, IParseScriptResult | IParseStyleResult>;
+   parsed: Map<string, IParsedAsset>;
    compiled: Map<
       string,
       {
-         runtime: string;
-         code: string;
+         asset: IAsset;
+         content: string;
          map?: RawSourceMap | null;
       }
    >;

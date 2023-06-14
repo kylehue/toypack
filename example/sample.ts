@@ -35,11 +35,14 @@ addFile(
       <style>
          body {
             background: url(./images/cat.png);
-         }
+
+
+            color: red;
+         } p { display: block; }
       </style>
       <script type="module" src="src/main"></script>
    </head>
-   <body>
+   <body class="d-flex flex-column">
       <div class="" style="background: url(./images/cat.png);">
          <button id="runSandbox">Run</button>
          <button id="download">Download</button>

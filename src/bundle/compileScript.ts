@@ -18,6 +18,16 @@ export async function compileScript(
       throw new Error("The source to compile must be a valid script.");
    }
 
+   // Check cache
+   const cached = this.cachedDeps.compiled.get(source);
+   if (cached && !script.asset.modified) {
+      return {
+         source,
+         content: cached.content,
+         map: cached.map
+      };
+   }
+
    const { dependencyMap, AST, map: inputSourceMap } = script;
    const moduleType = this.config.bundle.moduleType;
    const mode = this.config.bundle.mode;
@@ -194,6 +204,15 @@ export async function compileScript(
       content: transpiled.code || "",
       map,
    };
+
+   // Cache
+   if (!cached || script.asset.modified) {
+      this.cachedDeps.compiled.set(source, {
+         content: result.content,
+         map: result.map,
+         asset: script.asset,
+      });
+   }
 
    return result;
 }

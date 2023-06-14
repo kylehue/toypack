@@ -21,7 +21,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "",
+      entry: "src/main",
       moduleType: "esm",
       resolve: {
          alias: {

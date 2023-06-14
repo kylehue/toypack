@@ -50,8 +50,8 @@ export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
                this,
                smg,
                compiled.map,
-               dep.original.source,
-               dep.original.content,
+               dep.asset.source,
+               dep.asset.content,
                compiled.content,
                finalizeBundleContent()
             );

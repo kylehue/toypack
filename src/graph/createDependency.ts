@@ -1,6 +1,6 @@
 import { RawSourceMap } from "source-map-js";
 import { IParsedAsset, IParsedScript, IParsedStyle } from "./parseAsset.js";
-import { IAssetResource, IAssetText } from "../asset.js";
+import { IAsset, IAssetResource, IAssetText } from "../asset.js";
 import { CssNode } from "css-tree";
 import { Node } from "@babel/traverse";
 
@@ -32,10 +32,7 @@ interface IDependencyTextBase {
    dependencyMap: Record<string, string>;
    map?: RawSourceMap;
    rawChunkSources: string[];
-   original: {
-      source: string;
-      content: string;
-   }
+   asset: IAssetText;
 }
 
 export interface IDependencyScript extends IDependencyTextBase {

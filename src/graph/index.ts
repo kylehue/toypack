@@ -4,11 +4,12 @@ import {
    invalidEntryError,
    entryNotFoundError,
    resolveFailureError,
+   assetNotFoundError,
 } from "../errors.js";
 import { Toypack } from "../Toypack.js";
 import { parseURL } from "../utils.js";
 import { createDependency, IDependency } from "./createDependency.js";
-import { parseAsset } from "./parseAsset.js";
+import { IParsedAsset, parseAsset } from "./parseAsset.js";
 
 /**
  * Recursively get the dependency graph of an asset.
@@ -16,23 +17,39 @@ import { parseAsset } from "./parseAsset.js";
  */
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
    const graph: IDependencyGraph = {};
-   const recurse = async (source: string, content: string | Blob) => {
+   const recurse = async (rawSource: string, content: string | Blob) => {
       // Avoid dependency duplication in the graph
-      if (graph[source]) {
+      if (graph[rawSource]) {
+         return;
+      }
+
+      const parsedSource = parseURL(rawSource);
+      const asset = this.getAsset(parsedSource.target);
+      if (!asset) {
+         this.hooks.trigger("onError", assetNotFoundError(rawSource));
          return;
       }
 
       // No need to parse a resource dependency
-      if (this.hasExtension("resource", source)) {
-         const asset = this.getAsset(source) as IAssetResource;
-         graph[source] = createDependency("resource", {
+      if (asset.type == "resource") {
+         graph[rawSource] = createDependency("resource", {
             asset,
-            chunkSource: source
+            chunkSource: rawSource
          });
          return;
       }
+      
+      let parsed: IParsedAsset;
 
-      const parsed = await parseAsset.call(this, source, content);
+      // Cache
+      const cached = this.cachedDeps.parsed.get(rawSource);
+      if (cached && !asset.modified) {
+         parsed = cached;
+      } else {
+         parsed = await parseAsset.call(this, rawSource, content);
+         this.cachedDeps.parsed.set(rawSource, parsed);
+      }
+
       const dependencyMap: Record<string, string> = {};
       const rawChunkSources: string[] = [];
 
@@ -45,12 +62,8 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             map: script.map,
             dependencyMap,
             rawChunkSources: script == parsed.scripts[0] ? rawChunkSources : [],
-            isEntry: source == entry.source,
-            original: {
-               source: parsed.original.source,
-               /** @todo fix without string inference */
-               content: parsed.original.content as string,
-            },
+            isEntry: asset.source == entry.source,
+            asset
          });
 
          rawChunkSources.push(script.chunkSource);
@@ -65,21 +78,17 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             map: style.map,
             dependencyMap,
             rawChunkSources: style == parsed.styles[0] ? rawChunkSources : [],
-            original: {
-               source: parsed.original.source,
-               /** @todo fix without string inference */
-               content: parsed.original.content as string,
-            },
+            asset,
          });
 
          rawChunkSources.push(style.chunkSource);
       }
 
       // Add the main. main = first item in the chunks array
-      if (this.hasExtension("script", source)) {
-         graph[source] = graph[parsed.scripts[0].chunkSource];
-      } else if (this.hasExtension("style", source)) {
-         graph[source] = graph[parsed.styles[0].chunkSource];
+      if (this.hasExtension("script", rawSource)) {
+         graph[rawSource] = graph[parsed.scripts[0].chunkSource];
+      } else if (this.hasExtension("style", rawSource)) {
+         graph[rawSource] = graph[parsed.styles[0].chunkSource];
       }
 
       // Recursively scan dependency for dependencies
@@ -88,13 +97,13 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
          const relativeSource = parsedDepSource.target;
          const depAsset = this.getAsset(
             this.resolve(relativeSource, {
-               baseDir: path.dirname(source),
+               baseDir: path.dirname(rawSource),
             }) || ""
          );
          if (!depAsset) {
             this.hooks.trigger(
                "onError",
-               resolveFailureError(relativeSource, source)
+               resolveFailureError(relativeSource, rawSource)
             );
             break;
          }
@@ -141,5 +150,4 @@ export async function getDependencyGraph(this: Toypack) {
 }
 
 export type IDependencyImportParams = Record<string, string | boolean>;
-
 export type IDependencyGraph = Record<string, IDependency>;

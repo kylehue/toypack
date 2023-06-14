@@ -15,14 +15,6 @@ export async function parseScriptAsset(
    source: string,
    content: string
 ): Promise<IParseScriptResult> {
-   /** @todo fix and test caching */
-   // Check cache before parsing
-   // const cachedResult = this.cachedDeps.parsed.get(source);
-   // if (cachedResult && cachedResult.type == "script") {
-   //    const cachedAsset = this.getAsset(source);
-   //    if (cachedAsset && !cachedAsset.modified) return cachedResult;
-   // }
-
    const result: IParseScriptResult = {
       dependencies: [] as string[],
       AST: emptyAST,
@@ -84,9 +76,6 @@ export async function parseScriptAsset(
          },
       });
    }
-
-   // Cache
-   //this.cachedDeps.parsed.set(source, result);
 
    return result;
 }

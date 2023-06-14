@@ -12,14 +12,6 @@ export async function parseStyleAsset(
    source: string,
    content: string
 ): Promise<IParseStyleResult> {
-   /** @todo fix and test caching */
-   // Check cache before parsing
-   // const cachedResult = this.cachedDeps.parsed.get(source);
-   // if (cachedResult && cachedResult.type == "style") {
-   //    const cachedAsset = this.getAsset(source);
-   //    if (cachedAsset && !cachedAsset.modified) return cachedResult;
-   // }
-
    const result: IParseStyleResult = {
       dependencies: [] as string[],
       AST: {} as cssTree.CssNode,
@@ -124,8 +116,6 @@ export async function parseStyleAsset(
          }
       }
    });
-
-   //this.cachedDeps.parsed.set(source, result);
 
    return result;
 }
