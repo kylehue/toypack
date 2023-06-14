@@ -66,7 +66,7 @@ function tryFileThenIndex(this: Toypack, source: string, extensions: string[]) {
 }
 
 function loadAsDirectory(this: Toypack, source: string, extensions: string[]) {
-   const pkg = this.assets.get(path.join(source, "package.json"));
+   const pkg = this.getAsset(path.join(source, "package.json"));
    const mainFieldValue =
       typeof pkg?.content == "string"
          ? (JSON.parse(pkg.content).main as string)
@@ -85,7 +85,7 @@ function loadAsDirectory(this: Toypack, source: string, extensions: string[]) {
 function loadAsFile(this: Toypack, source: string, extensions: string[]) {
    if (path.extname(source)) {
       // Get exact match if there's a file extension
-      const asset = this.assets.get(source);
+      const asset = this.getAsset(source);
 
       if (asset) {
          return asset.source;
@@ -94,7 +94,7 @@ function loadAsFile(this: Toypack, source: string, extensions: string[]) {
       // If there's no extension, get matching paths while ignoring the extensions
       for (let i = 0; i < extensions.length; i++) {
          const extension = extensions[i];
-         const asset = this.assets.get(source + extension);
+         const asset = this.getAsset(source + extension);
 
          if (asset) {
             return asset.source;
@@ -111,6 +111,10 @@ function loadIndex(this: Toypack, source: string, extensions: string[]) {
 }
 
 function getResolved(this: Toypack, source: string, opts: IResolveOptionsComp) {
+   if (source.startsWith("/") && this.getAsset(source)) {
+      return source;
+   }
+
    if (opts.includeCoreModules && !isLocal(source) && !isURL(source)) {
       const resolved = path.join("/", "node_modules", source);
       return loadAsDirectory.call(this, resolved, opts.extensions);
@@ -190,7 +194,7 @@ export function resolve(
             // Add module with empty object for fallbacks with no polyfill
             const emptyFallbackModuleSource =
                "/node_modules/toypack/empty/index.js";
-            let empty = this.assets.get(emptyFallbackModuleSource);
+            let empty = this.getAsset(emptyFallbackModuleSource);
 
             if (!empty) {
                empty = this.addOrUpdateAsset(
