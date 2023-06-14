@@ -175,18 +175,20 @@ function compile(this: Toypack, source: string, content: string) {
          compilation.append(`${varId}.setAttribute("${attr}", "${value}");`);
          const attributeIndex = getAttrIndexInLine(attr, value, line);
 
-         smg?.addMapping({
-            source,
-            original: {
-               line: originalPosition.line,
-               column: attributeIndex >= 0 ? attributeIndex : 0,
-            },
-            generated: {
-               line: compilation.getTotalLines(),
-               column: 0,
-            },
-            name: attr,
-         });
+         if (attributeIndex >= 0) {
+            smg?.addMapping({
+               source,
+               original: {
+                  line: originalPosition.line,
+                  column: attributeIndex,
+               },
+               generated: {
+                  line: compilation.getTotalLines(),
+                  column: 0,
+               },
+               name: attr,
+            });
+         }
       }
 
       varIdMap.set(varId, node);
@@ -200,19 +202,21 @@ function compile(this: Toypack, source: string, content: string) {
       const codeToAppend = `var ${varId} = document.createTextNode(\`${textContent}\`);`;
       compilation.append(codeToAppend);
 
-      const lines = codeToAppend.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-         smg?.addMapping({
-            source,
-            original: {
-               line: originalPosition.line,
-               column: originalPosition.column,
-            },
-            generated: {
-               line: compilation.getTotalLines() + 1 - lines.length + i,
-               column: 0,
-            },
-         });
+      if (originalPosition.line >= 0 && originalPosition.column >= 0) {
+         const lines = codeToAppend.split("\n");
+         for (let i = 0; i < lines.length; i++) {
+            smg?.addMapping({
+               source,
+               original: {
+                  line: originalPosition.line,
+                  column: originalPosition.column,
+               },
+               generated: {
+                  line: compilation.getTotalLines() + 1 - lines.length + i,
+                  column: 0,
+               },
+            });
+         }
       }
 
       varIdMap.set(varId, node);
@@ -293,6 +297,30 @@ function compile(this: Toypack, source: string, content: string) {
 
    if (bodyAST) {
       traverse(bodyAST, traverseCallback);
+      const originalPosition = indexToPosition(content, bodyAST.range[0]);
+      const line = content.split("\n")[originalPosition.line - 1];
+
+      // Add body attributes
+      for (const [attr, value] of Object.entries(bodyAST.attributes)) {
+         compilation.append(
+            `${bodyVarId}.setAttribute("${attr}", "${value}");`
+         );
+         const attributeIndex = getAttrIndexInLine(attr, value, line);
+         if (attributeIndex >= 0) {
+            smg?.addMapping({
+               source,
+               original: {
+                  line: originalPosition.line,
+                  column: attributeIndex,
+               },
+               generated: {
+                  line: compilation.getTotalLines(),
+                  column: 0,
+               },
+               name: attr,
+            });
+         }
+      }
    }
 
    // Appending the nodes
@@ -301,21 +329,23 @@ function compile(this: Toypack, source: string, content: string) {
       if (!parentId) return;
       const originalPosition = indexToPosition(content, node.range[0]);
       compilation.append(`${parentId}.appendChild(${id});`);
-      smg?.addMapping({
-         source,
-         original: {
-            line: originalPosition.line,
-            column: originalPosition.column,
-         },
-         generated: {
-            line: compilation.getTotalLines(),
-            column: 0,
-         },
-         name:
-            node instanceof HTMLElement
-               ? node.tagName.toLowerCase()
-               : undefined,
-      });
+      if (originalPosition.line >= 0 && originalPosition.column >= 0) {
+         smg?.addMapping({
+            source,
+            original: {
+               line: originalPosition.line,
+               column: originalPosition.column,
+            },
+            generated: {
+               line: compilation.getTotalLines(),
+               column: 0,
+            },
+            name:
+               node instanceof HTMLElement
+                  ? node.tagName.toLowerCase()
+                  : undefined,
+         });
+      }
    });
 
    // Deps
@@ -323,18 +353,19 @@ function compile(this: Toypack, source: string, content: string) {
       const originalPosition = indexToPosition(content, dep.node.range[0]);
       const importCode = getImportCode.call(this, dep.value);
       compilation.append(importCode);
-
-      smg?.addMapping({
-         source,
-         original: {
-            line: originalPosition.line,
-            column: originalPosition.column,
-         },
-         generated: {
-            line: compilation.getTotalLines(),
-            column: 0,
-         },
-      });
+      if (originalPosition.line >= 0 && originalPosition.column >= 0) {
+         smg?.addMapping({
+            source,
+            original: {
+               line: originalPosition.line,
+               column: originalPosition.column,
+            },
+            generated: {
+               line: compilation.getTotalLines(),
+               column: 0,
+            },
+         });
+      }
 
       compilation.breakLine();
    }
@@ -363,24 +394,30 @@ function compileCSSChunks(
 
       if (smg) {
          const cssChunkLines = cssChunk.content.split("\n");
-         const original = indexToPosition(config.originalContent, cssChunk.range[0]);
-
+         const originalPosition = indexToPosition(
+            config.originalContent,
+            cssChunk.range[0]
+         );
          smg.setSourceContent(config.originalSource, config.originalContent);
-
-         for (let i = 0; i < cssChunkLines.length; i++) {
-            const line = cssChunkLines[i];
-            const linePos = line.indexOf(line.trim());
-            smg.addMapping({
-               original: {
-                  line: original.line + i,
-                  column: !cssChunk.inline ? linePos : original.column,
-               },
-               generated: {
-                  line: i + 1,
-                  column: linePos,
-               },
-               source: config.originalSource,
-            });
+         if (originalPosition.line >= 0 && originalPosition.column >= 0) {
+            for (let i = 0; i < cssChunkLines.length; i++) {
+               const line = cssChunkLines[i];
+               const linePos = line.indexOf(line.trim());
+               if (linePos === -1) continue;
+               smg.addMapping({
+                  original: {
+                     line: originalPosition.line + i,
+                     column: !cssChunk.inline
+                        ? linePos
+                        : originalPosition.column,
+                  },
+                  generated: {
+                     line: i + 1,
+                     column: linePos,
+                  },
+                  source: config.originalSource,
+               });
+            }
          }
       }
 
@@ -413,7 +450,7 @@ export default function (): ILoader {
             const compiledCSSChunks = compileCSSChunks(compiled.cssChunks, {
                sourceMaps: !!sourceMapConfig,
                originalSource: data.source,
-               originalContent: contentToCompile
+               originalContent: contentToCompile,
             });
 
             const result: ILoaderResult = {
