@@ -62,6 +62,14 @@ export async function parseScriptAsset(
                result.dependencies.push(scope.node.source.value);
             }
          },
+         CallExpression(scope) {
+            const argNode = scope.node.arguments[0];
+            const callee = scope.node.callee;
+            const isDynamicImport = callee.type == "Import";
+            if (isDynamicImport && argNode.type == "StringLiteral") {
+               result.dependencies.push(argNode.value);
+            }
+         },
       });
    } else {
       traverseAST(result.AST, {
@@ -70,11 +78,7 @@ export async function parseScriptAsset(
             const callee = scope.node.callee;
             const isRequire =
                callee.type == "Identifier" && callee.name == "require";
-            const isDynamicImport = callee.type == "Import";
-            if (
-               (isRequire || isDynamicImport) &&
-               argNode.type == "StringLiteral"
-            ) {
+            if (isRequire && argNode.type == "StringLiteral") {
                result.dependencies.push(argNode.value);
             }
          },
