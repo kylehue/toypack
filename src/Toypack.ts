@@ -14,7 +14,6 @@ import { defaultConfig, IToypackConfig } from "./config.js";
 import { resolve, IResolveOptions } from "./resolve.js";
 import {
    getHash,
-   isChunk,
    isNodeModule,
    isValidSource,
    mergeDeep,
@@ -23,6 +22,7 @@ import {
 import JSONLoader from "./loaders/JSONLoader.js";
 import HTMLLoader from "./loaders/HTMLLoader.js";
 import RawLoader from "./loaders/RawLoader.js";
+import StyleLoader from "./loaders/StyleLoader.js";
 import { IParsedAsset } from "./graph/parseAsset.js";
 
 export class Toypack {
@@ -32,8 +32,8 @@ export class Toypack {
       style: [...styleExtensions],
       script: [...appExtensions],
    };
+   private assets: Map<string, IAsset> = new Map();
    protected loaders: ILoaderData[] = [];
-   protected assets: Map<string, IAsset>;
    protected cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
@@ -46,8 +46,7 @@ export class Toypack {
          config
       );
 
-      this.assets = new Map();
-      this.useLoader(RawLoader(), JSONLoader(), HTMLLoader());
+      this.useLoader(RawLoader(), JSONLoader(), HTMLLoader(), StyleLoader());
 
       if (this.config.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -242,22 +241,16 @@ export class Toypack {
       }
 
       this.assets.delete(source);
-      this.cachedDeps.parsed.delete(source);
-      this.cachedDeps.compiled.delete(source);
 
-      /**
-       * Remove chunks from cache that are associated with the deleted asset.
-       * @todo Find a better fix because this solution will create a bug if
-       * the user creates an asset with chunk source format.
-       */
+      // Remove from cache
       this.cachedDeps.parsed.forEach((cache, cacheSource) => {
-         if (source.startsWith(cacheSource) && isChunk(cacheSource)) {
+         if (cache.asset.source === asset.source) {
             this.cachedDeps.parsed.delete(cacheSource);
          }
       });
 
       this.cachedDeps.compiled.forEach((cache, cacheSource) => {
-         if (source.startsWith(cacheSource) && isChunk(cacheSource)) {
+         if (cache.asset.source === asset.source) {
             this.cachedDeps.compiled.delete(cacheSource);
          }
       });
@@ -274,6 +267,7 @@ export class Toypack {
       const oldMode = this.config.bundle.mode;
       //this.options.bundleOptions.mode = isProd ? "production" : "development";
       const graph = await getDependencyGraph.call(this);
+      console.log(graph);
       const result = await bundle.call(this, graph);
       this.config.bundle.mode = oldMode;
 
@@ -287,8 +281,7 @@ export class Toypack {
       if (!isProd && this.iframe) {
          this.iframe.srcdoc = result.html.content;
       }
-
-      console.log(graph);
+      
       return result;
    }
 }
@@ -297,17 +290,7 @@ export class Toypack {
 export default Toypack;
 export * as Babel from "@babel/standalone";
 export { CodeComposer } from "./CodeComposer.js";
-//export type { IOptions, RawSourceMap, IAsset };
-/* export type {
-   IChunk,
-   IDependency,
-   IDependencyMap,
-   IDependencyMapSource,
-   IDependencyImportParams as IModuleOptions,
-   IResourceDependency,
-   IScriptDependency,
-   IStyleDependency,
-} from "./graph/index.js"; */
+export type { IToypackConfig, IAsset };
 
 export interface IRawDependencyData {
    source: string;
@@ -355,7 +338,13 @@ export interface ILoaderData {
 }
 
 interface ICache {
-   parsed: Map<string, IParsedAsset>;
+   parsed: Map<
+      string,
+      {
+         asset: IAsset;
+         parsed: IParsedAsset;
+      }
+   >;
    compiled: Map<
       string,
       {
