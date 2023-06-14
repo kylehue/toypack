@@ -35,10 +35,10 @@ beforeAll(() => {
       })
    );
    toypack.addOrUpdateAsset("anotherFolder/index.js");
-   toypack.addOrUpdateAsset("node_modules/hello/index.js");
    toypack.addOrUpdateAsset("test/utils/tester/index.js");
    toypack.addOrUpdateAsset("test/utils/tester/stuff.js");
    toypack.addOrUpdateAsset("test/utils/foo/bar.js");
+   toypack.addOrUpdateAsset("node_modules/hello/index.js");
    toypack.addOrUpdateAsset("node_modules/reactlib/index.js");
    toypack.addOrUpdateAsset("node_modules/reactlib/test/hello.css");
    toypack.addOrUpdateAsset("node_modules/reactlib-dom/index.js");
@@ -47,100 +47,92 @@ beforeAll(() => {
 
 describe("Resolve", () => {
    test("Simple", () => {
-      let res = toypack.resolve("./src/main.js", {
-         baseDir: ".",
-      });
+      expect(
+         toypack.resolve("./src/main.js", {
+            baseDir: ".",
+         })
+      ).toBe("/src/main.js");
+   });
 
-      let expected = path.normalize("/src/main.js");
-
-      expect(res).toBe(expected);
+   test("Root", () => {
+      expect(
+         toypack.resolve("/assets/image.jpg", {
+            baseDir: path.dirname("/src/main.js"),
+         })
+      ).toBe("/assets/image.jpg");
    });
 
    test("baseDir", () => {
-      let res = toypack.resolve("../assets/image.jpg", {
-         baseDir: path.dirname("src/main.js"),
-      });
+      expect(
+         toypack.resolve("../assets/image.jpg", {
+            baseDir: "src",
+         })
+      ).toBe("/assets/image.jpg");
 
-      expect(res).toBe(path.normalize("/assets/image.jpg"));
-
-      let res2 = toypack.resolve("./src/main.js", {
-         baseDir: "src",
-      });
-
-      expect(res2).not.toBe(path.normalize("/src/main.js"));
+      expect(
+         toypack.resolve("./src/main.js", {
+            baseDir: "src",
+         })
+      ).not.toBe("/src/main.js");
    });
 
    test("Directories", () => {
-      let res = toypack.resolve("./someFolder", {
-         baseDir: ".",
-      });
+      expect(toypack.resolve("./someFolder")).toBe("/someFolder/file.js");
 
-      expect(res).toBe(path.normalize("/someFolder/file.js"));
-
-      let res2 = toypack.resolve("./anotherFolder", {
-         baseDir: ".",
-      });
-
-      expect(res2).toBe(path.normalize("/anotherFolder/index.js"));
+      expect(toypack.resolve("./anotherFolder")).toBe(
+         "/anotherFolder/index.js"
+      );
    });
 
    test("Alias", () => {
-      let res = toypack.resolve("@utils/foo/bar");
-      expect(res).toBe(path.normalize("/test/utils/foo/bar.js"));
+      expect(toypack.resolve("@utils/foo/bar")).toBe("/test/utils/foo/bar.js");
 
-      let res2 = toypack.resolve("@utils/tester");
-      expect(res2).toBe(path.normalize("/test/utils/tester/index.js"));
-
-      let res3 = toypack.resolve("react/test/hello.css");
-      expect(res3).toBe(
-         path.normalize("/node_modules/reactlib/test/hello.css")
+      expect(toypack.resolve("@utils/tester")).toBe(
+         "/test/utils/tester/index.js"
       );
 
-      let res4 = toypack.resolve("react");
-      expect(res4).toBe(path.normalize("/node_modules/reactlib/index.js"));
-
-      let res5 = toypack.resolve("react-dom/test/hello.css");
-      expect(res5).toBe(
-         path.normalize("/node_modules/reactlib-dom/test/hello.css")
+      expect(toypack.resolve("react/test/hello.css")).toBe(
+         "/node_modules/reactlib/test/hello.css"
       );
 
-      let res6 = toypack.resolve("react-dom");
-      expect(res6).toBe(path.normalize("/node_modules/reactlib-dom/index.js"));
+      expect(toypack.resolve("react")).toBe("/node_modules/reactlib/index.js");
 
-      let res7 = toypack.resolve("react/css");
-      expect(res7).toBe(
-         path.normalize("/node_modules/reactlib/test/hello.css")
+      expect(toypack.resolve("react-dom/test/hello.css")).toBe(
+         "/node_modules/reactlib-dom/test/hello.css"
       );
 
-      let res8 = toypack.resolve("../local", {
-         baseDir: path.dirname("/src/main.js")
-      });
-      expect(res8).toBe("/assets/image.jpg");
+      expect(toypack.resolve("react-dom")).toBe(
+         "/node_modules/reactlib-dom/index.js"
+      );
+
+      expect(toypack.resolve("react/css")).toBe(
+         "/node_modules/reactlib/test/hello.css"
+      );
+
+      expect(
+         toypack.resolve("../local", {
+            baseDir: path.dirname("/src/main.js"),
+         })
+      ).toBe("/assets/image.jpg");
    });
 
    test("Core modules", () => {
-      let res = toypack.resolve("hello", {
-         baseDir: ".",
-      });
-
-      let expected = path.normalize("/node_modules/hello/index.js");
-
-      expect(res).toBe(expected);
-
-      let excludeCoreModules = toypack.resolve("hello", {
-         baseDir: ".",
-         includeCoreModules: false,
-      });
-
-      expect(excludeCoreModules).not.toBe(expected);
+      const expected = "/node_modules/hello/index.js";
+      expect(toypack.resolve("hello")).toBe(expected);
+      expect(
+         toypack.resolve("hello", {
+            baseDir: ".",
+            includeCoreModules: false,
+         })
+      ).toBeNull();
    });
 
    test("External URLs", () => {
-      let res = toypack.resolve(
-         "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
-      );
-
-      expect(res).toBe(
+      expect(
+         toypack.resolve(
+            "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
+         )
+      ).toBe(
          "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
       );
    });
