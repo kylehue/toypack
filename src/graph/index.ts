@@ -9,7 +9,12 @@ import {
 import { Toypack } from "../Toypack.js";
 import { parseURL } from "../utils.js";
 import { createDependency, IDependency } from "./createDependency.js";
-import { IParsedAsset, parseAsset } from "./parseAsset.js";
+import {
+   IParsedAsset,
+   IParsedScript,
+   IParsedStyle,
+   parseAsset,
+} from "./parseAsset.js";
 
 /**
  * Recursively get the dependency graph of an asset.
@@ -17,6 +22,25 @@ import { IParsedAsset, parseAsset } from "./parseAsset.js";
  */
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
    const graph: IDependencyGraph = {};
+
+   const adjustDependencyMapsFromChunk = (
+      chunk: IParsedScript | IParsedStyle
+   ) => {
+      const chainedExtensionRegex = new RegExp(
+         "\\b" + chunk.chainedExtension + "\\b",
+         "g"
+      );
+      for (const chunkSource in graph) {
+         const dep = graph[chunkSource];
+         if (dep.type == "resource") continue;
+         for (const [rel, abs] of Object.entries(dep.dependencyMap)) {
+            if (chunk.chunkSource.replace(chainedExtensionRegex, "") == abs) {
+               dep.dependencyMap[rel] = chunk.chunkSource;
+            }
+         }
+      }
+   };
+
    const recurse = async (
       rawSource: string,
       content: string | Blob,
@@ -58,7 +82,7 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
       }
 
       const dependencyMap: Record<string, string> = {};
-      const rawChunkSources: string[] = [];
+      const rawChunkDependencies: string[] = [];
 
       // Add script chunks to graph
       for (const script of parsed.scripts) {
@@ -68,12 +92,14 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             content: script.content,
             map: script.map,
             dependencyMap,
-            rawChunkSources: script == parsed.scripts[0] ? rawChunkSources : [],
+            rawChunkDependencies:
+               script == parsed.scripts[0] ? rawChunkDependencies : [],
             isEntry,
             asset,
          });
 
-         rawChunkSources.push(script.chunkSource);
+         rawChunkDependencies.push(script.chunkSource);
+         adjustDependencyMapsFromChunk(script);
       }
 
       // Add style chunks to graph
@@ -84,20 +110,13 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             content: style.content,
             map: style.map,
             dependencyMap,
-            rawChunkSources: style == parsed.styles[0] ? rawChunkSources : [],
+            rawChunkDependencies:
+               style == parsed.styles[0] ? rawChunkDependencies : [],
             asset,
          });
 
-         rawChunkSources.push(style.chunkSource);
-      }
-
-      // Add the main. main = first item in the chunks array
-      if (this.hasExtension("script", rawSource)) {
-         graph[rawSource] = graph[parsed.scripts[0].chunkSource];
-      } else if (this.hasExtension("style", rawSource) && parsed.styles[0]) {
-         console.log(rawSource);
-
-         graph[rawSource] = graph[parsed.styles[0].chunkSource];
+         rawChunkDependencies.push(style.chunkSource);
+         adjustDependencyMapsFromChunk(style);
       }
 
       // Recursively scan dependency for dependencies

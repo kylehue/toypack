@@ -22,7 +22,6 @@ import {
 import JSONLoader from "./loaders/JSONLoader.js";
 import HTMLLoader from "./loaders/HTMLLoader.js";
 import RawLoader from "./loaders/RawLoader.js";
-import StyleLoader from "./loaders/StyleLoader.js";
 import { IParsedAsset } from "./graph/parseAsset.js";
 
 export class Toypack {
@@ -46,7 +45,7 @@ export class Toypack {
          config
       );
 
-      this.useLoader(RawLoader(), JSONLoader(), HTMLLoader(), StyleLoader());
+      this.useLoader(RawLoader(), JSONLoader(), HTMLLoader());
 
       if (this.config.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -304,10 +303,6 @@ export interface IChunk {
 }
 
 export interface ILoaderResult {
-   /**
-    * The main language to use in the contents.
-    */
-   mainLang: string;
    /**
     * Record of compiled contents. The key is the language and the value
     * is an array of compiled contents.

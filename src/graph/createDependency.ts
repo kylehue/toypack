@@ -31,7 +31,7 @@ interface IDependencyTextBase {
    AST: Node | CssNode
    dependencyMap: Record<string, string>;
    map?: RawSourceMap;
-   rawChunkSources: string[];
+   rawChunkDependencies: string[];
    asset: IAssetText;
 }
 

@@ -3,6 +3,7 @@ import { IParseScriptResult, parseScriptAsset } from "./parseScriptAsset.js";
 import { IParseStyleResult, parseStyleAsset } from "./parseStyleAsset.js";
 import { loadAsset } from "./loadAsset.js";
 import { RawSourceMap } from "source-map-js";
+import path from "path-browserify";
 
 /**
  * Loads and parses an asset.
@@ -28,7 +29,7 @@ export async function parseAsset(
    };
 
    const loadedAsset = await loadAsset.call(this, source, content);
-
+   
    // Scripts
    for (const script of loadedAsset.scripts) {
       if (typeof script.content != "string") continue;
@@ -45,6 +46,7 @@ export async function parseAsset(
          map: script.map,
          dependencies,
          AST,
+         chainedExtension: script.chainedExtension
       });
    }
 
@@ -64,6 +66,7 @@ export async function parseAsset(
          map: style.map,
          dependencies,
          AST,
+         chainedExtension: style.chainedExtension,
       });
    }
 
@@ -74,12 +77,14 @@ export interface IParsedScript extends IParseScriptResult {
    chunkSource: string;
    content: string;
    map?: RawSourceMap;
+   chainedExtension: string;
 }
 
 export interface IParsedStyle extends IParseStyleResult {
    chunkSource: string;
    content: string;
    map?: RawSourceMap;
+   chainedExtension: string;
 }
 
 export interface IParsedAsset {

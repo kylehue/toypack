@@ -24,9 +24,8 @@ function getChunkSourceFromRelativeSource(
    graph: IDependencyGraph
 ) {
    // Try if relative source starts from root
-   const fromGraphRoot = graph[relativeSource];
-   if (fromGraphRoot) {
-      return fromGraphRoot.chunkSource;
+   if (relativeSource.startsWith("/") && graph[relativeSource]) {
+      return graph[relativeSource].chunkSource;
    }
 
    // Try dependency map
@@ -36,19 +35,8 @@ function getChunkSourceFromRelativeSource(
       return fromGraphAbsolute.chunkSource;
    }
 
-   // Try to match the each asset's source with the absolute source
-   // If asset is found, check if it's the main chunk
-   const parsed = parseURL(absoluteSource);
-   for (const [chunkSource, dep] of Object.entries(graph)) {
-      if (dep.type != "script") continue;
-      if (dep.asset.source != parsed.target) continue;
-      const isMainChunk = dep.rawChunkSources[0] == chunkSource;
-      if (!isMainChunk) continue;
-      return chunkSource + parsed.query;
-   }
-
    // Throw error if not found
-   throw new Error(`Can't find ${relativeSource} from ${script.asset.source}.`);
+   throw new Error(`Can't resolve ${relativeSource} from ${script.asset.source}.`);
 }
 
 export async function compileScript(
@@ -71,7 +59,7 @@ export async function compileScript(
       };
    }
 
-   const { dependencyMap, AST, map: inputSourceMap } = script;
+   const { AST, map: inputSourceMap } = script;
    const moduleType = this.config.bundle.moduleType;
    const mode = this.config.bundle.mode;
 
@@ -87,11 +75,11 @@ export async function compileScript(
    });
 
    // Import chunks to main chunk
-   if (script.rawChunkSources.length > 1) {
+   if (script.rawChunkDependencies.length > 1) {
       modifyTraverseOptions({
          Program(scope) {
-            for (let i = script.rawChunkSources.length - 1; i >= 0; i--) {
-               const rawChunkSource = script.rawChunkSources[i];
+            for (let i = script.rawChunkDependencies.length - 1; i >= 0; i--) {
+               const rawChunkSource = script.rawChunkDependencies[i];
                if (rawChunkSource == script.chunkSource) continue;
                if (moduleType == "esm") {
                   const importDeclaration = babelTypes.importDeclaration(

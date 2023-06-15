@@ -5,6 +5,38 @@ import { ILoaderData, Toypack } from "../Toypack.js";
 import { supportedExtensions } from "../extensions.js";
 import { mergeSourceMaps, parseURL } from "../utils.js";
 
+function filterLoaders(
+   loaders: ILoaderData[],
+   source: string | ReturnType<typeof parseURL>
+) {
+   let parsedSource;
+   if (typeof source == "string") {
+      parsedSource = parseURL(source);
+   } else {
+      parsedSource = source;
+   }
+
+   const result: ILoaderData[] = [];
+   for (const loader of loaders) {
+      const tester = loader.test;
+      let hasMatched = false;
+      if (
+         (typeof tester == "function" &&
+            tester(parsedSource.target, parsedSource.params)) ||
+         (tester instanceof RegExp && tester.test(parsedSource.target))
+      ) {
+         hasMatched = true;
+      }
+
+      if (hasMatched) {
+         result.push(loader);
+         if (loader.chaining === false) break;
+      }
+   }
+
+   return result;
+}
+
 /**
  * Loads an asset's content using loaders.
  * @returns The chunks of the asset. The first item in the scripts/styles
@@ -21,21 +53,31 @@ export async function loadAsset(
    };
 
    const addToResult = (
-      rawSource: string,
+      sourceToAdd: string | ReturnType<typeof parseURL>,
       contentToAdd: string | Blob,
-      map?: RawSourceMap
+      map?: RawSourceMap,
+      chainedExtension = ""
    ) => {
-      const parsedSource = parseURL(rawSource);
-      let key: "scripts" | "styles" | null = null;
-      if (this.hasExtension("script", parsedSource.target)) {
-         key = "scripts";
-      } else if (this.hasExtension("style", parsedSource.target)) {
-         key = "styles";
+      let parsedSource;
+      if (typeof sourceToAdd == "string") {
+         parsedSource = parseURL(sourceToAdd);
+      } else {
+         parsedSource = sourceToAdd;
       }
 
-      if (key) {
+      // Determine which group it belongs to
+      let groupKey: "scripts" | "styles" | null = null;
+      if (this.hasExtension("script", parsedSource.target)) {
+         groupKey = "scripts";
+      } else if (this.hasExtension("style", parsedSource.target)) {
+         groupKey = "styles";
+      }
+
+      if (groupKey) {
          let chunkSource = parsedSource.target + parsedSource.query;
-         const group = loadedAssetResult[key];
+         const group = loadedAssetResult[groupKey];
+
+         // Avoid chunk source collision by indexing
          if (group.length >= 1) {
             const extname = path.extname(parsedSource.target);
             chunkSource = parsedSource.target.replace(
@@ -45,10 +87,12 @@ export async function loadAsset(
             chunkSource += "-" + group.length + extname + parsedSource.query;
          }
 
+         // Add
          group.push({
             chunkSource: chunkSource,
             content: contentToAdd,
             map,
+            chainedExtension
          });
       }
    };
@@ -56,29 +100,11 @@ export async function loadAsset(
    const loadRecursively = async (
       rawSource: string,
       contentToLoad: string | Blob,
-      map?: RawSourceMap
+      map?: RawSourceMap,
+      chainedExtension = ""
    ) => {
       const parsedSource = parseURL(rawSource);
-
-      // Get loaders
-      const loaders: ILoaderData[] = [];
-      for (const loader of this.loaders) {
-         const tester = loader.test;
-         let hasMatched = false;
-         if (
-            (typeof tester == "function" &&
-               tester(parsedSource.target, parsedSource.params)) ||
-            (tester instanceof RegExp && tester.test(parsedSource.target))
-         ) {
-            hasMatched = true;
-         }
-
-         if (hasMatched) {
-            loaders.push(loader);
-            if (loader.chaining === false) break;
-         }
-      }
-
+      const loaders = filterLoaders(this.loaders, parsedSource);
       const isSupported = supportedExtensions.includes(
          path.extname(parsedSource.target)
       );
@@ -94,7 +120,7 @@ export async function loadAsset(
 
       // If no loader found but is already supported, just add
       if (!loaders.length && isSupported) {
-         addToResult(rawSource, contentToLoad, map);
+         addToResult(parsedSource, contentToLoad, map, chainedExtension);
          return;
       }
 
@@ -108,12 +134,11 @@ export async function loadAsset(
          });
 
          // Load chunks recursively until it becomes supported
-         // This is for files like .vue that could emit .sass chunks
-         const chunkCollection = compileResult.contents
+         const chunksCollection = compileResult.contents
             ? Object.entries(compileResult.contents)
             : [];
 
-         for (const [lang, chunks] of chunkCollection) {
+         for (const [lang, chunks] of chunksCollection) {
             if (!chunks.length) break;
             const chunkSource =
                parsedSource.target + "." + lang + parsedSource.query;
@@ -129,12 +154,18 @@ export async function loadAsset(
                   "." + lang
                );
                if (isAlreadySupported) {
-                  addToResult(chunkSource, chunk.content, chunkSourceMap);
+                  addToResult(
+                     chunkSource,
+                     chunk.content,
+                     chunkSourceMap,
+                     chainedExtension + "." + lang
+                  );
                } else {
                   await loadRecursively(
                      chunkSource,
                      chunk.content,
-                     chunkSourceMap
+                     chunkSourceMap,
+                     chainedExtension + "." + lang
                   );
                }
             }
@@ -151,4 +182,5 @@ export interface IAssetChunk {
    chunkSource: string;
    content: string | Blob;
    map?: RawSourceMap;
+   chainedExtension: string;
 }
