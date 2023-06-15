@@ -7,10 +7,8 @@ export default function (options: LoaderOptions): ILoader {
       return {
          name: "TemplateLoader",
          test: /\.css$/,
-         async: false,
          compile: (data) => {
             const result: ILoaderResult = {
-               mainLang: "js",
                contents: {
                   js: [
                      {

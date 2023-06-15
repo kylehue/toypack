@@ -454,7 +454,6 @@ export default function (): ILoader {
             });
 
             const result: ILoaderResult = {
-               mainLang: "js",
                contents: {
                   js: [
                      {

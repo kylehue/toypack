@@ -21,7 +21,6 @@ export default function (): ILoader {
                moduleType == "esm" ? "export default " : "module.exports = ";
             
             const result: ILoaderResult = {
-               mainLang: "js",
                contents: {
                   js: [
                      {
