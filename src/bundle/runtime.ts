@@ -1,6 +1,6 @@
 import { CodeComposer } from "../CodeComposer.js";
 
-const identifiers = {
+export const identifiers = {
    modules: "_modules_",
    require: "_require_",
 } as const;

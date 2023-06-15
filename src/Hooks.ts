@@ -1,11 +1,18 @@
 import { Node } from "@babel/traverse";
 import { IAsset } from "./asset.js";
 import type { ITraverseOptions } from "./bundle/compileScript.js";
+import { CodeComposer } from "./CodeComposer.js";
 
 const eventMap = {
    onError: (event: IErrorEvent) => {},
    onBeforeResolve: (event: IBeforeResolveEvent) => {},
    onAfterResolve: (event: IAfterResolveEvent) => {},
+   onBeforeFinalizeScriptContent: (
+      event: IBeforeFinalizeScriptContentEvent
+   ) => {},
+   onAfterFinalizeScriptContent: (
+      event: IAfterFinalizeScriptContentEvent
+   ) => {},
    onTranspile: (event: ITranspileEvent) => {},
 } as const;
 
@@ -46,8 +53,8 @@ export class Hooks implements IHooks {
    }
 
    /**
-    * Triggers the listeners for the specified event with the provided arguments.
-    *
+    * Triggers the listeners for the specified event with the
+    * provided arguments.
     * @param eventName - The name of the event to trigger.
     * @param args - The arguments to pass to the event listeners.
     */
@@ -67,10 +74,6 @@ export class Hooks implements IHooks {
 
    /**
     * An event emitted when an error occurs.
-    *
-    * @param callback The function to emit.
-    * @param async Set to true to make the callback asynchronous.
-    * @returns {Function} A dispose function.
     */
    onError<T extends boolean>(
       callback: IEventMap<T>["onError"],
@@ -81,10 +84,6 @@ export class Hooks implements IHooks {
 
    /**
     * An event emitted when a module is being resolved.
-    *
-    * @param callback - The function to emit.
-    * @param async Set to true to make the callback asynchronous.
-    * @returns {Function} A dispose function.
     */
    onBeforeResolve<T extends boolean>(
       callback: IEventMap<T>["onBeforeResolve"],
@@ -95,10 +94,6 @@ export class Hooks implements IHooks {
 
    /**
     * An event emitted when a module is resolved.
-    *
-    * @param callback - The function to emit.
-    * @param async Set to true to make the callback asynchronous.
-    * @returns {Function} A dispose function.
     */
    onAfterResolve<T extends boolean>(
       callback: IEventMap<T>["onAfterResolve"],
@@ -109,16 +104,40 @@ export class Hooks implements IHooks {
 
    /**
     * An event emitted when a module is being transpiled.
-    *
-    * @param callback - The function to emit.
-    * @param async Set to true to make the callback asynchronous.
-    * @returns {Function} A dispose function.
     */
    onTranspile<T extends boolean>(
       callback: IEventMap<T>["onTranspile"],
       async?: T
    ): Function {
       return this._createListener("onTranspile", callback, async);
+   }
+
+   /**
+    * An event emitted before the script bundle gets finalized.
+    */
+   onBeforeFinalizeScriptContent<T extends boolean>(
+      callback: IEventMap<T>["onBeforeFinalizeScriptContent"],
+      async?: T
+   ): Function {
+      return this._createListener(
+         "onBeforeFinalizeScriptContent",
+         callback,
+         async
+      );
+   }
+
+   /**
+    * An event emitted after the script bundle is finalized.
+    */
+   onAfterFinalizeScriptContent<T extends boolean>(
+      callback: IEventMap<T>["onAfterFinalizeScriptContent"],
+      async?: T
+   ): Function {
+      return this._createListener(
+         "onAfterFinalizeScriptContent",
+         callback,
+         async
+      );
    }
 }
 
@@ -142,17 +161,27 @@ export interface IErrorEvent {
 export interface IBeforeResolveEvent {
    parent: IAsset;
    source: string;
+   changeSource: (newSource: string) => void;
 }
 
 export interface IAfterResolveEvent {
    parent: IAsset;
-   source: { relative: string; absolute: string };
+   source: string;
+   resolvedAsset: IAsset;
 }
 
 export interface ITranspileEvent {
    AST: Node;
    traverse: (traverseOptions: ITraverseOptions) => void;
    source: string;
+}
+
+export interface IBeforeFinalizeScriptContentEvent {
+   content: CodeComposer;
+}
+
+export interface IAfterFinalizeScriptContentEvent {
+   content: CodeComposer;
 }
 
 interface IListener {

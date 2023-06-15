@@ -120,14 +120,24 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
       }
 
       // Recursively scan dependency for dependencies
-      for (const rawDepSource of parsed.dependencies) {
+      for (let rawDepSource of parsed.dependencies) {
+         this.hooks.trigger("onBeforeResolve", {
+            source: rawDepSource,
+            parent: asset,
+            changeSource: (newSource: string) => {
+               rawDepSource = newSource;
+            }
+         });
+
          const parsedDepSource = parseURL(rawDepSource);
          const relativeSource = parsedDepSource.target;
-         const depAsset = this.getAsset(
+
+         let depAsset = this.getAsset(
             this.resolve(relativeSource, {
                baseDir: path.dirname(rawSource),
             }) || ""
          );
+
          if (!depAsset) {
             this.hooks.trigger(
                "onError",
@@ -135,6 +145,12 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             );
             break;
          }
+         
+         this.hooks.trigger("onAfterResolve", {
+            source: rawDepSource,
+            resolvedAsset: depAsset,
+            parent: asset,
+         });
 
          const absoluteSourceQuery = depAsset.source + parsedDepSource.query;
          dependencyMap[rawDepSource] = absoluteSourceQuery;

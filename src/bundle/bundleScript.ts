@@ -16,6 +16,11 @@ export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
 
    const finalizeBundleContent = () => {
       const bundleClone = bundle.clone();
+
+      this.hooks.trigger("onBeforeFinalizeScriptContent", {
+         content: bundleClone,
+      });
+
       bundleClone.prepend(rt.requireFunction());
 
       const entry = Object.values(graph).find(
@@ -30,6 +35,10 @@ export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
          <CODE_BODY>
       })();
       `);
+
+      this.hooks.trigger("onAfterFinalizeScriptContent", {
+         content: bundleClone,
+      });
 
       return bundleClone.toString();
    };
