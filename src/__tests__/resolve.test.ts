@@ -52,6 +52,12 @@ describe("Resolve", () => {
             baseDir: ".",
          })
       ).toBe("/src/main.js");
+
+      expect(
+         toypack.resolve("./src/main.js?raw&sample=2", {
+            baseDir: ".",
+         })
+      ).toBe("/src/main.js");
    });
 
    test("Root", () => {

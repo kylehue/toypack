@@ -1,6 +1,6 @@
 import path from "path-browserify";
 import { Toypack } from "./Toypack.js";
-import { isLocal, isURL } from "./utils.js";
+import { isLocal, isURL, parseURL } from "./utils.js";
 
 /**
  * Searches for the fallback data of a module id in the `fallback` field of the `bundleOptions.resolve` object.
@@ -144,6 +144,7 @@ export function resolve(
    source: string,
    options: Partial<IResolveOptions> = {}
 ) {
+   source = source.split("?")[0];
    let result: string | null = "";
    const opts: IResolveOptionsComp = Object.assign(
       {
