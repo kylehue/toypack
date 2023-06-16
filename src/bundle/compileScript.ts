@@ -5,7 +5,7 @@ import type {
 } from "@babel/core";
 import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
 import { transformFromAst } from "@babel/standalone";
-import babelTypes from "@babel/types";
+import babelTypes from "@babel/types/lib/index.js";
 import MapConverter from "convert-source-map";
 import { RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
@@ -68,7 +68,7 @@ export async function compileScript(
       traverseOptionsArray.push(traverseOptions);
    };
 
-   await this.hooks.trigger("onTranspile", {
+   this.hooks.trigger("onTranspile", {
       AST,
       traverse: modifyTraverseOptions,
       source,
@@ -239,7 +239,7 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
    for (const [key, group] of Object.entries(groups)) {
       options[key as Node["type"]] = (scope, node) => {
          for (const fn of group) {
-            (fn as ITraverseFunction<typeof key>)(scope, node);
+            fn(scope, node);
          }
       };
    }
@@ -253,9 +253,9 @@ export type ITraverseFunction<T> = (
 ) => void;
 
 export type ITraverseOptions = {
-   [Type in Node["type"]]?: ITraverseFunction<Type>;
+   [Type in Node["type"]]: ITraverseFunction<Type>;
 };
 
 export type ITraverseOptionGroups = {
-   [Type in Node["type"]]?: ITraverseFunction<Type>[];
+   [Type in Node["type"]]: ITraverseFunction<Type>[];
 };

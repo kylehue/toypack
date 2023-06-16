@@ -25,12 +25,10 @@ export class Hooks implements IHooks {
 
    private _createListener<T extends keyof IEventMap>(
       key: T,
-      callback: IEventMap[T],
-      async = false
+      callback: IEventMap[T]
    ) {
       const group = this._getListeners(key);
       group.push({
-         async,
          callback,
       });
 
@@ -64,90 +62,58 @@ export class Hooks implements IHooks {
    ) {
       const group = this._getListeners(eventName);
       for (const evt of group) {
-         if (evt.async) {
-            await (evt.callback as any)(...args);
-         } else {
-            (evt.callback as any)(...args);
-         }
+         (evt.callback as any)(...args);
       }
    }
 
    /**
     * An event emitted when an error occurs.
     */
-   onError<T extends boolean>(
-      callback: IEventMap<T>["onError"],
-      async?: T
-   ): Function {
-      return this._createListener("onError", callback, async);
+   onError(callback: IEventMap["onError"]): Function {
+      return this._createListener("onError", callback);
    }
 
    /**
     * An event emitted when a module is being resolved.
     */
-   onBeforeResolve<T extends boolean>(
-      callback: IEventMap<T>["onBeforeResolve"],
-      async?: T
-   ): Function {
-      return this._createListener("onBeforeResolve", callback, async);
+   onBeforeResolve(callback: IEventMap["onBeforeResolve"]): Function {
+      return this._createListener("onBeforeResolve", callback);
    }
 
    /**
     * An event emitted when a module is resolved.
     */
-   onAfterResolve<T extends boolean>(
-      callback: IEventMap<T>["onAfterResolve"],
-      async?: T
-   ): Function {
-      return this._createListener("onAfterResolve", callback, async);
+   onAfterResolve(callback: IEventMap["onAfterResolve"]): Function {
+      return this._createListener("onAfterResolve", callback);
    }
 
    /**
     * An event emitted when a module is being transpiled.
     */
-   onTranspile<T extends boolean>(
-      callback: IEventMap<T>["onTranspile"],
-      async?: T
-   ): Function {
-      return this._createListener("onTranspile", callback, async);
+   onTranspile(callback: IEventMap["onTranspile"]): Function {
+      return this._createListener("onTranspile", callback);
    }
 
    /**
     * An event emitted before the script bundle gets finalized.
     */
-   onBeforeFinalizeScriptContent<T extends boolean>(
-      callback: IEventMap<T>["onBeforeFinalizeScriptContent"],
-      async?: T
+   onBeforeFinalizeScriptContent(
+      callback: IEventMap["onBeforeFinalizeScriptContent"]
    ): Function {
-      return this._createListener(
-         "onBeforeFinalizeScriptContent",
-         callback,
-         async
-      );
+      return this._createListener("onBeforeFinalizeScriptContent", callback);
    }
 
    /**
     * An event emitted after the script bundle is finalized.
     */
-   onAfterFinalizeScriptContent<T extends boolean>(
-      callback: IEventMap<T>["onAfterFinalizeScriptContent"],
-      async?: T
+   onAfterFinalizeScriptContent(
+      callback: IEventMap["onAfterFinalizeScriptContent"]
    ): Function {
-      return this._createListener(
-         "onAfterFinalizeScriptContent",
-         callback,
-         async
-      );
+      return this._createListener("onAfterFinalizeScriptContent", callback);
    }
 }
 
-export type IEventMap<T extends boolean = false> = T extends false
-   ? typeof eventMap
-   : {
-        [K in keyof typeof eventMap]: (
-           ...args: Parameters<(typeof eventMap)[K]>
-        ) => Promise<void>;
-     };
+export type IEventMap = typeof eventMap;
 
 export type IHooks = {
    [K in keyof IEventMap]: (callback: IEventMap[K], async: boolean) => Function;
@@ -185,6 +151,5 @@ export interface IAfterFinalizeScriptContentEvent {
 }
 
 interface IListener {
-   async: boolean;
    callback: IEventMap[keyof IEventMap];
 }
