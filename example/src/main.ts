@@ -1,12 +1,13 @@
-import { sampleFiles } from "./sample.js";
-import { Toypack as ToypackESM, Babel } from "../build/Toypack.js";
-import DefinePlugin from "../build/plugins/DefinePlugin.js";
+import "./style.css";
+import { sampleFiles } from "./sampleFiles.js";
+import { Toypack as ToypackESM, Babel } from "../../";
+import DefinePlugin from "../../build/plugins/DefinePlugin.js";
 
 var saveData = (function () {
    var a = document.createElement("a");
    document.body.appendChild(a);
    a.style.display = "none";
-   return function (data, fileName, type) {
+   return function (data: any, fileName: string, type: string) {
       var blob = new Blob([data], { type }),
          url = window.URL.createObjectURL(blob);
       a.href = url;
@@ -58,20 +59,10 @@ downloadButton.onclick = async () => {
       saveData(resource.content, resource.source, resource.content.type);
    }
 
-   saveData(
-      result.js.content,
-      result.js.source,
-      "application/javascript"
-   );
-
+   saveData(result.js.content, result.js.source, "application/javascript");
    saveData(result.css.content, result.css.source, "text/css");
-
    saveData(result.html.content, result.html.source, "text/html");
 };
-
-toypack.hooks.onError((e) => {
-   //console.error(e.reason);
-});
 
 toypack.setIFrame(iframe);
 
@@ -83,35 +74,8 @@ const definePlugin = toypack.usePlugin(
 
 definePlugin.add("bingbong", "beepboop");
 
-(async () => {
-   const samplePic = await (
-      await fetch(
-         "https://cdn.discordapp.com/attachments/898027973272305674/1073582900991242260/image.png"
-      )
-   ).blob();
-   toypack.addOrUpdateAsset("/images/cat.png", samplePic);
+for (let [source, content] of Object.entries(sampleFiles)) {
+   toypack.addOrUpdateAsset(source, content);
+}
 
-   for (let [_, sampleFile] of Object.entries(sampleFiles)) {
-      toypack.addOrUpdateAsset(sampleFile.source, sampleFile.content);
-   }
-
-   console.log(await toypack.run());
-
-   /* iframe!.srcdoc = `
-<!DOCTYPE html>
-<html lang="en">
-   <head>
-      <script type="importmap">
-         {
-            "imports": {
-               "path-browserify": "https://esm.run/path-browserify"
-            }
-         }
-      </script>
-      <script type="module" src="${sampleURL}"></script>
-   </head>
-   <body>
-   </body>
-</html>
-`; */
-})();
+console.log(toypack.run());

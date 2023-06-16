@@ -1,0 +1,21 @@
+body {
+   background: url(../images/cat.png);
+   background-color: red;
+   color: white;
+   color: url(#test);
+}
+
+h1 {
+   font-size: 24px;
+   font-weight: bold;
+}
+
+.container {
+   width: 100%;
+   height: 200px;
+}
+
+.invalid-class {
+   border: 1px solid black;
+   padding: 10px;
+}

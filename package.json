@@ -16,13 +16,11 @@
       "access": "public"
    },
    "scripts": {
-      "dev": "concurrently \"set NODE_ENV=development\" \"npm run build:main -- --watch\" \"npm run type:dts -- --watch\" \"npm run build:style -- --watch\" \"npm run build:example -- --watch\"",
-      "build": "concurrently \"set NODE_ENV=production\" \"npm run clean\" \"npm run build:main\" \"npm run build:bundle\" \"npm run type:dts\" \"npm run build:style\"",
+      "dev": "concurrently \"set NODE_ENV=development\" \"npm run build:main -- --watch\" \"npm run type:dts -- --watch\"",
+      "build": "concurrently \"set NODE_ENV=production\" \"npm run clean\" \"npm run build:main\" \"npm run build:bundle\" \"npm run type:dts\"",
       "build:main": "swc ./src -d ./build",
-      "build:example": "swc ./example -d ./example-build",
-      "build:style": "sass ./styles/style.scss:./build/styles/style.css",
       "build:bundle": "webpack",
-      "clean": "rimraf build example-build browser coverage nyc_output",
+      "clean": "rimraf build browser coverage nyc_output",
       "type:dts": "tsc --emitDeclarationOnly --project tsconfig.build.json",
       "type:check": "tsc --noEmit",
       "format": "prettier \"src/**/*.ts\" --write",
@@ -45,6 +43,7 @@
       "@types/convert-source-map": "^2.0.0",
       "@types/css-tree": "^2.3.1",
       "@types/path-browserify": "^1.0.0",
+      "@types/workerpool": "^6.4.0",
       "@typescript-eslint/eslint-plugin": "^5.59.0",
       "@typescript-eslint/parser": "^5.59.0",
       "c8": "^7.13.0",
@@ -79,7 +78,8 @@
       "browser"
    ],
    "dependencies": {
-      "@babel/parser": "^7.22.3",
+      "@babel/parser": "^7.22.5",
+      "@babel/plugin-syntax-unicode-sets-regex": "^7.18.6",
       "@babel/standalone": "^7.22.4",
       "@babel/traverse": "^7.22.4",
       "babel-minify": "^0.5.2",

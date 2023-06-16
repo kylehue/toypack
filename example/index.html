@@ -1,35 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
-   <head>
-      <meta charset="UTF-8" />
-      <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Example</title>
-      <link rel="stylesheet" href="./style.css" />
-      <script type="importmap">
-         {
-            "imports": {
-               "path-browserify": "https://esm.sh/path-browserify@1.0.1",
-               "@babel/parser": "https://esm.sh/@babel/parser",
-               "@babel/types": "https://esm.sh/@babel/types",
-               "@babel/traverse": "https://esm.sh/@babel/traverse",
-               "@babel/standalone": "https://esm.sh/@babel/standalone",
-               "source-map-js": "https://esm.sh/source-map-js",
-               "convert-source-map": "https://esm.sh/convert-source-map",
-               "babel-minify": "https://esm.sh/babel-minify",
-               "css-tree": "https://esm.sh/css-tree",
-               "node-html-parser": "https://esm.sh/node-html-parser"
-            }
-         }
-      </script>
-      <script type="module" src="../example-build/example.js"></script>
-      <script src="../browser/Toypack.js"></script>
-   </head>
-   <body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + TS</title>
+  </head>
+  <body>
+    <div id="app">
       <div class="">
          <button id="runSandbox">Run</button>
          <button id="download">Download</button>
       </div>
       <iframe style="background:white;" id="sandbox" frameborder="0"></iframe>
-   </body>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

@@ -1,0 +1,7 @@
+{
+   "main": "/src/main",
+   "test": 123,
+   "dependencies": {
+      "foo": "bar"
+   }
+}
