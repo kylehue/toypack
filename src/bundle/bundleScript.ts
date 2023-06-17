@@ -54,7 +54,7 @@ export async function bundleScript(this: Toypack, graph: IDependencyGraph) {
          const wrapped = rt.moduleWrap(source, compiled.content);
          bundle.breakLine().append(wrapped);
 
-         if (smg && compiled.map) {
+         if (smg && compiled.map && typeof dep.asset.content == "string") {
             mergeMapToBundle.call(
                this,
                smg,

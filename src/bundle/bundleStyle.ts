@@ -21,7 +21,7 @@ export async function bundleStyle(this: Toypack, graph: IDependencyGraph) {
 
       bundle.append(compiled.content).breakLine();
 
-      if (smg && compiled.map) {
+      if (smg && compiled.map && typeof dep.asset.content == "string") {
          mergeMapToBundle.call(
             this,
             smg,

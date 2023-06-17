@@ -8,7 +8,7 @@ import {
    resourceExtensions,
    styleExtensions,
 } from "./extensions.js";
-import { getDependencyGraph, IDependencyImportParams } from "./graph/index.js";
+import { getDependencyGraph } from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
 import { defaultConfig, IToypackConfig } from "./config.js";
 import { resolve, IResolveOptions } from "./resolve.js";
@@ -23,6 +23,7 @@ import JSONLoader from "./loaders/JSONLoader.js";
 import HTMLLoader from "./loaders/HTMLLoader.js";
 import RawLoader from "./loaders/RawLoader.js";
 import { IParsedAsset } from "./graph/parseAsset.js";
+import { invalidAssetSourceError } from "./errors.js";
 
 export class Toypack {
    private iframe: HTMLIFrameElement | null = null;
@@ -60,29 +61,6 @@ export class Toypack {
       }
    }
 
-   /**
-    * Add an extension to the bundler. The bundler uses the extensions
-    * to divide the dependencies into script, style, and resource.
-    * @param type Where the extension would fall into.
-    * @param ext The extension.
-    */
-   protected addExtension(
-      type: keyof typeof this.extensions,
-      ext: string | string[]
-   ) {
-      if (Array.isArray(ext)) {
-         for (let x of ext) {
-            if (!this.hasExtension(type, "h" + x)) {
-               this.getExtensions(type).push(x);
-            }
-         }
-      } else {
-         if (!this.hasExtension(type, "h" + ext)) {
-            this.getExtensions(type).push(ext);
-         }
-      }
-   }
-
    protected getExtensions(type: keyof typeof this.extensions) {
       return this.extensions[type];
    }
@@ -110,7 +88,7 @@ export class Toypack {
    ) {
       const resolvedSource = this.resolve(source, { baseDir });
       const asset = resolvedSource ? this.getAsset(resolvedSource) : null;
-      if (!asset || asset?.type != "resource") return null;
+      if (!asset || asset.type != "resource") return null;
       if (this.config.bundle.mode == "production") {
          return "./" + getHash(asset.source) + path.extname(asset.source);
       } else {
@@ -124,18 +102,21 @@ export class Toypack {
     */
    public useLoader(...loaders: ILoader[]) {
       for (const loader of loaders) {
-         const loadedLoader = Object.assign(
-            {
-               chaining: true,
-            } as ILoaderData,
+         const loaderDataDefaults = {
+            chaining: true,
+            extensions: [] as NonNullable<ILoaderData["extensions"]>,
+         };
+
+         const loaderData = Object.assign(
+            loaderDataDefaults,
             loader.call(this)
          );
 
-         if (this.loaders.find((v) => v.name == loadedLoader.name)) {
-            throw new Error(`${loadedLoader.name} already exists.`);
+         for (const [group, ext] of loaderData.extensions) {
+            this.extensions[group].push(ext);
          }
 
-         this.loaders.push(loadedLoader);
+         this.loaders.push(loaderData);
       }
    }
 
@@ -176,15 +157,14 @@ export class Toypack {
 
    /**
     * Adds or updates an asset with the given source and content.
-    * @param {string} source The source file path of the asset.
+    * @param {string} source The source path of the asset.
     * @param {string | Blob} [content=""] The content of the asset.
     * @returns {Asset} The created or updated Asset object.
     */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
       if (!isValidSource(source)) {
-         throw new Error(
-            `The source '${source}' is invalid because it contains characters that are not allowed.`
-         );
+         this.hooks.trigger("onError", invalidAssetSourceError(source));
+         return {} as IAsset;
       }
 
       source = path.join("/", source);
@@ -216,7 +196,10 @@ export class Toypack {
    }
 
    public clearAsset() {
-      this.assets.clear();
+      this.assets.forEach((asset) => {
+         this.removeAsset(asset.source);
+      });
+
       this.clearCache();
    }
 
@@ -264,7 +247,7 @@ export class Toypack {
     */
    public async run(isProd = false) {
       const oldMode = this.config.bundle.mode;
-      //this.options.bundleOptions.mode = isProd ? "production" : "development";
+      this.config.bundle.mode = isProd ? "production" : oldMode;
       const graph = await getDependencyGraph.call(this);
       console.log(graph);
       const result = await bundle.call(this, graph);
@@ -272,7 +255,7 @@ export class Toypack {
 
       // Set modified flag to false for all assets except those in node_modules
       this.assets.forEach((asset) => {
-         if (isNodeModule(asset.source) || asset.type != "text") return;
+         if (isNodeModule(asset.source) || asset.type == "resource") return;
          asset.modified = false;
       });
 
@@ -280,7 +263,7 @@ export class Toypack {
       if (!isProd && this.iframe) {
          this.iframe.srcdoc = result.html.content;
       }
-      
+
       return result;
    }
 }
@@ -291,24 +274,13 @@ export * as Babel from "@babel/standalone";
 export { CodeComposer } from "./CodeComposer.js";
 export type { IToypackConfig, IAsset };
 
-export interface IRawDependencyData {
-   source: string;
-   content: string | Blob;
-   params: IDependencyImportParams;
-}
-
-export interface IChunk {
-   content: string;
-   map?: RawSourceMap;
-}
-
-export interface ILoaderResult {
-   /**
-    * Record of compiled contents. The key is the language and the value
-    * is an array of compiled contents.
-    */
-   contents: Record<string, IChunk[]>;
-}
+export type ILoaderResult = Record<
+   string,
+   {
+      content: string;
+      map?: RawSourceMap;
+   }[]
+>;
 
 export interface ILoaderData {
    /** The name of the loader. */
@@ -321,7 +293,7 @@ export interface ILoaderData {
       | RegExp
       | ((source: string, params: IDependencyImportParams) => boolean);
    /**
-    * Determines if the loader is chainable with other loaders.
+    * Determines if the loader should be chainable with other loaders.
     * If set to false, the bundler will exclude other loaders and
     * exclusively use this loader. Defaults to true.
     */
@@ -330,7 +302,17 @@ export interface ILoaderData {
    compile: (
       data: IRawDependencyData
    ) => ILoaderResult | Promise<ILoaderResult>;
+   /** Extensions to add to the bundler. */
+   extensions?: [keyof InstanceType<typeof Toypack>["extensions"], string][];
 }
+
+interface IRawDependencyData {
+   source: string;
+   content: string | Blob;
+   params: IDependencyImportParams;
+}
+
+type IDependencyImportParams = ReturnType<typeof parseURL>["params"];
 
 interface ICache {
    parsed: Map<

@@ -127,18 +127,14 @@ export async function loadAsset(
       // Load content with each of the loaders
       for (let i = loaders.length - 1; i >= 0; i--) {
          const loader = loaders[i];
-         const compileResult = await loader.compile({
+         const compiledChunks = await loader.compile({
             source: parsedSource.target,
             content: contentToLoad,
             params: parsedSource.params,
          });
 
          // Load chunks recursively until it becomes supported
-         const chunksCollection = compileResult.contents
-            ? Object.entries(compileResult.contents)
-            : [];
-
-         for (const [lang, chunks] of chunksCollection) {
+         for (const [lang, chunks] of Object.entries(compiledChunks)) {
             if (!chunks.length) break;
             const chunkSource =
                parsedSource.target + "." + lang + parsedSource.query;

@@ -432,12 +432,12 @@ function compileCSSChunks(
 
 export default function (): ILoader {
    return function (this: Toypack) {
-      this.addExtension("script", ".html");
       const sourceMapConfig = this.config.bundle.sourceMap;
 
       return {
          name: "HTMLLoader",
          test: /\.html$/,
+         extensions: [["script", ".html"]],
          compile: async (data) => {
             let contentToCompile;
             if (typeof data.content != "string") {
@@ -454,15 +454,13 @@ export default function (): ILoader {
             });
 
             const result: ILoaderResult = {
-               contents: {
-                  js: [
-                     {
-                        content: compiled.content,
-                        map: compiled.map,
-                     },
-                  ],
-                  css: compiledCSSChunks,
-               },
+               js: [
+                  {
+                     content: compiled.content,
+                     map: compiled.map,
+                  },
+               ],
+               css: compiledCSSChunks,
             };
 
             return result;

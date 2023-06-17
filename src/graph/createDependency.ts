@@ -32,7 +32,7 @@ interface IDependencyTextBase {
    dependencyMap: Record<string, string>;
    map?: RawSourceMap;
    rawChunkDependencies: string[];
-   asset: IAssetText;
+   asset: IAsset;
 }
 
 export interface IDependencyScript extends IDependencyTextBase {
