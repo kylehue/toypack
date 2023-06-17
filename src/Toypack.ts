@@ -1,6 +1,6 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import { PartialDeep } from "type-fest";
+import { PartialDeep, Asyncify } from "type-fest";
 import { IAsset, createAsset } from "./asset.js";
 import { bundle } from "./bundle/index.js";
 import {
@@ -24,15 +24,17 @@ import HTMLLoader from "./loaders/HTMLLoader.js";
 import RawLoader from "./loaders/RawLoader.js";
 import { IParsedAsset } from "./graph/parseAsset.js";
 import { invalidAssetSourceError } from "./errors.js";
+import { CssNode } from "css-tree";
 
 export class Toypack {
-   private iframe: HTMLIFrameElement | null = null;
-   private extensions = {
+   private _iframe: HTMLIFrameElement | null = null;
+   private _extensions = {
       resource: [...resourceExtensions],
       style: [...styleExtensions],
       script: [...appExtensions],
    };
-   private assets: Map<string, IAsset> = new Map();
+   private _assets: Map<string, IAsset> = new Map();
+   private _buildHooks: { [key in keyof IBuildHooks]: IBuildHooks[key][] } = {};
    protected loaders: ILoaderData[] = [];
    protected cachedDeps: ICache = {
       parsed: new Map(),
@@ -61,11 +63,11 @@ export class Toypack {
       }
    }
 
-   protected getExtensions(type: keyof typeof this.extensions) {
-      return this.extensions[type];
+   protected getExtensions(type: keyof typeof this._extensions) {
+      return this._extensions[type];
    }
 
-   protected hasExtension(type: keyof typeof this.extensions, source: string) {
+   protected hasExtension(type: keyof typeof this._extensions, source: string) {
       if (!source) {
          throw new Error("Source must be string. Received " + source);
       }
@@ -113,7 +115,7 @@ export class Toypack {
          );
 
          for (const [group, ext] of loaderData.extensions) {
-            this.extensions[group].push(ext);
+            this._extensions[group].push(ext);
          }
 
          this.loaders.push(loaderData);
@@ -145,14 +147,14 @@ export class Toypack {
     * @param {HTMLIFrameElement} iframe The HTML iframe element.
     */
    public setIFrame(iframe: HTMLIFrameElement) {
-      this.iframe = iframe;
+      this._iframe = iframe;
    }
 
    /**
     * Unsets the HTML iframe element.
     */
    public unsetIFrame() {
-      this.iframe = null;
+      this._iframe = null;
    }
 
    /**
@@ -169,11 +171,11 @@ export class Toypack {
 
       source = path.join("/", source);
 
-      let asset = this.assets.get(source);
+      let asset = this._assets.get(source);
 
       if (!asset) {
          asset = createAsset(source, content);
-         this.assets.set(source, asset);
+         this._assets.set(source, asset);
       } else {
          asset.content = content;
       }
@@ -192,11 +194,11 @@ export class Toypack {
     */
    public getAsset(source: string) {
       source = path.join("/", source);
-      return this.assets.get(source) || null;
+      return this._assets.get(source) || null;
    }
 
    public clearAsset() {
-      this.assets.forEach((asset) => {
+      this._assets.forEach((asset) => {
          this.removeAsset(asset.source);
       });
 
@@ -215,14 +217,14 @@ export class Toypack {
    public removeAsset(source: string) {
       source = path.join("/", source);
 
-      const asset = this.assets.get(source);
+      const asset = this._assets.get(source);
       if (!asset) return;
 
       if (asset.type == "resource" && asset.contentURL) {
          URL.revokeObjectURL(asset.contentURL);
       }
 
-      this.assets.delete(source);
+      this._assets.delete(source);
 
       // Remove from cache
       this.cachedDeps.parsed.forEach((cache, cacheSource) => {
@@ -254,14 +256,14 @@ export class Toypack {
       this.config.bundle.mode = oldMode;
 
       // Set modified flag to false for all assets except those in node_modules
-      this.assets.forEach((asset) => {
+      this._assets.forEach((asset) => {
          if (isNodeModule(asset.source) || asset.type == "resource") return;
          asset.modified = false;
       });
 
       // IFrame
-      if (!isProd && this.iframe) {
-         this.iframe.srcdoc = result.html.content;
+      if (!isProd && this._iframe) {
+         this._iframe.srcdoc = result.html.content;
       }
 
       return result;
@@ -273,6 +275,24 @@ export default Toypack;
 export * as Babel from "@babel/standalone";
 export { CodeComposer } from "./CodeComposer.js";
 export type { IToypackConfig, IAsset };
+
+interface ICache {
+   parsed: Map<
+      string,
+      {
+         asset: IAsset;
+         parsed: IParsedAsset;
+      }
+   >;
+   compiled: Map<
+      string,
+      {
+         asset: IAsset;
+         content: string;
+         map?: RawSourceMap | null;
+      }
+   >;
+}
 
 export type ILoaderResult = Record<
    string,
@@ -303,7 +323,7 @@ export interface ILoaderData {
       data: IRawDependencyData
    ) => ILoaderResult | Promise<ILoaderResult>;
    /** Extensions to add to the bundler. */
-   extensions?: [keyof InstanceType<typeof Toypack>["extensions"], string][];
+   extensions?: [keyof InstanceType<typeof Toypack>["_extensions"], string][];
 }
 
 interface IRawDependencyData {
@@ -314,23 +334,42 @@ interface IRawDependencyData {
 
 type IDependencyImportParams = ReturnType<typeof parseURL>["params"];
 
-interface ICache {
-   parsed: Map<
-      string,
-      {
-         asset: IAsset;
-         parsed: IParsedAsset;
-      }
-   >;
-   compiled: Map<
-      string,
-      {
-         asset: IAsset;
-         content: string;
-         map?: RawSourceMap | null;
-      }
-   >;
-}
-
 export type ILoader = (this: Toypack) => ILoaderData;
 export type IPlugin = (this: Toypack) => any;
+
+interface IBuildHooks {
+   load?: (dep: {
+      source: string;
+      params: IDependencyImportParams;
+      content: string | Blob;
+   }) => ILoaderResult | void | Promise<ILoaderResult | void>;
+   transform?: (dep: any) => void;
+   resolve?: (id: string) => string;
+   beforeFinalize?: (content: any) => void;
+   afterFinalize?: (content: any) => void;
+   config?: (config: IToypackConfig) => Partial<IToypackConfig>;
+   start?: () => void;
+}
+
+type plugin = () => IBuildHooks;
+
+const myPlugin: plugin = () => {
+   let config: IToypackConfig;
+   return {
+      start() {
+         
+      },
+      load(dep) {
+         if (!dep.params.raw) return;
+
+         return {
+            js: []
+         }
+      },
+      resolve(id) {
+         return id;
+      },
+   };
+};
+
+let test = myPlugin();

@@ -16,6 +16,8 @@ import { adder } from "@classes/adder?test";
 console.log(adder(4, 6));
 const bingbong = "beepboop";
 console.log(bingbong);
+import testing from "./testing.cjs";
+console.log(testing);
 // import mainRaw from "./main.ts?raw";
 // console.log(mainRaw);
 // import rawHTML from "../index.html?raw";
