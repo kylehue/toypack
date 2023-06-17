@@ -22,7 +22,7 @@ import {
  */
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
    const graph: IDependencyGraph = {};
-
+   const bundleMode = this.config.bundle.mode;
    const adjustDependencyMapsFromChunk = (
       chunk: IParsedScript | IParsedStyle
    ) => {
@@ -58,27 +58,31 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
          return;
       }
 
-      // No need to parse a resource dependency
-      if (asset.type == "resource") {
+      let parsed: IParsedAsset;
+
+      // Cache
+      const cached = this.cachedDeps.parsed.get(rawSource + "-" + bundleMode);
+      if (cached && !asset.modified) {
+         parsed = cached.parsed;
+      } else {
+         parsed = await parseAsset.call(this, rawSource, content);
+         this.cachedDeps.parsed.set(rawSource + "-" + bundleMode, {
+            asset,
+            parsed,
+         });
+      }
+
+      // Add resource to graph if its parsed object didn't emit a script/style
+      if (
+         asset.type == "resource" &&
+         !parsed.scripts.length &&
+         !parsed.styles.length
+      ) {
          graph[rawSource] = createDependency("resource", {
             asset,
             chunkSource: rawSource,
          });
          return;
-      }
-
-      let parsed: IParsedAsset;
-
-      // Cache
-      const cached = this.cachedDeps.parsed.get(rawSource);
-      if (cached && !asset.modified) {
-         parsed = cached.parsed;
-      } else {
-         parsed = await parseAsset.call(this, rawSource, content);
-         this.cachedDeps.parsed.set(rawSource, {
-            asset,
-            parsed,
-         });
       }
 
       const dependencyMap: Record<string, string> = {};
@@ -126,7 +130,7 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             parent: asset,
             changeSource: (newSource: string) => {
                rawDepSource = newSource;
-            }
+            },
          });
 
          const parsedDepSource = parseURL(rawDepSource);
@@ -145,7 +149,7 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             );
             break;
          }
-         
+
          this.hooks.trigger("onAfterResolve", {
             source: rawDepSource,
             resolvedAsset: depAsset,
@@ -191,5 +195,4 @@ export async function getDependencyGraph(this: Toypack) {
    return graph;
 }
 
-export type IDependencyImportParams = Record<string, string | boolean>;
 export type IDependencyGraph = Record<string, IDependency>;

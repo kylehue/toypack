@@ -50,7 +50,8 @@ export async function compileScript(
    }
 
    // Check cache
-   const cached = this.cachedDeps.compiled.get(source);
+   const bundleMode = this.config.bundle.mode;
+   const cached = this.cachedDeps.compiled.get(source + "-" + bundleMode);
    if (cached && !script.asset.modified) {
       return {
          source,
@@ -202,7 +203,7 @@ export async function compileScript(
 
    // Cache
    if (!cached || script.asset.modified) {
-      this.cachedDeps.compiled.set(source, {
+      this.cachedDeps.compiled.set(source + "-" + bundleMode, {
          content: result.content,
          map: result.map,
          asset: script.asset,
@@ -239,7 +240,7 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
    for (const [key, group] of Object.entries(groups)) {
       options[key as Node["type"]] = (scope, node) => {
          for (const fn of group) {
-            fn(scope, node);
+            (fn as ITraverseFunction<Node["type"]>)(scope, node);
          }
       };
    }
@@ -253,9 +254,9 @@ export type ITraverseFunction<T> = (
 ) => void;
 
 export type ITraverseOptions = {
-   [Type in Node["type"]]: ITraverseFunction<Type>;
+   [Type in Node["type"]]?: ITraverseFunction<Type>;
 };
 
 export type ITraverseOptionGroups = {
-   [Type in Node["type"]]: ITraverseFunction<Type>[];
+   [Type in Node["type"]]?: ITraverseFunction<Type>[];
 };

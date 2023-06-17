@@ -16,7 +16,8 @@ export function compileStyle(
    }
 
    // Check cache
-   const cached = this.cachedDeps.compiled.get(source);
+   const bundleMode = this.config.bundle.mode;
+   const cached = this.cachedDeps.compiled.get(source + "-" + bundleMode);
    if (cached && !style.asset.modified) {
       return {
          source,
@@ -53,7 +54,7 @@ export function compileStyle(
    }
 
    if (!cached || style.asset.modified) {
-      this.cachedDeps.compiled.set(source, {
+      this.cachedDeps.compiled.set(source + "-" + bundleMode, {
          content: result.content,
          map: result.map,
          asset: style.asset,
