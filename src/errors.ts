@@ -22,7 +22,7 @@ export function assetNotFoundError(source: string) {
 export function resolveFailureError(source: string, parentSource: string) {
    return {
       code: 3,
-      reason: `Could not resolve '${source}' at '${parentSource}'`,
+      reason: `Could not resolve '${source}' from '${parentSource}'`,
    };
 }
 
@@ -44,5 +44,12 @@ export function parseError(reason: string) {
    return {
       code: 6,
       reason: reason,
+   };
+}
+
+export function invalidAssetSourceError(source: string) {
+   return {
+      code: 7,
+      reason: `The source '${source}' is invalid because it contains characters that are not allowed.`,
    };
 }
