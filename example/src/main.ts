@@ -44,6 +44,7 @@ const toypack = new ToypackESM({
    },
 });
 
+(window as any).toypack = toypack;
 console.log(toypack, Babel.availablePlugins, Babel.availablePresets);
 
 runButton.onclick = async () => {
@@ -51,9 +52,7 @@ runButton.onclick = async () => {
 };
 
 downloadButton.onclick = async () => {
-   toypack.config.bundle.mode = "production";
-   let result = await toypack.run();
-   toypack.config.bundle.mode = "development";
+   let result = await toypack.run(true);
 
    for (let resource of result.resources) {
       saveData(resource.content, resource.source, resource.content.type);
@@ -78,4 +77,4 @@ for (let [source, content] of Object.entries(sampleFiles)) {
    toypack.addOrUpdateAsset(source, content);
 }
 
-console.log(toypack.run());
+console.log(await toypack.run());

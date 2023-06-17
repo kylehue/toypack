@@ -4,8 +4,6 @@
 // import path from "path";
 // console.log(path);
 //import "../index.html";
-import rawHTML from "../index.html?raw";
-console.log(rawHTML);
 console.log(44);
 console.log(3);
 console.log(123456);
@@ -18,8 +16,10 @@ import { adder } from "@classes/adder?test";
 console.log(adder(4, 6));
 const bingbong = "beepboop";
 console.log(bingbong);
-import mainRaw from "./main.ts?raw";
-console.log(mainRaw);
+// import mainRaw from "./main.ts?raw";
+// console.log(mainRaw);
+// import rawHTML from "../index.html?raw";
+// console.log(rawHTML);
 
 // (async () => {
 //    const test = await import("../index.html?raw");

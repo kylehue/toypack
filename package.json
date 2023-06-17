@@ -16,7 +16,7 @@
       "access": "public"
    },
    "scripts": {
-      "dev": "concurrently \"set NODE_ENV=development\" \"npm run build:main -- --watch\" \"npm run type:dts -- --watch\"",
+      "dev": "concurrently \"set NODE_ENV=development\" \"npm run build:main -- --watch\" \"npm run type:dts -- --watch\" \"cd ./example&&npm run dev\"",
       "build": "concurrently \"set NODE_ENV=production\" \"npm run clean\" \"npm run build:main\" \"npm run build:bundle\" \"npm run type:dts\"",
       "build:main": "swc ./src -d ./build",
       "build:bundle": "webpack",
