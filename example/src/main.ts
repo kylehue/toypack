@@ -65,13 +65,13 @@ downloadButton.onclick = async () => {
 
 toypack.setIFrame(iframe);
 
-const definePlugin = toypack.usePlugin(
-   DefinePlugin({
-      foo: "bar",
-   })
-);
+// const definePlugin = toypack.usePlugin(
+//    DefinePlugin({
+//       foo: "bar",
+//    })
+// );
 
-definePlugin.add("bingbong", "beepboop");
+// definePlugin.add("bingbong", "beepboop");
 
 for (let [source, content] of Object.entries(sampleFiles)) {
    toypack.addOrUpdateAsset(source, content);

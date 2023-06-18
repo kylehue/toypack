@@ -7,14 +7,11 @@ import {
    assetNotFoundError,
 } from "../errors.js";
 import { Toypack } from "../Toypack.js";
-import { parseURL } from "../utils.js";
-import { createDependency, IDependency } from "./createDependency.js";
-import {
-   IParsedAsset,
-   IParsedScript,
-   IParsedStyle,
-   parseAsset,
-} from "./parseAsset.js";
+import { mergeSourceMaps, parseURL } from "../utils.js";
+import { RawSourceMap } from "source-map-js";
+import { parseScriptAsset } from "./parseScriptAsset.js";
+import { parseStyleAsset } from "./parseStyleAsset.js";
+import { LoadBuildHook } from "../buildHooks.js";
 
 /**
  * Recursively get the dependency graph of an asset.
@@ -22,147 +19,60 @@ import {
  */
 async function getGraphRecursive(this: Toypack, entry: IAssetText) {
    const graph: IDependencyGraph = {};
-   const bundleMode = this.config.bundle.mode;
-   const adjustDependencyMapsFromChunk = (
-      chunk: IParsedScript | IParsedStyle
-   ) => {
-      const chainedExtensionRegex = new RegExp(
-         "\\b" + chunk.chainedExtension + "\\b",
-         "g"
-      );
-      for (const chunkSource in graph) {
-         const dep = graph[chunkSource];
-         if (dep.type == "resource") continue;
-         for (const [rel, abs] of Object.entries(dep.dependencyMap)) {
-            if (chunk.chunkSource.replace(chainedExtensionRegex, "") == abs) {
-               dep.dependencyMap[rel] = chunk.chunkSource;
+   const config = this.getConfig();
+   const bundleMode = config.bundle.mode;
+
+   const recurse = async (rawSource: string, isEntry = false) => {
+      let loaded: NonNullable<ReturnType<LoadBuildHook>> = {
+         content: isEntry ? entry.content : "",
+      };
+
+      this._triggerBuildHook(
+         "load",
+         (result) => {
+            loaded.content = result.content;
+            if (loaded.map && result.map) {
+               loaded.map = mergeSourceMaps(loaded.map, result.map);
+            } else {
+               loaded.map = result.map;
             }
-         }
-      }
+
+            // Update args
+            return [{ content: loaded.content, source: rawSource }];
+         },
+         [{ content: loaded.content, source: rawSource }]
+      );
+      
+
+      const parsed = this.hasExtension("script", rawSource)
+         ? await parseScriptAsset.call(this, rawSource, loaded.content)
+         : await parseStyleAsset.call(this, rawSource, loaded.content);
+
+      console.log(parsed);
+
+      // for (const dep of parsed.dependencies) {
+      //    let resolved: string = dep;
+      //    if (this._buildHooks.resolve) {
+      //       for (const hookFunction of this._buildHooks.resolve) {
+      //          const result = await hookFunction(resolved);
+
+      //          if (!result) continue;
+
+      //          loaded.content = result.content;
+      //          loaded.map =
+      //             loaded.map && result.map
+      //                ? mergeSourceMaps(loaded.map, result.map)
+      //                : result.map;
+
+      //          if (result.disableChaining === true) break;
+      //       }
+      //    }
+
+      //    await recurse(resolved);
+      // }
    };
 
-   const recurse = async (
-      rawSource: string,
-      content: string | Blob,
-      isEntry = false
-   ) => {
-      // Avoid dependency duplication in the graph
-      if (graph[rawSource]) {
-         return;
-      }
-
-      const parsedSource = parseURL(rawSource);
-      const asset = this.getAsset(parsedSource.target);
-      if (!asset) {
-         this.hooks.trigger("onError", assetNotFoundError(rawSource));
-         return;
-      }
-
-      let parsed: IParsedAsset;
-
-      // Cache
-      const cached = this.cachedDeps.parsed.get(rawSource + "-" + bundleMode);
-      if (cached && !asset.modified) {
-         parsed = cached.parsed;
-      } else {
-         parsed = await parseAsset.call(this, rawSource, content);
-         this.cachedDeps.parsed.set(rawSource + "-" + bundleMode, {
-            asset,
-            parsed,
-         });
-      }
-
-      // Add resource to graph if its parsed object didn't emit a script/style
-      if (
-         asset.type == "resource" &&
-         !parsed.scripts.length &&
-         !parsed.styles.length
-      ) {
-         graph[rawSource] = createDependency("resource", {
-            asset,
-            chunkSource: rawSource,
-         });
-         return;
-      }
-
-      const dependencyMap: Record<string, string> = {};
-      const rawChunkDependencies: string[] = [];
-
-      // Add script chunks to graph
-      for (const script of parsed.scripts) {
-         graph[script.chunkSource] = createDependency("script", {
-            AST: script.AST,
-            chunkSource: script.chunkSource,
-            content: script.content,
-            map: script.map,
-            dependencyMap,
-            rawChunkDependencies:
-               script == parsed.scripts[0] ? rawChunkDependencies : [],
-            isEntry,
-            asset,
-         });
-
-         rawChunkDependencies.push(script.chunkSource);
-         adjustDependencyMapsFromChunk(script);
-      }
-
-      // Add style chunks to graph
-      for (const style of parsed.styles) {
-         graph[style.chunkSource] = createDependency("style", {
-            AST: style.AST,
-            chunkSource: style.chunkSource,
-            content: style.content,
-            map: style.map,
-            dependencyMap,
-            rawChunkDependencies:
-               style == parsed.styles[0] ? rawChunkDependencies : [],
-            asset,
-         });
-
-         rawChunkDependencies.push(style.chunkSource);
-         adjustDependencyMapsFromChunk(style);
-      }
-
-      // Recursively scan dependency for dependencies
-      for (let rawDepSource of parsed.dependencies) {
-         this.hooks.trigger("onBeforeResolve", {
-            source: rawDepSource,
-            parent: asset,
-            changeSource: (newSource: string) => {
-               rawDepSource = newSource;
-            },
-         });
-
-         const parsedDepSource = parseURL(rawDepSource);
-         const relativeSource = parsedDepSource.target;
-
-         let depAsset = this.getAsset(
-            this.resolve(relativeSource, {
-               baseDir: path.dirname(rawSource),
-            }) || ""
-         );
-
-         if (!depAsset) {
-            this.hooks.trigger(
-               "onError",
-               resolveFailureError(relativeSource, rawSource)
-            );
-            break;
-         }
-
-         this.hooks.trigger("onAfterResolve", {
-            source: rawDepSource,
-            resolvedAsset: depAsset,
-            parent: asset,
-         });
-
-         const absoluteSourceQuery = depAsset.source + parsedDepSource.query;
-         dependencyMap[rawDepSource] = absoluteSourceQuery;
-         await recurse(absoluteSourceQuery, depAsset.content);
-      }
-   };
-
-   await recurse(entry.source, entry.content, true);
+   await recurse(entry.source, true);
 
    return graph;
 }
@@ -174,8 +84,9 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
  */
 export async function getDependencyGraph(this: Toypack) {
    let graph: IDependencyGraph = {};
-   const entrySource = this.config.bundle.entry
-      ? this.resolve(path.join("/", this.config.bundle.entry))
+   const config = this.getConfig();
+   const entrySource = config.bundle.entry
+      ? this.resolve(path.join("/", config.bundle.entry))
       : this.resolve("/");
 
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;
@@ -195,4 +106,4 @@ export async function getDependencyGraph(this: Toypack) {
    return graph;
 }
 
-export type IDependencyGraph = Record<string, IDependency>;
+export type IDependencyGraph = Record<string, any>;

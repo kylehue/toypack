@@ -12,6 +12,7 @@ export async function parseStyleAsset(
    source: string,
    content: string
 ): Promise<IParseStyleResult> {
+   const config = this.getConfig();
    const result: IParseStyleResult = {
       dependencies: [] as string[],
       AST: {} as cssTree.CssNode,
@@ -19,7 +20,7 @@ export async function parseStyleAsset(
 
    // Parse
    const AST = cssTree.parse(content, {
-      positions: !!this.config.bundle.sourceMap,
+      positions: !!config.bundle.sourceMap,
       filename: source,
       onParseError: (error: any) => {
          let message = error.formattedMessage;

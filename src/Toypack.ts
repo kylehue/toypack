@@ -1,8 +1,7 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import { PartialDeep, Asyncify } from "type-fest";
+import { PartialDeep, Asyncify, ReadonlyDeep } from "type-fest";
 import { IAsset, createAsset } from "./asset.js";
-import { bundle } from "./bundle/index.js";
 import {
    appExtensions,
    resourceExtensions,
@@ -19,12 +18,12 @@ import {
    mergeDeep,
    parseURL,
 } from "./utils.js";
-import JSONLoader from "./loaders/JSONLoader.js";
-import HTMLLoader from "./loaders/HTMLLoader.js";
-import RawLoader from "./loaders/RawLoader.js";
-import { IParsedAsset } from "./graph/parseAsset.js";
+import jsonPlugin from "./plugins/jsonPlugin.js";
+import htmlPlugin from "./plugins/htmlPlugin.js";
+import rawPlugin from "./plugins/rawPlugin.js";
 import { invalidAssetSourceError } from "./errors.js";
 import { CssNode } from "css-tree";
+import { BuildHookConfig, BuildHooks, Plugin } from "./buildHooks.js";
 
 export class Toypack {
    private _iframe: HTMLIFrameElement | null = null;
@@ -34,31 +33,38 @@ export class Toypack {
       script: [...appExtensions],
    };
    private _assets: Map<string, IAsset> = new Map();
-   private _buildHooks: { [key in keyof IBuildHooks]: IBuildHooks[key][] } = {};
-   protected loaders: ILoaderData[] = [];
-   protected cachedDeps: ICache = {
+   private _config: IToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
+   protected _buildHooks: { [key in keyof BuildHooks]?: BuildHooks[key][] } =
+      {};
+   //protected _loaders: ILoaderData[] = [];
+   protected _cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
    };
-   public config: IToypackConfig;
    public hooks = new Hooks();
    constructor(config?: PartialDeep<IToypackConfig>) {
-      this.config = mergeDeep(
-         JSON.parse(JSON.stringify(defaultConfig)),
-         config
-      );
+      if (config) this.setConfig(config);
 
-      this.useLoader(RawLoader(), JSONLoader(), HTMLLoader());
+      this.usePlugin(htmlPlugin(), rawPlugin(), jsonPlugin());
 
-      if (this.config.logLevel == "error") {
+      if (this._config.logLevel == "error") {
          this.hooks.onError((error) => {
             console.error(error.reason);
          });
       }
    }
 
+   public setConfig(config: PartialDeep<IToypackConfig>) {
+      this.clearCache();
+      this._config = mergeDeep(this._config, config as IToypackConfig);
+   }
+
+   public getConfig(): ReadonlyDeep<IToypackConfig> {
+      return this._config;
+   }
+
    protected warn(message: string) {
-      if (this.config.logLevel == "error" || this.config.logLevel == "warn") {
+      if (this._config.logLevel == "error" || this._config.logLevel == "warn") {
          console.warn(message);
       }
    }
@@ -72,8 +78,8 @@ export class Toypack {
          throw new Error("Source must be string. Received " + source);
       }
 
-      const parsed = parseURL(source);
-      const extension = path.extname(parsed.target);
+      source = source.split("?")[0];
+      const extension = path.extname(source);
       return this.getExtensions(type).includes(extension);
    }
 
@@ -91,7 +97,7 @@ export class Toypack {
       const resolvedSource = this.resolve(source, { baseDir });
       const asset = resolvedSource ? this.getAsset(resolvedSource) : null;
       if (!asset || asset.type != "resource") return null;
-      if (this.config.bundle.mode == "production") {
+      if (this._config.bundle.mode == "production") {
          return "./" + getHash(asset.source) + path.extname(asset.source);
       } else {
          return asset.contentURL;
@@ -99,36 +105,106 @@ export class Toypack {
    }
 
    /**
-    * Adds loaders to the list of loaders.
-    * @param {ILoader} loaders The loaders to add.
+    * Adds a plugin to Toypack.
     */
-   public useLoader(...loaders: ILoader[]) {
-      for (const loader of loaders) {
-         const loaderDataDefaults = {
-            chaining: true,
-            extensions: [] as NonNullable<ILoaderData["extensions"]>,
-         };
-
-         const loaderData = Object.assign(
-            loaderDataDefaults,
-            loader.call(this)
-         );
-
-         for (const [group, ext] of loaderData.extensions) {
-            this._extensions[group].push(ext);
+   public usePlugin<T extends ReturnType<Plugin>>(...plugins: T[]) {
+      const registerBuildHook = <HookName extends keyof BuildHooks>(
+         hookName: HookName,
+         hookFunction?: BuildHooks[HookName]
+      ) => {
+         if (!hookFunction) return;
+         let hookGroup = this._buildHooks[hookName];
+         if (!hookGroup) {
+            hookGroup = [];
+            this._buildHooks[hookName] = hookGroup;
          }
 
-         this.loaders.push(loaderData);
+         hookGroup.push(hookFunction);
+
+         /**
+          * Sort plugins
+          * If chaining is set to false, it should always be first no matter
+          * what the order is.
+          * If order is set to "pre", it should be first.
+          * If order is set to "post", it should be last.
+          */
+         hookGroup.splice(
+            0,
+            hookGroup.length,
+            ...hookGroup.sort((a, b) => {
+               // Sort based on the "chaining" property
+               if (typeof a === "object" && a.chaining === false) {
+                  return -1;
+               } else if (typeof b === "object" && b.chaining === false) {
+                  return 1;
+               }
+
+               // Sort objects with "order: pre" first
+               if (typeof a === "object" && a.order === "pre") {
+                  return -1;
+               } else if (typeof b === "object" && b.order === "pre") {
+                  return 1;
+               }
+
+               // Sort objects with "order: post" last
+               if (typeof a === "object" && a.order === "post") {
+                  return 1;
+               } else if (typeof b === "object" && b.order === "post") {
+                  return -1;
+               }
+
+               // No specific ordering criteria, maintain original order
+               return 0;
+            })
+         );
+      };
+
+      // Register build hooks
+      for (let i = 0; i < plugins.length; i++) {
+         const plugin = plugins[i];
+         registerBuildHook("load", plugin.load);
+         registerBuildHook("transform", plugin.transform);
       }
    }
 
-   /**
-    * Adds a plugin to Toypack.
-    * @param {IPlugin} plugin The plugin to add.
-    * @returns {ReturnType<IPlugin>}
-    */
-   public usePlugin<T extends IPlugin>(plugin: T): ReturnType<T> {
-      return plugin.call(this);
+   protected async _triggerBuildHook<
+      HookName extends keyof BuildHooks,
+      Hook extends BuildHooks[HookName]
+   >(
+      hookName: HookName,
+      callback: (
+         result: NonNullable<
+            Awaited<
+               ReturnType<Hook extends BuildHookConfig ? Hook["handler"] : Hook>
+            >
+         >
+      ) => void | Parameters<
+         Hook extends BuildHookConfig ? Hook["handler"] : Hook
+      >,
+      args: Parameters<Hook extends BuildHookConfig ? Hook["handler"] : Hook>
+   ) {
+      const hookGroup = this._buildHooks[hookName];
+      if (!hookGroup) return;
+      for (const hook of hookGroup) {
+         let result;
+         if (typeof hook == "function") {
+            result = (hook as any).apply(null, args);
+         } else {
+            if (hook.async === true) {
+               result = await (hook.handler as any).apply(null, args);
+            } else {
+               result = (hook.handler as any).apply(null, args);
+            }
+         }
+
+         if (result) {
+            args = callback(result) || args;
+
+            if (typeof hook != "function" && hook.chaining === false) {
+               break;
+            }
+         }
+      }
    }
 
    /**
@@ -138,7 +214,31 @@ export class Toypack {
     * @returns {string} The resolved absolute path.
     */
    public resolve(relativeSource: string, options?: Partial<IResolveOptions>) {
-      return resolve.call(this, relativeSource, options);
+      const opts = Object.assign(
+         {
+            aliases: this._config.bundle.resolve.alias,
+            fallbacks: this._config.bundle.resolve.fallback,
+            extensions: this._config.bundle.resolve.extensions,
+         } as IResolveOptions,
+         options || {}
+      );
+
+      opts.extensions = [
+         ...new Set([
+            ...opts.extensions,
+            ...this._extensions.script,
+            ...this._extensions.style,
+            ...this._extensions.resource,
+         ]),
+      ];
+
+      const assets: Record<string, string> = {};
+
+      for (const [source, asset] of this._assets) {
+         assets[source] = typeof asset.content == "string" ? asset.content : "";
+      }
+
+      return resolve(assets, relativeSource, opts);
    }
 
    /**
@@ -206,8 +306,8 @@ export class Toypack {
    }
 
    public clearCache() {
-      this.cachedDeps.compiled.clear();
-      this.cachedDeps.parsed.clear();
+      this._cachedDeps.compiled.clear();
+      this._cachedDeps.parsed.clear();
    }
 
    /**
@@ -227,15 +327,15 @@ export class Toypack {
       this._assets.delete(source);
 
       // Remove from cache
-      this.cachedDeps.parsed.forEach((cache, cacheSource) => {
+      this._cachedDeps.parsed.forEach((cache, cacheSource) => {
          if (cache.asset.source === asset.source) {
-            this.cachedDeps.parsed.delete(cacheSource);
+            this._cachedDeps.parsed.delete(cacheSource);
          }
       });
 
-      this.cachedDeps.compiled.forEach((cache, cacheSource) => {
+      this._cachedDeps.compiled.forEach((cache, cacheSource) => {
          if (cache.asset.source === asset.source) {
-            this.cachedDeps.compiled.delete(cacheSource);
+            this._cachedDeps.compiled.delete(cacheSource);
          }
       });
    }
@@ -248,25 +348,28 @@ export class Toypack {
     * of the bundling process.
     */
    public async run(isProd = false) {
-      const oldMode = this.config.bundle.mode;
-      this.config.bundle.mode = isProd ? "production" : oldMode;
-      const graph = await getDependencyGraph.call(this);
-      console.log(graph);
-      const result = await bundle.call(this, graph);
-      this.config.bundle.mode = oldMode;
+      console.log(this._buildHooks.load);
+      
+      console.log(await getDependencyGraph.call(this));
+      // const oldMode = this._config.bundle.mode;
+      // this._config.bundle.mode = isProd ? "production" : oldMode;
+      // const graph = await getDependencyGraph.call(this);
+      // console.log(graph);
+      // const result = await bundle.call(this, graph);
+      // this._config.bundle.mode = oldMode;
 
-      // Set modified flag to false for all assets except those in node_modules
-      this._assets.forEach((asset) => {
-         if (isNodeModule(asset.source) || asset.type == "resource") return;
-         asset.modified = false;
-      });
+      // // Set modified flag to false for all assets except those in node_modules
+      // this._assets.forEach((asset) => {
+      //    if (isNodeModule(asset.source) || asset.type == "resource") return;
+      //    asset.modified = false;
+      // });
 
-      // IFrame
-      if (!isProd && this._iframe) {
-         this._iframe.srcdoc = result.html.content;
-      }
+      // // IFrame
+      // if (!isProd && this._iframe) {
+      //    this._iframe.srcdoc = result.html.content;
+      // }
 
-      return result;
+      // return result;
    }
 }
 
@@ -281,7 +384,7 @@ interface ICache {
       string,
       {
          asset: IAsset;
-         parsed: IParsedAsset;
+         parsed: any;
       }
    >;
    compiled: Map<
@@ -293,83 +396,3 @@ interface ICache {
       }
    >;
 }
-
-export type ILoaderResult = Record<
-   string,
-   {
-      content: string;
-      map?: RawSourceMap;
-   }[]
->;
-
-export interface ILoaderData {
-   /** The name of the loader. */
-   name: string;
-   /**
-    * A regular expression pattern or function used to match the asset
-    * source that the loader should be applied to.
-    */
-   test:
-      | RegExp
-      | ((source: string, params: IDependencyImportParams) => boolean);
-   /**
-    * Determines if the loader should be chainable with other loaders.
-    * If set to false, the bundler will exclude other loaders and
-    * exclusively use this loader. Defaults to true.
-    */
-   chaining?: boolean;
-   /** Function that handles the compilation of the matched files. */
-   compile: (
-      data: IRawDependencyData
-   ) => ILoaderResult | Promise<ILoaderResult>;
-   /** Extensions to add to the bundler. */
-   extensions?: [keyof InstanceType<typeof Toypack>["_extensions"], string][];
-}
-
-interface IRawDependencyData {
-   source: string;
-   content: string | Blob;
-   params: IDependencyImportParams;
-}
-
-type IDependencyImportParams = ReturnType<typeof parseURL>["params"];
-
-export type ILoader = (this: Toypack) => ILoaderData;
-export type IPlugin = (this: Toypack) => any;
-
-interface IBuildHooks {
-   load?: (dep: {
-      source: string;
-      params: IDependencyImportParams;
-      content: string | Blob;
-   }) => ILoaderResult | void | Promise<ILoaderResult | void>;
-   transform?: (dep: any) => void;
-   resolve?: (id: string) => string;
-   beforeFinalize?: (content: any) => void;
-   afterFinalize?: (content: any) => void;
-   config?: (config: IToypackConfig) => Partial<IToypackConfig>;
-   start?: () => void;
-}
-
-type plugin = () => IBuildHooks;
-
-const myPlugin: plugin = () => {
-   let config: IToypackConfig;
-   return {
-      start() {
-         
-      },
-      load(dep) {
-         if (!dep.params.raw) return;
-
-         return {
-            js: []
-         }
-      },
-      resolve(id) {
-         return id;
-      },
-   };
-};
-
-let test = myPlugin();

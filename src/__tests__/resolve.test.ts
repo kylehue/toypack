@@ -17,6 +17,10 @@ const toypack = new Toypack({
             "react/css": "/node_modules/reactlib/test/hello.css",
             "../local": "/assets/image.jpg",
          },
+         fallback: {
+            path: false,
+            assert: "assert-browserify",
+         },
       },
    },
 });
@@ -120,6 +124,13 @@ describe("Resolve", () => {
             baseDir: path.dirname("/src/main.js"),
          })
       ).toBe("/assets/image.jpg");
+   });
+
+   test("Fallback", () => {
+      const expected = "/node_modules/assert-browserify/index.js";
+      toypack.addOrUpdateAsset(expected);
+      expect(toypack.resolve("assert")).toBe(expected);
+      expect(toypack.resolve("path")).toBe("virtual:empty");
    });
 
    test("Core modules", () => {

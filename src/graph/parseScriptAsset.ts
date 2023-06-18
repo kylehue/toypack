@@ -2,6 +2,7 @@ import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { Node } from "@babel/traverse";
 import { parseError } from "../errors.js";
 import { Toypack } from "../Toypack.js";
+import { IBabelParseOptions } from "src/config.js";
 
 const emptyAST: Node = babelParse("");
 
@@ -15,16 +16,17 @@ export async function parseScriptAsset(
    source: string,
    content: string
 ): Promise<IParseScriptResult> {
+   const config = this.getConfig();
    const result: IParseScriptResult = {
       dependencies: [] as string[],
       AST: emptyAST,
    };
 
-   const moduleType = this.config.bundle.moduleType;
+   const moduleType = config.bundle.moduleType;
 
    // Parse
    try {
-      const userBabelOptions = this.config.babel.parse;
+      const userBabelOptions = config.babel.parse as IBabelParseOptions;
       const importantBabelOptions: ParserOptions = {
          sourceType: moduleType == "esm" ? "module" : "script",
          sourceFilename: source,

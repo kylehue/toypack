@@ -165,31 +165,6 @@ export function indexToPosition(content: string, index: number) {
    return { line, column };
 }
 
-function isObject(item: any) {
-   return item && typeof item === "object" && !Array.isArray(item);
-}
-
-/**
- * Deep merge two objects.
- */
-export function mergeDeep<T extends Object>(target: T, ...sources: T[]) {
-   if (!sources.length) return target;
-   const source = sources.shift();
-
-   if (isObject(target) && isObject(source)) {
-      for (const key in source) {
-         if (isObject(source[key])) {
-            if (!target[key]) Object.assign(target, { [key]: {} });
-            mergeDeep(target[key] as any, source[key]);
-         } else {
-            Object.assign(target, { [key]: source[key] });
-         }
-      }
-   }
-
-   return mergeDeep(target, ...sources);
-}
-
 /**
  * Merge old source map and new source map and return merged.
  * If old or new source map value is falsy, return another one as it is.
@@ -248,3 +223,80 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
 
    return JSON.parse(mergedMapGenerator.toString()) as RawSourceMap;
 }
+
+// https://github.com/voodoocreation/ts-deepmerge
+type TAllKeys<T> = T extends any ? keyof T : never;
+type TIndexValue<T, K extends PropertyKey, D = never> = T extends any
+   ? K extends keyof T
+      ? T[K]
+      : D
+   : never;
+type TPartialKeys<T, K extends keyof T> = Omit<T, K> &
+   Partial<Pick<T, K>> extends infer O
+   ? { [P in keyof O]: O[P] }
+   : never;
+type TFunction = (...a: any[]) => any;
+type TPrimitives =
+   | string
+   | number
+   | boolean
+   | bigint
+   | symbol
+   | Date
+   | TFunction;
+type TMerged<T> = [T] extends [Array<any>]
+   ? { [K in keyof T]: TMerged<T[K]> }
+   : [T] extends [TPrimitives]
+   ? T
+   : [T] extends [object]
+   ? TPartialKeys<{ [K in TAllKeys<T>]: TMerged<TIndexValue<T, K>> }, never>
+   : T;
+
+const isObject = (obj: any) => {
+   if (typeof obj === "object" && obj !== null) {
+      if (typeof Object.getPrototypeOf === "function") {
+         const prototype = Object.getPrototypeOf(obj);
+         return prototype === Object.prototype || prototype === null;
+      }
+
+      return Object.prototype.toString.call(obj) === "[object Object]";
+   }
+
+   return false;
+};
+
+interface IObject {
+   [key: string]: any;
+}
+
+export const mergeDeep = <T extends IObject[]>(
+   ...objects: T
+): TMerged<T[number]> =>
+   objects.reduce((result, current) => {
+      if (Array.isArray(current)) {
+         throw new TypeError(
+            "Arguments provided to ts-deepmerge must be objects, not arrays."
+         );
+      }
+
+      Object.keys(current).forEach((key) => {
+         if (["__proto__", "constructor", "prototype"].includes(key)) {
+            return;
+         }
+
+         if (Array.isArray(result[key]) && Array.isArray(current[key])) {
+            result[key] = Array.from(
+               new Set((result[key] as unknown[]).concat(current[key]))
+            );
+         } else if (isObject(result[key]) && isObject(current[key])) {
+            result[key] = mergeDeep(
+               result[key] as IObject,
+               current[key] as IObject
+            );
+         } else {
+            result[key] = current[key];
+         }
+      });
+
+      return result;
+   }, {}) as any;
