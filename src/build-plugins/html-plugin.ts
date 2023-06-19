@@ -9,8 +9,9 @@ import {
 } from "node-html-parser";
 import { RawSourceMap, SourceMapGenerator } from "source-map-js";
 import MapConverter from "convert-source-map";
-import { getHash, indexToPosition } from "../utils.js";
-import { Plugin } from "../buildHooks.js";
+import { getHash } from "../utils/get-hash.js";
+import { indexToPosition } from "../utils/index-to-position.js";
+import { Plugin } from "../plugin/plugin.js";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 
@@ -435,7 +436,7 @@ const htmlPlugin: Plugin = () => {
    return {
       name: "html-plugin",
       load(dep) {
-         if (!/\.ts$/.test(dep.source)) return;
+         if (!/\.html$/.test(dep.source)) return;
          // const compiled = compile.call(this.bundler, dep.source, contentToCompile);
          // const compiledCSSChunks = compileCSSChunks(compiled.cssChunks, {
          //    sourceMaps: !!config.sourceMapConfig,
@@ -454,6 +455,7 @@ const htmlPlugin: Plugin = () => {
          // };
 
          return {
+            type: "script",
             content: "console.log('html plugin');" + dep.content,
          };
       },

@@ -1,7 +1,7 @@
 import path from "path-browserify";
 import * as cssTree from "css-tree";
 import { Toypack } from "../Toypack.js";
-import { parseError } from "../errors.js";
+import { parseError } from "../utils/errors.js";
 
 /**
  * Parses and extracts the dependencies of a CSS asset.
@@ -15,7 +15,7 @@ export async function parseStyleAsset(
    const config = this.getConfig();
    const result: IParseStyleResult = {
       dependencies: [] as string[],
-      AST: {} as cssTree.CssNode,
+      ast: {} as cssTree.CssNode,
    };
 
    // Parse
@@ -38,7 +38,7 @@ export async function parseStyleAsset(
       },
    });
 
-   result.AST = AST;
+   result.ast = AST;
 
    // Extract dependencies
    cssTree.walk(AST, (node, item, list) => {
@@ -123,5 +123,5 @@ export async function parseStyleAsset(
 
 export interface IParseStyleResult {
    dependencies: string[];
-   AST: cssTree.CssNode;
+   ast: cssTree.CssNode;
 }

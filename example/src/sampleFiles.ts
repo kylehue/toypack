@@ -2,6 +2,7 @@ export const sampleFiles: Record<string, string | Blob> = {
    "package.json": (await import("@test/package.json?raw")).default,
    "index.html": (await import("@test/index.html?raw")).default,
    "src/main.ts": (await import("@test/src/main.ts?raw")).default,
+   "src/App.vue": (await import("@test/src/App.vue?raw")).default,
    "src/testing.cjs": (await import("@test/src/testing.cjs?raw")).default,
    "src/testing.mjs": (await import("@test/src/testing.mjs?raw")).default,
    "classes/adder.js": (await import("@test/classes/adder.js?raw")).default,

@@ -1,29 +1,33 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import { PartialDeep, Asyncify, ReadonlyDeep } from "type-fest";
-import { IAsset, createAsset } from "./asset.js";
+import {
+   PartialDeep,
+   Asyncify,
+   ReadonlyDeep,
+   Constructor,
+   IsEmptyObject,
+} from "type-fest";
+import { IAsset, createAsset } from "./utils/create-asset.js";
 import {
    appExtensions,
    resourceExtensions,
    styleExtensions,
-} from "./extensions.js";
+} from "./utils/extensions.js";
 import { getDependencyGraph } from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
 import { defaultConfig, IToypackConfig } from "./config.js";
-import { resolve, IResolveOptions } from "./resolve.js";
-import {
-   getHash,
-   isNodeModule,
-   isValidSource,
-   mergeDeep,
-   parseURL,
-} from "./utils.js";
-import jsonPlugin from "./plugins/jsonPlugin.js";
-import htmlPlugin from "./plugins/htmlPlugin.js";
-import rawPlugin from "./plugins/rawPlugin.js";
-import { invalidAssetSourceError } from "./errors.js";
-import { CssNode } from "css-tree";
-import { BuildHookConfig, BuildHooks, Plugin } from "./buildHooks.js";
+import { resolve, IResolveOptions } from "./utils/resolve.js";
+import jsonPlugin from "./build-plugins/json-plugin.js";
+import htmlPlugin from "./build-plugins/html-plugin.js";
+import rawPlugin from "./build-plugins/raw-plugin.js";
+import vuePlugin from "./build-plugins/vue-plugin.js";
+import sassPlugin from "./build-plugins/sass-plugin.js";
+import { invalidAssetSourceError } from "./utils/errors.js";
+import { PluginManager } from "./plugin/PluginManager.js";
+import { Plugin } from "./plugin/plugin.js";
+import { mergeObjects } from "./utils/merge-objects.js";
+import { getHash } from "./utils/get-hash.js";
+import { isValidAssetSource } from "./utils/is-valid-asset-source.js";
 
 export class Toypack {
    private _iframe: HTMLIFrameElement | null = null;
@@ -34,9 +38,7 @@ export class Toypack {
    };
    private _assets: Map<string, IAsset> = new Map();
    private _config: IToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
-   protected _buildHooks: { [key in keyof BuildHooks]?: BuildHooks[key][] } =
-      {};
-   //protected _loaders: ILoaderData[] = [];
+   protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
@@ -45,7 +47,13 @@ export class Toypack {
    constructor(config?: PartialDeep<IToypackConfig>) {
       if (config) this.setConfig(config);
 
-      this.usePlugin(htmlPlugin(), rawPlugin(), jsonPlugin());
+      this.usePlugin(
+         htmlPlugin(),
+         rawPlugin(),
+         jsonPlugin(),
+         sassPlugin(),
+         vuePlugin()
+      );
 
       if (this._config.logLevel == "error") {
          this.hooks.onError((error) => {
@@ -54,9 +62,22 @@ export class Toypack {
       }
    }
 
+   /**
+    * Adds a plugin to Toypack.
+    */
+   public usePlugin<T extends ReturnType<Plugin>>(...plugins: T[]) {
+      // Register build hooks
+      for (let i = 0; i < plugins.length; i++) {
+         const plugin = plugins[i];
+         this._pluginManager.registerHook("load", plugin.load);
+         this._pluginManager.registerHook("resolve", plugin.resolve);
+         this._pluginManager.registerHook("config", plugin.config);
+      }
+   }
+
    public setConfig(config: PartialDeep<IToypackConfig>) {
       this.clearCache();
-      this._config = mergeDeep(this._config, config as IToypackConfig);
+      this._config = mergeObjects(this._config, config as IToypackConfig);
    }
 
    public getConfig(): ReadonlyDeep<IToypackConfig> {
@@ -101,109 +122,6 @@ export class Toypack {
          return "./" + getHash(asset.source) + path.extname(asset.source);
       } else {
          return asset.contentURL;
-      }
-   }
-
-   /**
-    * Adds a plugin to Toypack.
-    */
-   public usePlugin<T extends ReturnType<Plugin>>(...plugins: T[]) {
-      const registerBuildHook = <HookName extends keyof BuildHooks>(
-         hookName: HookName,
-         hookFunction?: BuildHooks[HookName]
-      ) => {
-         if (!hookFunction) return;
-         let hookGroup = this._buildHooks[hookName];
-         if (!hookGroup) {
-            hookGroup = [];
-            this._buildHooks[hookName] = hookGroup;
-         }
-
-         hookGroup.push(hookFunction);
-
-         /**
-          * Sort plugins
-          * If chaining is set to false, it should always be first no matter
-          * what the order is.
-          * If order is set to "pre", it should be first.
-          * If order is set to "post", it should be last.
-          */
-         hookGroup.splice(
-            0,
-            hookGroup.length,
-            ...hookGroup.sort((a, b) => {
-               // Sort based on the "chaining" property
-               if (typeof a === "object" && a.chaining === false) {
-                  return -1;
-               } else if (typeof b === "object" && b.chaining === false) {
-                  return 1;
-               }
-
-               // Sort objects with "order: pre" first
-               if (typeof a === "object" && a.order === "pre") {
-                  return -1;
-               } else if (typeof b === "object" && b.order === "pre") {
-                  return 1;
-               }
-
-               // Sort objects with "order: post" last
-               if (typeof a === "object" && a.order === "post") {
-                  return 1;
-               } else if (typeof b === "object" && b.order === "post") {
-                  return -1;
-               }
-
-               // No specific ordering criteria, maintain original order
-               return 0;
-            })
-         );
-      };
-
-      // Register build hooks
-      for (let i = 0; i < plugins.length; i++) {
-         const plugin = plugins[i];
-         registerBuildHook("load", plugin.load);
-         registerBuildHook("transform", plugin.transform);
-      }
-   }
-
-   protected async _triggerBuildHook<
-      HookName extends keyof BuildHooks,
-      Hook extends BuildHooks[HookName]
-   >(
-      hookName: HookName,
-      callback: (
-         result: NonNullable<
-            Awaited<
-               ReturnType<Hook extends BuildHookConfig ? Hook["handler"] : Hook>
-            >
-         >
-      ) => void | Parameters<
-         Hook extends BuildHookConfig ? Hook["handler"] : Hook
-      >,
-      args: Parameters<Hook extends BuildHookConfig ? Hook["handler"] : Hook>
-   ) {
-      const hookGroup = this._buildHooks[hookName];
-      if (!hookGroup) return;
-      for (const hook of hookGroup) {
-         let result;
-         if (typeof hook == "function") {
-            result = (hook as any).apply(null, args);
-         } else {
-            if (hook.async === true) {
-               result = await (hook.handler as any).apply(null, args);
-            } else {
-               result = (hook.handler as any).apply(null, args);
-            }
-         }
-
-         if (result) {
-            args = callback(result) || args;
-
-            if (typeof hook != "function" && hook.chaining === false) {
-               break;
-            }
-         }
       }
    }
 
@@ -264,7 +182,7 @@ export class Toypack {
     * @returns {Asset} The created or updated Asset object.
     */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
-      if (!isValidSource(source)) {
+      if (!isValidAssetSource(source)) {
          this.hooks.trigger("onError", invalidAssetSourceError(source));
          return {} as IAsset;
       }
@@ -293,7 +211,7 @@ export class Toypack {
     * @returns {Asset | null} The Asset object if found, otherwise null.
     */
    public getAsset(source: string) {
-      source = path.join("/", source);
+      source = path.join("/", source.split("?")[0]);
       return this._assets.get(source) || null;
    }
 
@@ -348,8 +266,15 @@ export class Toypack {
     * of the bundling process.
     */
    public async run(isProd = false) {
-      console.log(this._buildHooks.load);
-      
+      await this._pluginManager.triggerHook(
+         "config",
+         [this._config],
+         (config) => {
+            if (!config) return;
+            this.setConfig(config);
+         }
+      );
+
       console.log(await getDependencyGraph.call(this));
       // const oldMode = this._config.bundle.mode;
       // this._config.bundle.mode = isProd ? "production" : oldMode;
@@ -376,7 +301,7 @@ export class Toypack {
 // Lib exports & types
 export default Toypack;
 export * as Babel from "@babel/standalone";
-export { CodeComposer } from "./CodeComposer.js";
+export { CodeComposer } from "./utils/CodeComposer.js";
 export type { IToypackConfig, IAsset };
 
 interface ICache {

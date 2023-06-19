@@ -1,7 +1,7 @@
 import { Node } from "@babel/traverse";
-import { IAsset } from "./asset.js";
-import type { ITraverseOptions } from "./bundle/compileScript.js";
-import { CodeComposer } from "./CodeComposer.js";
+import { IAsset } from "./utils/create-asset.js";
+//import type { ITraverseOptions } from "./bundle/compileScript.js";
+import { CodeComposer } from "./utils/CodeComposer.js";
 
 const eventMap = {
    onError: (event: IErrorEvent) => {},
@@ -138,7 +138,7 @@ export interface IAfterResolveEvent {
 
 export interface ITranspileEvent {
    AST: Node;
-   traverse: (traverseOptions: ITraverseOptions) => void;
+   traverse: (traverseOptions: any) => void;
    source: string;
 }
 

@@ -7,7 +7,7 @@
 console.log(44);
 console.log(3);
 console.log(123456);
-import pkgjson from "../package.json";
+import pkgjson from "../package";
 console.log(pkgjson);
 const foo: string = "bar";
 console.log(foo);
@@ -18,6 +18,9 @@ const bingbong = "beepboop";
 console.log(bingbong);
 import testing from "./testing.cjs";
 console.log(testing);
+import App from "./App";
+console.log(App);
+
 // import mainRaw from "./main.ts?raw";
 // console.log(mainRaw);
 // import rawHTML from "../index.html?raw";

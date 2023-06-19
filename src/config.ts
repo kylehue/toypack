@@ -6,7 +6,9 @@ export const defaultConfig = {
     */
    bundle: {
       /**
-       * The entry point of the program. If not specified, entry will be `/index.js` or `/index.html`. If those files doesn't exist, entry will be the path specified in the `main` field of `/package.json`.
+       * The entry point of the program. If not specified, entry will be
+       * `/index.js` or `/index.html`. If those files doesn't exist, entry
+       * will be the path specified in the `main` field of `/package.json`.
        */
       entry: "",
       /**
@@ -15,7 +17,10 @@ export const defaultConfig = {
        */
       moduleType: "esm" as IModuleTypeConfig,
       /**
-       * The mode of the bundle. `development` is optimized for a fast and flexible workflow during the development process. `production` is optimized for performance and efficiency in a live production environment.
+       * The mode of the bundle. `development` is optimized for a fast
+       * and flexible workflow during the development process. `production`
+       * is optimized for performance and efficiency in a live production
+       * environment.
        * @default "development"
        */
       mode: "development" as IModeConfig,
@@ -28,15 +33,18 @@ export const defaultConfig = {
           */
          alias: {} as Record<string, string>,
          /**
-          * An object mapping fallback module names to their corresponding paths or modules. Allows for providing fallback modules when a module is not found in the normal resolution process.
+          * An object mapping fallback module names to their corresponding
+          * paths or modules. Allows for providing fallback modules when a
+          * module is not found in the normal resolution process.
           */
          fallback: {} as Record<string, string | false>,
          /**
-          * An array of prioritized file extensions to resolve.
+          * Additional extensions to consider for imported sources without
+          * an explicit extension.
           * @default
-          * [".js", ".ts", ".json"]
+          * []
           */
-         extensions: [".js", ".ts", ".json"] as string[],
+         extensions: [] as string[],
       },
       /**
        * Indicates whether to generate source maps for the bundled code.

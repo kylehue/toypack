@@ -1,6 +1,6 @@
 import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { Node } from "@babel/traverse";
-import { parseError } from "../errors.js";
+import { parseError } from "../utils/errors.js";
 import { Toypack } from "../Toypack.js";
 import { IBabelParseOptions } from "src/config.js";
 
@@ -19,10 +19,12 @@ export async function parseScriptAsset(
    const config = this.getConfig();
    const result: IParseScriptResult = {
       dependencies: [] as string[],
-      AST: emptyAST,
+      ast: emptyAST,
    };
 
-   const moduleType = config.bundle.moduleType;
+   const moduleType = source.startsWith("virtual:")
+      ? "esm"
+      : config.bundle.moduleType;
 
    // Parse
    try {
@@ -30,9 +32,8 @@ export async function parseScriptAsset(
       const importantBabelOptions: ParserOptions = {
          sourceType: moduleType == "esm" ? "module" : "script",
          sourceFilename: source,
-         allowImportExportEverywhere: true,
       };
-      result.AST = babelParse(content, {
+      result.ast = babelParse(content, {
          ...userBabelOptions,
          ...importantBabelOptions,
       });
@@ -44,7 +45,7 @@ export async function parseScriptAsset(
 
    // Extract dependencies
    if (moduleType == "esm") {
-      traverseAST(result.AST, {
+      traverseAST(result.ast, {
          ImportDeclaration(scope) {
             result.dependencies.push(scope.node.source.value);
          },
@@ -66,7 +67,7 @@ export async function parseScriptAsset(
          },
       });
    } else {
-      traverseAST(result.AST, {
+      traverseAST(result.ast, {
          CallExpression(scope) {
             const argNode = scope.node.arguments[0];
             const callee = scope.node.callee;
@@ -84,5 +85,5 @@ export async function parseScriptAsset(
 
 export interface IParseScriptResult {
    dependencies: string[];
-   AST: Node;
+   ast: Node;
 }

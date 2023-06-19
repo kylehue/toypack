@@ -1,5 +1,6 @@
 import path from "path-browserify";
-import { isLocal, isURL } from "./utils.js";
+import { isLocal } from "./is-local.js";
+import { isUrl } from "./is-url.js";
 
 /**
  * Searches for the fallback data of a source path.
@@ -130,11 +131,11 @@ function getResolved(
    if (
       options.includeCoreModules &&
       !isLocal(sourceToResolve) &&
-      !isURL(sourceToResolve)
+      !isUrl(sourceToResolve)
    ) {
       const pre = path.join("/", "node_modules", sourceToResolve);
       return loadAsDirectory(assets, pre, options);
-   } else if (isURL(sourceToResolve)) {
+   } else if (isUrl(sourceToResolve)) {
       return sourceToResolve;
    } else {
       const pre = path.join("/", options.baseDir, sourceToResolve);
@@ -172,7 +173,7 @@ export function resolve(
          sourceToResolve.replace(aliasData.alias, "")
       );
       const aliasIsCoreModule =
-         !isLocal(aliasData.replacement) && !isURL(aliasData.replacement);
+         !isLocal(aliasData.replacement) && !isUrl(aliasData.replacement);
 
       if (!aliasIsCoreModule) {
          aliased = "./" + path.relative(opts.baseDir, aliased);
