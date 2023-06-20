@@ -46,11 +46,7 @@ export async function loadChunk(
          loaded.content = result.content;
 
          if (loaded.type == "script" || loaded.type == "style") {
-            if (loaded.map && result.map) {
-               loaded.map = mergeSourceMaps(loaded.map, result.map);
-            } else {
-               loaded.map = result.map;
-            }
+            loaded.map = result.map;
          }
       },
       context
@@ -64,18 +60,13 @@ export async function loadChunk(
    return loaded;
 }
 
-interface LoadChunkBase {
-   type: "script" | "style" | "resource";
-   asset?: IAsset | null;
-}
-
-export interface LoadChunkResource extends LoadChunkBase {
+export interface LoadChunkResource {
    type: "resource";
    content: Blob;
    asset?: IAssetResource | null;
 }
 
-export interface LoadChunkText extends LoadChunkBase {
+export interface LoadChunkText {
    type: "script" | "style";
    content: string;
    asset?: IAssetText | null;

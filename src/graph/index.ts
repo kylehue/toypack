@@ -55,15 +55,16 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             ? await parseScriptAsset.call(this, rawSource, loaded.content)
             : await parseStyleAsset.call(this, rawSource, loaded.content);
 
-      const dependency = {
+      const dependency: ScriptDependency | StyleDependency = {
          asset: loaded.asset,
          source: rawSource,
          ast: parsed.ast,
          dependencyMap: {},
          map: loaded.map,
          type: loaded.type,
+         // @ts-ignore
          c: loaded.content,
-      } as ScriptDependency | StyleDependency;
+      };
 
       graph[rawSource] = dependency;
 
@@ -138,22 +139,21 @@ export async function getDependencyGraph(this: Toypack) {
 interface DependencyBase {
    type: "script" | "style" | "resource";
    source: string;
-   asset: IAsset;
 }
 
 export interface ScriptDependency extends DependencyBase {
    type: "script";
    ast: Node;
-   asset: IAssetText;
    dependencyMap: Record<string, string>;
+   asset?: IAssetText | null;
    map?: RawSourceMap | null;
 }
 
 export interface StyleDependency extends DependencyBase {
    type: "style";
    ast: CssNode;
-   asset: IAssetText;
    dependencyMap: Record<string, string>;
+   asset?: IAssetText | null;
    map?: RawSourceMap | null;
 }
 
