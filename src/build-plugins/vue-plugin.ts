@@ -1,49 +1,53 @@
-import { Plugin } from "../plugin/plugin.js";
+import { Loader, Plugin } from "../types.js";
 
 const vuePlugin: Plugin = () => {
-   let storedName: string = "";
-   return {
-      name: "vue-plugin",
-      config() {
-         return {
-            bundle: {
-               resolve: {
-                  extensions: [".vue"]
-               }
-            }
-         }
-      },
-      load(dep) {
-         console.log(dep.source, "is imported by", this.getImporter()?.source, this.isEntry);
-         if (
-            dep.source == `virtual:${storedName}.test.js` ||
-            dep.source == `virtual:${storedName}.hello.js`
-         ) {
-            return {
-               type: "script",
-               content: `console.log("${dep.source}");`,
-            };
-         }
+   let sources: any = {};
 
-         if (/\.vue$/.test(dep.source)) {
-            
-            storedName = dep.source;
-            return {
-               type: "script",
-               content: `
-import "virtual:${storedName}.style.scss";
-import { render } from "virtual:${storedName}.hello.js";
-import script from "virtual:${storedName}.test.js";
+   const vueLoader: Loader = {
+      test: /\.vue$/,
+      compile(dep) {
+         const mocks: Record<string, string> = {};
+         mocks[`virtual:${dep.source}.style.scss`] = `
+body {
+   content: "sass from vue!";
+}
+`;
+         mocks[`virtual:${dep.source}.test.js`] = `
+const script = {
+   template: ""
+};
+
+export default script;
+`;
+         mocks[`virtual:${dep.source}.hello.ts`] = `
+export function render() {
+   console.log("render!");
+}
+`;
+         sources = mocks;
+         return `
+import "virtual:${dep.source}.style.scss";
+import { render } from "virtual:${dep.source}.hello.ts";
+import script from "virtual:${dep.source}.test.js";
 
 script.render = render;
-script.__file = "${storedName}";
+script.__file = "${dep.source}";
 script.__scopeId = "xxxxxxxxx";
 
 export default script;
-`,
-            };
+`;
+      },
+   };
+
+   return {
+      name: "vue-plugin",
+      extensions: [["script", ".vue"]],
+      loaders: [vueLoader],
+      setup() {},
+      load(dep) {
+         if (dep.source in sources) {
+            return sources[dep.source];
          }
-         
       },
    };
 };

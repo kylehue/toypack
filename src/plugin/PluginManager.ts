@@ -1,9 +1,7 @@
-import { DependencyGraph, Plugin } from "../types";
 import Toypack from "../Toypack.js";
+import { DependencyGraph, Plugin } from "../types";
+import { parseURL, getUsableResourcePath, error, info, warn } from "../utils";
 import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
-import { parseURL } from "../utils/parse-url.js";
-import { getUsableResourcePath } from "../utils/get-usable-resource-path.js";
-import { error, info, warn } from "../utils/debug.js";
 
 type PluginData = ReturnType<Plugin>;
 type BuildHooksGroupMap = {
@@ -29,7 +27,7 @@ export class PluginManager {
          if (prop == "name" || prop == "extensions" || prop == "loader") {
             continue;
          }
-         
+
          const hookName = prop as keyof BuildHooks;
          this._registerHook(plugin, hookName, plugin[hookName]);
       }
@@ -140,7 +138,7 @@ export class PluginManager {
          const context = partialContext[0]
             ? this._createContext(partialContext[0], plugin)
             : null;
-         let args = typeof hookArgs == "function" ? hookArgs() : hookArgs;
+         const args = typeof hookArgs == "function" ? hookArgs() : hookArgs;
          let result;
          if (typeof hook == "function") {
             result = (hook as any).apply(context, args);

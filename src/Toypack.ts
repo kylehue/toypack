@@ -1,25 +1,27 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import { PartialDeep } from "type-fest";
-import { Hooks } from "./Hooks.js";
-import { bundle } from "./bundle/index.js";
-import { ToypackConfig, defaultConfig } from "./config.js";
-import { getDependencyGraph } from "./graph/index.js";
-import { PluginManager } from "./plugin/PluginManager.js";
-import { Asset, ResolveOptions, Plugin, Loader } from "./types.js";
-import { createAsset } from "./utils/create-asset.js";
-import { invalidAssetSourceError } from "./utils/errors.js";
-import { resourceExtensions, styleExtensions, appExtensions } from "./utils/extensions.js";
-import { getHash } from "./utils/get-hash.js";
-import { isValidAssetSource } from "./utils/is-valid-asset-source.js";
-import { mergeObjects } from "./utils/merge-objects.js";
-import { resolve } from "./utils/resolve.js";
 import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
 import sassPlugin from "./build-plugins/sass-plugin.js";
 import vuePlugin from "./build-plugins/vue-plugin.js";
-import { error, warn, info } from "./utils/debug.js";
+import { bundle } from "./bundle/index.js";
+import { ToypackConfig, defaultConfig } from "./config.js";
+import { getDependencyGraph } from "./graph/index.js";
+import { Hooks } from "./Hooks.js";
+import { PluginManager } from "./plugin/PluginManager.js";
+import { Asset, ResolveOptions, Plugin, Loader } from "./types.js";
+import {
+   resolve,
+   mergeObjects,
+   createAsset,
+   isValidAssetSource,
+   resourceExtensions,
+   styleExtensions,
+   appExtensions,
+   invalidAssetSourceError,
+} from "./utils";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -28,7 +30,7 @@ export class Toypack extends Hooks {
       style: [...styleExtensions],
       script: [...appExtensions],
    };
-   private _assets: Map<string, Asset> = new Map();
+   private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
    private _loaders: Loader[] = [];
    protected _pluginManager = new PluginManager(this);

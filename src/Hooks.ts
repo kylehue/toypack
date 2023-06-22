@@ -6,7 +6,7 @@ export class Hooks implements IHooks {
    private _listeners = new Map<keyof EventMap, Listener[]>();
 
    private _getListeners<K extends keyof EventMap>(key: K): Listener[] {
-      return this._listeners.get(key) as Listener[];
+      return this._listeners.get(key)!;
    }
 
    private _createListener<T extends keyof EventMap>(

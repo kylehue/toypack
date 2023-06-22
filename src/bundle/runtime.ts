@@ -1,4 +1,4 @@
-import { CodeComposer } from "../utils/CodeComposer.js";
+import { CodeComposer } from "../utils";
 
 export const identifiers = {
    modules: "_modules_",

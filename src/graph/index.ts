@@ -1,21 +1,18 @@
-import path from "path-browserify";
-import { Asset, ResourceAsset, TextAsset } from "../utils/create-asset.js";
-import {
-   invalidEntryError,
-   entryNotFoundError,
-   resolveFailureError,
-   assetNotFoundError,
-} from "../utils/errors.js";
-import { Toypack } from "../Toypack.js";
-import { RawSourceMap } from "source-map-js";
-import { parseScriptAsset } from "./parse-script-chunk.js";
-import { parseStyleAsset } from "./parse-style-chunk.js";
-import { LoadBuildHook, LoadResult } from "../plugin/hook-types.js";
-import { loadChunk } from "./load-chunk.js";
 import { Node } from "@babel/traverse";
 import { CssNode } from "css-tree";
-import { parseURL } from "../utils/parse-url.js";
-import { PartialContext } from "../plugin/PluginManager.js";
+import path from "path-browserify";
+import { RawSourceMap } from "source-map-js";
+import Toypack from "../Toypack.js";
+import { TextAsset, Asset, ResourceAsset } from "../types.js";
+import {
+   resolveFailureError,
+   entryNotFoundError,
+   invalidEntryError,
+   parseURL,
+} from "../utils";
+import { loadChunk } from "./load-chunk.js";
+import { parseScriptAsset } from "./parse-script-chunk.js";
+import { parseStyleAsset } from "./parse-style-chunk.js";
 
 /**
  * Recursively get the dependency graph of an asset.
@@ -58,7 +55,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          ast: parsed.ast,
          dependencyMap: {},
          map: loaded.map,
-         // @ts-ignore
+         // @ts-expect-error
          c: loaded.content,
          isEntry: isEntry,
          type: loaded.type,
@@ -85,7 +82,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
-            let nonVirtualResolution = this.resolve(resolved, {
+            const nonVirtualResolution = this.resolve(resolved, {
                baseDir: path.dirname(rawSource),
             });
 
@@ -94,7 +91,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                   "onError",
                   resolveFailureError(
                      depSource,
-                     loaded.asset?.source || rawSource
+                     loaded.asset.source || rawSource
                   )
                );
 

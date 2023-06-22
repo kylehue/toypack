@@ -10,8 +10,8 @@ export function indexToPosition(content: string, index: number) {
       throw new RangeError("The index must be greater than or equal to 0.");
    }
 
-   let lines = content.substring(0, index).split("\n");
-   let line = lines.length;
-   let column = lines[lines.length - 1].length;
+   const lines = content.substring(0, index).split("\n");
+   const line = lines.length;
+   const column = lines[lines.length - 1].length;
    return { line, column };
 }

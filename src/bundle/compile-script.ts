@@ -3,14 +3,12 @@ import type {
    BabelFileResult,
    PluginItem,
 } from "@babel/core";
-import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
 import { transformFromAst } from "@babel/standalone";
-import babelTypes from "@babel/types/lib/index.js";
+import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
 import MapConverter from "convert-source-map";
 import { RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
-import { mergeSourceMaps } from "../utils/merge-source-maps.js";
-import { DependencyGraph } from "../graph/index.js";
+import { mergeSourceMaps } from "../utils";
 
 const importantPresets: PluginItem[] = ["env"];
 const importantPlugins: PluginItem[] = [

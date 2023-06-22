@@ -1,5 +1,5 @@
 import { Plugin } from "../types.js";
-import { parseURL } from "../utils/parse-url.js";
+import { parseURL } from "../utils";
 
 const rawPlugin: Plugin = () => {
    return {

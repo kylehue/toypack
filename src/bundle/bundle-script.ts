@@ -1,13 +1,12 @@
+import babelMinify from "babel-minify";
+import MapConverter from "convert-source-map";
+import { SourceMapGenerator } from "source-map-js";
 import { DependencyGraph } from "../graph";
 import { CodeComposer, Toypack } from "../Toypack.js";
-import { SourceMapGenerator } from "source-map-js";
-import { requireFunction, requireCall, moduleWrap } from "./runtime.js";
-import { compileScript } from "./compile-script.js";
-import { mergeSourceMapToBundle } from "../utils/merge-source-map-bundle.js";
+import { mergeSourceMapToBundle, getUsableResourcePath } from "../utils";
 import { mergeSourceMaps } from "../utils/merge-source-maps.js";
-import { getUsableResourcePath } from "../utils/get-usable-resource-path.js";
-import MapConverter from "convert-source-map";
-import babelMinify from "babel-minify";
+import { compileScript } from "./compile-script.js";
+import { requireFunction, requireCall, moduleWrap } from "./runtime.js";
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const bundle = new CodeComposer();

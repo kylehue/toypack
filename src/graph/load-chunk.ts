@@ -1,10 +1,13 @@
-import { Asset, ResourceAsset, TextAsset } from "../utils/create-asset.js";
-import { Toypack } from "../Toypack.js";
 import { BuildHookContext, LoadResult } from "../plugin/hook-types.js";
-import { mergeSourceMaps } from "../utils/merge-source-maps.js";
 import { PartialContext } from "../plugin/PluginManager.js";
-import { isSupported } from "../utils/is-supported.js";
-import { loaderNotFoundError } from "../utils/errors.js";
+import { Toypack } from "../Toypack.js";
+import {
+   mergeSourceMaps,
+   isSupported,
+   loaderNotFoundError,
+   Asset,
+   ResourceAsset,
+} from "../utils";
 
 /**
  * Load a chunk by its source.

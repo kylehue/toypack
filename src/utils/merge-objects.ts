@@ -56,7 +56,7 @@ type TPrimitives =
    | symbol
    | Date
    | TFunction;
-type TMerged<T> = [T] extends [Array<any>]
+type TMerged<T> = [T] extends [any[]]
    ? { [K in keyof T]: TMerged<T[K]> }
    : [T] extends [TPrimitives]
    ? T
@@ -77,6 +77,4 @@ const isObject = (obj: any) => {
    return false;
 };
 
-interface IObject {
-   [key: string]: any;
-}
+type IObject = Record<string, any>;

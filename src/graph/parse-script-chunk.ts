@@ -1,8 +1,7 @@
 import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { Node } from "@babel/traverse";
-import { parseError } from "../utils/errors.js";
 import { Toypack } from "../Toypack.js";
-import { BabelParseConfig } from "src/config.js";
+import { parseError } from "../utils";
 
 const emptyAST: Node = babelParse("");
 
@@ -28,7 +27,7 @@ export async function parseScriptAsset(
 
    // Parse
    try {
-      const userBabelOptions = config.babel.parse as BabelParseConfig;
+      const userBabelOptions = config.babel.parse ;
       const importantBabelOptions: ParserOptions = {
          sourceType: moduleType == "esm" ? "module" : "script",
          sourceFilename: source,

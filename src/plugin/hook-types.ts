@@ -1,10 +1,9 @@
 import type { RawSourceMap } from "source-map-js";
 import { Asyncify, PartialDeep } from "type-fest";
 import { ToypackConfig as ToypackConfig } from "../config";
-import { Asset } from "../utils/create-asset";
-import { Toypack } from "../Toypack.js";
 import { Dependency, DependencyGraph } from "../graph/index.js";
-import { parseURL } from "../utils/parse-url.js";
+import { Toypack } from "../Toypack.js";
+import { parseURL, Asset } from "../utils";
 
 // Interfaces
 export interface ModuleInfo {
