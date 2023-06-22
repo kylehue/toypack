@@ -1,13 +1,13 @@
 export function createAsset<T extends string | Blob>(
    source: string,
    content: T
-): IAsset<T> {
-   const type: IAsset["type"] = typeof content == "string" ? "text" : "resource";
-   const asset: IAsset<T> = {
+): Asset<T> {
+   const type: Asset["type"] = typeof content == "string" ? "text" : "resource";
+   const asset: Asset<T> = {
       type,
       source,
       content,
-   } as IAsset<T>;
+   } as Asset<T>;
 
    if (asset.type == "text") {
       asset.modified = true;
@@ -18,24 +18,24 @@ export function createAsset<T extends string | Blob>(
    return asset;
 }
 
-interface IAssetBase {
+interface AssetBase {
    source: string;
    modified: boolean;
 }
 
-export interface IAssetResource extends IAssetBase {
+export interface ResourceAsset extends AssetBase {
    type: "resource";
    content: Blob;
    contentURL: string;
 }
 
-export interface IAssetText extends IAssetBase {
+export interface TextAsset extends AssetBase {
    type: "text";
    content: string;
 }
 
-export type IAsset<T = unknown> = T extends string
-   ? IAssetText
-   : T extends IAssetResource
-   ? IAssetResource
-   : IAssetText | IAssetResource;
+export type Asset<T = unknown> = T extends string
+   ? TextAsset
+   : T extends ResourceAsset
+   ? ResourceAsset
+   : TextAsset | ResourceAsset;

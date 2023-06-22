@@ -2,7 +2,7 @@ import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { Node } from "@babel/traverse";
 import { parseError } from "../utils/errors.js";
 import { Toypack } from "../Toypack.js";
-import { IBabelParseOptions } from "src/config.js";
+import { BabelParseConfig } from "src/config.js";
 
 const emptyAST: Node = babelParse("");
 
@@ -28,7 +28,7 @@ export async function parseScriptAsset(
 
    // Parse
    try {
-      const userBabelOptions = config.babel.parse as IBabelParseOptions;
+      const userBabelOptions = config.babel.parse as BabelParseConfig;
       const importantBabelOptions: ParserOptions = {
          sourceType: moduleType == "esm" ? "module" : "script",
          sourceFilename: source,
@@ -38,7 +38,7 @@ export async function parseScriptAsset(
          ...importantBabelOptions,
       });
    } catch (error) {
-      this.hooks.trigger("onError", parseError(error as any));
+      this._trigger("onError", parseError(error as any));
 
       return result;
    }

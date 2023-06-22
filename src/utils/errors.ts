@@ -8,7 +8,7 @@ export function anyError(reason: string) {
 export function loaderNotFoundError(source: string) {
    return {
       code: 1,
-      reason: `'${source}' contains unsupported content. Please ensure that you have the necessary loaders configured to handle the content within this file.`,
+      reason: `Failed to load '${source}'.`,
    };
 }
 
@@ -22,7 +22,7 @@ export function assetNotFoundError(source: string) {
 export function resolveFailureError(source: string, parentSource: string) {
    return {
       code: 3,
-      reason: `Could not resolve '${source}' from '${parentSource}'`,
+      reason: `Failed to resolve '${source}' from '${parentSource}'`,
    };
 }
 

@@ -1,14 +1,42 @@
-import { DependencyGraph } from "src/graph/index.js";
+import { DependencyGraph, Plugin } from "../types";
 import Toypack from "../Toypack.js";
-import { BuildHookConfig, BuildHookContext, BuildHooks, PluginContextOptions } from "./hooks.js";
+import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
+import { parseURL } from "../utils/parse-url.js";
+import { getUsableResourcePath } from "../utils/get-usable-resource-path.js";
+import { error, info, warn } from "../utils/debug.js";
 
-type BuildHooksGroupMap = { [key in keyof BuildHooks]?: BuildHooks[key][] };
+type PluginData = ReturnType<Plugin>;
+type BuildHooksGroupMap = {
+   [key in keyof BuildHooks]?: {
+      plugin: PluginData;
+      hook: BuildHooks[key];
+   }[];
+};
+
+export interface PartialContext {
+   bundler: Toypack;
+   graph: DependencyGraph;
+   importer: string | undefined;
+}
+
 export class PluginManager {
    private _hooks: BuildHooksGroupMap = {};
 
    constructor(private bundler: Toypack) {}
 
-   public registerHook<HookName extends keyof BuildHooks>(
+   public registerPlugin<T extends PluginData>(plugin: T) {
+      for (const prop in plugin) {
+         if (prop == "name" || prop == "extensions" || prop == "loader") {
+            continue;
+         }
+         
+         const hookName = prop as keyof BuildHooks;
+         this._registerHook(plugin, hookName, plugin[hookName]);
+      }
+   }
+
+   private _registerHook<HookName extends keyof BuildHooks>(
+      plugin: PluginData,
       hookName: HookName,
       hookFunction?: BuildHooks[HookName]
    ) {
@@ -19,13 +47,16 @@ export class PluginManager {
          this._hooks[hookName] = hookGroup;
       }
 
-      hookGroup.push(hookFunction);
+      hookGroup.push({
+         plugin,
+         hook: hookFunction,
+      });
 
       // Sort hooks by configuration
       hookGroup.splice(
          0,
          hookGroup.length,
-         ...hookGroup.sort((a, b) => {
+         ...hookGroup.sort(({ hook: a }, { hook: b }) => {
             // Sort based on the "chaining" property
             if (typeof a === "object" && a.chaining === false) {
                return -1;
@@ -52,19 +83,37 @@ export class PluginManager {
       );
    }
 
-   public getContext({
-      bundler,
-      graph,
-      importer,
-      isEntry,
-   }: PluginContextOptions): BuildHookContext {
-      return {
-         bundler,
-         graph,
-         isEntry,
-         getModuleIds: () => Object.keys(graph),
-         getImporter: () => (importer ? graph[importer] : null),
+   private _createContext(partialContext: PartialContext, plugin: PluginData) {
+      const result: BuildHookContext = {
+         bundler: partialContext.bundler,
+         graph: partialContext.graph,
+         getImporter: () =>
+            partialContext.importer
+               ? partialContext.graph[partialContext.importer]
+               : null,
+         getUsableResourcePath: (source: string, baseDir = ".") => {
+            return getUsableResourcePath(
+               partialContext.bundler,
+               source,
+               baseDir
+            );
+         },
+         parseSource: parseURL,
+         error: (message) => {
+            const logLevel = partialContext.bundler.getConfig().logLevel;
+            error(logLevel, `[${plugin.name}] Error: ` + message);
+         },
+         warn: (message) => {
+            const logLevel = partialContext.bundler.getConfig().logLevel;
+            warn(logLevel, `[${plugin.name}] Warning: ` + message);
+         },
+         info: (message) => {
+            const logLevel = partialContext.bundler.getConfig().logLevel;
+            info(logLevel, `[${plugin.name}]: ` + message);
+         },
       };
+
+      return result;
    }
 
    public async triggerHook<
@@ -80,35 +129,38 @@ export class PluginManager {
             undefined | null | void
          >
       ) => void,
-      ...context: ThisParameterType<HookFunction> extends BuildHookContext
-         ? [context: BuildHookContext]
-         : [context: void]
+      ...partialContext: ThisParameterType<HookFunction> extends BuildHookContext
+         ? [partialContext: PartialContext]
+         : [partialContext: void]
    ) {
-      const ctx = context.length ? context : [{}];
       const hookGroup = this._hooks[hookName];
       if (!hookGroup) return;
-      for (const hook of hookGroup) {
+      const tm: any = [];
+      for (const { hook, plugin } of hookGroup) {
+         const context = partialContext[0]
+            ? this._createContext(partialContext[0], plugin)
+            : null;
          let args = typeof hookArgs == "function" ? hookArgs() : hookArgs;
          let result;
          if (typeof hook == "function") {
-            result = (hook as any).apply(...ctx, args);
+            result = (hook as any).apply(context, args);
          } else {
             if (hook.async === true) {
-               result = await (hook.handler as any).apply(...ctx, args);
+               result = await (hook.handler as any).apply(context, args);
             } else {
-               result = (hook.handler as any).apply(...ctx, args);
+               result = (hook.handler as any).apply(context, args);
             }
          }
 
          if (result) {
             callback(result);
-
             // Stop when needed
             if (
                // Is chaining set to false?
-               (typeof hook != "function" && hook.chaining === false) ||
+               typeof hook != "function" &&
+               hook.chaining === false /* ||
                // Loader hook should only apply to an asset once
-               hookName == "load"
+               hookName == "load" */
             ) {
                break;
             }

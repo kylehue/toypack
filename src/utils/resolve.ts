@@ -54,7 +54,7 @@ export function getResolveAliasData(
 function tryFileThenIndex(
    assets: Record<string, string>,
    sourceToResolve: string,
-   options: IResolveOptions
+   options: ResolveOptions
 ) {
    const file = loadAsFile(assets, sourceToResolve, options);
 
@@ -68,7 +68,7 @@ function tryFileThenIndex(
 function loadAsDirectory(
    assets: Record<string, string>,
    sourceToResolve: string,
-   options: IResolveOptions
+   options: ResolveOptions
 ) {
    const pkg = assets[path.join(sourceToResolve, "package.json")];
    const mainFieldValue =
@@ -87,7 +87,7 @@ function loadAsDirectory(
 function loadAsFile(
    assets: Record<string, string>,
    sourceToResolve: string,
-   options: IResolveOptions
+   options: ResolveOptions
 ) {
    if (
       path.extname(sourceToResolve) &&
@@ -110,7 +110,7 @@ function loadAsFile(
 function loadIndex(
    assets: Record<string, string>,
    source: string,
-   options: IResolveOptions
+   options: ResolveOptions
 ) {
    const resolvedIndex = path.join(source, "index");
    return loadAsFile(assets, resolvedIndex, options);
@@ -119,7 +119,7 @@ function loadIndex(
 function getResolved(
    assets: Record<string, string>,
    sourceToResolve: string,
-   options: IResolveOptions
+   options: ResolveOptions
 ) {
    if (
       sourceToResolve.startsWith("/") &&
@@ -154,11 +154,11 @@ function getResolved(
 export function resolve(
    assets: Record<string, string>,
    sourceToResolve: string,
-   options: Partial<IResolveOptions> = {}
+   options: Partial<ResolveOptions> = {}
 ) {
    sourceToResolve = sourceToResolve.split("?")[0];
    let result: string | null = "";
-   const opts: IResolveOptions = Object.assign(
+   const opts: ResolveOptions = Object.assign(
       Object.assign({}, defaultResolveOptions),
       options
    );
@@ -206,4 +206,4 @@ const defaultResolveOptions = {
    fallbacks: {} as Record<string, string | false>,
 };
 
-export type IResolveOptions = typeof defaultResolveOptions;
+export type ResolveOptions = typeof defaultResolveOptions;

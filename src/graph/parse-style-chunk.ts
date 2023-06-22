@@ -2,6 +2,7 @@ import path from "path-browserify";
 import * as cssTree from "css-tree";
 import { Toypack } from "../Toypack.js";
 import { parseError } from "../utils/errors.js";
+import { getUsableResourcePath } from "../utils/get-usable-resource-path.js";
 
 /**
  * Parses and extracts the dependencies of a CSS asset.
@@ -34,7 +35,7 @@ export async function parseStyleAsset(
 
          message += `\n\nSource file: ${source}`;
 
-         this.hooks.trigger("onError", parseError(message));
+         this._trigger("onError", parseError(message));
       },
    });
 
@@ -51,8 +52,8 @@ export async function parseStyleAsset(
          // No need to add data urls to dependencies
          if (isValidDep && sourceValue.startsWith("data:")) isValidDep = false;
          // url()'s source path can't be .js or .css.
-         if (isValidDep && !this.hasExtension("resource", sourceValue)) {
-            this.hooks.trigger(
+         if (isValidDep && !this._hasExtension("resource", sourceValue)) {
+            this._trigger(
                "onError",
                parseError(
                   `'url()' tokens can't be used to reference ${path.extname(
@@ -65,12 +66,8 @@ export async function parseStyleAsset(
          }
 
          if (isValidDep) {
-            /**
-             * Change source path based on bundle mode.
-             * Development mode is gonna use Blob urls for resources.
-             * Production mode is gonna use external urls.
-             */
-            const resourceUseableSource = this.resourceSourceToUseableSource(
+            const resourceUseableSource = getUsableResourcePath(
+               this,
                "./" + sourceValue.replace(/^\//, ""),
                path.dirname(source)
             );

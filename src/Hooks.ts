@@ -1,31 +1,17 @@
-import { Node } from "@babel/traverse";
-import { IAsset } from "./utils/create-asset.js";
-//import type { ITraverseOptions } from "./bundle/compileScript.js";
-import { CodeComposer } from "./utils/CodeComposer.js";
-
 const eventMap = {
-   onError: (event: IErrorEvent) => {},
-   onBeforeResolve: (event: IBeforeResolveEvent) => {},
-   onAfterResolve: (event: IAfterResolveEvent) => {},
-   onBeforeFinalizeScriptContent: (
-      event: IBeforeFinalizeScriptContentEvent
-   ) => {},
-   onAfterFinalizeScriptContent: (
-      event: IAfterFinalizeScriptContentEvent
-   ) => {},
-   onTranspile: (event: ITranspileEvent) => {},
+   onError: (event: ErrorEvent) => {},
 } as const;
 
 export class Hooks implements IHooks {
-   private _listeners = new Map<keyof IEventMap, IListener[]>();
+   private _listeners = new Map<keyof EventMap, Listener[]>();
 
-   private _getListeners<K extends keyof IEventMap>(key: K): IListener[] {
-      return this._listeners.get(key) as IListener[];
+   private _getListeners<K extends keyof EventMap>(key: K): Listener[] {
+      return this._listeners.get(key) as Listener[];
    }
 
-   private _createListener<T extends keyof IEventMap>(
+   private _createListener<T extends keyof EventMap>(
       key: T,
-      callback: IEventMap[T]
+      callback: EventMap[T]
    ) {
       const group = this._getListeners(key);
       group.push({
@@ -46,7 +32,7 @@ export class Hooks implements IHooks {
    constructor() {
       // Instantiate listener arrays
       for (const key in eventMap) {
-         this._listeners.set(key as keyof IEventMap, []);
+         this._listeners.set(key as keyof EventMap, []);
       }
    }
 
@@ -56,9 +42,9 @@ export class Hooks implements IHooks {
     * @param eventName - The name of the event to trigger.
     * @param args - The arguments to pass to the event listeners.
     */
-   async trigger<K extends keyof IEventMap>(
+   protected async _trigger<K extends keyof EventMap>(
       eventName: K,
-      ...args: Parameters<IEventMap[K]>
+      ...args: Parameters<EventMap[K]>
    ) {
       const group = this._getListeners(eventName);
       for (const evt of group) {
@@ -69,87 +55,22 @@ export class Hooks implements IHooks {
    /**
     * An event emitted when an error occurs.
     */
-   onError(callback: IEventMap["onError"]): Function {
+   onError(callback: EventMap["onError"]): Function {
       return this._createListener("onError", callback);
-   }
-
-   /**
-    * An event emitted when a module is being resolved.
-    */
-   onBeforeResolve(callback: IEventMap["onBeforeResolve"]): Function {
-      return this._createListener("onBeforeResolve", callback);
-   }
-
-   /**
-    * An event emitted when a module is resolved.
-    */
-   onAfterResolve(callback: IEventMap["onAfterResolve"]): Function {
-      return this._createListener("onAfterResolve", callback);
-   }
-
-   /**
-    * An event emitted when a module is being transpiled.
-    */
-   onTranspile(callback: IEventMap["onTranspile"]): Function {
-      return this._createListener("onTranspile", callback);
-   }
-
-   /**
-    * An event emitted before the script bundle gets finalized.
-    */
-   onBeforeFinalizeScriptContent(
-      callback: IEventMap["onBeforeFinalizeScriptContent"]
-   ): Function {
-      return this._createListener("onBeforeFinalizeScriptContent", callback);
-   }
-
-   /**
-    * An event emitted after the script bundle is finalized.
-    */
-   onAfterFinalizeScriptContent(
-      callback: IEventMap["onAfterFinalizeScriptContent"]
-   ): Function {
-      return this._createListener("onAfterFinalizeScriptContent", callback);
    }
 }
 
-export type IEventMap = typeof eventMap;
+export type EventMap = typeof eventMap;
 
 export type IHooks = {
-   [K in keyof IEventMap]: (callback: IEventMap[K], async: boolean) => Function;
+   [K in keyof EventMap]: (callback: EventMap[K], async: boolean) => Function;
 };
 
-export interface IErrorEvent {
+export interface ErrorEvent {
    code: number;
    reason: string;
 }
 
-export interface IBeforeResolveEvent {
-   parent: IAsset;
-   source: string;
-   changeSource: (newSource: string) => void;
-}
-
-export interface IAfterResolveEvent {
-   parent: IAsset;
-   source: string;
-   resolvedAsset: IAsset;
-}
-
-export interface ITranspileEvent {
-   AST: Node;
-   traverse: (traverseOptions: any) => void;
-   source: string;
-}
-
-export interface IBeforeFinalizeScriptContentEvent {
-   content: CodeComposer;
-}
-
-export interface IAfterFinalizeScriptContentEvent {
-   content: CodeComposer;
-}
-
-interface IListener {
-   callback: IEventMap[keyof IEventMap];
+interface Listener {
+   callback: EventMap[keyof EventMap];
 }

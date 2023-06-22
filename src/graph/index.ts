@@ -1,5 +1,5 @@
 import path from "path-browserify";
-import { IAsset, IAssetResource, IAssetText } from "../utils/create-asset.js";
+import { Asset, ResourceAsset, TextAsset } from "../utils/create-asset.js";
 import {
    invalidEntryError,
    entryNotFoundError,
@@ -10,32 +10,29 @@ import { Toypack } from "../Toypack.js";
 import { RawSourceMap } from "source-map-js";
 import { parseScriptAsset } from "./parse-script-chunk.js";
 import { parseStyleAsset } from "./parse-style-chunk.js";
-import { LoadBuildHook, LoadResult } from "../plugin/hooks.js";
+import { LoadBuildHook, LoadResult } from "../plugin/hook-types.js";
 import { loadChunk } from "./load-chunk.js";
 import { Node } from "@babel/traverse";
 import { CssNode } from "css-tree";
 import { parseURL } from "../utils/parse-url.js";
+import { PartialContext } from "../plugin/PluginManager.js";
 
 /**
  * Recursively get the dependency graph of an asset.
  * @returns An array of dependency objects.
  */
-async function getGraphRecursive(this: Toypack, entry: IAssetText) {
+async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};
 
    const recurse = async (rawSource: string, _prev?: string) => {
       if (graph[rawSource]) return;
       const isEntry = rawSource === entry.source;
 
-      // Get plugin context
-      const pluginContext = this._pluginManager.getContext({
+      const loaded = await loadChunk.call(this, rawSource, isEntry, {
          bundler: this,
-         graph: graph,
-         isEntry: isEntry,
+         graph,
          importer: _prev,
       });
-
-      const loaded = await loadChunk.call(this, rawSource, pluginContext);
 
       // No need to parse resources
       if (loaded.type == "resource") {
@@ -61,9 +58,10 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
          ast: parsed.ast,
          dependencyMap: {},
          map: loaded.map,
-         type: loaded.type,
          // @ts-ignore
          c: loaded.content,
+         isEntry: isEntry,
+         type: loaded.type,
       };
 
       graph[rawSource] = dependency;
@@ -78,7 +76,11 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             (result) => {
                resolved = result;
             },
-            pluginContext
+            {
+               bundler: this,
+               graph,
+               importer: rawSource,
+            }
          );
 
          // If not a virtual module, resolve source with bundler
@@ -88,19 +90,25 @@ async function getGraphRecursive(this: Toypack, entry: IAssetText) {
             });
 
             if (!nonVirtualResolution) {
-               throw new Error(
-                  `Failed to resolve "${depSource}" from "${
+               this._trigger(
+                  "onError",
+                  resolveFailureError(
+                     depSource,
                      loaded.asset?.source || rawSource
-                  }".`
+                  )
                );
+
+               continue;
             }
 
-            const parsed = parseURL(depSource);
-            resolved = nonVirtualResolution + parsed.query;
+            resolved = nonVirtualResolution;
          }
 
-         dependency.dependencyMap[depSource] = resolved;
+         // Fix query's order to avoid duplicates
+         const parsed = parseURL(depSource);
+         resolved = resolved.split("?")[0] + parsed.query;
 
+         dependency.dependencyMap[depSource] = resolved;
          await recurse(resolved, rawSource);
       }
    };
@@ -122,12 +130,12 @@ export async function getDependencyGraph(this: Toypack) {
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;
 
    if (!entryAsset) {
-      this.hooks.trigger("onError", entryNotFoundError());
+      this._trigger("onError", entryNotFoundError());
       return graph;
    }
 
    if (entryAsset.type != "text") {
-      this.hooks.trigger("onError", invalidEntryError(entryAsset.source));
+      this._trigger("onError", invalidEntryError(entryAsset.source));
       return graph;
    }
 
@@ -145,21 +153,23 @@ export interface ScriptDependency extends DependencyBase {
    type: "script";
    ast: Node;
    dependencyMap: Record<string, string>;
-   asset?: IAssetText | null;
+   asset: Asset;
    map?: RawSourceMap | null;
+   isEntry: boolean;
 }
 
 export interface StyleDependency extends DependencyBase {
    type: "style";
    ast: CssNode;
    dependencyMap: Record<string, string>;
-   asset?: IAssetText | null;
+   asset: Asset;
    map?: RawSourceMap | null;
+   isEntry: boolean;
 }
 
 export interface ResourceDependency extends DependencyBase {
    type: "resource";
-   asset: IAssetResource;
+   asset: ResourceAsset;
 }
 
 export type Dependency =

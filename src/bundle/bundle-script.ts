@@ -5,6 +5,7 @@ import { requireFunction, requireCall, moduleWrap } from "./runtime.js";
 import { compileScript } from "./compile-script.js";
 import { mergeSourceMapToBundle } from "../utils/merge-source-map-bundle.js";
 import { mergeSourceMaps } from "../utils/merge-source-maps.js";
+import { getUsableResourcePath } from "../utils/get-usable-resource-path.js";
 import MapConverter from "convert-source-map";
 import babelMinify from "babel-minify";
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
@@ -70,7 +71,8 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       } else if (dep.type == "resource") {
          const cjsModuleContents = moduleWrap(
             dep.asset.source,
-            `module.exports = "${this._getUsableResourcePath(
+            `module.exports = "${getUsableResourcePath(
+               this,
                dep.asset.source
             )}";`
          );

@@ -1,21 +1,23 @@
-import { Plugin } from "../plugin/plugin.js";
+import { Plugin } from "../types.js";
+import { parseURL } from "../utils/parse-url.js";
 
 const rawPlugin: Plugin = () => {
    return {
       name: "raw-plugin",
-      load: {
-         chaining: false,
-         async: true,
-         async handler(dep) {
-            
-            /** @todo parse source */
-            if (!/\?raw$/.test(dep.source)) return;
-            return {
-               type: "script",
-               content: "console.log('raw plugin');",
-            };
+      loaders: [
+         {
+            test(source) {
+               return parseURL(source).params.raw === true;
+            },
+            disableChaining: true,
+            compile(dep) {
+               return {
+                  type: "script",
+                  content: `export default \`${dep.content}\`;`,
+               };
+            },
          },
-      },
+      ],
    };
 };
 

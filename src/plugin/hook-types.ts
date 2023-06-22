@@ -1,30 +1,49 @@
 import type { RawSourceMap } from "source-map-js";
 import { Asyncify, PartialDeep } from "type-fest";
-import { IToypackConfig as ToypackConfig } from "../config";
-import { IAsset } from "../utils/create-asset";
+import { ToypackConfig as ToypackConfig } from "../config";
+import { Asset } from "../utils/create-asset";
 import { Toypack } from "../Toypack.js";
 import { Dependency, DependencyGraph } from "../graph/index.js";
+import { parseURL } from "../utils/parse-url.js";
+
+// Interfaces
+export interface ModuleInfo {
+   type: "resource" | "script" | "style";
+   source: string;
+   content: string | Blob;
+   isEntry: boolean;
+   asset: Asset;
+}
+
+export interface LoadResult {
+   content: string;
+   type?: "script" | "style";
+   map?: RawSourceMap | null;
+}
+
+export interface Loader {
+   test: RegExp | ((source: string) => boolean);
+   disableChaining?: boolean;
+   compile: (moduleInfo: ModuleInfo) => LoadResult | string;
+}
 
 // Hooks
 export type LoadBuildHook = (
    this: BuildHookContext,
-   dep: {
-      source: string;
-      content: string | Blob;
-      isEntry: boolean;
-      asset?: IAsset | null;
-   }
-) => LoadResult | void;
+   moduleInfo: ModuleInfo
+) => LoadResult | string | void;
 
-export interface LoadResult {
-   type: "script" | "style";
-   content: string;
-   map?: RawSourceMap | null;
-}
+export type LoaderBuildHook = () => Loader;
 
-export type TransformBuildHook = (this: BuildHookContext, dep: any) => void;
+export type TransformBuildHook = (
+   this: BuildHookContext,
+   moduleInfo: any
+) => void;
 
-export type ResolveBuildHook = (this: BuildHookContext, id: string) => string | void;
+export type ResolveBuildHook = (
+   this: BuildHookContext,
+   id: string
+) => string | void;
 
 export type ConfigBuildHook = (
    config: ToypackConfig
@@ -34,16 +53,12 @@ export type ConfigBuildHook = (
 export interface BuildHookContext {
    bundler: Toypack;
    graph: DependencyGraph;
-   isEntry: boolean;
-   getModuleIds: () => string[];
    getImporter: () => Dependency | null;
-}
-
-export interface PluginContextOptions {
-   bundler: Toypack;
-   graph: DependencyGraph;
-   importer?: string | null;
-   isEntry: boolean;
+   error: (message: string) => void;
+   warn: (message: string) => void;
+   info: (message: string) => void;
+   getUsableResourcePath: (source: string, baseDir: string) => string | null;
+   parseSource: typeof parseURL;
 }
 
 // Object build hook

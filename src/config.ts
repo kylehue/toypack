@@ -15,7 +15,7 @@ export const defaultConfig = {
        * The module type of the program.
        * @default "esm"
        */
-      moduleType: "esm" as IModuleTypeConfig,
+      moduleType: "esm" as ModuleTypeConfig,
       /**
        * The mode of the bundle. `development` is optimized for a fast
        * and flexible workflow during the development process. `production`
@@ -23,7 +23,7 @@ export const defaultConfig = {
        * environment.
        * @default "development"
        */
-      mode: "development" as IModeConfig,
+      mode: "development" as ModeConfig,
       /**
        * Configuration for resolving module imports.
        */
@@ -50,7 +50,7 @@ export const defaultConfig = {
        * Indicates whether to generate source maps for the bundled code.
        * @default true
        */
-      sourceMap: true as ISourceMapConfig,
+      sourceMap: true as SourceMapConfig,
    },
    /**
     * Configuration for Babel.
@@ -59,23 +59,24 @@ export const defaultConfig = {
       transform: {
          presets: [],
          plugins: [],
-      } as IBabelTransformOptions,
+      } as BabelTransformConfig,
       parse: {
          plugins: [],
-      } as IBabelParseOptions,
+      } as BabelParseConfig,
    },
    /**
     * Log level.
     * @default "error"
     */
-   logLevel: "error" as ILogLevelConfig,
+   logLevel: "error" as LogLevelConfig,
 };
 
-export type IToypackConfig = typeof defaultConfig;
-export type IModuleTypeConfig = "esm" | "cjs";
-export type IModeConfig = "production" | "development";
-export type ILogLevelConfig = "error" | "warn" | "info" | "none";
-export type IBabelTransformOptions = Pick<
+export type ToypackConfig = typeof defaultConfig;
+export type ModuleTypeConfig = "esm" | "cjs";
+export type ModeConfig = "production" | "development";
+export type LogLevelConfig = "error" | "warn" | "info" | "none";
+export type SourceMapConfig = boolean | "nosources";
+export type BabelTransformConfig = Pick<
    TransformOptions,
    | "plugins"
    | "presets"
@@ -85,9 +86,8 @@ export type IBabelTransformOptions = Pick<
    | "shouldPrintComment"
 >;
 
-export type IBabelParseOptions = Omit<
+export type BabelParseConfig = Omit<
    ParserOptions,
    "sourceType" | "sourceFilename" | "strictMode"
 >;
 
-export type ISourceMapConfig = boolean | "nosources";

@@ -1,60 +1,95 @@
-import { IAsset, IAssetResource, IAssetText } from "../utils/create-asset.js";
+import { Asset, ResourceAsset, TextAsset } from "../utils/create-asset.js";
 import { Toypack } from "../Toypack.js";
-import { BuildHookContext, LoadResult } from "../plugin/hooks.js";
+import { BuildHookContext, LoadResult } from "../plugin/hook-types.js";
 import { mergeSourceMaps } from "../utils/merge-source-maps.js";
+import { PartialContext } from "../plugin/PluginManager.js";
+import { isSupported } from "../utils/is-supported.js";
+import { loaderNotFoundError } from "../utils/errors.js";
 
 /**
  * Load a chunk by its source.
+ * @param rawSource The source of the chunk to load.
  * @returns An object containing the loaded contents.
  */
 export async function loadChunk(
    this: Toypack,
    rawSource: string,
-   context: BuildHookContext
+   isEntry: boolean,
+   { graph, importer }: PartialContext
 ) {
    const asset = this.getAsset(rawSource);
-   let type: "script" | "style" | "resource" | null = null;
-   if (this.hasExtension("script", rawSource)) {
-      type = "script";
-   } else if (this.hasExtension("style", rawSource)) {
-      type = "style";
-   } else if (
-      this.hasExtension("resource", rawSource) ||
-      asset?.type == "resource"
-   ) {
-      type = "resource";
-   }
+   const type = this._getTypeFromSource(rawSource);
 
    const loaded: LoadChunkResult = {
-      type,
-      content: asset?.content,
-      asset,
+      type: type,
+      content: asset?.content || undefined,
+      asset: asset || (importer ? graph[importer] : null),
    } as LoadChunkResult;
 
    await this._pluginManager.triggerHook(
       "load",
       () => [
          {
-            asset,
+            ...loaded,
             source: rawSource,
-            content: loaded.content,
-            isEntry: context.isEntry,
+            isEntry: isEntry,
          },
       ],
       (result) => {
-         loaded.type = result.type;
-         loaded.content = result.content;
+         if (typeof result == "string") {
+            loaded.content = result;
+         } else {
+            loaded.content = result.content;
 
-         if (loaded.type == "script" || loaded.type == "style") {
-            loaded.map = result.map;
+            if (result.type) {
+               loaded.type = result.type;
+            }
+
+            if (loaded.type == "script" || loaded.type == "style") {
+               loaded.map = result.map;
+            }
          }
       },
-      context
+      {
+         bundler: this,
+         graph,
+         importer,
+      }
    );
 
-   if (typeof loaded.type != "string" || typeof loaded.content == "undefined") {
-      let source = asset?.source || rawSource;
-      throw new Error("Failed to load a module: " + source);
+   const loaders = this._getLoadersFor(rawSource);
+   for (const loader of loaders) {
+      const loaderResult = loader.compile({
+         ...loaded,
+         source: rawSource,
+         isEntry: isEntry,
+      });
+
+      if (typeof loaderResult == "string") {
+         loaded.content = loaderResult;
+      } else {
+         loaded.content = loaderResult.content;
+
+         if (loaderResult.type) {
+            loaded.type = loaderResult.type;
+         }
+
+         if (loaded.type == "script" || loaded.type == "style") {
+            if (loaded.map && loaderResult.map) {
+               loaded.map = mergeSourceMaps(loaded.map, loaderResult.map);
+            } else if (!loaded.map && loaderResult.map) {
+               loaded.map = loaderResult.map;
+            }
+         }
+      }
+   }
+
+   if (
+      typeof loaded.type != "string" ||
+      typeof loaded.content == "undefined" ||
+      (!isSupported(rawSource) && !loaders.length)
+   ) {
+      this._trigger("onError", loaderNotFoundError(rawSource));
    }
 
    return loaded;
@@ -63,13 +98,13 @@ export async function loadChunk(
 export interface LoadChunkResource {
    type: "resource";
    content: Blob;
-   asset?: IAssetResource | null;
+   asset: ResourceAsset;
 }
 
 export interface LoadChunkText {
    type: "script" | "style";
    content: string;
-   asset?: IAssetText | null;
+   asset: Asset;
    map?: LoadResult["map"];
 }
 

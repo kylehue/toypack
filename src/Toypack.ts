@@ -1,143 +1,154 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import {
-   PartialDeep,
-   Asyncify,
-   ReadonlyDeep,
-   Constructor,
-   IsEmptyObject,
-} from "type-fest";
-import { IAsset, createAsset } from "./utils/create-asset.js";
-import {
-   appExtensions,
-   resourceExtensions,
-   styleExtensions,
-} from "./utils/extensions.js";
-import { getDependencyGraph } from "./graph/index.js";
+import { PartialDeep } from "type-fest";
 import { Hooks } from "./Hooks.js";
-import { defaultConfig, IToypackConfig } from "./config.js";
-import { resolve, IResolveOptions } from "./utils/resolve.js";
-import jsonPlugin from "./build-plugins/json-plugin.js";
-import htmlPlugin from "./build-plugins/html-plugin.js";
-import rawPlugin from "./build-plugins/raw-plugin.js";
-import vuePlugin from "./build-plugins/vue-plugin.js";
-import sassPlugin from "./build-plugins/sass-plugin.js";
-import { invalidAssetSourceError } from "./utils/errors.js";
+import { bundle } from "./bundle/index.js";
+import { ToypackConfig, defaultConfig } from "./config.js";
+import { getDependencyGraph } from "./graph/index.js";
 import { PluginManager } from "./plugin/PluginManager.js";
-import { Plugin } from "./plugin/plugin.js";
-import { mergeObjects } from "./utils/merge-objects.js";
+import { Asset, ResolveOptions, Plugin, Loader } from "./types.js";
+import { createAsset } from "./utils/create-asset.js";
+import { invalidAssetSourceError } from "./utils/errors.js";
+import { resourceExtensions, styleExtensions, appExtensions } from "./utils/extensions.js";
 import { getHash } from "./utils/get-hash.js";
 import { isValidAssetSource } from "./utils/is-valid-asset-source.js";
+import { mergeObjects } from "./utils/merge-objects.js";
+import { resolve } from "./utils/resolve.js";
+import htmlPlugin from "./build-plugins/html-plugin.js";
+import jsonPlugin from "./build-plugins/json-plugin.js";
+import rawPlugin from "./build-plugins/raw-plugin.js";
+import sassPlugin from "./build-plugins/sass-plugin.js";
+import vuePlugin from "./build-plugins/vue-plugin.js";
+import { error, warn, info } from "./utils/debug.js";
 
-export class Toypack {
+export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
    private _extensions = {
       resource: [...resourceExtensions],
       style: [...styleExtensions],
       script: [...appExtensions],
    };
-   private _assets: Map<string, IAsset> = new Map();
-   private _config: IToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
+   private _assets: Map<string, Asset> = new Map();
+   private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
+   private _loaders: Loader[] = [];
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
    };
-   public hooks = new Hooks();
-   constructor(config?: PartialDeep<IToypackConfig>) {
+   constructor(config?: PartialDeep<ToypackConfig>) {
+      super();
       if (config) this.setConfig(config);
 
       this.usePlugin(
-         htmlPlugin(),
-         rawPlugin(),
          jsonPlugin(),
+         htmlPlugin(),
+         vuePlugin(),
          sassPlugin(),
-         vuePlugin()
+         rawPlugin()
       );
 
       if (this._config.logLevel == "error") {
-         this.hooks.onError((error) => {
+         this.onError((error) => {
             console.error(error.reason);
          });
       }
    }
 
-   /**
-    * Adds a plugin to Toypack.
-    */
-   public usePlugin<T extends ReturnType<Plugin>>(...plugins: T[]) {
-      // Register build hooks
-      for (let i = 0; i < plugins.length; i++) {
-         const plugin = plugins[i];
-         this._pluginManager.registerHook("load", plugin.load);
-         this._pluginManager.registerHook("resolve", plugin.resolve);
-         this._pluginManager.registerHook("config", plugin.config);
+   protected _getLoadersFor(source: string) {
+      const result: Loader[] = [];
+      for (const loader of this._loaders) {
+         let hasMatched = false;
+         if (typeof loader.test == "function" && loader.test(source)) {
+            hasMatched = true;
+         } else if (loader.test instanceof RegExp && loader.test.test(source)) {
+            hasMatched = true;
+         }
+
+         if (hasMatched) {
+            result.push(loader);
+            if (loader.disableChaining === true) break;
+         }
       }
+
+      return result;
    }
 
-   public setConfig(config: PartialDeep<IToypackConfig>) {
-      this.clearCache();
-      this._config = mergeObjects(this._config, config as IToypackConfig);
-   }
-
-   public getConfig(): ReadonlyDeep<IToypackConfig> {
-      return this._config;
-   }
-
-   protected warn(message: string) {
-      if (this._config.logLevel == "error" || this._config.logLevel == "warn") {
-         console.warn(message);
+   protected _getTypeFromSource(source: string) {
+      let type: keyof typeof this._extensions | null = null;
+      if (this._hasExtension("script", source)) {
+         type = "script";
+      } else if (this._hasExtension("style", source)) {
+         type = "style";
+      } else if (this._hasExtension("resource", source)) {
+         type = "resource";
       }
+
+      return type;
    }
 
-   protected getExtensions(type: keyof typeof this._extensions) {
+   protected _getExtensions(type: keyof typeof this._extensions) {
       return this._extensions[type];
    }
 
-   protected hasExtension(type: keyof typeof this._extensions, source: string) {
+   protected _hasExtension(
+      type: keyof typeof this._extensions,
+      source: string
+   ) {
       if (!source) {
          throw new Error("Source must be string. Received " + source);
       }
 
       source = source.split("?")[0];
       const extension = path.extname(source);
-      return this.getExtensions(type).includes(extension);
+      return this._getExtensions(type).includes(extension);
    }
 
    /**
-    * Convert a resource's source path to a useable source path.
-    * If in development mode, the resource path will become a blob url.
-    * If in production mode, the resource path will have a unique hash as
-    * its basename.
-    * @returns The useable source path string.
+    * Add plugins to the bundler.
     */
-   protected resourceSourceToUseableSource(
-      source: string,
-      baseDir: string = "."
-   ) {
-      const resolvedSource = this.resolve(source, { baseDir });
-      const asset = resolvedSource ? this.getAsset(resolvedSource) : null;
-      if (!asset || asset.type != "resource") return null;
-      if (this._config.bundle.mode == "production") {
-         return "./" + getHash(asset.source) + path.extname(asset.source);
-      } else {
-         return asset.contentURL;
+   public usePlugin(...plugins: ReturnType<Plugin>[]) {
+      for (const plugin of plugins) {
+         this._pluginManager.registerPlugin(plugin);
+
+         if (plugin.extensions) {
+            for (const ext of plugin.extensions) {
+               if (!this._hasExtension(ext[0], ext[1])) {
+                  this._extensions[ext[0]].push(ext[1]);
+               }
+            }
+         }
+
+         if (plugin.loaders) {
+            for (const loader of plugin.loaders) {
+               this._loaders.push(loader);
+            }
+         }
       }
+   }
+
+   public setConfig(config: PartialDeep<ToypackConfig>) {
+      this.clearCache();
+      this._config = mergeObjects(this._config, config as ToypackConfig);
+   }
+
+   public getConfig(): ToypackConfig {
+      return this._config;
    }
 
    /**
     * Resolves a relative source path.
     * @param {string} relativeSource The relative source path to resolve.
-    * @param {Partial<IResolveOptions>} [options] Optional resolve options.
+    * @param {Partial<ResolveOptions>} [options] Optional resolve options.
     * @returns {string} The resolved absolute path.
     */
-   public resolve(relativeSource: string, options?: Partial<IResolveOptions>) {
+   public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
       const opts = Object.assign(
          {
             aliases: this._config.bundle.resolve.alias,
             fallbacks: this._config.bundle.resolve.fallback,
             extensions: this._config.bundle.resolve.extensions,
-         } as IResolveOptions,
+         } as ResolveOptions,
          options || {}
       );
 
@@ -183,8 +194,8 @@ export class Toypack {
     */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
       if (!isValidAssetSource(source)) {
-         this.hooks.trigger("onError", invalidAssetSourceError(source));
-         return {} as IAsset;
+         this._trigger("onError", invalidAssetSourceError(source));
+         return {} as Asset;
       }
 
       source = path.join("/", source);
@@ -275,7 +286,9 @@ export class Toypack {
          }
       );
 
-      console.log(await getDependencyGraph.call(this));
+      const graph = await getDependencyGraph.call(this);
+      console.log(graph);
+      const result = await bundle.call(this, graph);
       // const oldMode = this._config.bundle.mode;
       // this._config.bundle.mode = isProd ? "production" : oldMode;
       // const graph = await getDependencyGraph.call(this);
@@ -302,20 +315,20 @@ export class Toypack {
 export default Toypack;
 export * as Babel from "@babel/standalone";
 export { CodeComposer } from "./utils/CodeComposer.js";
-export type { IToypackConfig, IAsset };
+export type { ToypackConfig as IToypackConfig, Asset as IAsset };
 
 interface ICache {
    parsed: Map<
       string,
       {
-         asset: IAsset;
+         asset: Asset;
          parsed: any;
       }
    >;
    compiled: Map<
       string,
       {
-         asset: IAsset;
+         asset: Asset;
          content: string;
          map?: RawSourceMap | null;
       }
