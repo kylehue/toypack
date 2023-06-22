@@ -279,14 +279,7 @@ export class Toypack extends Hooks {
     * of the bundling process.
     */
    public async run(isProd = false) {
-      await this._pluginManager.triggerHook(
-         "config",
-         [this._config],
-         (config) => {
-            if (!config) return;
-            this.setConfig(config);
-         }
-      );
+      await this._pluginManager.triggerHook("buildStart", [this], () => {});
 
       const graph = await getDependencyGraph.call(this);
       console.log(graph);

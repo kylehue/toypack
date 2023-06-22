@@ -28,7 +28,7 @@ export async function loadChunk(
       content: asset?.content || undefined,
       asset: asset || (importer ? graph[importer] : null),
    } as LoadChunkResult;
-
+   
    await this._pluginManager.triggerHook(
       "load",
       () => [

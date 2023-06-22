@@ -1,6 +1,6 @@
 import Toypack from "../Toypack.js";
 import { DependencyGraph, Plugin } from "../types";
-import { parseURL, getUsableResourcePath, error, info, warn } from "../utils";
+import { parseURL, getUsableResourcePath, error, info, warn, anyError, pluginError } from "../utils";
 import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
 
 type PluginData = ReturnType<Plugin>;
@@ -99,7 +99,13 @@ export class PluginManager {
          parseSource: parseURL,
          error: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
-            error(logLevel, `[${plugin.name}] Error: ` + message);
+            if (logLevel == "error") {
+               // @ts-ignore
+               this.bundler._trigger(
+                  "onError",
+                  pluginError(plugin.name, message)
+               );
+            }
          },
          warn: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
@@ -133,7 +139,6 @@ export class PluginManager {
    ) {
       const hookGroup = this._hooks[hookName];
       if (!hookGroup) return;
-      const tm: any = [];
       for (const { hook, plugin } of hookGroup) {
          const context = partialContext[0]
             ? this._createContext(partialContext[0], plugin)
@@ -152,14 +157,7 @@ export class PluginManager {
 
          if (result) {
             callback(result);
-            // Stop when needed
-            if (
-               // Is chaining set to false?
-               typeof hook != "function" &&
-               hook.chaining === false /* ||
-               // Loader hook should only apply to an asset once
-               hookName == "load" */
-            ) {
+            if (typeof hook != "function" && hook.chaining === false) {
                break;
             }
          }

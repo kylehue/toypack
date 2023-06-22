@@ -32,8 +32,6 @@ export type LoadBuildHook = (
    moduleInfo: ModuleInfo
 ) => LoadResult | string | void;
 
-export type LoaderBuildHook = () => Loader;
-
 export type TransformBuildHook = (
    this: BuildHookContext,
    moduleInfo: any
@@ -44,9 +42,9 @@ export type ResolveBuildHook = (
    id: string
 ) => string | void;
 
-export type ConfigBuildHook = (
-   config: ToypackConfig
-) => PartialDeep<ToypackConfig> | void;
+export type StartBuildHook = (
+   bundler: Toypack
+) => void;
 
 // Context
 export interface BuildHookContext {
@@ -82,7 +80,7 @@ export type BuildHookConfig<
 export interface BuildHooks {
    load: LoadBuildHook | BuildHookConfig<LoadBuildHook>;
    resolve: ResolveBuildHook | BuildHookConfig<ResolveBuildHook>;
-   config: ConfigBuildHook | BuildHookConfig<ConfigBuildHook>;
+   buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
    //transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
    // beforeFinalize: (content: any) => void;
    // afterFinalize: (content: any) => void;

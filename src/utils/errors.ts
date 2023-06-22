@@ -53,3 +53,10 @@ export function invalidAssetSourceError(source: string) {
       reason: `The source '${source}' is invalid because it contains characters that are not allowed.`,
    };
 }
+
+export function pluginError(pluginName: string, reason: string) {
+   return {
+      code: 8,
+      reason: `[${pluginName}] Error: ${reason}`,
+   };
+}

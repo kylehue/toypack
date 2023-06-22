@@ -71,7 +71,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             "resolve",
             () => [resolved],
             (result) => {
-               resolved = result;
+               if (result) resolved = result;
             },
             {
                bundler: this,
@@ -79,7 +79,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                importer: rawSource,
             }
          );
-
+         
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
             const nonVirtualResolution = this.resolve(resolved, {
