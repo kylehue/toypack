@@ -11,9 +11,9 @@ export async function parseStyleAsset(
    this: Toypack,
    source: string,
    content: string
-): Promise<IParseStyleResult> {
+): Promise<ParsedStyleResult> {
    const config = this.getConfig();
-   const result: IParseStyleResult = {
+   const result: ParsedStyleResult = {
       dependencies: [] as string[],
       ast: {} as cssTree.CssNode,
    };
@@ -117,7 +117,7 @@ export async function parseStyleAsset(
    return result;
 }
 
-export interface IParseStyleResult {
+export interface ParsedStyleResult {
    dependencies: string[];
    ast: cssTree.CssNode;
 }

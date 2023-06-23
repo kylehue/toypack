@@ -14,9 +14,9 @@ export async function parseScriptAsset(
    this: Toypack,
    source: string,
    content: string
-): Promise<IParseScriptResult> {
+): Promise<ParsedScriptResult> {
    const config = this.getConfig();
-   const result: IParseScriptResult = {
+   const result: ParsedScriptResult = {
       dependencies: [] as string[],
       ast: emptyAST,
    };
@@ -82,7 +82,7 @@ export async function parseScriptAsset(
    return result;
 }
 
-export interface IParseScriptResult {
+export interface ParsedScriptResult {
    dependencies: string[];
    ast: Node;
 }
