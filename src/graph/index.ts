@@ -21,14 +21,21 @@ import { parseStyleAsset } from "./parse-style-chunk.js";
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};
 
-   const recurse = async (rawSource: string, _prev?: string) => {
-      if (graph[rawSource]) return;
+   const recurse = async (rawSource: string, _importer?: string) => {
+      if (graph[rawSource]) {
+         if (_importer && !graph[rawSource].importers.includes(_importer)) {
+            graph[rawSource].importers.push(_importer);
+         }
+
+         return;
+      }
+
       const isEntry = rawSource === entry.source;
 
       const loaded = await loadChunk.call(this, rawSource, isEntry, {
          bundler: this,
          graph,
-         importer: _prev,
+         importer: _importer,
       });
 
       // No need to parse resources
@@ -38,6 +45,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                type: "resource",
                asset: loaded.asset,
                source: rawSource,
+               importers: _importer ? [_importer] : [],
             };
          }
 
@@ -58,6 +66,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          // @ts-expect-error
          c: loaded.content,
          isEntry: isEntry,
+         importers: _importer ? [_importer] : [],
          type: loaded.type,
       };
 
@@ -67,18 +76,18 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       for (const depSource of parsed.dependencies) {
          let resolved: string = depSource;
          // Resolve source with plugins
-         await this._pluginManager.triggerHook(
-            "resolve",
-            () => [resolved],
-            (result) => {
-               if (result) resolved = result;
-            },
-            {
+         await this._pluginManager.triggerHook({
+            name: "resolve",
+            args: () => [resolved],
+            context: {
                bundler: this,
                graph,
                importer: rawSource,
-            }
-         );
+            },
+            callback(result) {
+               if (result) resolved = result;
+            },
+         });
          
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
@@ -144,6 +153,7 @@ export async function getDependencyGraph(this: Toypack) {
 interface DependencyBase {
    type: "script" | "style" | "resource";
    source: string;
+   importers: string[];
 }
 
 export interface ScriptDependency extends DependencyBase {

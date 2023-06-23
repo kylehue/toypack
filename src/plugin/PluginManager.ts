@@ -1,6 +1,14 @@
 import Toypack from "../Toypack.js";
 import { DependencyGraph, Plugin } from "../types";
-import { parseURL, getUsableResourcePath, error, info, warn, anyError, pluginError } from "../utils";
+import {
+   parseURL,
+   getUsableResourcePath,
+   error,
+   info,
+   warn,
+   anyError,
+   pluginError,
+} from "../utils";
 import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
 
 type PluginData = ReturnType<Plugin>;
@@ -16,6 +24,28 @@ export interface PartialContext {
    graph: DependencyGraph;
    importer: string | undefined;
 }
+
+type TriggerOptions<
+   HookName extends keyof BuildHooks,
+   Hook extends BuildHooks[HookName],
+   HookFunction extends Hook extends BuildHookConfig ? Hook["handler"] : Hook,
+   HookReturn extends Awaited<ReturnType<HookFunction>>,
+   Callback = (
+      result: Exclude<HookReturn, undefined | null | void>
+   ) => void
+> = {
+   name: HookName;
+   args: Parameters<HookFunction> | (() => Parameters<HookFunction>);
+} & (ThisParameterType<HookFunction> extends BuildHookContext
+   ? { context: PartialContext }
+   : { context?: never }) &
+   (HookReturn extends void
+      ? {
+           callback?: Callback;
+        }
+      : {
+           callback: Callback;
+        });
 
 export class PluginManager {
    private _hooks: BuildHooksGroupMap = {};
@@ -84,7 +114,6 @@ export class PluginManager {
    private _createContext(partialContext: PartialContext, plugin: PluginData) {
       const result: BuildHookContext = {
          bundler: partialContext.bundler,
-         graph: partialContext.graph,
          getImporter: () =>
             partialContext.importer
                ? partialContext.graph[partialContext.importer]
@@ -121,42 +150,28 @@ export class PluginManager {
    }
 
    public async triggerHook<
-      HookName extends keyof BuildHooks,
-      Hook extends BuildHooks[HookName],
-      HookFunction extends Hook extends BuildHookConfig ? Hook["handler"] : Hook
-   >(
-      hookName: HookName,
-      hookArgs: Parameters<HookFunction> | (() => Parameters<HookFunction>),
-      callback: (
-         result: Exclude<
-            Awaited<ReturnType<HookFunction>>,
-            undefined | null | void
-         >
-      ) => void,
-      ...partialContext: ThisParameterType<HookFunction> extends BuildHookContext
-         ? [partialContext: PartialContext]
-         : [partialContext: void]
-   ) {
-      const hookGroup = this._hooks[hookName];
+      T extends keyof BuildHooks,
+      H extends BuildHooks[T],
+      K extends H extends BuildHookConfig ? H["handler"] : H,
+      R extends Awaited<ReturnType<K>>
+   >({ name, args: rawArgs, context, callback }: TriggerOptions<T, H, K, R>) {
+      const hookGroup = this._hooks[name];
       if (!hookGroup) return;
       for (const { hook, plugin } of hookGroup) {
-         const context = partialContext[0]
-            ? this._createContext(partialContext[0], plugin)
-            : null;
-         const args = typeof hookArgs == "function" ? hookArgs() : hookArgs;
-         let result;
+         const ctx = context ? this._createContext(context, plugin) : null;
+         const args = typeof rawArgs == "function" ? rawArgs() : rawArgs;
+         let result: R;
          if (typeof hook == "function") {
-            result = (hook as any).apply(context, args);
+            result = (hook as any).apply(ctx, args);
          } else {
             if (hook.async === true) {
-               result = await (hook.handler as any).apply(context, args);
+               result = await (hook.handler as any).apply(ctx, args);
             } else {
-               result = (hook.handler as any).apply(context, args);
+               result = (hook.handler as any).apply(ctx, args);
             }
          }
-
-         if (result) {
-            callback(result);
+         if (typeof callback == "function" && result) {
+            (callback as any)(result);
             if (typeof hook != "function" && hook.chaining === false) {
                break;
             }

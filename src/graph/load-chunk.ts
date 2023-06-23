@@ -28,17 +28,22 @@ export async function loadChunk(
       content: asset?.content || undefined,
       asset: asset || (importer ? graph[importer] : null),
    } as LoadChunkResult;
-   
-   await this._pluginManager.triggerHook(
-      "load",
-      () => [
+
+   await this._pluginManager.triggerHook({
+      name: "load",
+      args: () => [
          {
             ...loaded,
             source: rawSource,
             isEntry: isEntry,
          },
       ],
-      (result) => {
+      context: {
+         bundler: this,
+         graph,
+         importer,
+      },
+      callback(result) {
          if (typeof result == "string") {
             loaded.content = result;
          } else {
@@ -52,13 +57,8 @@ export async function loadChunk(
                loaded.map = result.map;
             }
          }
-      },
-      {
-         bundler: this,
-         graph,
-         importer,
       }
-   );
+   });
 
    const loaders = this._getLoadersFor(rawSource);
    for (const loader of loaders) {
