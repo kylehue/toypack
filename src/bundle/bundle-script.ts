@@ -39,10 +39,8 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       if (dep.type == "script") {
          const compiled = await compileScript.call(
             this,
-            dep.source,
-            dep.ast,
-            dep.dependencyMap,
-            dep.map
+            dep,
+            graph
          );
 
          const wrapped = moduleWrap(source, compiled.content);

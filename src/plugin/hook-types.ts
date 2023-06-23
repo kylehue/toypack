@@ -1,9 +1,14 @@
 import type { RawSourceMap } from "source-map-js";
-import { Asyncify, PartialDeep } from "type-fest";
-import { ToypackConfig as ToypackConfig } from "../config";
-import { Dependency, DependencyGraph } from "../graph/index.js";
+import { Asyncify } from "type-fest";
+import {
+   Dependency,
+   ScriptDependency,
+   StyleDependency,
+} from "../graph/index.js";
 import { Toypack } from "../Toypack.js";
 import { parseURL, Asset } from "../utils";
+import { ITraverseOptions } from "../bundle/compile-script.js";
+import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
 
 // Interfaces
 export interface ModuleInfo {
@@ -26,30 +31,39 @@ export interface Loader {
    compile: (moduleInfo: ModuleInfo) => LoadResult | string;
 }
 
+export interface ScriptTransform {
+   type: "script";
+   chunk: ScriptDependency;
+   traverse: (traverseOptions: ITraverseOptions) => void;
+}
+
+export interface StyleTransform {
+   type: "style";
+   chunk: StyleDependency;
+   traverse: (traverseOptions: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
+}
+
 // Hooks
 export type LoadBuildHook = (
    this: BuildHookContext,
    moduleInfo: ModuleInfo
 ) => LoadResult | string | void;
 
-export type TransformBuildHook = (
-   this: BuildHookContext,
-   moduleInfo: any
-) => void;
-
 export type ResolveBuildHook = (
    this: BuildHookContext,
    id: string
 ) => string | void;
 
-export type StartBuildHook = (
-   bundler: Toypack
+export type StartBuildHook = (bundler: Toypack) => void;
+
+export type TransformBuildHook = (
+   this: BuildHookContext,
+   context: ScriptTransform | StyleTransform
 ) => void;
 
 // Context
 export interface BuildHookContext {
    bundler: Toypack;
-   graph: DependencyGraph;
    getImporter: () => Dependency | null;
    error: (message: string) => void;
    warn: (message: string) => void;
@@ -81,7 +95,7 @@ export interface BuildHooks {
    load: LoadBuildHook | BuildHookConfig<LoadBuildHook>;
    resolve: ResolveBuildHook | BuildHookConfig<ResolveBuildHook>;
    buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
-   //transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
+   transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
    // beforeFinalize: (content: any) => void;
    // afterFinalize: (content: any) => void;
    // start: () => void;

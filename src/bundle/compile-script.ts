@@ -9,6 +9,7 @@ import MapConverter from "convert-source-map";
 import { RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
 import { mergeSourceMaps } from "../utils";
+import { DependencyGraph, ScriptDependency } from "src/types.js";
 
 const importantPresets: PluginItem[] = ["env"];
 const importantPlugins: PluginItem[] = [
@@ -17,10 +18,14 @@ const importantPlugins: PluginItem[] = [
 
 export async function compileScript(
    this: Toypack,
-   source: string,
-   ast: Node,
-   dependencyMap: Record<string, string>,
-   inputSourceMap?: RawSourceMap | null
+   chunk: ScriptDependency,
+   graph: DependencyGraph,
+   
+   // source: string,
+   // ast: Node,
+   // dependencyMap: Record<string, string>,
+
+   // inputSourceMap?: RawSourceMap | null
 ) {
    // Check cache
    // const bundleMode = this.config.bundle.mode;
@@ -42,25 +47,41 @@ export async function compileScript(
       traverseOptionsArray.push(traverseOptions);
    };
 
+   this._pluginManager.triggerHook({
+      name: "transform",
+      args: [
+         {
+            type: "script",
+            chunk: chunk,
+            traverse: modifyTraverseOptions,
+         },
+      ],
+      context: {
+         bundler: this,
+         graph,
+         importer: chunk.importers[0],
+      },
+   });
+
    // Rename imported sources from relative to absolute paths
    if (moduleType == "esm") {
       modifyTraverseOptions({
          ImportDeclaration({ node }) {
-            node.source.value = dependencyMap[node.source.value];
+            node.source.value = chunk.dependencyMap[node.source.value];
          },
          ExportAllDeclaration({ node }) {
-            node.source.value = dependencyMap[node.source.value];
+            node.source.value = chunk.dependencyMap[node.source.value];
          },
          ExportNamedDeclaration({ node }) {
             if (node.source?.type != "StringLiteral") return;
-            node.source.value = dependencyMap[node.source.value];
+            node.source.value = chunk.dependencyMap[node.source.value];
          },
          CallExpression({ node }) {
             const argNode = node.arguments[0];
             const callee = node.callee;
             const isDynamicImport = callee.type == "Import";
             if (isDynamicImport && argNode.type == "StringLiteral") {
-               argNode.value = dependencyMap[argNode.value];
+               argNode.value = chunk.dependencyMap[argNode.value];
             }
          },
       });
@@ -72,7 +93,7 @@ export async function compileScript(
             const isRequire =
                callee.type == "Identifier" && callee.name == "require";
             if (isRequire && argNode.type == "StringLiteral") {
-               argNode.value = dependencyMap[argNode.value];
+               argNode.value = chunk.dependencyMap[argNode.value];
             }
          },
       });
@@ -82,7 +103,7 @@ export async function compileScript(
       groupTraverseOptions(traverseOptionsArray)
    );
 
-   traverseAST(ast, traverseOptions);
+   traverseAST(chunk.ast, traverseOptions);
 
    const userBabelOptions = config.babel.transform;
 
@@ -94,27 +115,27 @@ export async function compileScript(
       plugins: [
          ...new Set([...importantPlugins, ...(userBabelOptions.plugins || [])]),
       ],
-      sourceFileName: source,
-      filename: source,
+      sourceFileName: chunk.source,
+      filename: chunk.source,
       sourceMaps: !!config.bundle.sourceMap,
       envName: mode,
       minified: false,
       cloneInputAst: false,
    } as TransformOptions;
 
-   const transpiled = transformFromAst(ast, undefined, {
+   const transpiled = transformFromAst(chunk.ast, undefined, {
       ...userBabelOptions,
       ...importantBabelOptions,
    }) as any as BabelFileResult;
 
    let map = MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap;
 
-   if (inputSourceMap) {
-      map = mergeSourceMaps(inputSourceMap, map);
+   if (chunk.map) {
+      map = mergeSourceMaps(chunk.map, map);
    }
 
    const result = {
-      source,
+      source: chunk.source,
       content: transpiled.code || "",
       map,
    };
