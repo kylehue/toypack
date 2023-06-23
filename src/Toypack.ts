@@ -288,15 +288,12 @@ export class Toypack extends Hooks {
          args: [this],
       });
 
+      const oldMode = this._config.bundle.mode;
+      this._config.bundle.mode = isProd ? "production" : oldMode;
       const graph = await getDependencyGraph.call(this);
       console.log(graph);
       const result = await bundle.call(this, graph);
-      // const oldMode = this._config.bundle.mode;
-      // this._config.bundle.mode = isProd ? "production" : oldMode;
-      // const graph = await getDependencyGraph.call(this);
-      // console.log(graph);
-      // const result = await bundle.call(this, graph);
-      // this._config.bundle.mode = oldMode;
+      this._config.bundle.mode = oldMode;
 
       // Set modified flag to false for all assets except those in node_modules
       this._assets.forEach((asset) => {
@@ -304,12 +301,12 @@ export class Toypack extends Hooks {
          asset.modified = false;
       });
 
-      // // IFrame
-      // if (!isProd && this._iframe) {
-      //    this._iframe.srcdoc = result.html.content;
-      // }
+      // IFrame
+      if (!isProd && this._iframe) {
+         this._iframe.srcdoc = result.html.content;
+      }
 
-      // return result;
+      return result;
    }
 }
 
@@ -317,7 +314,7 @@ export class Toypack extends Hooks {
 export default Toypack;
 export * as Babel from "@babel/standalone";
 export { CodeComposer } from "./utils/CodeComposer.js";
-export type { ToypackConfig as IToypackConfig, Asset as IAsset };
+export type { ToypackConfig, Asset };
 
 interface ICache {
    parsed: Map<
