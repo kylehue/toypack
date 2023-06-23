@@ -2,7 +2,6 @@ import { Loader, Plugin } from "../types.js";
 
 const vuePlugin: Plugin = () => {
    let sources: any = {};
-
    const vueLoader: Loader = {
       test: /\.vue$/,
       compile(dep) {
@@ -43,11 +42,15 @@ export default script;
       name: "vue-plugin",
       extensions: [["script", ".vue"]],
       loaders: [vueLoader],
-      setup() {},
+      buildStart() {},
       load(dep) {
          if (dep.source in sources) {
             return sources[dep.source];
          }
+      },
+      transform(ctx) {
+         if (ctx.type != "script") return
+         
       },
    };
 };

@@ -1,5 +1,4 @@
-import { IToypackConfig } from "../Toypack.js";
-import { CodeComposer, Toypack } from "../Toypack.js";
+import MapConverter from "convert-source-map";
 import {
    parse as parseHTML,
    Node,
@@ -8,10 +7,11 @@ import {
    TextNode,
 } from "node-html-parser";
 import { RawSourceMap, SourceMapGenerator } from "source-map-js";
-import MapConverter from "convert-source-map";
+import { ToypackConfig , CodeComposer, Toypack } from "../Toypack.js";
+
+import { Plugin } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
 import { indexToPosition } from "../utils/index-to-position.js";
-import { Plugin } from "../plugin/plugin.js";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 
@@ -436,7 +436,7 @@ const htmlPlugin: Plugin = () => {
    return {
       name: "html-plugin",
       load(dep) {
-         if (!/\.html$/.test(dep.source)) return;
+         if (!dep.source.endsWith(".html")) return;
          // const compiled = compile.call(this.bundler, dep.source, contentToCompile);
          // const compiledCSSChunks = compileCSSChunks(compiled.cssChunks, {
          //    sourceMaps: !!config.sourceMapConfig,
@@ -454,10 +454,8 @@ const htmlPlugin: Plugin = () => {
          //    css: compiledCSSChunks,
          // };
 
-         return {
-            type: "script",
-            content: "console.log('html plugin');" + dep.content,
-         };
+         console.log(dep);
+         return "uwu {}";
       },
    };
 }

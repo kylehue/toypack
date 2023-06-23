@@ -1,19 +1,20 @@
-import { Plugin } from "../plugin/plugin.js";
+import { Loader, Plugin } from "../types.js";
 
 const sassPlugin: Plugin = () => {
+   const sassLoader: Loader = {
+      test: /\.s[ac]ss$/,
+      compile(dep) {
+         return "body { background-color: alicia; }" + dep.content;
+      },
+   };
+
    return {
       name: "sass-plugin",
-      load: {
-         async: true,
-         async handler(dep) {
-            if (!/\.s[ac]ss$/.test(dep.source)) return;
-            
-            return {
-               type: "style",
-               content: "body { background-color: alicia; }",
-            };
-         },
-      },
+      loaders: [sassLoader],
+      extensions: [
+         ["style", ".sass"],
+         ["style", ".scss"],
+      ]
    };
 };
 
