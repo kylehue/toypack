@@ -21,7 +21,11 @@ import {
    styleExtensions,
    appExtensions,
    invalidAssetSourceError,
+   isNodeModule,
 } from "./utils";
+import { LoadChunkResult } from "./graph/load-chunk.js";
+import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
+import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -294,11 +298,11 @@ export class Toypack extends Hooks {
       // const result = await bundle.call(this, graph);
       // this._config.bundle.mode = oldMode;
 
-      // // Set modified flag to false for all assets except those in node_modules
-      // this._assets.forEach((asset) => {
-      //    if (isNodeModule(asset.source) || asset.type == "resource") return;
-      //    asset.modified = false;
-      // });
+      // Set modified flag to false for all assets except those in node_modules
+      this._assets.forEach((asset) => {
+         if (isNodeModule(asset.source) || asset.type == "resource") return;
+         asset.modified = false;
+      });
 
       // // IFrame
       // if (!isProd && this._iframe) {
@@ -320,7 +324,8 @@ interface ICache {
       string,
       {
          asset: Asset;
-         parsed: any;
+         parsed: ParsedScriptResult | ParsedStyleResult | null;
+         loaded: LoadChunkResult;
       }
    >;
    compiled: Map<

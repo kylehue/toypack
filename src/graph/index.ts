@@ -20,7 +20,8 @@ import { parseStyleAsset } from "./parse-style-chunk.js";
  */
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};
-
+   const config = this.getConfig();
+   const bundleMode = config.bundle.mode;
    const recurse = async (rawSource: string, _importer?: string) => {
       if (graph[rawSource]) {
          if (_importer && !graph[rawSource].importers.includes(_importer)) {
@@ -32,45 +33,63 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       const isEntry = rawSource === entry.source;
 
-      const loaded = await loadChunk.call(this, rawSource, isEntry, {
-         bundler: this,
-         graph,
-         importer: _importer,
-      });
+      let loaded, parsed;
+
+      // Cache
+      const cached = this._cachedDeps.parsed.get(rawSource + "." + bundleMode);
+      
+      if (cached && !cached.asset.modified) {
+         loaded = cached.loaded;
+         parsed = cached.parsed;
+      } else {
+         loaded = await loadChunk.call(this, rawSource, isEntry, {
+            bundler: this,
+            graph,
+            importer: _importer,
+         });
+         parsed =
+            loaded.type == "script"
+               ? await parseScriptAsset.call(this, rawSource, loaded.content)
+               : loaded.type == "style"
+               ? await parseStyleAsset.call(this, rawSource, loaded.content)
+                  : null;
+         this._cachedDeps.parsed.set(rawSource + "." + bundleMode, {
+            asset: loaded.asset,
+            parsed,
+            loaded
+         });
+      }
 
       // No need to parse resources
       if (loaded.type == "resource") {
          if (loaded.asset) {
-            graph[rawSource] = {
+            const chunk: ResourceDependency = {
                type: "resource",
                asset: loaded.asset,
                source: rawSource,
                importers: _importer ? [_importer] : [],
             };
+
+            graph[rawSource] = chunk;
          }
 
          return;
       }
 
-      const parsed =
-         loaded.type == "script"
-            ? await parseScriptAsset.call(this, rawSource, loaded.content)
-            : await parseStyleAsset.call(this, rawSource, loaded.content);
+      if (!parsed) return;
 
-      const dependency: ScriptDependency | StyleDependency = {
+      const chunk: ScriptDependency | StyleDependency = {
          asset: loaded.asset,
          source: rawSource,
          ast: parsed.ast,
          dependencyMap: {},
          map: loaded.map,
-         // @ts-expect-error
-         c: loaded.content,
          isEntry: isEntry,
          importers: _importer ? [_importer] : [],
          type: loaded.type,
-      };
+      } as ScriptDependency | StyleDependency;
 
-      graph[rawSource] = dependency;
+      graph[rawSource] = chunk;
 
       // Scan dependency's dependencies
       for (const depSource of parsed.dependencies) {
@@ -88,7 +107,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                if (result) resolved = result;
             },
          });
-         
+
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
             const nonVirtualResolution = this.resolve(resolved, {
@@ -114,7 +133,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          const parsed = parseURL(depSource);
          resolved = resolved.split("?")[0] + parsed.query;
 
-         dependency.dependencyMap[depSource] = resolved;
+         chunk.dependencyMap[depSource] = resolved;
          await recurse(resolved, rawSource);
       }
    };

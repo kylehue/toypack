@@ -19,26 +19,24 @@ const importantPlugins: PluginItem[] = [
 export async function compileScript(
    this: Toypack,
    chunk: ScriptDependency,
-   graph: DependencyGraph,
-   
-   // source: string,
-   // ast: Node,
-   // dependencyMap: Record<string, string>,
-
-   // inputSourceMap?: RawSourceMap | null
-) {
-   // Check cache
-   // const bundleMode = this.config.bundle.mode;
-   // const cached = this.cachedDeps.compiled.get(source + "-" + bundleMode);
-   // if (cached && !script.asset.modified) {
-   //    return {
-   //       source,
-   //       content: cached.content,
-   //       map: cached.map,
-   //    };
-   // }
-
+   graph: DependencyGraph
+): Promise<CompiledScriptResult> {
    const config = this.getConfig();
+
+   // Check cache
+   const bundleMode = config.bundle.mode;
+   const cached = this._cachedDeps.compiled.get(
+      chunk.source + "." + bundleMode
+   );
+
+   if (cached && !chunk.asset.modified) {
+      return {
+         source: chunk.source,
+         content: cached.content,
+         map: cached.map,
+      };
+   }
+
    const moduleType = config.bundle.moduleType;
    const mode = config.bundle.mode;
 
@@ -141,13 +139,13 @@ export async function compileScript(
    };
 
    // Cache
-   // if (!cached || script.asset.modified) {
-   //    this.cachedDeps.compiled.set(source + "-" + bundleMode, {
-   //       content: result.content,
-   //       map: result.map,
-   //       asset: script.asset,
-   //    });
-   // }
+   if (!cached || chunk.asset.modified) {
+      this._cachedDeps.compiled.set(chunk.source + "." + bundleMode, {
+         content: result.content,
+         map: result.map,
+         asset: chunk.asset,
+      });
+   }
 
    return result;
 }
@@ -199,3 +197,9 @@ export type ITraverseOptions = {
 export type ITraverseOptionGroups = {
    [Type in Node["type"]]?: ITraverseFunction<Type>[];
 };
+
+export interface CompiledScriptResult {
+   source: string;
+   content: string;
+   map?: RawSourceMap | null;
+}
