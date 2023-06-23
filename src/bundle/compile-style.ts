@@ -26,6 +26,24 @@ export function compileStyle(
       };
    }
 
+   this._pluginManager.triggerHook({
+      name: "transform",
+      args: [
+         {
+            chunk,
+            type: "style",
+            traverse: (opts) => {
+               CSSTree.walk(chunk.ast, opts);
+            },
+         },
+      ],
+      context: {
+         bundler: this,
+         graph: graph,
+         importer: chunk.importers[0],
+      },
+   });
+
    const compiled = CSSTree.generate(chunk.ast, {
       sourceMap: !!config.bundle.sourceMap,
    }) as any as CSSTreeGeneratedResult;
