@@ -35,42 +35,41 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    };
 
    for (const source in graph) {
-      const dep = graph[source];
-      if (dep.type == "script") {
+      const chunk = graph[source];
+      if (chunk.type == "script") {
          const compiled = await compileScript.call(
             this,
-            dep,
+            chunk,
             graph
          );
 
          const wrapped = moduleWrap(source, compiled.content);
          bundle.breakLine().append(wrapped);
 
-         if (smg && compiled.map && typeof dep.asset.content == "string") {
+         if (smg && compiled.map && typeof chunk.asset.content == "string") {
             let originalContent: string | undefined = undefined;
             if (
                config.bundle.sourceMap != "nosources" &&
-               dep.asset.type == "text"
+               chunk.asset.type == "text"
             ) {
-               originalContent = dep.asset.content;
+               originalContent = chunk.asset.content;
             }
 
-            mergeSourceMapToBundle.call(
-               this,
+            mergeSourceMapToBundle(
                smg,
                compiled.map,
-               dep.source,
+               chunk.asset.source,
                compiled.content,
                finalizeBundleContent(),
                originalContent
             );
          }
-      } else if (dep.type == "resource") {
+      } else if (chunk.type == "resource") {
          const cjsModuleContents = moduleWrap(
-            dep.asset.source,
+            chunk.asset.source,
             `module.exports = "${getUsableResourcePath(
                this,
-               dep.asset.source
+               chunk.asset.source
             )}";`
          );
 
