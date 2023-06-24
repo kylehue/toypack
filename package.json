@@ -3,10 +3,15 @@
    "description": "A sandbox bundler for browsers.",
    "version": "1.0.0-development",
    "type": "module",
-   "main": "./build/Toypack.js",
    "types": "./build/Toypack.d.ts",
    "license": "MIT",
    "author": "kylehue",
+   "exports": {
+      ".": "./build/Toypack.js",
+      "./utils": "./build/utils/index.js",
+      "./plugins/*": "./build/build-plugins/*",
+      "./types": "./build/types.js"
+   },
    "repository": {
       "type": "git",
       "url": "git+https://github.com/kylehue/toypack.git"
