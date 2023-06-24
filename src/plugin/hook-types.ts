@@ -57,12 +57,13 @@ export type ResolveBuildHook = (
    id: string
 ) => string | void;
 
-export type StartBuildHook = (bundler: Toypack) => void;
-
 export type TransformBuildHook = (
    this: BuildHookContext,
    context: ScriptTransform | StyleTransform
 ) => void;
+
+export type StartBuildHook = (this: BuildHookContext, bundler: Toypack) => void;
+export type EndBuildHook = (this: BuildHookContext, bundler: Toypack) => void;
 
 // Context
 export interface BuildHookContext {
@@ -97,8 +98,9 @@ export type BuildHookConfig<
 export interface BuildHooks {
    load: LoadBuildHook | BuildHookConfig<LoadBuildHook>;
    resolve: ResolveBuildHook | BuildHookConfig<ResolveBuildHook>;
-   buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
    transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
+   buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
+   buildEnd: EndBuildHook | BuildHookConfig<EndBuildHook>;
    // beforeFinalize: (content: any) => void;
    // afterFinalize: (content: any) => void;
    // start: () => void;

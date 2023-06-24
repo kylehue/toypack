@@ -97,6 +97,16 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       );
    }
 
+   await this._pluginManager.triggerHook({
+      name: "buildEnd",
+      args: [this],
+      context: {
+         bundler: this,
+         graph,
+         importer: undefined,
+      },
+   });
+
    return result;
 }
 
