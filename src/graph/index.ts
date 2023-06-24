@@ -20,6 +20,17 @@ import { parseStyleAsset } from "./parse-style-chunk.js";
  */
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};
+
+   await this._pluginManager.triggerHook({
+      name: "buildStart",
+      args: [this],
+      context: {
+         bundler: this,
+         graph,
+         importer: undefined,
+      },
+   });
+
    const config = this.getConfig();
    const bundleMode = config.bundle.mode;
    const recurse = async (rawSource: string, _importer?: string) => {
@@ -37,7 +48,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       // Cache
       const cached = this._cachedDeps.parsed.get(rawSource + "." + bundleMode);
-      
+
       if (cached && !cached.asset.modified) {
          loaded = cached.loaded;
          parsed = cached.parsed;
@@ -52,11 +63,11 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                ? await parseScriptAsset.call(this, rawSource, loaded.content)
                : loaded.type == "style"
                ? await parseStyleAsset.call(this, rawSource, loaded.content)
-                  : null;
+               : null;
          this._cachedDeps.parsed.set(rawSource + "." + bundleMode, {
             asset: loaded.asset,
             parsed,
-            loaded
+            loaded,
          });
       }
 
