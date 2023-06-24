@@ -1,7 +1,7 @@
 import * as cssTree from "css-tree";
 import path from "path-browserify";
 import { Toypack } from "../Toypack.js";
-import { getUsableResourcePath, parseError } from "../utils";
+import { getUsableResourcePath, ERRORS } from "../utils";
 
 /**
  * Parses and extracts the dependencies of a CSS asset.
@@ -34,7 +34,7 @@ export async function parseStyleAsset(
 
          message += `\n\nSource file: ${source}`;
 
-         this._trigger("onError", parseError(message));
+         this._trigger("onError", ERRORS.parse(message));
       },
    });
 
@@ -54,7 +54,7 @@ export async function parseStyleAsset(
          if (isValidDep && !this._hasExtension("resource", sourceValue)) {
             this._trigger(
                "onError",
-               parseError(
+               ERRORS.parse(
                   `'url()' tokens can't be used to reference ${path.extname(
                      sourceValue
                   )} files. '${sourceValue}' is not a valid resource file.`

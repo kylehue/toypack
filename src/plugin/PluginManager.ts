@@ -3,11 +3,8 @@ import { DependencyGraph, Plugin } from "../types";
 import {
    parseURL,
    getUsableResourcePath,
-   error,
-   info,
-   warn,
-   anyError,
-   pluginError,
+   DEBUG,
+   ERRORS,
 } from "../utils";
 import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
 
@@ -126,21 +123,25 @@ export class PluginManager {
          parseSource: parseURL,
          error: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
-            if (logLevel == "error") {
+            if (
+               logLevel == "error" ||
+               logLevel == "warn" ||
+               logLevel == "info"
+            ) {
                // @ts-ignore
                this.bundler._trigger(
                   "onError",
-                  pluginError(plugin.name, message)
+                  ERRORS.plugin(plugin.name, message)
                );
             }
          },
          warn: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
-            warn(logLevel, `[${plugin.name}] Warning: ` + message);
+            DEBUG.warn(logLevel, `[${plugin.name}] Warning: ` + message);
          },
          info: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
-            info(logLevel, `[${plugin.name}]: ` + message);
+            DEBUG.info(logLevel, `[${plugin.name}]: ` + message);
          },
       };
 

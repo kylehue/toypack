@@ -4,7 +4,7 @@ import { Toypack } from "../Toypack.js";
 import {
    mergeSourceMaps,
    isSupported,
-   loaderNotFoundError,
+   ERRORS,
    Asset,
    ResourceAsset,
 } from "../utils";
@@ -111,7 +111,7 @@ export async function loadChunk(
       typeof loaded.content == "undefined" ||
       (!isSupported(rawSource) && !loaders.length)
    ) {
-      this._trigger("onError", loaderNotFoundError(rawSource));
+      this._trigger("onError", ERRORS.loaderNotFound(rawSource));
    }
 
    return loaded;

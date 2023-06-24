@@ -1,10 +1,10 @@
 import path from "path-browserify";
-import { supportedExtensions } from "./extensions.js";
+import * as EXTENSIONS from "./extensions.js";
 
 /**
  * Test if a source is supported.
  */
 export function isSupported(source: string) {
    source = source.split("?")[0];
-   return supportedExtensions.includes(path.extname(source));
+   return EXTENSIONS.supported.includes(path.extname(source));
 }

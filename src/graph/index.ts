@@ -5,9 +5,7 @@ import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset } from "../types.js";
 import {
-   resolveFailureError,
-   entryNotFoundError,
-   invalidEntryError,
+   ERRORS,
    parseURL,
 } from "../utils";
 import { loadChunk } from "./load-chunk.js";
@@ -128,7 +126,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             if (!nonVirtualResolution) {
                this._trigger(
                   "onError",
-                  resolveFailureError(
+                  ERRORS.resolveFailure(
                      depSource,
                      loaded.asset.source || rawSource
                   )
@@ -166,12 +164,12 @@ export async function getDependencyGraph(this: Toypack) {
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;
 
    if (!entryAsset) {
-      this._trigger("onError", entryNotFoundError());
+      this._trigger("onError", ERRORS.entryNotFound());
       return graph;
    }
 
    if (entryAsset.type != "text") {
-      this._trigger("onError", invalidEntryError(entryAsset.source));
+      this._trigger("onError", ERRORS.invalidEntry(entryAsset.source));
       return graph;
    }
 

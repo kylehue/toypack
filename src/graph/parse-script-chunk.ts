@@ -1,7 +1,7 @@
 import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { Node } from "@babel/traverse";
 import { Toypack } from "../Toypack.js";
-import { parseError } from "../utils";
+import { ERRORS } from "../utils";
 
 const emptyAST: Node = babelParse("");
 
@@ -37,7 +37,7 @@ export async function parseScriptAsset(
          ...importantBabelOptions,
       });
    } catch (error) {
-      this._trigger("onError", parseError(error as any));
+      this._trigger("onError", ERRORS.parse(error as any));
 
       return result;
    }

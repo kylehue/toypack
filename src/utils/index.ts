@@ -1,8 +1,8 @@
 export * from "./CodeComposer.js";
 export * from "./create-asset.js";
-export * from "./debug.js";
-export * from "./errors.js";
-export * from "./extensions.js";
+export * as DEBUG from "./debug.js";
+export * as ERRORS from "./errors.js";
+export * as EXTENSIONS from "./extensions.js";
 export * from "./find-code-position.js";
 export * from "./get-hash.js";
 export * from "./get-usable-resource-path.js";
@@ -17,4 +17,3 @@ export * from "./merge-source-map-bundle.js";
 export * from "./merge-source-maps.js";
 export * from "./parse-url.js";
 export * from "./resolve.js";
-export * from "./to-pascal-case.js";

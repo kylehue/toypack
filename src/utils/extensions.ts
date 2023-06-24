@@ -1,4 +1,4 @@
-export const resourceExtensions: string[] = [
+export const resource: string[] = [
    ".png",
    ".jpg",
    ".jpeg",
@@ -30,9 +30,9 @@ export const resourceExtensions: string[] = [
    ".map",
 ];
 
-export const styleExtensions: string[] = [".css"];
+export const style: string[] = [".css"];
 
-export const appExtensions: string[] = [
+export const app: string[] = [
    ".js",
    ".mjs",
    ".cjs",
@@ -41,8 +41,8 @@ export const appExtensions: string[] = [
    ".tsx",
 ];
 
-export const supportedExtensions = [
-   ...appExtensions,
-   ...styleExtensions,
-   ...resourceExtensions,
+export const supported = [
+   ...app,
+   ...style,
+   ...resource,
 ];
