@@ -20,13 +20,21 @@ export async function loadChunk(
    isEntry: boolean,
    { graph, importer }: PartialContext
 ) {
-   const asset = this.getAsset(rawSource);
+   /**
+    * Importer can't possibly be undefined if the asset with the rawSource
+    * is undefined.
+    * Importer only becomes undefined if the rawSource asset is the entry.
+    */
+   const asset = this.getAsset(rawSource) || graph[importer!].asset;
    const type = this._getTypeFromSource(rawSource);
 
    const loaded: LoadChunkResult = {
       type: type,
-      content: asset?.content || undefined,
-      asset: asset || (importer ? graph[importer].asset : null),
+      content:
+         typeof asset.content == "string" || asset.content instanceof Blob
+            ? asset.content
+            : undefined,
+      asset: asset,
    } as LoadChunkResult;
 
    await this._pluginManager.triggerHook({
@@ -57,16 +65,27 @@ export async function loadChunk(
                loaded.map = result.map;
             }
          }
-      }
+      },
    });
 
    const loaders = this._getLoadersFor(rawSource);
-   for (const loader of loaders) {
-      const loaderResult = loader.compile({
+   for (const { loader, plugin } of loaders) {
+      const context = this._pluginManager.createContext(
+         {
+            bundler: this,
+            graph,
+            importer,
+         },
+         plugin
+      );
+
+      const loaderResult = loader.compile.call(context, {
          ...loaded,
          source: rawSource,
          isEntry: isEntry,
       });
+
+      if (!loaderResult) continue;
 
       if (typeof loaderResult == "string") {
          loaded.content = loaderResult;

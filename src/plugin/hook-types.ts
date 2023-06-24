@@ -28,7 +28,10 @@ export interface LoadResult {
 export interface Loader {
    test: RegExp | ((source: string) => boolean);
    disableChaining?: boolean;
-   compile: (moduleInfo: ModuleInfo) => LoadResult | string;
+   compile: (
+      this: BuildHookContext,
+      moduleInfo: ModuleInfo
+   ) => LoadResult | string | void;
 }
 
 export interface ScriptTransform {
@@ -65,11 +68,11 @@ export type TransformBuildHook = (
 export interface BuildHookContext {
    bundler: Toypack;
    getImporter: () => Dependency | null;
+   getUsableResourcePath: (source: string, baseDir: string) => string | null;
+   parseSource: typeof parseURL;
    error: (message: string) => void;
    warn: (message: string) => void;
    info: (message: string) => void;
-   getUsableResourcePath: (source: string, baseDir: string) => string | null;
-   parseSource: typeof parseURL;
 }
 
 // Object build hook

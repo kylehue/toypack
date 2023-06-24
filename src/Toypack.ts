@@ -36,7 +36,7 @@ export class Toypack extends Hooks {
    };
    private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
-   private _loaders: Loader[] = [];
+   private _loaders: { plugin: ReturnType<Plugin>; loader: Loader }[] = [];
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
@@ -62,8 +62,8 @@ export class Toypack extends Hooks {
    }
 
    protected _getLoadersFor(source: string) {
-      const result: Loader[] = [];
-      for (const loader of this._loaders) {
+      const result: typeof this._loaders = [];
+      for (const { loader, plugin } of this._loaders) {
          let hasMatched = false;
          if (typeof loader.test == "function" && loader.test(source)) {
             hasMatched = true;
@@ -72,7 +72,7 @@ export class Toypack extends Hooks {
          }
 
          if (hasMatched) {
-            result.push(loader);
+            result.push({ loader, plugin });
             if (loader.disableChaining === true) break;
          }
       }
@@ -127,7 +127,7 @@ export class Toypack extends Hooks {
 
          if (plugin.loaders) {
             for (const loader of plugin.loaders) {
-               this._loaders.push(loader);
+               this._loaders.push({ loader, plugin });
             }
          }
       }

@@ -30,9 +30,7 @@ type TriggerOptions<
    Hook extends BuildHooks[HookName],
    HookFunction extends Hook extends BuildHookConfig ? Hook["handler"] : Hook,
    HookReturn extends Awaited<ReturnType<HookFunction>>,
-   Callback = (
-      result: Exclude<HookReturn, undefined | null | void>
-   ) => void
+   Callback = (result: Exclude<HookReturn, undefined | null | void>) => void
 > = {
    name: HookName;
    args: Parameters<HookFunction> | (() => Parameters<HookFunction>);
@@ -111,7 +109,7 @@ export class PluginManager {
       );
    }
 
-   private _createContext(partialContext: PartialContext, plugin: PluginData) {
+   public createContext(partialContext: PartialContext, plugin: PluginData) {
       const result: BuildHookContext = {
          bundler: partialContext.bundler,
          getImporter: () =>
@@ -158,7 +156,7 @@ export class PluginManager {
       const hookGroup = this._hooks[name];
       if (!hookGroup) return;
       for (const { hook, plugin } of hookGroup) {
-         const ctx = context ? this._createContext(context, plugin) : null;
+         const ctx = context ? this.createContext(context, plugin) : null;
          const args = typeof rawArgs == "function" ? rawArgs() : rawArgs;
          let result: R;
          if (typeof hook == "function") {
