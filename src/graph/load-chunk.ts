@@ -37,6 +37,14 @@ export async function loadChunk(
       asset: asset,
    } as LoadChunkResult;
 
+   // Merge source map from node modules
+   if (loaded.type == "script" || loaded.type == "style") {
+      const cacheFromNodeModules = this._cachedDeps.nodeModules.get(rawSource);
+      if (cacheFromNodeModules?.map) {
+         loaded.map = cacheFromNodeModules.map;
+      }
+   }
+
    await this._pluginManager.triggerHook({
       name: "load",
       args: () => [
@@ -71,16 +79,6 @@ export async function loadChunk(
          }
       },
    });
-
-   // Merge source map from node modules
-   if (loaded.type == "script" || loaded.type == "style") {
-      const cacheFromNodeModules = this._cachedDeps.nodeModules.get(rawSource);
-      if (cacheFromNodeModules?.map && loaded.map) {
-         loaded.map = mergeSourceMaps(cacheFromNodeModules.map, loaded.map);
-      } else if (cacheFromNodeModules?.map && !loaded.map) {
-         loaded.map = cacheFromNodeModules.map;
-      }
-   }
 
    const loaders = this._getLoadersFor(rawSource);
    for (const { loader, plugin } of loaders) {
