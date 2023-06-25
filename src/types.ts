@@ -28,4 +28,10 @@ export type {
    ModeConfig,
    ModuleTypeConfig,
 } from "./config.js";
+export type {
+   Package,
+   PackageManagerConfig,
+   PackageProviderConfig,
+} from "./package-manager/index.js";
 export type { Asset, ResourceAsset, TextAsset, ResolveOptions } from "./utils";
+export type Toypack = InstanceType<typeof import("./Toypack.js").Toypack>;

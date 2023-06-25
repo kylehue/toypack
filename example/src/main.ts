@@ -1,7 +1,6 @@
 import "./style.css";
 import { sampleFiles } from "./sampleFiles.js";
-import { Toypack as ToypackESM, Babel } from "../../";
-import DefinePlugin from "../../build/plugins/DefinePlugin.js";
+import { Toypack as ToypackESM, Babel } from "toypack";
 
 var saveData = (function () {
    var a = document.createElement("a");
@@ -22,7 +21,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "src/main",
+      entry: "index.html",
       moduleType: "esm",
       resolve: {
          alias: {
@@ -43,6 +42,9 @@ const toypack = new ToypackESM({
       },
    },
 });
+
+await toypack.installPackage("react");
+await toypack.installPackage("vue", "3.1.2");
 
 (window as any).toypack = toypack;
 console.log(toypack, Babel.availablePlugins, Babel.availablePresets);

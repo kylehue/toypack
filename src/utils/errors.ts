@@ -60,3 +60,16 @@ export function plugin(pluginName: string, reason: string) {
       reason: `[${pluginName}] Error: ${reason}`,
    };
 }
+
+export function packageInstallFailure(
+   name: string,
+   version: string,
+   stack?: string
+) {
+   return {
+      code: 9,
+      reason: `Failed to install ${name}@${version}. ${
+         stack ? `\n\n${stack}` : ""
+      }`,
+   };
+}

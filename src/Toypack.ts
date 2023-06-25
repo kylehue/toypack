@@ -4,6 +4,7 @@ import { PartialDeep } from "type-fest";
 import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
+import importUrlPlugin from "./build-plugins/import-url-plugin.js";
 import sassPlugin from "./build-plugins/sass-plugin.js";
 import vuePlugin from "./build-plugins/vue-plugin.js";
 import { bundle } from "./bundle/index.js";
@@ -17,22 +18,21 @@ import {
    mergeObjects,
    createAsset,
    isValidAssetSource,
-   resourceExtensions,
-   styleExtensions,
-   appExtensions,
-   invalidAssetSourceError,
+   ERRORS,
+   EXTENSIONS,
    isNodeModule,
 } from "./utils";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
+import { fetchPackage } from "./package-manager/index.js";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
    private _extensions = {
-      resource: [...resourceExtensions],
-      style: [...styleExtensions],
-      script: [...appExtensions],
+      resource: [...EXTENSIONS.resource],
+      style: [...EXTENSIONS.style],
+      script: [...EXTENSIONS.script],
    };
    private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
@@ -41,6 +41,7 @@ export class Toypack extends Hooks {
    protected _cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
+      nodeModules: new Map(),
    };
    constructor(config?: PartialDeep<ToypackConfig>) {
       super();
@@ -51,10 +52,15 @@ export class Toypack extends Hooks {
          htmlPlugin(),
          vuePlugin(),
          sassPlugin(),
-         rawPlugin()
+         rawPlugin(),
+         importUrlPlugin()
       );
 
-      if (this._config.logLevel == "error") {
+      if (
+         this._config.logLevel == "error" ||
+         this._config.logLevel == "warn" ||
+         this._config.logLevel == "info"
+      ) {
          this.onError((error) => {
             console.error(error.reason);
          });
@@ -108,6 +114,16 @@ export class Toypack extends Hooks {
       source = source.split("?")[0];
       const extension = path.extname(source);
       return this._getExtensions(type).includes(extension);
+   }
+
+   public async installPackage(name: string, version?: string) {
+      const pkg = await fetchPackage.call(this, name, version);
+      for (const pkgAsset of Object.values(pkg.assets)) {
+         this.addOrUpdateAsset(pkgAsset.source, pkgAsset.content);
+         this._cachedDeps.nodeModules.set(pkgAsset.source, {
+            map: pkgAsset.map,
+         });
+      }
    }
 
    /**
@@ -200,7 +216,7 @@ export class Toypack extends Hooks {
     */
    public addOrUpdateAsset(source: string, content: string | Blob = "") {
       if (!isValidAssetSource(source)) {
-         this._trigger("onError", invalidAssetSourceError(source));
+         this._trigger("onError", ERRORS.invalidAssetSource(source));
          return {} as Asset;
       }
 
@@ -325,6 +341,12 @@ interface ICache {
       {
          asset: Asset;
          content: string;
+         map?: RawSourceMap | null;
+      }
+   >;
+   nodeModules: Map<
+      string,
+      {
          map?: RawSourceMap | null;
       }
    >;

@@ -1,4 +1,5 @@
 import { ParserOptions, TransformOptions } from "@babel/core";
+import { PackageManagerConfig } from "./package-manager";
 
 export const defaultConfig = {
    /**
@@ -66,9 +67,33 @@ export const defaultConfig = {
    },
    /**
     * Log level.
-    * @default "error"
+    * @default "info"
     */
-   logLevel: "error" as LogLevelConfig,
+   logLevel: "info" as LogLevelConfig,
+   /**
+    * Configuration for the package manager.
+    */
+   packageManager: {
+      providers: [
+         {
+            host: "https://esm.sh/",
+            dtsHeader: "X-Typescript-Types"
+         },
+         {
+            host: "https://cdn.skypack.dev/",
+            dtsHeader: "X-Typescript-Types",
+            queryParams: {
+               dts: true,
+            },
+         },
+         {
+            host: "https://cdn.jsdelivr.net/",
+            postpath: "+esm",
+            prepath: "npm",
+         },
+      ],
+      dts: false,
+   } as PackageManagerConfig,
 };
 
 export type ToypackConfig = typeof defaultConfig;
@@ -90,4 +115,3 @@ export type BabelParseConfig = Omit<
    ParserOptions,
    "sourceType" | "sourceFilename" | "strictMode"
 >;
-
