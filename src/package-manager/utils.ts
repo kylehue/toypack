@@ -34,7 +34,7 @@ export function getFetchUrlFromProvider(
 
 export function resolve(
    source: string,
-   parentSource: string,
+   parentSource: string = "/",
    root: string = "/"
 ) {
    if (isUrl(source)) return source;
