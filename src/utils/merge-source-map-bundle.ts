@@ -33,16 +33,27 @@ export function mergeSourceMapToBundle(
       );
    }
 
+   const smc = new SourceMapConsumer(sourceMap);
+
+   // Add source map's sources and contents to target map
+   (smc as any).sources.forEach(function (sourceFile: string) {
+      if (sourceFile == "unknown") return;
+      (targetMap as any)._sources.add(sourceFile);
+      const sourceContent = smc.sourceContentFor(sourceFile);
+      if (sourceContent != null) {
+         targetMap.setSourceContent(sourceFile, sourceContent);
+      }
+   });
+
    if (originalContent) {
       targetMap.setSourceContent(source, originalContent);
    }
 
-   const smc = new SourceMapConsumer(sourceMap);
    smc.eachMapping((map) => {
       if (map.originalLine === null) return;
-
+      
       targetMap.addMapping({
-         source: source,
+         source: map.source,
          original: {
             line: map.originalLine,
             column: map.originalColumn,
