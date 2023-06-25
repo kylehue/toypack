@@ -32,17 +32,19 @@ export const resource: string[] = [
 
 export const style: string[] = [".css"];
 
-export const app: string[] = [
+export const script: string[] = [
    ".js",
    ".mjs",
    ".cjs",
    ".ts",
    ".jsx",
    ".tsx",
+   ".mts",
+   ".cts"
 ];
 
 export const supported = [
-   ...app,
+   ...script,
    ...style,
    ...resource,
 ];
