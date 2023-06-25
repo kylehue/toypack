@@ -10,7 +10,8 @@ import { getUsableResourcePath, ERRORS } from "../utils";
 export async function parseStyleAsset(
    this: Toypack,
    source: string,
-   content: string
+   content: string,
+   options?: ParseStyleOptions
 ): Promise<ParsedStyleResult> {
    const config = this.getConfig();
    const result: ParsedStyleResult = {
@@ -20,6 +21,7 @@ export async function parseStyleAsset(
 
    // Parse
    const AST = cssTree.parse(content, {
+      ...(options?.parserOptions || {}),
       positions: !!config.bundle.sourceMap,
       filename: source,
       onParseError: (error: any) => {
@@ -76,6 +78,7 @@ export async function parseStyleAsset(
             }
 
             result.dependencies.push(sourceValue);
+            options?.inspectDependencies?.(node);
          }
       }
 
@@ -93,6 +96,7 @@ export async function parseStyleAsset(
          ) {
             result.dependencies.push(path.join("/", atImportValueNode.value));
             list.remove(item);
+            options?.inspectDependencies?.(atImportValueNode);
          }
 
          // @import url("...");
@@ -110,6 +114,7 @@ export async function parseStyleAsset(
                path.join("/", atImportURLValueNode.value)
             );
             list.remove(item);
+            options?.inspectDependencies?.(atImportURLValueNode);
          }
       }
    });
@@ -120,4 +125,12 @@ export async function parseStyleAsset(
 export interface ParsedStyleResult {
    dependencies: string[];
    ast: cssTree.CssNode;
+}
+
+export interface ParseStyleOptions {
+   parserOptions?: Omit<
+      cssTree.ParseOptions,
+      "positions" | "filename" | "onParseError"
+   >;
+   inspectDependencies?: (node: cssTree.Url | cssTree.StringNode) => void;
 }
