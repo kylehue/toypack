@@ -62,11 +62,25 @@ export async function loadChunk(
             }
 
             if (loaded.type == "script" || loaded.type == "style") {
-               loaded.map = result.map;
+               if (loaded.map && result.map) {
+                  loaded.map = mergeSourceMaps(loaded.map, result.map);
+               } else if (!loaded.map && result.map) {
+                  loaded.map = result.map;
+               }
             }
          }
       },
    });
+
+   // Merge source map from node modules
+   if (loaded.type == "script" || loaded.type == "style") {
+      const cacheFromNodeModules = this._cachedDeps.nodeModules.get(rawSource);
+      if (cacheFromNodeModules?.map && loaded.map) {
+         loaded.map = mergeSourceMaps(cacheFromNodeModules.map, loaded.map);
+      } else if (cacheFromNodeModules?.map && !loaded.map) {
+         loaded.map = cacheFromNodeModules.map;
+      }
+   }
 
    const loaders = this._getLoadersFor(rawSource);
    for (const { loader, plugin } of loaders) {
