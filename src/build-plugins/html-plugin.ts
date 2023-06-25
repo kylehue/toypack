@@ -72,7 +72,7 @@ function getImportMap(node: AST) {
 }
 
 function getImportCode(source: string) {
-   return `require("${source}")`;
+   return `import "${source}";`;
 }
 
 function hasDescendantNode(parent: Node, node: Node) {
