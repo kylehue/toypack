@@ -306,9 +306,8 @@ export class Toypack extends Hooks {
       const result = await bundle.call(this, graph);
       this._config.bundle.mode = oldMode;
 
-      // Set modified flag to false for all assets except those in node_modules
+      // Set modified flag to false for all assets (used in caching)
       this._assets.forEach((asset) => {
-         if (isNodeModule(asset.source) || asset.type == "resource") return;
          asset.modified = false;
       });
 
