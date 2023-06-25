@@ -4,10 +4,7 @@ import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset } from "../types.js";
-import {
-   ERRORS,
-   parseURL,
-} from "../utils";
+import { ERRORS, mergeSourceMaps, parseURL } from "../utils";
 import { loadChunk } from "./load-chunk.js";
 import { parseScriptAsset } from "./parse-script-chunk.js";
 import { parseStyleAsset } from "./parse-style-chunk.js";
@@ -131,11 +128,9 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                      loaded.asset.source || rawSource
                   )
                );
-
-               continue;
+            } else {
+               resolved = nonVirtualResolution;
             }
-
-            resolved = nonVirtualResolution;
          }
 
          // Fix query's order to avoid duplicates
