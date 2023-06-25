@@ -70,6 +70,12 @@ describe("Resolve", () => {
             baseDir: path.dirname("/src/main.js"),
          })
       ).toBe("/assets/image.jpg");
+
+      expect(
+         toypack.resolve("/assets/image", {
+            baseDir: path.dirname("/src/main.js"),
+         })
+      ).toBe("/assets/image.jpg");
    });
 
    test("baseDir", () => {

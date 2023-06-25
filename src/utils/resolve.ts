@@ -122,10 +122,10 @@ function getResolved(
    options: ResolveOptions
 ) {
    if (
-      sourceToResolve.startsWith("/") &&
+      sourceToResolve.startsWith("/") ||
       typeof assets[sourceToResolve] == "string"
    ) {
-      return sourceToResolve;
+      return loadAsFile(assets, sourceToResolve, options);
    }
 
    if (
