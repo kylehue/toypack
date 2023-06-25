@@ -1,5 +1,5 @@
 const URL_RE = /https?:\/\/((?:[\w\d-]+\.)+[\w\d]{2,})/i;
-const DATA_URL_RE = /^(data:)([\w\/\+-]*)(;charset=[\w-]+|;base64){0,1},(.*)/gi;
+const DATA_URL_RE = /data:([-\w]+\/[-+\w.]+)?(;?\w+=[-\w]+)*(;base64)?,.*/gi;
 
 /**
  * Check if string is an external url.
