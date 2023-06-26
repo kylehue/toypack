@@ -28,6 +28,16 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
             originalContent = chunk.asset.content;
          }
 
+         /**
+          * Chunks that didn't emit source maps won't have its original code.
+          * To solve this, we can manually put the loaded content in the
+          * compiled map.
+          */
+         if (!chunk.map && compiled.map) {
+            compiled.map.sourcesContent = [chunk.content];
+            originalContent = undefined;
+         }
+
          mergeSourceMapToBundle(
             smg,
             compiled.map,
