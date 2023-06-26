@@ -121,7 +121,9 @@ export async function loadChunk(
    if (
       typeof loaded.type != "string" ||
       typeof loaded.content == "undefined" ||
-      (!isSupported(rawSource) && !loaders.length)
+      (!isSupported(rawSource) &&
+         !loaders.length &&
+         typeof loaded.type != "string")
    ) {
       this._trigger("onError", ERRORS.loaderNotFound(rawSource));
    }
