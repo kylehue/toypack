@@ -76,8 +76,13 @@ export const defaultConfig = {
    packageManager: {
       providers: [
          {
+            host: "https://cdn.jsdelivr.net/",
+            postpath: "+esm",
+            prepath: "npm",
+         },
+         {
             host: "https://esm.sh/",
-            dtsHeader: "X-Typescript-Types"
+            dtsHeader: "X-Typescript-Types",
          },
          {
             host: "https://cdn.skypack.dev/",
@@ -85,11 +90,6 @@ export const defaultConfig = {
             queryParams: {
                dts: true,
             },
-         },
-         {
-            host: "https://cdn.jsdelivr.net/",
-            postpath: "+esm",
-            prepath: "npm",
          },
       ],
       dts: false,

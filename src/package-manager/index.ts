@@ -24,7 +24,7 @@ export async function fetchPackage(
       assets: {},
    };
 
-   let currentProviderIndex = 2;
+   let currentProviderIndex = 0;
    let currentProvider: PackageProviderConfig | null =
       providers[currentProviderIndex] || null;
    if (!currentProvider) {
