@@ -3,6 +3,7 @@ import {
    SourceMapConsumer,
    SourceMapGenerator,
 } from "source-map-js";
+import MapConverter from "convert-source-map";
 
 /**
  * Merge old source map and new source map and return merged.
@@ -60,5 +61,7 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
    (mergedMapGenerator as any)._sourceRoot = oldMap.sourceRoot;
    (mergedMapGenerator as any)._file = oldMap.file;
 
-   return JSON.parse(mergedMapGenerator.toString()) as RawSourceMap;
+   return MapConverter.fromJSON(
+      mergedMapGenerator.toString()
+   ).toObject() as RawSourceMap;
 }

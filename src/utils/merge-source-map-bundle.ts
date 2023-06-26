@@ -22,7 +22,7 @@ export function mergeSourceMapToBundle(
    source: string,
    generatedContent: string,
    bundleContent: string,
-   originalContent?: string,
+   originalContent?: string
 ) {
    if (!targetMap) return;
    const position = findCodePosition(bundleContent, generatedContent);
@@ -35,23 +35,13 @@ export function mergeSourceMapToBundle(
 
    const smc = new SourceMapConsumer(sourceMap);
 
-   // Add source map's sources and contents to target map
-   (smc as any).sources.forEach(function (sourceFile: string) {
-      if (sourceFile == "unknown") return;
-      (targetMap as any)._sources.add(sourceFile);
-      const sourceContent = smc.sourceContentFor(sourceFile);
-      if (sourceContent != null) {
-         targetMap.setSourceContent(sourceFile, sourceContent);
-      }
-   });
-
    if (originalContent) {
       targetMap.setSourceContent(source, originalContent);
    }
 
    smc.eachMapping((map) => {
       if (map.originalLine === null) return;
-      
+
       targetMap.addMapping({
          source: map.source,
          original: {
@@ -64,5 +54,14 @@ export function mergeSourceMapToBundle(
          },
          name: map.name,
       });
+   });
+
+   // Add source map's sources and contents to target map
+   (smc as any).sources.forEach(function (sourceFile: string) {
+      const sourceContent = smc.sourceContentFor(sourceFile);
+      if (sourceContent) {
+         (targetMap as any)._sources.add(sourceFile);
+         targetMap.setSourceContent(sourceFile, sourceContent);
+      }
    });
 }

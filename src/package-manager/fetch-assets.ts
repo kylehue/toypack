@@ -9,7 +9,7 @@ import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import type { Toypack } from "../types";
-import { ERRORS, EXTENSIONS, getSourceMapUrl, mergeSourceMaps } from "../utils";
+import { ERRORS, EXTENSIONS, getSourceMapUrl, mergeSourceMaps, removeSourceMapUrl } from "../utils";
 import { PackageProviderConfig, Package } from ".";
 import {
    getFetchUrlFromProvider,
@@ -167,18 +167,17 @@ export async function fetchAssets(
          await recurse(resolved);
       }
 
+      // Remove the #sourceMappingUrl comment
+      asset.content = removeSourceMapUrl(asset.content);
+
       // Source maps?
       if (!!config.bundle.sourceMap) {
          const sourceMapUrl = getSourceMapUrl(rawContent);
          if (sourceMapUrl) {
-            asset.content = asset.content
-               .replace(/\/\/[#@]\s*sourceMappingURL=(.+)\s*$/, "")
-               .trimEnd();
-
             const resolved = resolve(sourceMapUrl, url, provider.host);
             const sourceMap = cached
                ? cached.map
-               : await (await fetch(resolved)).json();
+               : await(await fetch(resolved)).json();
             if (sourceMap && map) {
                asset.map = mergeSourceMaps(sourceMap, map);
             } else {
