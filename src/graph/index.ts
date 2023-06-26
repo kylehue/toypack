@@ -88,6 +88,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          asset: loaded.asset,
          source: rawSource,
          ast: parsed.ast,
+         content: loaded.content,
          dependencyMap: {},
          map: loaded.map,
          isEntry: isEntry,
@@ -182,6 +183,7 @@ interface DependencyBase {
 export interface ScriptDependency extends DependencyBase {
    type: "script";
    ast: Node;
+   content: string;
    dependencyMap: Record<string, string>;
    asset: Asset;
    map?: RawSourceMap | null;
@@ -191,6 +193,7 @@ export interface ScriptDependency extends DependencyBase {
 export interface StyleDependency extends DependencyBase {
    type: "style";
    ast: CssNode;
+   content: string;
    dependencyMap: Record<string, string>;
    asset: Asset;
    map?: RawSourceMap | null;
