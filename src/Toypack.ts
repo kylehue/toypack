@@ -25,7 +25,11 @@ import {
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
-import { fetchPackage } from "./package-manager/index.js";
+import {
+   PackageProviderConfig,
+   fetchPackage,
+   test,
+} from "./package-manager/index.js";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -37,6 +41,7 @@ export class Toypack extends Hooks {
    private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
    private _loaders: { plugin: ReturnType<Plugin>; loader: Loader }[] = [];
+   private _packageProviders: PackageProviderConfig[] = [];
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
@@ -65,6 +70,36 @@ export class Toypack extends Hooks {
             console.error(error.reason);
          });
       }
+
+      this.registerPackageProvider({
+         host: "cdn.skypack.dev",
+         dtsHeader: "X-Typescript-Types",
+         queryParams: {
+            dts: true,
+         },
+         isBadResponse(response, { name, version }) {
+            if (
+               new RegExp(`cdn\\.skypack\\.dev/error/.*${name}@.*`).test(
+                  response.url
+               )
+            ) {
+               return true;
+            }
+
+            return false;
+         },
+      });
+
+      this.registerPackageProvider({
+         host: "esm.sh",
+         dtsHeader: "X-Typescript-Types",
+      });
+
+      this.registerPackageProvider({
+         host: "cdn.jsdelivr.net",
+         postpath: "+esm",
+         prepath: "npm",
+      });
    }
 
    protected _getLoadersFor(source: string) {
@@ -116,6 +151,10 @@ export class Toypack extends Hooks {
       return this._getExtensions(type).includes(extension);
    }
 
+   protected _getPackageProviders() {
+      return this._packageProviders;
+   }
+
    public async installPackage(name: string, version?: string) {
       const pkg = await fetchPackage.call(this, name, version);
       for (const pkgAsset of Object.values(pkg.assets)) {
@@ -123,6 +162,18 @@ export class Toypack extends Hooks {
          this._cachedDeps.nodeModules.set(pkgAsset.source, {
             map: pkgAsset.map,
          });
+      }
+      //const pkg = await test.call(this, name, version);
+   }
+
+   public registerPackageProvider(
+      provider: PackageProviderConfig,
+      isMainProvider = false
+   ) {
+      if (isMainProvider) {
+         this._packageProviders.unshift(provider);
+      } else {
+         this._packageProviders.push(provider);
       }
    }
 
@@ -299,24 +350,21 @@ export class Toypack extends Hooks {
     * of the bundling process.
     */
    public async run(isProd = false) {
-      const oldMode = this._config.bundle.mode;
-      this._config.bundle.mode = isProd ? "production" : oldMode;
-      const graph = await getDependencyGraph.call(this);
-      console.log(graph);
-      const result = await bundle.call(this, graph);
-      this._config.bundle.mode = oldMode;
-
-      // Set modified flag to false for all assets (used in caching)
-      this._assets.forEach((asset) => {
-         asset.modified = false;
-      });
-
-      // IFrame
-      if (!isProd && this._iframe) {
-         this._iframe.srcdoc = result.html.content;
-      }
-
-      return result;
+      // const oldMode = this._config.bundle.mode;
+      // this._config.bundle.mode = isProd ? "production" : oldMode;
+      // const graph = await getDependencyGraph.call(this);
+      // console.log(graph);
+      // const result = await bundle.call(this, graph);
+      // this._config.bundle.mode = oldMode;
+      // // Set modified flag to false for all assets (used in caching)
+      // this._assets.forEach((asset) => {
+      //    asset.modified = false;
+      // });
+      // // IFrame
+      // if (!isProd && this._iframe) {
+      //    this._iframe.srcdoc = result.html.content;
+      // }
+      // return result;
    }
 }
 

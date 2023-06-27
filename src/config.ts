@@ -73,27 +73,7 @@ export const defaultConfig = {
    /**
     * Configuration for the package manager.
     */
-   packageManager: {
-      providers: [
-         {
-            host: "https://cdn.jsdelivr.net/",
-            postpath: "+esm",
-            prepath: "npm",
-         },
-         {
-            host: "https://esm.sh/",
-            dtsHeader: "X-Typescript-Types",
-         },
-         {
-            host: "https://cdn.skypack.dev/",
-            dtsHeader: "X-Typescript-Types",
-            queryParams: {
-               dts: true,
-            },
-         },
-      ],
-      dts: false,
-   } as PackageManagerConfig,
+   packageManager: {} as PackageManagerConfig,
 };
 
 export type ToypackConfig = typeof defaultConfig;
