@@ -9,13 +9,24 @@ import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import type { Toypack } from "../types";
-import { ERRORS, EXTENSIONS, getSourceMapUrl, mergeSourceMaps, removeSourceMapUrl } from "../utils";
+import {
+   ERRORS,
+   EXTENSIONS,
+   getSourceMapUrl,
+   mergeSourceMaps,
+   parsePackageName,
+   removeSourceMapUrl,
+} from "../utils";
 import { PackageProviderConfig, Package } from ".";
 import {
    getFetchUrlFromProvider,
    getExtension,
    getType,
    resolve,
+   getPackageInfoFromUrl,
+   removeProviderHostFromUrl,
+   getUrlFromProviderHost,
+   getOptimizedPath,
 } from "./utils.js";
 
 const cache = new Map<
@@ -26,34 +37,90 @@ const cache = new Map<
       map?: RawSourceMap | null;
    }
 >();
+
+const badProvidersUrlMap: Record<string, string[]> = {};
+
 export async function fetchAssets(
    this: Toypack,
-   provider: PackageProviderConfig,
+   providers: PackageProviderConfig[],
    name: string,
-   version: string,
-   onProviderFallback: () => PackageProviderConfig | null
+   version: string
 ) {
+   let currentProviderIndex = 0;
+   let provider = providers[currentProviderIndex];
+   const assets = new Map<string, PackageAsset>();
    const config = this.getConfig();
-   let assets: Package["assets"] = {};
+   const subpath = parsePackageName(name).path;
    const entryUrl = getFetchUrlFromProvider(provider, name, version);
    let entryResponse: Response = {} as Response;
 
-   const recurse = async (url: string) => {
-      const source = url.split("?")[0];
+   const inspectDependencies = (
+      node: { value: string },
+      url: string,
+      fallbackFilename: string
+   ) => {
+      const optimizedPath = getOptimizedPath(
+         url,
+         subpath,
+         fallbackFilename,
+         version,
+         provider
+      );
 
-      if (assets[source]) return;
+      node.value = optimizedPath.importPath;
+   };
+
+   const recurse = async (url: string) => {
+      if (assets.get(url)) return false;
 
       const cached = cache.get(url);
       const response = cached ? cached.response : await fetch(url);
-      if (!response.ok) {
-         let newProvider = onProviderFallback();
-         if (newProvider) {
-            assets = {};
-            provider = newProvider;
-            await recurse(getFetchUrlFromProvider(provider, name, version));
+
+      // Use backup providers if the current provider can't fetch the url
+      const urlIsBadForProvider =
+         badProvidersUrlMap[provider.host]?.includes(url);
+      if (
+         !response.ok ||
+         urlIsBadForProvider ||
+         (await provider.isBadResponse?.(response, { name, version }))
+      ) {
+         if (!urlIsBadForProvider) {
+            badProvidersUrlMap[provider.host] ??= [];
+            badProvidersUrlMap[provider.host].push(url);
          }
 
-         return;
+         let backupProvider =
+            providers[++currentProviderIndex % providers.length];
+         let isOutOfProviders = false;
+         while (badProvidersUrlMap[backupProvider.host]?.includes(url)) {
+            backupProvider =
+               providers[++currentProviderIndex % providers.length];
+
+            if (backupProvider == provider) {
+               isOutOfProviders = true;
+               break;
+            }
+         }
+
+         const pkgPath = getPackageInfoFromUrl(url).fullPath;
+         if (backupProvider == provider || isOutOfProviders) {
+            assets.clear();
+            this._trigger(
+               "onError",
+               ERRORS.any(
+                  `[package-manager] Error: Failed to fetch ${name}@${version} because none of the providers could fetch one of its dependencies which is ${pkgPath}.`
+               )
+            );
+            return false;
+         }
+
+         if (backupProvider && backupProvider != provider) {
+            provider = backupProvider;
+            const newUrl = getFetchUrlFromProvider(provider, pkgPath);
+            await recurse(newUrl);
+         }
+
+         return false;
       }
 
       // Is it a script or a style? (this is needed when parsing)
@@ -68,8 +135,16 @@ export async function fetchAssets(
             )
          );
 
-         return;
+         return false;
       }
+
+      const optimizedPath = getOptimizedPath(
+         url,
+         subpath,
+         type == "script" ? "index.js" : "index.css",
+         version,
+         provider
+      );
 
       const rawContent = cached ? cached.content : await response.text();
       let content = "";
@@ -77,7 +152,6 @@ export async function fetchAssets(
 
       // Parse
       let ast: CssNode | Node, rawDependencies: string[];
-      let dependencies: string[] = [];
       if (type == "script") {
          const parserOptions: ParserOptions = {
             plugins:
@@ -86,17 +160,17 @@ export async function fetchAssets(
 
          const parsedScript = await parseScriptAsset.call(
             this,
-            source,
+            optimizedPath.path,
             rawContent,
             {
                parserOptions,
-               // Resolve import paths to /node_modules/
                inspectDependencies(node) {
-                  const resolved = resolve(node.value, url, provider.host);
-                  node.value =
-                     `/node_modules/${name}/` +
-                     resolved.replace(provider.host, "");
-                  dependencies.push(node.value);
+                  const resolvedUrl = resolve(
+                     node.value,
+                     url,
+                     getUrlFromProviderHost(provider)
+                  );
+                  inspectDependencies(node, resolvedUrl, "index.js");
                },
             }
          );
@@ -104,9 +178,10 @@ export async function fetchAssets(
          ast = parsedScript.ast;
          rawDependencies = parsedScript.dependencies;
          const generated = generateScript(parsedScript.ast, {
-            sourceFileName: source,
-            filename: source,
+            sourceFileName: optimizedPath.path,
+            filename: optimizedPath.path,
             sourceMaps: !!config.bundle.sourceMap,
+            comments: true,
          });
 
          content = generated.code;
@@ -114,15 +189,16 @@ export async function fetchAssets(
       } else {
          const parsedStyle = await parseStyleAsset.call(
             this,
-            source,
+            optimizedPath.path,
             rawContent,
             {
                inspectDependencies(node) {
-                  const resolved = resolve(node.value, url, provider.host);
-                  node.value =
-                     `/node_modules/${name}/` +
-                     resolved.replace(provider.host, "");
-                  dependencies.push(node.value);
+                  const resolvedUrl = resolve(
+                     node.value,
+                     url,
+                     getUrlFromProviderHost(provider)
+                  );
+                  inspectDependencies(node, resolvedUrl, "index.css");
                },
             }
          );
@@ -141,113 +217,119 @@ export async function fetchAssets(
          }
       }
 
+      const isEntry = url === entryUrl;
+
+      if (isEntry) {
+         entryResponse = response;
+      }
+
       const asset: PackageAsset = {
          type,
-         source,
+         source: optimizedPath.path,
          ast,
-         isEntry: url === entryUrl,
+         isEntry,
          url,
-         dependencies,
          content,
       } as PackageAsset;
 
-      assets[source] = asset;
+      assets.set(url, asset);
 
       if (asset.type == "script") {
          asset.dts = extension == ".d.ts" ? true : false;
       }
 
-      if (asset.isEntry) {
-         entryResponse = response;
-      }
-
       // Get dependency's dependencies by recursing
       for (const depSource of rawDependencies) {
-         const resolved = resolve(depSource, url, provider.host);
-         await recurse(resolved);
+         const resolved = resolve(
+            depSource,
+            url,
+            getUrlFromProviderHost(provider)
+         );
+
+         const isSuccess = await recurse(resolved);
+         if (!isSuccess) return false;
       }
 
-      // Remove the #sourceMappingUrl comment
       asset.content = removeSourceMapUrl(asset.content);
 
-      // Source maps?
-      if (!!config.bundle.sourceMap) {
-         const sourceMapUrl = getSourceMapUrl(rawContent);
-         if (sourceMapUrl) {
-            const resolved = resolve(sourceMapUrl, url, provider.host);
-            const sourceMap = cached
-               ? cached.map
-               : await(await fetch(resolved)).json();
-            if (sourceMap && map) {
-               asset.map = mergeSourceMaps(sourceMap, map);
-            } else {
-               asset.map = sourceMap || map;
+      // Get source map
+      if (
+         !!config.bundle.sourceMap &&
+         config.packageManager.overrides?.sourceMap
+      ) {
+         let sourceMap: RawSourceMap | null = null;
+         if (cached?.map) {
+            sourceMap = cached.map;
+         } else {
+            const sourceMapUrl = getSourceMapUrl(rawContent);
+            if (sourceMapUrl) {
+               const resolvedMapUrl = resolve(
+                  sourceMapUrl,
+                  url,
+                  getUrlFromProviderHost(provider)
+               );
+               const mapResponse = await fetch(resolvedMapUrl);
+               if (mapResponse) {
+                  sourceMap = await mapResponse.json();
+               }
             }
+         }
+
+         if (sourceMap && map) {
+            asset.map = mergeSourceMaps(sourceMap, map);
+         } else {
+            asset.map = sourceMap || map;
          }
       }
 
       // Cache
-      if (!cached)
+      if (!cached) {
          cache.set(url, { content: rawContent, response, map: asset.map });
+      }
+
+      return true;
    };
 
    await recurse(entryUrl);
 
-   // Get dts files
-   if (
-      config.packageManager.dts &&
-      typeof provider.dtsHeader == "string" &&
-      entryResponse.ok
-   ) {
-      const entryExtension = getExtension(entryUrl, provider);
-      if (
-         entryExtension != ".d.ts" &&
-         (EXTENSIONS.script.includes(entryExtension) ||
-            !EXTENSIONS.style.includes(entryExtension))
-      ) {
-         const dtsUrl = entryResponse.headers.get(provider.dtsHeader);
-         if (dtsUrl) {
-            await recurse(resolve(dtsUrl, entryUrl, provider.host));
-         } else {
-            this._trigger(
-               "onError",
-               ERRORS.any(
-                  "[package-manager] Error: Couldn't get the declaration types for " +
-                     entryUrl
-               )
-            );
-         }
-      }
+   // // Get dts files
+   // if (
+   //    config.packageManager.dts &&
+   //    typeof provider.dtsHeader == "string" &&
+   //    entryResponse.ok
+   // ) {
+   //    const entryExtension = getExtension(entryUrl, provider);
+   //    if (
+   //       entryExtension != ".d.ts" &&
+   //       (EXTENSIONS.script.includes(entryExtension) ||
+   //          !EXTENSIONS.style.includes(entryExtension))
+   //    ) {
+   //       const dtsUrl = entryResponse.headers.get(provider.dtsHeader);
+   //       if (dtsUrl) {
+   //          await recurse(
+   //             resolve(dtsUrl, entryUrl, getUrlFromProviderHost(provider))
+   //          );
+   //       } else {
+   //          this._trigger(
+   //             "onError",
+   //             ERRORS.any(
+   //                "[package-manager] Error: Couldn't get the declaration types for " +
+   //                   entryUrl
+   //             )
+   //          );
+   //       }
+   //    }
+   // }
+
+   const finalizedAssets: Record<string, PackageAsset> = {};
+
+   for (const [_, asset] of assets) {
+      finalizedAssets[asset.source] = asset;
    }
 
-   return finalizeAssets(assets, name, provider);
-}
+   console.log(finalizedAssets);
 
-function finalizeAssets(
-   assets: Record<string, PackageAsset>,
-   name: string,
-   provider: PackageProviderConfig
-) {
-   const finalized: Record<string, PackageAsset> = {};
-   for (const [source, asset] of Object.entries(assets)) {
-      let newSource: string;
-      if (asset.isEntry) {
-         newSource =
-            `/node_modules/${name}/index` +
-            (asset.type == "script" ? ".js" : ".css");
-      } else {
-         newSource = source.replace(provider.host, `/node_modules/${name}/`);
-      }
-
-      if (!path.extname(newSource)) {
-         newSource += asset.type == "script" && !asset.dts ? ".js" : ".css";
-      }
-
-      asset.source = newSource;
-      finalized[newSource] = asset;
-   }
-
-   return finalized;
+   return finalizedAssets;
 }
 
 interface PackageAssetBase {
@@ -255,7 +337,6 @@ interface PackageAssetBase {
    url: string;
    map?: RawSourceMap | null;
    isEntry: boolean;
-   dependencies: string[];
    content: string;
 }
 

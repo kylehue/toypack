@@ -1,7 +1,7 @@
 import type { Node } from "@babel/traverse";
 import type { CssNode } from "css-tree";
 import type { RawSourceMap } from "source-map-js";
-import type { Toypack } from "../types";
+import type { SourceMapConfig, Toypack } from "../types";
 import { DEBUG, ERRORS } from "../utils";
 import { PackageAsset, fetchAssets } from "./fetch-assets.js";
 
@@ -17,17 +17,14 @@ export async function fetchPackage(
    version = "latest"
 ): Promise<Package> {
    const config = this.getConfig();
-   const providers = config.packageManager.providers;
+   const providers = this._getPackageProviders();
    const pkg: Package = {
       name,
       version,
       assets: {},
    };
 
-   let currentProviderIndex = 0;
-   let currentProvider: PackageProviderConfig | null =
-      providers[currentProviderIndex] || null;
-   if (!currentProvider) {
+   if (!providers.length) {
       this._trigger(
          "onError",
          ERRORS.any("[package-manager] Error: No providers were found.")
@@ -36,31 +33,13 @@ export async function fetchPackage(
       return pkg;
    }
 
-   pkg.assets = await fetchAssets.call(
-      this,
-      currentProvider,
-      name,
-      version,
-      () => {
-         currentProvider = providers[currentProviderIndex++] || null;
-         return currentProvider;
-      }
-   );
+   pkg.assets = await fetchAssets.call(this, providers, name, version);
 
    const assetCount = Object.values(pkg.assets).length;
-   if (!assetCount) {
-      this._trigger(
-         "onError",
-         ERRORS.any(
-            `[package-manager] Error: Failed to fetch ${name}@${version}.`
-         )
-      );
-   } else {
-      DEBUG.info(
-         config.logLevel,
-         `[package-manager]: Successfully fetched ${assetCount} assets in ${name}@${version}.`
-      );
-   }
+   DEBUG.info(
+      config.logLevel,
+      `[package-manager]: Successfully fetched ${assetCount} assets in ${name}@${version}.`
+   );
 
    return pkg;
 }
@@ -70,51 +49,36 @@ export async function fetchPackage(
  */
 export async function test(this: Toypack, name?: string, version = "latest") {
    const testCases: { name: string; version: string }[] = [
+      { name: "vue/compiler-sfc", version: "3.2.13" },
       { name: "bootstrap/dist/css/bootstrap.min.css", version: "5.1.2" },
-      { name: "vue", version: "3.1.2" },
+      { name: "vue", version: "3.2.13" },
       { name: "@kylehue/drawer", version: "latest" },
       { name: "react", version: "17.0.2" },
       { name: "@types/babel__core", version: "latest" },
    ];
 
-   if (name) {
-      testCases.unshift({ name, version });
-   }
-
-   const config = this.getConfig();
-   config.packageManager.dts = true;
+   const providers = this._getPackageProviders();
+   const skypackProvider = providers[0];
+   const esmshProvider = providers[1];
+   const jsdelivrProvider = providers[2];
    for (const testCase of testCases) {
-      config.packageManager.providers[0] = {
-         host: "https://esm.sh/",
-         dtsHeader: "X-Typescript-Types",
-      };
+      providers[0] = skypackProvider;
       const esmsh = await fetchPackage.call(
          this,
          testCase.name,
          testCase.version
       );
       console.info("esm.sh:", testCase.name, esmsh.assets);
-      config.packageManager.providers[0] = {
-         host: "https://cdn.skypack.dev/",
-         dtsHeader: "X-Typescript-Types",
-         queryParams: {
-            dts: true,
-         },
-      };
+      providers[0] = esmshProvider;
       const skypack = await fetchPackage.call(
          this,
          testCase.name,
          testCase.version
       );
       console.info("skypack:", testCase.name, skypack.assets);
-
       // jsdelvr doesn't support @types/*
       if (testCase.name != "@types/babel__core") {
-         config.packageManager.providers[0] = {
-            host: "https://cdn.jsdelivr.net/",
-            postpath: "+esm",
-            prepath: "npm",
-         };
+         providers[0] = jsdelivrProvider;
          const jsdelvr = await fetchPackage.call(
             this,
             testCase.name,
@@ -156,6 +120,29 @@ export interface PackageProviderConfig {
     * package manager requests.
     */
    prepath?: string;
+   /**
+    * Function to change the path of fetched modules. Must return either
+    * a string (path in absolute form) or an object containing the `path`
+    * and the `importPath` (the path used to import the module).
+    */
+   handlePath?: (moduleInfo: {
+      url: string;
+      subpath: string;
+      filename: string;
+      version: string;
+      provider: PackageProviderConfig;
+   }) => string | { path: string; importPath: string };
+   /**
+    * Function to check whether the fetch response is ok or not. Return true
+    * if not ok and false if ok.
+    */
+   isBadResponse?: (
+      response: Response,
+      packageInfo: {
+         name: string;
+         version: string;
+      }
+   ) => Promise<boolean> | boolean;
 }
 
 export interface PackageManagerConfig {
@@ -165,10 +152,12 @@ export interface PackageManagerConfig {
     * If the primary provider fails to fetch a package, the
     * package manager will fallback to the next provider.
     */
-   providers: PackageProviderConfig[];
    /**
     * Whether to fetch dts files or not.
     * @default false
     */
    dts?: boolean;
+   overrides?: {
+      sourceMap?: boolean;
+   }
 }
