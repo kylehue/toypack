@@ -17,7 +17,7 @@ import {
    parsePackageName,
    removeSourceMapUrl,
 } from "../utils";
-import { PackageProviderConfig, Package } from ".";
+import { PackageProvider, Package } from ".";
 import {
    getFetchUrlFromProvider,
    getExtension,
@@ -28,8 +28,10 @@ import {
    getUrlFromProviderHost,
    getOptimizedPath,
 } from "./utils.js";
+import { fetchWithProviders } from "./fetch-with-providers.js";
+import { fetchSourceMapInContent } from "./fetch-source-map.js";
 
-const cache = new Map<
+export const _cache = new Map<
    string,
    {
       content: string;
@@ -38,20 +40,17 @@ const cache = new Map<
    }
 >();
 
-const badProvidersUrlMap: Record<string, string[]> = {};
-
 export async function fetchAssets(
    this: Toypack,
-   providers: PackageProviderConfig[],
+   providers: PackageProvider[],
    name: string,
    version: string
 ) {
-   let currentProviderIndex = 0;
-   let provider = providers[currentProviderIndex];
    const assets = new Map<string, PackageAsset>();
    const config = this.getConfig();
    const subpath = parsePackageName(name).path;
-   const entryUrl = getFetchUrlFromProvider(provider, name, version);
+   let provider = providers[0];
+   let entryUrl = getFetchUrlFromProvider(provider, name, version);
    let entryResponse: Response = {} as Response;
 
    const inspectDependencies = (
@@ -60,67 +59,38 @@ export async function fetchAssets(
       fallbackFilename: string
    ) => {
       const optimizedPath = getOptimizedPath(
+         name,
+         version,
          url,
          subpath,
          fallbackFilename,
-         version,
          provider
       );
 
       node.value = optimizedPath.importPath;
    };
 
-   const recurse = async (url: string) => {
+   const recurse: (url: string) => Promise<boolean> = async (url: string) => {
       if (assets.get(url)) return false;
+      const isEntry = url === entryUrl;
+      const fetched = await fetchWithProviders(providers, url, name, version);
 
-      const cached = cache.get(url);
-      const response = cached ? cached.response : await fetch(url);
-
-      // Use backup providers if the current provider can't fetch the url
-      const urlIsBadForProvider =
-         badProvidersUrlMap[provider.host]?.includes(url);
-      if (
-         !response.ok ||
-         urlIsBadForProvider ||
-         (await provider.isBadResponse?.(response, { name, version }))
-      ) {
-         if (!urlIsBadForProvider) {
-            badProvidersUrlMap[provider.host] ??= [];
-            badProvidersUrlMap[provider.host].push(url);
-         }
-
-         let backupProvider =
-            providers[++currentProviderIndex % providers.length];
-         let isOutOfProviders = false;
-         while (badProvidersUrlMap[backupProvider.host]?.includes(url)) {
-            backupProvider =
-               providers[++currentProviderIndex % providers.length];
-
-            if (backupProvider == provider) {
-               isOutOfProviders = true;
-               break;
-            }
-         }
-
-         const pkgPath = getPackageInfoFromUrl(url).fullPath;
-         if (backupProvider == provider || isOutOfProviders) {
-            assets.clear();
-            this._trigger(
-               "onError",
-               ERRORS.any(
-                  `[package-manager] Error: Failed to fetch ${name}@${version} because none of the providers could fetch one of its dependencies which is ${pkgPath}.`
-               )
-            );
-            return false;
-         }
-
-         if (backupProvider && backupProvider != provider) {
-            provider = backupProvider;
-            const newUrl = getFetchUrlFromProvider(provider, pkgPath);
-            await recurse(newUrl);
-         }
+      if (!fetched) {
+         assets.clear();
+         this._trigger(
+            "onError",
+            ERRORS.any(
+               `[package-manager] Error: Failed to fetch ${name}@${version} because none of the providers could fetch one of its dependencies.`
+            )
+         );
 
          return false;
+      }
+
+      const response = fetched.response;
+      if (isEntry) {
+         provider = fetched.provider;
+         entryUrl = fetched.url;
       }
 
       // Is it a script or a style? (this is needed when parsing)
@@ -138,19 +108,37 @@ export async function fetchAssets(
          return false;
       }
 
+      const cached = _cache.get(url);
+      const rawContent = cached ? cached.content : await response.text();
+      let forcedVersion: string | undefined = undefined;
+      if (isEntry && typeof provider.handleEntryVersion == "function") {
+         forcedVersion =
+            provider.handleEntryVersion({
+               response,
+               rawContent,
+               name,
+               version,
+            }) || undefined;
+      }
+
       const optimizedPath = getOptimizedPath(
-         url,
-         subpath,
-         type == "script" ? "index.js" : "index.css",
+         name,
          version,
-         provider
+         response.url,
+         subpath,
+         type == "script"
+            ? extension == ".d.ts"
+               ? "index.d.ts"
+               : "index.js"
+            : "index.css",
+         provider,
+         forcedVersion
       );
 
-      const rawContent = cached ? cached.content : await response.text();
       let content = "";
       let map: RawSourceMap | null = null;
 
-      // Parse
+      // Parse and compile
       let ast: CssNode | Node, rawDependencies: string[];
       if (type == "script") {
          const parserOptions: ParserOptions = {
@@ -167,10 +155,15 @@ export async function fetchAssets(
                inspectDependencies(node) {
                   const resolvedUrl = resolve(
                      node.value,
-                     url,
+                     response.url,
                      getUrlFromProviderHost(provider)
                   );
-                  inspectDependencies(node, resolvedUrl, "index.js");
+
+                  inspectDependencies(
+                     node,
+                     resolvedUrl,
+                     extension == ".d.ts" ? "index.d.ts" : "index.js"
+                  );
                },
             }
          );
@@ -195,7 +188,7 @@ export async function fetchAssets(
                inspectDependencies(node) {
                   const resolvedUrl = resolve(
                      node.value,
-                     url,
+                     response.url,
                      getUrlFromProviderHost(provider)
                   );
                   inspectDependencies(node, resolvedUrl, "index.css");
@@ -217,8 +210,6 @@ export async function fetchAssets(
          }
       }
 
-      const isEntry = url === entryUrl;
-
       if (isEntry) {
          entryResponse = response;
       }
@@ -228,8 +219,8 @@ export async function fetchAssets(
          source: optimizedPath.path,
          ast,
          isEntry,
-         url,
-         content,
+         url: response.url,
+         content: removeSourceMapUrl(content),
       } as PackageAsset;
 
       assets.set(url, asset);
@@ -238,42 +229,16 @@ export async function fetchAssets(
          asset.dts = extension == ".d.ts" ? true : false;
       }
 
-      // Get dependency's dependencies by recursing
-      for (const depSource of rawDependencies) {
-         const resolved = resolve(
-            depSource,
-            url,
-            getUrlFromProviderHost(provider)
-         );
-
-         const isSuccess = await recurse(resolved);
-         if (!isSuccess) return false;
-      }
-
-      asset.content = removeSourceMapUrl(asset.content);
-
       // Get source map
       if (
          !!config.bundle.sourceMap &&
-         config.packageManager.overrides?.sourceMap
+         config.packageManager.overrides?.sourceMap !== false
       ) {
-         let sourceMap: RawSourceMap | null = null;
-         if (cached?.map) {
-            sourceMap = cached.map;
-         } else {
-            const sourceMapUrl = getSourceMapUrl(rawContent);
-            if (sourceMapUrl) {
-               const resolvedMapUrl = resolve(
-                  sourceMapUrl,
-                  url,
-                  getUrlFromProviderHost(provider)
-               );
-               const mapResponse = await fetch(resolvedMapUrl);
-               if (mapResponse) {
-                  sourceMap = await mapResponse.json();
-               }
-            }
-         }
+         let sourceMap = await fetchSourceMapInContent(
+            rawContent,
+            url,
+            provider
+         );
 
          if (sourceMap && map) {
             asset.map = mergeSourceMaps(sourceMap, map);
@@ -284,7 +249,50 @@ export async function fetchAssets(
 
       // Cache
       if (!cached) {
-         cache.set(url, { content: rawContent, response, map: asset.map });
+         _cache.set(url, { content: rawContent, response, map: asset.map });
+      }
+
+      // If entry and not a dts, fetch dts
+      if (
+         isEntry &&
+         asset.type == "script" &&
+         !asset.dts &&
+         provider.dtsHeader
+      ) {
+         const entryExtension = getExtension(entryUrl, provider);
+         if (
+            entryExtension != ".d.ts" &&
+            (EXTENSIONS.script.includes(entryExtension) ||
+               !EXTENSIONS.style.includes(entryExtension))
+         ) {
+            const dtsUrl = entryResponse.headers.get(provider.dtsHeader);
+            if (dtsUrl) {
+               await recurse(
+                  resolve(dtsUrl, entryUrl, getUrlFromProviderHost(provider))
+               );
+            } else {
+               this._trigger(
+                  "onError",
+                  ERRORS.any(
+                     "[package-manager] Error: Couldn't get the declaration types for " +
+                        entryUrl
+                  )
+               );
+            }
+         }
+      }
+
+      // Get dependency's dependencies by recursing
+      for (const depSource of rawDependencies) {
+         const resolved = resolve(
+            depSource,
+            response.url,
+            getUrlFromProviderHost(provider)
+         );
+
+         const isSuccess = await recurse(resolved);
+         // break if a dependency fails
+         if (!isSuccess) return false;
       }
 
       return true;
@@ -292,7 +300,7 @@ export async function fetchAssets(
 
    await recurse(entryUrl);
 
-   // // Get dts files
+   // Get dts files
    // if (
    //    config.packageManager.dts &&
    //    typeof provider.dtsHeader == "string" &&

@@ -1,5 +1,5 @@
 import path from "path-browserify";
-import { PackageProviderConfig } from ".";
+import { Package, PackageProvider } from ".";
 import { EXTENSIONS, isUrl, parsePackageName } from "../utils";
 
 export function queryParamsToString(params?: Record<string, string | true>) {
@@ -14,19 +14,19 @@ export function queryParamsToString(params?: Record<string, string | true>) {
    return str.replace(/&$/, "");
 }
 
-export function getUrlFromProviderHost(provider: PackageProviderConfig) {
+export function getUrlFromProviderHost(provider: PackageProvider) {
    return "https://" + provider.host + "/";
 }
 
 export function removeProviderHostFromUrl(
    url: string,
-   provider: PackageProviderConfig
+   provider: PackageProvider
 ) {
    return url.replace(getUrlFromProviderHost(provider), "");
 }
 
 export function getFetchUrlFromProvider(
-   provider: PackageProviderConfig,
+   provider: PackageProvider,
    name: string,
    version?: string
 ) {
@@ -67,7 +67,7 @@ export function resolve(
    );
 }
 
-export function getExtension(url: string, provider: PackageProviderConfig) {
+export function getExtension(url: string, provider: PackageProvider) {
    url = url.split("?")[0];
 
    if (provider.postpath) {
@@ -111,13 +111,20 @@ const packageInfoPatterns = [
    new RegExp(`.*/(?<name>[a-z0-9\\-_]+)(?:@v?(?<version>[\\.a-z0-9]+)).*`),
 ];
 
-export function getPackageInfoFromUrl(str: string) {
-   let scope, name, version;
+export function getPackageInfoFromUrl(
+   url: string,
+   provider: PackageProvider,
+   forceVersionAs?: string
+) {
+   let scope,
+      name,
+      version = forceVersionAs;
+
    for (const reg of packageInfoPatterns) {
       if (scope && name && version) break;
-      const matches = reg.exec(str);
+      const matches = reg.exec(url);
       if (!matches?.groups) continue;
-      scope ??= matches.groups.scope?.replace(/^@/, "");
+      scope ??= matches.groups.scope;
       name ??= matches.groups.name;
       /**
        * If the regex somehow captures a name like name@1.0.0,
@@ -127,14 +134,23 @@ export function getPackageInfoFromUrl(str: string) {
          [name, version] = name.split("@");
       }
 
-      version ??= matches.groups.version?.replace(/^@/, "");
+      version ??= matches.groups.version;
+   }
+
+   if (typeof provider.handlePackageInfo == "function") {
+      const pkgInfo = provider.handlePackageInfo(url);
+      if (pkgInfo) {
+         scope = pkgInfo.scope;
+         name = pkgInfo.name;
+         version = pkgInfo.version;
+      }
    }
 
    // Finalize
    version ??= "latest";
    let fullPath = "";
    if (scope) {
-      scope = trimSlashes(scope.split("?")[0]);
+      scope = trimSlashes(scope.split("?")[0].replace(/^@/, ""));
       fullPath += `@${scope}/`;
    }
    if (name) {
@@ -142,7 +158,9 @@ export function getPackageInfoFromUrl(str: string) {
       fullPath += name;
    }
    if (version) {
-      version = trimSlashes(version.split("?")[0].replace("v", ""));
+      version = trimSlashes(
+         version.split("?")[0].replace("v", "").replace(/^@/, "")
+      );
       fullPath += `@${version}`;
    }
 
@@ -155,21 +173,35 @@ export function getPackageInfoFromUrl(str: string) {
 }
 
 export function getOptimizedPath(
+   pkgName: string,
+   pkgVersion: string,
    url: string,
    subpath: string,
    filename: string,
-   version: string,
-   provider: PackageProviderConfig
+   provider: PackageProvider,
+   forceVersionAs?: string
 ): {
    path: string;
    importPath: string;
 } {
    if (typeof provider.handlePath == "function") {
-      const optimizedPath = provider.handlePath({url, subpath, filename, version, provider});
-      return typeof optimizedPath == "string" ? {
-         path: optimizedPath,
-         importPath: optimizedPath
-      } : optimizedPath;
+      const optimizedPath = provider.handlePath({
+         name: pkgName,
+         version: pkgVersion,
+         url,
+         subpath,
+         filename,
+         provider,
+      });
+
+      if (optimizedPath) {
+         return typeof optimizedPath == "string"
+            ? {
+                 path: optimizedPath,
+                 importPath: optimizedPath,
+              }
+            : optimizedPath;
+      }
    }
 
    if (subpath) {
@@ -188,7 +220,7 @@ export function getOptimizedPath(
    url = url.split("?")[0];
 
    if (!result.path) {
-      const pkgInfo = getPackageInfoFromUrl(url);
+      const pkgInfo = getPackageInfoFromUrl(url, provider, forceVersionAs);
 
       if (pkgInfo.name) {
          result.importPath = path.join(pkgInfo.fullPath, filename);
@@ -198,7 +230,8 @@ export function getOptimizedPath(
 
    if (!result.path) {
       result.importPath =
-         `${name}@${version}/` + removeProviderHostFromUrl(url, provider);
+         `${pkgName}@${forceVersionAs || pkgVersion}/` +
+         removeProviderHostFromUrl(url, provider);
       result.path = "/node_modules/" + result.importPath;
    }
 

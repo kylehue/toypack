@@ -58,9 +58,9 @@ export async function test(this: Toypack, name?: string, version = "latest") {
    ];
 
    const providers = this._getPackageProviders();
-   const skypackProvider = providers[0];
-   const esmshProvider = providers[1];
-   const jsdelivrProvider = providers[2];
+   const skypackProvider = providers.find(p => p.host == "cdn.skypack.dev")!;
+   const esmshProvider = providers.find((p) => p.host == "esm.sh")!;
+   const jsdelivrProvider = providers.find((p) => p.host == "cdn.jsdelivr.net")!;
    for (const testCase of testCases) {
       providers[0] = skypackProvider;
       const esmsh = await fetchPackage.call(
@@ -95,7 +95,7 @@ export interface Package {
    assets: Record<string, PackageAsset>;
 }
 
-export interface PackageProviderConfig {
+export interface PackageProvider {
    /**
     * The host of the package provider.
     */
@@ -129,9 +129,10 @@ export interface PackageProviderConfig {
       url: string;
       subpath: string;
       filename: string;
+      name: string;
       version: string;
-      provider: PackageProviderConfig;
-   }) => string | { path: string; importPath: string };
+      provider: PackageProvider;
+   }) => string | { path: string; importPath: string } | void;
    /**
     * Function to check whether the fetch response is ok or not. Return true
     * if not ok and false if ok.
@@ -143,6 +144,28 @@ export interface PackageProviderConfig {
          version: string;
       }
    ) => Promise<boolean> | boolean;
+   /**
+    * Function to extract the package info from a url. A package info contains
+    * the following:
+    * - `scope` - The scope of the package.
+    * - `name` - The name of the package.
+    * - `version` - The version of the package. Defaults to "latest".
+    */
+   handlePackageInfo?: (url: string) => {
+      scope?: string;
+      name: string;
+      version?: string;
+   } | void;
+   /**
+    * Function to extract the real version of a fetched entry module.
+    * @returns
+    */
+   handleEntryVersion?: (entryInfo: {
+      response: Response;
+      rawContent: string;
+      name: string;
+      version: string;
+   }) => string | void;
 }
 
 export interface PackageManagerConfig {
@@ -159,5 +182,5 @@ export interface PackageManagerConfig {
    dts?: boolean;
    overrides?: {
       sourceMap?: boolean;
-   }
+   };
 }
