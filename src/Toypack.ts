@@ -26,10 +26,11 @@ import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
 import {
-   PackageProviderConfig,
+   PackageProvider,
    fetchPackage,
    test,
 } from "./package-manager/index.js";
+import { getPackageInfoFromUrl } from "./package-manager/utils";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -41,7 +42,7 @@ export class Toypack extends Hooks {
    private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
    private _loaders: { plugin: ReturnType<Plugin>; loader: Loader }[] = [];
-   private _packageProviders: PackageProviderConfig[] = [];
+   private _packageProviders: PackageProvider[] = [];
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
@@ -71,13 +72,34 @@ export class Toypack extends Hooks {
          });
       }
 
-      this.registerPackageProvider({
+      this.usePackageProvider({
+         host: "esm.sh",
+         dtsHeader: "X-Typescript-Types",
+      });
+
+      this.usePackageProvider({
+         host: "cdn.jsdelivr.net",
+         postpath: "+esm",
+         prepath: "npm",
+         // We can get the entry's version in the banner
+         handleEntryVersion({ rawContent, name }) {
+            const banner = /^\/\*\*(?<banner>(?:\n|.)*)\*\//.exec(rawContent)
+               ?.groups?.banner;
+            if (!banner) return;
+            const version = new RegExp(
+               `.*Original file: /npm/${name}@v?(?<version>[\\.a-z0-9]+).*/`
+            ).exec(banner)?.groups?.version;
+            return version;
+         },
+      });
+
+      this.usePackageProvider({
          host: "cdn.skypack.dev",
          dtsHeader: "X-Typescript-Types",
          queryParams: {
             dts: true,
          },
-         isBadResponse(response, { name, version }) {
+         isBadResponse(response, { name }) {
             if (
                new RegExp(`cdn\\.skypack\\.dev/error/.*${name}@.*`).test(
                   response.url
@@ -88,17 +110,12 @@ export class Toypack extends Hooks {
 
             return false;
          },
-      });
-
-      this.registerPackageProvider({
-         host: "esm.sh",
-         dtsHeader: "X-Typescript-Types",
-      });
-
-      this.registerPackageProvider({
-         host: "cdn.jsdelivr.net",
-         postpath: "+esm",
-         prepath: "npm",
+         // We can get the entry's version in dts
+         handleEntryVersion({ response }) {
+            const dtsUrl = response.headers.get(this.dtsHeader!);
+            if (!dtsUrl) return;
+            return getPackageInfoFromUrl(dtsUrl, this, "")?.version;
+         },
       });
    }
 
@@ -166,8 +183,13 @@ export class Toypack extends Hooks {
       //const pkg = await test.call(this, name, version);
    }
 
-   public registerPackageProvider(
-      provider: PackageProviderConfig,
+   /**
+    * Add a provider to be used in package manager.
+    * @param provider The package provider.
+    * @param isMainProvider Set to true to always use this provider first.
+    */
+   public usePackageProvider(
+      provider: PackageProvider,
       isMainProvider = false
    ) {
       if (isMainProvider) {
@@ -300,6 +322,10 @@ export class Toypack extends Hooks {
    }
 
    public clearAsset() {
+      /**
+       * Don't do this._assets.clear() because that won't revoke the
+       * object urls of blobs.
+       */
       this._assets.forEach((asset) => {
          this.removeAsset(asset.source);
       });

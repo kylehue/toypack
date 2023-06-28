@@ -1,19 +1,19 @@
-import { PackageProviderConfig, Toypack } from "../types";
+import { PackageProvider, Toypack } from "../types";
 import { _cache } from "./fetch-assets";
-import { getFetchUrlFromProvider, getPackageInfoFromUrl } from "./utils.js";
+import { getFetchUrlFromProvider, getPackageInfoFromUrl } from "./utils";
 
 const badProvidersUrlMap: Record<string, string[]> = {};
 interface FetchResult {
    response: Response;
    url: string;
-   provider: PackageProviderConfig;
+   provider: PackageProvider;
 }
 
 /**
  * Fetch a url. If it fails, use other providers.
  */
 export async function fetchWithProviders(
-   providers: PackageProviderConfig[],
+   providers: PackageProvider[],
    url: string,
    name: string,
    version: string
@@ -60,7 +60,11 @@ export async function fetchWithProviders(
             return null;
          }
 
-         const pkgPath = getPackageInfoFromUrl(url, provider).fullPath;
+         const pkgPath = getPackageInfoFromUrl(
+            url,
+            provider,
+            ""
+         ).fullPackageName;
          provider = backupProvider;
          url = getFetchUrlFromProvider(provider, pkgPath);
          return await recurse();

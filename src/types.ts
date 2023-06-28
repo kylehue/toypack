@@ -31,7 +31,7 @@ export type {
 export type {
    Package,
    PackageManagerConfig,
-   PackageProviderConfig,
+   PackageProvider,
 } from "./package-manager/index.js";
 export type { Asset, ResourceAsset, TextAsset, ResolveOptions } from "./utils";
 export type Toypack = InstanceType<typeof import("./Toypack.js").Toypack>;

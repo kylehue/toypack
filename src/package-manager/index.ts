@@ -150,11 +150,13 @@ export interface PackageProvider {
     * - `scope` - The scope of the package.
     * - `name` - The name of the package.
     * - `version` - The version of the package. Defaults to "latest".
+    * - `filename` - The filename in the url.
     */
    handlePackageInfo?: (url: string) => {
       scope?: string;
       name: string;
       version?: string;
+      filename?: string;
    } | void;
    /**
     * Function to extract the real version of a fetched entry module.

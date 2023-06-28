@@ -27,7 +27,7 @@ import {
    removeProviderHostFromUrl,
    getUrlFromProviderHost,
    getOptimizedPath,
-} from "./utils.js";
+} from "./utils";
 import { fetchWithProviders } from "./fetch-with-providers.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 
