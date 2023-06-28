@@ -11,7 +11,7 @@ import { ToypackConfig, CodeComposer, Toypack } from "../Toypack.js";
 
 import { Loader, Plugin } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
-import { indexToPosition } from "../utils/index-to-position.js";
+import { indexToPosition } from "../utils";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 
