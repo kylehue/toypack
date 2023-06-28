@@ -4,9 +4,9 @@
 
 import path from "path-browserify";
 import { expect, it, beforeAll } from "vitest";
-import { resolve } from "../../package-manager/utils.js";
+import { resolve } from "../../package-manager/utils";
 
-it("should work", () => {
+it("should work with relative paths", () => {
    expect(
       resolve(
          "../jsx.d.ts",
@@ -14,7 +14,9 @@ it("should work", () => {
          "https://esm.sh/"
       )
    ).toEqual("https://esm.sh/v118/vue@3.3.4/jsx.d.ts");
+});
 
+it("should work with root paths", () => {
    expect(
       resolve(
          "/jsx.d.ts",
@@ -22,7 +24,9 @@ it("should work", () => {
          "https://esm.sh/"
       )
    ).toEqual("https://esm.sh/jsx.d.ts");
+});
 
+it("should work with url", () => {
    expect(
       resolve(
          "https://esm.sh/vue@3.3.4",
