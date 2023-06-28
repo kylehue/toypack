@@ -3,7 +3,7 @@
  */
 
 import path from "path-browserify";
-import { describe, expect, test, beforeAll } from "vitest";
+import { expect, it, beforeAll } from "vitest";
 import { Toypack } from "../Toypack.js";
 
 const toypack = new Toypack({
@@ -49,114 +49,108 @@ beforeAll(() => {
    toypack.addOrUpdateAsset("node_modules/reactlib-dom/test/hello.css");
 });
 
-describe("Resolve", () => {
-   test("Simple", () => {
-      expect(
-         toypack.resolve("./src/main.js", {
-            baseDir: ".",
-         })
-      ).toBe("/src/main.js");
+it("should resolve", () => {
+   expect(
+      toypack.resolve("./src/main.js", {
+         baseDir: ".",
+      })
+   ).toBe("/src/main.js");
 
-      expect(
-         toypack.resolve("./src/main.js?raw&sample=2", {
-            baseDir: ".",
-         })
-      ).toBe("/src/main.js");
-   });
+   expect(
+      toypack.resolve("./src/main.js?raw&sample=2", {
+         baseDir: ".",
+      })
+   ).toBe("/src/main.js");
+});
 
-   test("Root", () => {
-      expect(
-         toypack.resolve("/assets/image.jpg", {
-            baseDir: path.dirname("/src/main.js"),
-         })
-      ).toBe("/assets/image.jpg");
+it("should resolve absolute paths", () => {
+   expect(
+      toypack.resolve("/assets/image.jpg", {
+         baseDir: path.dirname("/src/main.js"),
+      })
+   ).toBe("/assets/image.jpg");
 
-      expect(
-         toypack.resolve("/assets/image", {
-            baseDir: path.dirname("/src/main.js"),
-         })
-      ).toBe("/assets/image.jpg");
-   });
+   expect(
+      toypack.resolve("/assets/image", {
+         baseDir: path.dirname("/src/main.js"),
+      })
+   ).toBe("/assets/image.jpg");
+});
 
-   test("baseDir", () => {
-      expect(
-         toypack.resolve("../assets/image.jpg", {
-            baseDir: "src",
-         })
-      ).toBe("/assets/image.jpg");
+it("should resolve with base directory", () => {
+   expect(
+      toypack.resolve("../assets/image.jpg", {
+         baseDir: "src",
+      })
+   ).toBe("/assets/image.jpg");
 
-      expect(
-         toypack.resolve("./src/main.js", {
-            baseDir: "src",
-         })
-      ).not.toBe("/src/main.js");
-   });
+   expect(
+      toypack.resolve("./src/main.js", {
+         baseDir: "src",
+      })
+   ).not.toBe("/src/main.js");
+});
 
-   test("Directories", () => {
-      expect(toypack.resolve("./someFolder")).toBe("/someFolder/file.js");
+it("should resolve folders", () => {
+   expect(toypack.resolve("./someFolder")).toBe("/someFolder/file.js");
 
-      expect(toypack.resolve("./anotherFolder")).toBe(
-         "/anotherFolder/index.js"
-      );
-   });
+   expect(toypack.resolve("./anotherFolder")).toBe("/anotherFolder/index.js");
+});
 
-   test("Alias", () => {
-      expect(toypack.resolve("@utils/foo/bar")).toBe("/test/utils/foo/bar.js");
+it("should resolve aliases", () => {
+   expect(toypack.resolve("@utils/foo/bar")).toBe("/test/utils/foo/bar.js");
 
-      expect(toypack.resolve("@utils/tester")).toBe(
-         "/test/utils/tester/index.js"
-      );
+   expect(toypack.resolve("@utils/tester")).toBe("/test/utils/tester/index.js");
 
-      expect(toypack.resolve("react/test/hello.css")).toBe(
-         "/node_modules/reactlib/test/hello.css"
-      );
+   expect(toypack.resolve("react/test/hello.css")).toBe(
+      "/node_modules/reactlib/test/hello.css"
+   );
 
-      expect(toypack.resolve("react")).toBe("/node_modules/reactlib/index.js");
+   expect(toypack.resolve("react")).toBe("/node_modules/reactlib/index.js");
 
-      expect(toypack.resolve("react-dom/test/hello.css")).toBe(
-         "/node_modules/reactlib-dom/test/hello.css"
-      );
+   expect(toypack.resolve("react-dom/test/hello.css")).toBe(
+      "/node_modules/reactlib-dom/test/hello.css"
+   );
 
-      expect(toypack.resolve("react-dom")).toBe(
-         "/node_modules/reactlib-dom/index.js"
-      );
+   expect(toypack.resolve("react-dom")).toBe(
+      "/node_modules/reactlib-dom/index.js"
+   );
 
-      expect(toypack.resolve("react/css")).toBe(
-         "/node_modules/reactlib/test/hello.css"
-      );
+   expect(toypack.resolve("react/css")).toBe(
+      "/node_modules/reactlib/test/hello.css"
+   );
 
-      expect(
-         toypack.resolve("../local", {
-            baseDir: path.dirname("/src/main.js"),
-         })
-      ).toBe("/assets/image.jpg");
-   });
+   expect(
+      toypack.resolve("../local", {
+         baseDir: path.dirname("/src/main.js"),
+      })
+   ).toBe("/assets/image.jpg");
+});
 
-   test("Fallback", () => {
-      const expected = "/node_modules/assert-browserify/index.js";
-      toypack.addOrUpdateAsset(expected);
-      expect(toypack.resolve("assert")).toBe(expected);
-      expect(toypack.resolve("path")).toBe("virtual:empty");
-   });
+it("should resolve fallback", () => {
+   const expected = "/node_modules/assert-browserify/index.js";
+   toypack.addOrUpdateAsset(expected);
+   expect(toypack.resolve("assert")).toBe(expected);
+   expect(toypack.resolve("path")).toBe("virtual:empty");
+});
 
-   test("Core modules", () => {
-      const expected = "/node_modules/hello/index.js";
-      expect(toypack.resolve("hello")).toBe(expected);
-      expect(
-         toypack.resolve("hello", {
-            baseDir: ".",
-            includeCoreModules: false,
-         })
-      ).toBeNull();
-   });
+it("should resolve node_modules", () => {
+   const expected = "/node_modules/hello/index.js";
+   expect(toypack.resolve("hello")).toBe(expected);
+   expect(
+      toypack.resolve("hello", {
+         baseDir: ".",
+         includeCoreModules: false,
+      })
+   ).toBeNull();
+});
 
-   test("External URLs", () => {
-      expect(
-         toypack.resolve(
-            "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
-         )
-      ).toBe(
+it("should leave urls as it is", () => {
+   expect(
+      toypack.resolve(
          "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
-      );
-   });
+      )
+   ).toBe(
+      "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
+   );
 });
