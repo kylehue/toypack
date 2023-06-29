@@ -35,16 +35,20 @@ const toypack = new ToypackESM({
    },
    babel: {
       transform: {
-         presets: ["typescript"],
+         presets: ["typescript", "react"],
       },
       parse: {
-         plugins: ["typescript"],
+         plugins: ["typescript", "jsx"],
       },
    },
 });
 
+// await toypack.installPackage("react");
+// await toypack.installPackage("vue", "3.1.2");
+// await toypack.installPackage("matter-js");
+// await toypack.installPackage("vue");
 await toypack.installPackage("react");
-await toypack.installPackage("vue", "3.1.2");
+await toypack.installPackage("react-dom/client");
 
 (window as any).toypack = toypack;
 console.log(toypack, Babel.availablePlugins, Babel.availablePresets);

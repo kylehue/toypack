@@ -6,6 +6,8 @@ export const sampleFiles: Record<string, string | Blob> = {
    "src/App.vue": (await import("@test/src/App.vue?raw")).default,
    "src/testing.cjs": (await import("@test/src/testing.cjs?raw")).default,
    "src/testing.mjs": (await import("@test/src/testing.mjs?raw")).default,
+   "react/index.jsx": (await import("@test/react/index.jsx?raw")).default,
+   "react/App.jsx": (await import("@test/react/App.jsx?raw")).default,
    "classes/adder.js": (await import("@test/classes/adder.js?raw")).default,
    "classes/createNum.js": (await import("@test/classes/createNum.js?raw"))
       .default,

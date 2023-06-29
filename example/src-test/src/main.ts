@@ -3,16 +3,13 @@
 // console.log(path.join("src", "classes"));
 // import path from "path";
 // console.log(path);
-import test from "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/+esm";
-setTimeout(() => {
-   const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
-   
-   meowButton.onclick = () => test();
-}, 500);
+import "../react";
+import confetti from "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/+esm";
+const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
+meowButton.onclick = () => confetti();
 
-import * as React from "react";
-import * as Vue from "vue";
-console.log(React, Vue);
+// import Matter from "matter-js";
+// console.log(Matter);
 // import path, * as cool from "path-browserify";
 // import { resolve as res, join as wow } from "path-browserify";
 // import { test } from "./testing.mjs";
@@ -46,3 +43,9 @@ console.log(React, Vue);
 //    const test = await import("../index.html?raw");
 //    console.log(test);
 // })();
+
+/* CJS */
+// require("../react");
+// const confetti = require("https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/+esm").default;
+// const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
+// meowButton.onclick = () => confetti();
