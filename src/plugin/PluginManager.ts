@@ -120,6 +120,22 @@ export class PluginManager {
                baseDir
             );
          },
+         getImportCode: (importSource: string) => {
+            const config = this.bundler.getConfig();
+            if (config.bundle.moduleType == "esm") {
+               return `import "${importSource}";`;
+            } else {
+               return `require("${importSource}");`;
+            }
+         },
+         getDefaultExportCode: (exportCode: string) => {
+            const config = this.bundler.getConfig();
+            if (config.bundle.moduleType == "esm") {
+               return `export default ${exportCode};`;
+            } else {
+               return `module.exports = ${exportCode};`;
+            }
+         },
          parseSource: parseURL,
          error: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;

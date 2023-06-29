@@ -9,6 +9,7 @@ import { Toypack } from "../Toypack.js";
 import { parseURL, Asset } from "../utils";
 import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
+import { BundleResult } from "src/bundle/index.js";
 
 // Interfaces
 export interface ModuleInfo {
@@ -62,14 +63,19 @@ export type TransformBuildHook = (
    context: ScriptTransform | StyleTransform
 ) => void;
 
-export type StartBuildHook = (this: BuildHookContext, bundler: Toypack) => void;
-export type EndBuildHook = (this: BuildHookContext, bundler: Toypack) => void;
+export type StartBuildHook = (this: BuildHookContext) => void;
+export type EndBuildHook = (
+   this: BuildHookContext,
+   result: BundleResult
+) => void;
 
 // Context
 export interface BuildHookContext {
    bundler: Toypack;
    getImporter: () => Dependency | null;
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
+   getImportCode: (importSource: string) => string;
+   getDefaultExportCode: (exportCode: string) => string;
    parseSource: typeof parseURL;
    error: (message: string) => void;
    warn: (message: string) => void;
