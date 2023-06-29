@@ -53,7 +53,7 @@ export class Hooks implements IHooks {
    }
 
    /**
-    * An event emitted when an error occurs.
+    * Listen to errors.
     */
    onError(callback: EventMap["onError"]): Function {
       return this._createListener("onError", callback);

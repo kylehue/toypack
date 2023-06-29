@@ -195,6 +195,12 @@ export class Toypack extends Hooks {
       return matches;
    }
 
+   /**
+    * Install a package from npm.
+    * @param name The name of the package to install.
+    * @param version The version of the package to install. Defaults
+    * to latest.
+    */
    public async installPackage(name: string, version?: string) {
       const pkg = await getPackage.call(this, name, version);
       for (const pkgAsset of Object.values(pkg.assets)) {
@@ -263,8 +269,8 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Resolves a relative source path.
-    * @param {string} relativeSource The relative source path to resolve.
+    * Resolve a source path.
+    * @param {string} relativeSource The source path to resolve.
     * @param {Partial<ResolveOptions>} [options] Optional resolve options.
     * @returns {string} The resolved absolute path.
     */
@@ -435,10 +441,9 @@ export class Toypack extends Hooks {
 
    /**
     * Runs the compilation process.
-    * @param {boolean} [isProd=false] Indicates whether to run in
-    * production mode.
-    * @returns {Promise} A promise that resolves with the result
-    * of the bundling process.
+    * @param {boolean} [isProd=false] Indicates whether to run
+    * in production mode.
+    * @returns An object containing the bundle result.
     */
    public async run(isProd = false) {
       const oldMode = this._config.bundle.mode;
