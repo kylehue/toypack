@@ -18,7 +18,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
    await this._pluginManager.triggerHook({
       name: "buildStart",
-      args: [this],
+      args: [],
       context: {
          bundler: this,
          graph,

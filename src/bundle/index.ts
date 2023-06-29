@@ -11,7 +11,7 @@ let previousLinkUrl: string | undefined = undefined;
 export async function bundle(this: Toypack, graph: DependencyGraph) {
    const outputFilename = "index";
 
-   const result = {
+   const result: BundleResult = {
       resources: [] as Resource[],
       js: {
          source: outputFilename + ".js",
@@ -99,7 +99,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
 
    await this._pluginManager.triggerHook({
       name: "buildEnd",
-      args: [this],
+      args: [result],
       context: {
          bundler: this,
          graph,
@@ -113,4 +113,16 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
 export interface Resource {
    source: string;
    content: Blob;
+}
+
+export interface BundledAsset {
+   source: string;
+   content: string;
+}
+
+export interface BundleResult {
+   resources: Resource[];
+   js: BundledAsset;
+   css: BundledAsset;
+   html: BundledAsset;
 }

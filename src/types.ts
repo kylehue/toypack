@@ -19,6 +19,7 @@ export type {
    ScriptDependency,
    StyleDependency,
 } from "./graph/index.js";
+export type { BundleResult } from "./bundle/index.js";
 export type {
    ToypackConfig,
    SourceMapConfig,
