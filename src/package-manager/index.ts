@@ -3,7 +3,7 @@ import type { CssNode } from "css-tree";
 import type { RawSourceMap } from "source-map-js";
 import type { SourceMapConfig, Toypack } from "../types";
 import { DEBUG, ERRORS } from "../utils";
-import { PackageAsset, fetchAssets } from "./fetch-assets.js";
+import { PackageAsset, fetchPackage } from "./fetch-package.js";
 
 /**
  * Fetch a package from the specified provider(s).
@@ -11,14 +11,14 @@ import { PackageAsset, fetchAssets } from "./fetch-assets.js";
  * @param version The version of the package.
  * @returns An object containing the assets of the package.
  */
-export async function fetchPackage(
+export async function getPackage(
    this: Toypack,
    name: string,
    version = "latest"
 ): Promise<Package> {
    const config = this.getConfig();
    const providers = this._getPackageProviders();
-   const pkg: Package = {
+   let pkg: Package = {
       name,
       version,
       assets: {},
@@ -33,7 +33,7 @@ export async function fetchPackage(
       return pkg;
    }
 
-   pkg.assets = await fetchAssets.call(this, providers, name, version);
+   pkg = await fetchPackage.call(this, providers, name, version);
 
    const assetCount = Object.values(pkg.assets).length;
    DEBUG.info(
@@ -70,7 +70,7 @@ export async function test(this: Toypack, name?: string, version = "latest") {
          esmshProvider,
          jsdelivrProvider,
       ];
-      const esmsh = await fetchPackage.call(
+      const esmsh = await getPackage.call(
          this,
          testCase.name,
          testCase.version
@@ -81,7 +81,7 @@ export async function test(this: Toypack, name?: string, version = "latest") {
          skypackProvider,
          jsdelivrProvider,
       ];
-      const skypack = await fetchPackage.call(
+      const skypack = await getPackage.call(
          this,
          testCase.name,
          testCase.version
@@ -94,7 +94,7 @@ export async function test(this: Toypack, name?: string, version = "latest") {
             skypackProvider,
             esmshProvider,
          ];
-         const jsdelvr = await fetchPackage.call(
+         const jsdelvr = await getPackage.call(
             this,
             testCase.name,
             testCase.version

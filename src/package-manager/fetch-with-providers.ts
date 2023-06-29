@@ -1,5 +1,5 @@
 import { PackageProvider, Toypack } from "../types";
-import { _cache } from "./fetch-assets";
+import { _cache } from "./fetch-package";
 import { getFetchUrlFromProvider, getPackageInfoFromUrl } from "./utils";
 
 const badProvidersUrlMap: Record<string, string[]> = {};

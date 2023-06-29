@@ -8,7 +8,7 @@ import { RawSourceMap } from "source-map-js";
 import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
-import type { Toypack } from "../types";
+import type { Toypack } from "../types.js";
 import {
    DEBUG,
    ERRORS,
@@ -17,8 +17,8 @@ import {
    mergeSourceMaps,
    parsePackageName,
    removeSourceMapUrl,
-} from "../utils";
-import { PackageProvider, Package } from ".";
+} from "../utils/index.js";
+import { PackageProvider, Package } from "./index.js";
 import {
    getFetchUrlFromProvider,
    getExtension,
@@ -28,7 +28,7 @@ import {
    removeProviderHostFromUrl,
    getUrlFromProviderHost,
    getOptimizedPath,
-} from "./utils";
+} from "./utils/index.js";
 import { fetchWithProviders } from "./fetch-with-providers.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 
@@ -41,12 +41,12 @@ export const _cache = new Map<
    }
 >();
 
-export async function fetchAssets(
+export async function fetchPackage(
    this: Toypack,
    providers: PackageProvider[],
    name: string,
    version: string
-) {
+): Promise<Package> {
    const assets = new Map<string, PackageAsset>();
    const config = this.getConfig();
    const subpath = parsePackageName(name).path;
@@ -135,6 +135,12 @@ export async function fetchAssets(
          forcedVersion
       );
 
+      const pkgInfo = getPackageInfoFromUrl(optimizedPath.path, provider, "");
+
+      if (isEntry) {
+         version = pkgInfo.version;
+      }
+
       let content = "";
       let map: RawSourceMap | null = null;
       const isDts = getExtension(optimizedPath.path, provider) == ".d.ts";
@@ -217,6 +223,9 @@ export async function fetchAssets(
          isEntry,
          url: response.url,
          content: removeSourceMapUrl(content),
+         name: `${pkgInfo.scope ? `@${pkgInfo.scope}/` : ""}${pkgInfo.name}`,
+         version: pkgInfo.version,
+         subpath
       } as PackageAsset;
 
       assets.set(url, asset);
@@ -300,7 +309,11 @@ export async function fetchAssets(
       finalizedAssets[asset.source] = asset;
    }
 
-   return finalizedAssets;
+   return {
+      name,
+      version,
+      assets: finalizedAssets,
+   };
 }
 
 interface PackageAssetBase {
@@ -309,6 +322,9 @@ interface PackageAssetBase {
    map?: RawSourceMap | null;
    isEntry: boolean;
    content: string;
+   name: string;
+   version: string;
+   subpath: string;
 }
 
 export interface PackageScriptAsset extends PackageAssetBase {

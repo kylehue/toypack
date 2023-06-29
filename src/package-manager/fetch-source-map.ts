@@ -1,6 +1,6 @@
 import { RawSourceMap } from "source-map-js";
 import { PackageProvider } from ".";
-import { _cache } from "./fetch-assets";
+import { _cache } from "./fetch-package";
 import { getSourceMapUrl } from "../utils";
 import { getUrlFromProviderHost, resolve } from "./utils";
 
