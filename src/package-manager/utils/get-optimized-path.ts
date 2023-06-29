@@ -1,14 +1,28 @@
 import path from "path-browserify";
 import { PackageProvider } from "..";
 import { getPackageInfoFromUrl } from "./get-package-info.js";
-import { removeProviderHostFromUrl } from "./get-provider-host-url.js";
+import { removeProviderHostFromUrl } from "./";
 
+/**
+ * Get the optimized path from a url. If url is
+ * `https://example.com/sub/@scope/name@1.0.0/test.css`, it should output:
+ * - `/node_modules/@scope/name@1.0.0/test.css` as the path and;
+ * - `@scope/name@1.0.0/test.css` as the importPath.
+ * @param pkgName The name of the package.
+ * @param pkgVersion The version of the package.
+ * @param url The url used to fetch the package.
+ * @param subpath The path to a filename in the package.
+ * @param fallbackFilename The filename to use in case the subpath is empty or
+ * doesn't have a filename.
+ * @param provider The package provider used to fetch url.
+ * @returns An object containing the path and the importPath.
+ */
 export function getOptimizedPath(
    pkgName: string,
    pkgVersion: string,
    url: string,
    subpath: string,
-   filename: string,
+   fallbackFilename: string,
    provider: PackageProvider,
    forceVersionAs?: string
 ): {
@@ -21,7 +35,7 @@ export function getOptimizedPath(
          version: pkgVersion,
          url,
          subpath,
-         filename,
+         filename: fallbackFilename,
          provider,
       });
 
@@ -37,9 +51,9 @@ export function getOptimizedPath(
 
    if (subpath) {
       if (!path.extname(subpath)) {
-         filename = path.join(subpath, filename);
+         fallbackFilename = path.join(subpath, fallbackFilename);
       } else {
-         filename = subpath;
+         fallbackFilename = subpath;
       }
    }
 
@@ -54,22 +68,30 @@ export function getOptimizedPath(
       const pkgInfo = getPackageInfoFromUrl(
          url,
          provider,
-         filename,
+         fallbackFilename,
          forceVersionAs
       );
 
+      // Need to make sure the package name was extracted
       if (pkgInfo.name) {
-         result.importPath = path.join(pkgInfo.fullPackageName, filename);
-         result.path = path.join("/node_modules", result.importPath);
+         result.path = path.join(
+            "/node_modules",
+            path.join(
+               pkgInfo.fullPackageName,
+               path.dirname(subpath),
+               pkgInfo.filename
+            )
+         );
       }
    }
 
    if (!result.path) {
-      result.importPath =
-         `${pkgName}@${forceVersionAs || pkgVersion}/` +
-         removeProviderHostFromUrl(url, provider);
-      result.path = "/node_modules/" + result.importPath;
+      result.path =
+         `/node_modules/${pkgName}@${
+            forceVersionAs || pkgVersion || "latest"
+         }/` + removeProviderHostFromUrl(url, provider);
    }
 
+   result.importPath = result.path.replace(/^\/node_modules\//, "");
    return result;
 }

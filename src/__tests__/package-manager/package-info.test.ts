@@ -22,24 +22,7 @@ const dummyProvider2: PackageProvider = {
    },
 };
 
-it("should be able to use `handlePackageInfo`", () => {
-   expect(
-      getPackageInfoFromUrl(
-         "https://foo.bar/test/@scope/name@1.0.0/file.js",
-         dummyProvider2,
-         "index.js"
-      )
-   ).toEqual({
-      fullPackageName: "foo@5.5.5",
-      fullPath: "foo@5.5.5/bar.js",
-      scope: "",
-      name: "foo",
-      version: "5.5.5",
-      filename: "bar.js",
-   });
-});
-
-it("should work with scope", () => {
+it("simple test", () => {
    expect(
       getPackageInfoFromUrl(
          "https://foo.bar/test/@scope/name@1.0.0/file.js",
@@ -57,23 +40,6 @@ it("should work with scope", () => {
 
    expect(
       getPackageInfoFromUrl(
-         "https://foo.bar/test/@scope/name@1.0.0",
-         dummyProvider,
-         "index.js"
-      )
-   ).toEqual({
-      fullPackageName: "@scope/name@1.0.0",
-      fullPath: "@scope/name@1.0.0/index.js",
-      scope: "scope",
-      name: "name",
-      version: "1.0.0",
-      filename: "index.js",
-   });
-});
-
-it("should work without scope", () => {
-   expect(
-      getPackageInfoFromUrl(
          "https://foo.bar/test/name@1.0.0/file.js",
          dummyProvider,
          "index.js"
@@ -86,17 +52,36 @@ it("should work without scope", () => {
       version: "1.0.0",
       filename: "file.js",
    });
+});
 
+it("should be able to use `handlePackageInfo`", () => {
    expect(
       getPackageInfoFromUrl(
-         "https://foo.bar/test/name@1.0.0",
+         "https://foo.bar/test/@scope/name@1.0.0/file.js",
+         dummyProvider2,
+         "index.js"
+      )
+   ).toEqual({
+      fullPackageName: "foo@5.5.5",
+      fullPath: "foo@5.5.5/bar.js",
+      scope: "",
+      name: "foo",
+      version: "5.5.5",
+      filename: "bar.js",
+   });
+});
+
+it("should use fallbackFilename", () => {
+   expect(
+      getPackageInfoFromUrl(
+         "https://foo.bar/test/@scope/name@1.0.0",
          dummyProvider,
          "index.js"
       )
    ).toEqual({
-      fullPackageName: "name@1.0.0",
-      fullPath: "name@1.0.0/index.js",
-      scope: "",
+      fullPackageName: "@scope/name@1.0.0",
+      fullPath: "@scope/name@1.0.0/index.js",
+      scope: "scope",
       name: "name",
       version: "1.0.0",
       filename: "index.js",

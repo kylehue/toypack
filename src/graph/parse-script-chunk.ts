@@ -1,10 +1,25 @@
 import { parse as babelParse, ParserOptions } from "@babel/parser";
-import traverseAST, { Node, NodePath } from "@babel/traverse";
+import traverseAST, { Node, NodePath, TraverseOptions } from "@babel/traverse";
 import * as t from "@babel/types";
 import { Toypack } from "../Toypack.js";
 import { ERRORS } from "../utils";
 
 const emptyAST: Node = babelParse("");
+
+const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
+const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
+
+function getReferenceMatch(str: string) {
+   const pathMatch = referencePathRegex.exec(str);
+   if (pathMatch?.[1]) {
+      return pathMatch[1];
+   }
+
+   const typesMatch = referenceTypesRegex.exec(str);
+   if (typesMatch?.[1]) {
+      return "@types/" + typesMatch[1];
+   }
+}
 
 /**
  * Parses and extracts the dependencies of a script asset. Script assets
@@ -27,27 +42,31 @@ export async function parseScriptAsset(
       ? "esm"
       : config.bundle.moduleType;
 
+   const userBabelOptions = config.babel.parse;
+   const importantBabelOptions: ParserOptions = {
+      sourceType: moduleType == "esm" ? "module" : "script",
+      sourceFilename: source,
+   };
+   const parserOptions: ParserOptions = {
+      ...userBabelOptions,
+      ...importantBabelOptions,
+      ...(options?.parserOptions || {}),
+   };
+
    // Parse
    try {
-      const userBabelOptions = config.babel.parse;
-      const importantBabelOptions: ParserOptions = {
-         sourceType: moduleType == "esm" ? "module" : "script",
-         sourceFilename: source,
-      };
-      result.ast = babelParse(content, {
-         ...userBabelOptions,
-         ...importantBabelOptions,
-         ...(options?.parserOptions || {}),
-      });
+      result.ast = babelParse(content, parserOptions);
    } catch (error) {
       this._trigger("onError", ERRORS.parse(error as any));
 
       return result;
    }
 
+   let traverseOptions: TraverseOptions = {};
+
    // Extract dependencies
    if (moduleType == "esm") {
-      traverseAST(result.ast, {
+      traverseOptions = {
          ImportDeclaration(path) {
             result.dependencies.push(path.node.source.value);
             options?.inspectDependencies?.(path.node.source, path);
@@ -71,9 +90,9 @@ export async function parseScriptAsset(
                options?.inspectDependencies?.(argNode, path);
             }
          },
-      });
+      };
    } else {
-      traverseAST(result.ast, {
+      traverseOptions = {
          CallExpression(path) {
             const argNode = path.node.arguments[0];
             const callee = path.node.callee;
@@ -84,8 +103,37 @@ export async function parseScriptAsset(
                options?.inspectDependencies?.(argNode, path);
             }
          },
-      });
+      };
    }
+
+   /**
+    * Scan `///<reference [path/types]="..." />` in dts files.
+    */
+   const isDts = parserOptions.plugins?.find(
+      (p) => Array.isArray(p) && p[0] == "typescript" && p[1].dts
+   );
+   if (isDts && result.ast.comments) {
+      for (const comment of result.ast.comments) {
+         if (comment.type == "CommentBlock") continue;
+         const match = getReferenceMatch(comment.value);
+         if (!match) continue;
+         // Create a facade node because comments doesn't have one
+         const fakeNode = {
+            value: match,
+         };
+
+         result.dependencies.push(fakeNode.value);
+         options?.inspectDependencies?.(fakeNode, result.ast);
+
+         /**
+          * inspectDependencies() will be useless here because we passed
+          * a fake node. One solution is to change comment's value ourselves.
+          */
+         comment.value = `/ <reference path="${fakeNode.value}" />`;
+      }
+   }
+
+   traverseAST(result.ast, traverseOptions);
 
    result.dependencies = [...new Set(result.dependencies)];
 
@@ -100,13 +148,16 @@ export interface ParsedScriptResult {
 
 export interface ParseScriptOptions {
    parserOptions?: ParserOptions;
+   /** Function to mutate the node or path of a dependency. */
    inspectDependencies?: (
-      node: t.StringLiteral,
-      path: NodePath<
-         | t.ImportDeclaration
-         | t.ExportAllDeclaration
-         | t.ExportNamedDeclaration
-         | t.CallExpression
-      >
+      node: t.StringLiteral | { value: string },
+      path:
+         | NodePath<
+              | t.ImportDeclaration
+              | t.ExportAllDeclaration
+              | t.ExportNamedDeclaration
+              | t.CallExpression
+           >
+         | t.File
    ) => void;
 }

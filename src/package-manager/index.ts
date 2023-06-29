@@ -58,18 +58,29 @@ export async function test(this: Toypack, name?: string, version = "latest") {
    ];
 
    const providers = this._getPackageProviders();
-   const skypackProvider = providers.find(p => p.host == "cdn.skypack.dev")!;
+   const skypackProvider = providers.find((p) => p.host == "cdn.skypack.dev")!;
    const esmshProvider = providers.find((p) => p.host == "esm.sh")!;
-   const jsdelivrProvider = providers.find((p) => p.host == "cdn.jsdelivr.net")!;
+   const jsdelivrProvider = providers.find(
+      (p) => p.host == "cdn.jsdelivr.net"
+   )!;
+   console.log(skypackProvider, esmshProvider, jsdelivrProvider);
    for (const testCase of testCases) {
-      providers[0] = skypackProvider;
+      (this as any)._packageProviders = [
+         skypackProvider,
+         esmshProvider,
+         jsdelivrProvider,
+      ];
       const esmsh = await fetchPackage.call(
          this,
          testCase.name,
          testCase.version
       );
       console.info("esm.sh:", testCase.name, esmsh.assets);
-      providers[0] = esmshProvider;
+      (this as any)._packageProviders = [
+         esmshProvider,
+         skypackProvider,
+         jsdelivrProvider,
+      ];
       const skypack = await fetchPackage.call(
          this,
          testCase.name,
@@ -78,7 +89,11 @@ export async function test(this: Toypack, name?: string, version = "latest") {
       console.info("skypack:", testCase.name, skypack.assets);
       // jsdelvr doesn't support @types/*
       if (testCase.name != "@types/babel__core") {
-         providers[0] = jsdelivrProvider;
+         (this as any)._packageProviders = [
+            jsdelivrProvider,
+            skypackProvider,
+            esmshProvider,
+         ];
          const jsdelvr = await fetchPackage.call(
             this,
             testCase.name,

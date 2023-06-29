@@ -14,6 +14,17 @@ export function queryParamsToString(params?: Record<string, string | true>) {
    return str.replace(/&$/, "");
 }
 
+export function getUrlFromProviderHost(provider: PackageProvider) {
+   return "https://" + provider.host + "/";
+}
+
+export function removeProviderHostFromUrl(
+   url: string,
+   provider: PackageProvider
+) {
+   return url.replace(getUrlFromProviderHost(provider), "");
+}
+
 export function getFetchUrlFromProvider(
    provider: PackageProvider,
    name: string,
@@ -21,8 +32,7 @@ export function getFetchUrlFromProvider(
 ) {
    const parsed = parsePackageName(name);
    return (
-      "https://" +
-      provider.host +
+      getUrlFromProviderHost(provider).replace(/\/$/, "") +
       path.join(
          "/",
          provider.prepath || "",
@@ -42,10 +52,11 @@ export function resolve(
    if (isUrl(source)) return source;
    parentSource = parentSource.replace(root, "");
 
-   // @types/@babel/core -> @types/babel__core
-   if (parentSource.startsWith("@") && source.startsWith("@")) {
-      source = source.replace(/^@/, "").replace(/\//, "__");
-   }
+   /** @todo remove */
+   // // @types/@babel/core -> @types/babel__core
+   // if (parentSource.startsWith("@") && source.startsWith("@")) {
+   //    source = source.replace(/^@/, "").replace(/\//, "__");
+   // }
 
    if (source.startsWith("/")) {
       return root + path.join(source).replace(/^\//, "");
@@ -56,6 +67,10 @@ export function resolve(
    );
 }
 
+/**
+ * Get file extension in url. Defaults to `.js`.
+ * - Note: This function treats `.d.ts` as an extension.
+ */
 export function getExtension(url: string, provider: PackageProvider) {
    url = url.split("?")[0];
 
@@ -78,6 +93,9 @@ export function getExtension(url: string, provider: PackageProvider) {
    return path.extname(url) || ".js";
 }
 
+/**
+ * Get type based on extension and response.
+ */
 export function getType(extension: string, response?: Response | null) {
    const mimeType = response?.headers.get("Content-Type")?.split(";")[0];
    const isScript =
@@ -91,4 +109,3 @@ export function getType(extension: string, response?: Response | null) {
 
 export * from "./get-optimized-path.js";
 export * from "./get-package-info.js";
-export * from "./get-provider-host-url.js";

@@ -10,6 +10,7 @@ import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import type { Toypack } from "../types";
 import {
+   DEBUG,
    ERRORS,
    EXTENSIONS,
    getSourceMapUrl,
@@ -51,7 +52,6 @@ export async function fetchAssets(
    const subpath = parsePackageName(name).path;
    let provider = providers[0];
    let entryUrl = getFetchUrlFromProvider(provider, name, version);
-   let entryResponse: Response = {} as Response;
 
    const inspectDependencies = (
       node: { value: string },
@@ -137,13 +137,13 @@ export async function fetchAssets(
 
       let content = "";
       let map: RawSourceMap | null = null;
+      const isDts = getExtension(optimizedPath.path, provider) == ".d.ts";
 
       // Parse and compile
       let ast: CssNode | Node, rawDependencies: string[];
       if (type == "script") {
          const parserOptions: ParserOptions = {
-            plugins:
-               extension == ".d.ts" ? [["typescript", { dts: true }]] : [],
+            plugins: isDts ? [["typescript", { dts: true }]] : [],
          };
 
          const parsedScript = await parseScriptAsset.call(
@@ -162,7 +162,7 @@ export async function fetchAssets(
                   inspectDependencies(
                      node,
                      resolvedUrl,
-                     extension == ".d.ts" ? "index.d.ts" : "index.js"
+                     isDts ? "index.d.ts" : "index.js"
                   );
                },
             }
@@ -210,10 +210,6 @@ export async function fetchAssets(
          }
       }
 
-      if (isEntry) {
-         entryResponse = response;
-      }
-
       const asset: PackageAsset = {
          type,
          source: optimizedPath.path,
@@ -226,7 +222,7 @@ export async function fetchAssets(
       assets.set(url, asset);
 
       if (asset.type == "script") {
-         asset.dts = extension == ".d.ts" ? true : false;
+         asset.dts = isDts;
       }
 
       // Get source map
@@ -254,6 +250,7 @@ export async function fetchAssets(
 
       // If entry and not a dts, fetch dts
       if (
+         (config.packageManager.dts || name.startsWith("@types/")) &&
          isEntry &&
          asset.type == "script" &&
          !asset.dts &&
@@ -265,24 +262,22 @@ export async function fetchAssets(
             (EXTENSIONS.script.includes(entryExtension) ||
                !EXTENSIONS.style.includes(entryExtension))
          ) {
-            const dtsUrl = entryResponse.headers.get(provider.dtsHeader);
+            const dtsUrl = response.headers.get(provider.dtsHeader);
             if (dtsUrl) {
                await recurse(
                   resolve(dtsUrl, entryUrl, getUrlFromProviderHost(provider))
                );
             } else {
-               this._trigger(
-                  "onError",
-                  ERRORS.any(
-                     "[package-manager] Error: Couldn't get the declaration types for " +
-                        entryUrl
-                  )
+               DEBUG.warn(
+                  this.getConfig().logLevel,
+                  "[package-manager] Error: Couldn't get the declaration types for " +
+                     entryUrl
                );
             }
          }
       }
 
-      // Get dependency's dependencies by recursing
+      // Get dependency's dependencies recursively
       for (const depSource of rawDependencies) {
          const resolved = resolve(
             depSource,
@@ -300,42 +295,10 @@ export async function fetchAssets(
 
    await recurse(entryUrl);
 
-   // Get dts files
-   // if (
-   //    config.packageManager.dts &&
-   //    typeof provider.dtsHeader == "string" &&
-   //    entryResponse.ok
-   // ) {
-   //    const entryExtension = getExtension(entryUrl, provider);
-   //    if (
-   //       entryExtension != ".d.ts" &&
-   //       (EXTENSIONS.script.includes(entryExtension) ||
-   //          !EXTENSIONS.style.includes(entryExtension))
-   //    ) {
-   //       const dtsUrl = entryResponse.headers.get(provider.dtsHeader);
-   //       if (dtsUrl) {
-   //          await recurse(
-   //             resolve(dtsUrl, entryUrl, getUrlFromProviderHost(provider))
-   //          );
-   //       } else {
-   //          this._trigger(
-   //             "onError",
-   //             ERRORS.any(
-   //                "[package-manager] Error: Couldn't get the declaration types for " +
-   //                   entryUrl
-   //             )
-   //          );
-   //       }
-   //    }
-   // }
-
    const finalizedAssets: Record<string, PackageAsset> = {};
-
    for (const [_, asset] of assets) {
       finalizedAssets[asset.source] = asset;
    }
-
-   console.log(finalizedAssets);
 
    return finalizedAssets;
 }
