@@ -1,8 +1,9 @@
-import { parse as babelParse, ParserOptions } from "@babel/parser";
+import { parse as babelParse, ParserOptions, ParseError } from "@babel/parser";
 import traverseAST, { Node, NodePath, TraverseOptions } from "@babel/traverse";
 import * as t from "@babel/types";
 import { Toypack } from "../Toypack.js";
 import { ERRORS } from "../utils";
+import { codeFrameColumns } from "@babel/code-frame";
 
 const emptyAST: Node = babelParse("");
 
@@ -38,9 +39,10 @@ export async function parseScriptAsset(
       ast: emptyAST,
    };
 
-   const moduleType = source.startsWith("virtual:")
-      ? "esm"
-      : config.bundle.moduleType;
+   const moduleType =
+      source.startsWith("virtual:") || source.startsWith("/node_modules/")
+         ? "esm"
+         : config.bundle.moduleType;
 
    const userBabelOptions = config.babel.parse;
    const importantBabelOptions: ParserOptions = {
@@ -56,9 +58,19 @@ export async function parseScriptAsset(
    // Parse
    try {
       result.ast = babelParse(content, parserOptions);
-   } catch (error) {
-      this._trigger("onError", ERRORS.parse(error as any));
+   } catch (error: any) {
+      let message = "";
+      if (error.loc && error.pos) {
+         const result = codeFrameColumns(content, {
+            start: error.loc,
+         });
+         console.dir(error)
+         message = `${error.name}: ${error.message} in "${source}"\n${result}`;
+      } else {
+         message = error;
+      }
 
+      this._trigger("onError", ERRORS.parse(message));
       return result;
    }
 

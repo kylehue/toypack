@@ -37,7 +37,9 @@ export async function compileScript(
       };
    }
 
-   const moduleType = config.bundle.moduleType;
+   const moduleType = chunk.source.startsWith("/node_modules/")
+      ? "esm"
+      : config.bundle.moduleType;
    const mode = config.bundle.mode;
 
    const traverseOptionsArray: ITraverseOptions[] = [];
