@@ -180,16 +180,16 @@ export class Toypack extends Hooks {
       return this._packageProviders;
    }
 
-   protected _findDependency(name: string, version?: string, subpath?: string) {
+   protected _findDependency(depSource: string) {
       const matches: PackageDependency[] = [];
+      const parsed = parsePackageName(depSource);
+      
       for (const dep of Object.values(this._dependencies)) {
-         if (
-            dep.name == name &&
-            (typeof version == "undefined" || dep.version == version) &&
-            (typeof subpath == "undefined" || dep.subpath == subpath)
-         ) {
-            matches.push(dep);
-         }
+         if (dep.name != parsed.name) continue;
+         if (dep.subpath != parsed.path) continue;
+         if (dep.version != parsed.version && parsed.version != "latest") continue;
+
+         matches.push(dep);
       }
 
       return matches;
