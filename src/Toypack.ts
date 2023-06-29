@@ -21,16 +21,23 @@ import {
    ERRORS,
    EXTENSIONS,
    isNodeModule,
+   parsePackageName,
+   isLocal,
+   isUrl,
 } from "./utils";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
-import {
-   PackageProvider,
-   fetchPackage,
-   test,
-} from "./package-manager/index.js";
+import { PackageProvider, getPackage, test } from "./package-manager/index.js";
 import { getPackageInfoFromUrl } from "./package-manager/utils";
+
+interface PackageDependency {
+   name: string;
+   subpath: string;
+   version: string;
+   resolved: string;
+   isEntry: boolean;
+}
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -49,6 +56,7 @@ export class Toypack extends Hooks {
       compiled: new Map(),
       nodeModules: new Map(),
    };
+   protected _dependencies: Record<string, PackageDependency> = {};
    constructor(config?: PartialDeep<ToypackConfig>) {
       super();
       if (config) this.setConfig(config);
@@ -172,15 +180,38 @@ export class Toypack extends Hooks {
       return this._packageProviders;
    }
 
+   protected _findDependency(name: string, version?: string, subpath?: string) {
+      const matches: PackageDependency[] = [];
+      for (const dep of Object.values(this._dependencies)) {
+         if (
+            dep.name == name &&
+            (typeof version == "undefined" || dep.version == version) &&
+            (typeof subpath == "undefined" || dep.subpath == subpath)
+         ) {
+            matches.push(dep);
+         }
+      }
+
+      return matches;
+   }
+
    public async installPackage(name: string, version?: string) {
-      const pkg = await fetchPackage.call(this, name, version);
+      const pkg = await getPackage.call(this, name, version);
       for (const pkgAsset of Object.values(pkg.assets)) {
-         this.addOrUpdateAsset(pkgAsset.source, pkgAsset.content);
-         this._cachedDeps.nodeModules.set(pkgAsset.source, {
-            map: pkgAsset.map,
+         const { name, version, subpath, content, map, source } = pkgAsset;
+         const key = `${name}${subpath} ${version}`;
+         this._dependencies[key] = {
+            name,
+            version,
+            resolved: source,
+            subpath,
+            isEntry: this._dependencies[key]?.isEntry || pkgAsset.isEntry,
+         };
+         this.addOrUpdateAsset(source, content);
+         this._cachedDeps.nodeModules.set(source, {
+            map: map,
          });
       }
-      //const pkg = await test.call(this, name, version);
    }
 
    /**
@@ -238,6 +269,40 @@ export class Toypack extends Hooks {
     * @returns {string} The resolved absolute path.
     */
    public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
+      const isNodeModule = !isLocal(relativeSource) && !isUrl(relativeSource);
+      if (isNodeModule) {
+         const deps = this._findDependency(relativeSource);
+         let dep: PackageDependency | undefined = undefined;
+         if (deps.length == 1) {
+            dep = deps[0];
+         } else if (deps.length > 1) {
+            /**
+             * If there are 2 or more matches, return the one
+             * that is not installed just because it's a dependency of
+             * a dependency.
+             */
+            dep = deps.find((d) => d.isEntry);
+
+            /**
+             * If every dep is just a dependency of a dependency,
+             * return the one that has the latest version.
+             */
+            if (!dep) {
+               // Sort versions
+               // https://stackoverflow.com/a/40201629/16446474
+               // prettier-ignore
+               dep = deps.find((d) => d.version == "latest") ??
+                  deps.find((d) => d.version == deps
+                     .map((a) => a.version.split(".").map((n) => +n + 100000)
+                     .join(".")).sort()
+                     .map((a) => a.split(".").map((n) => +n - 100000).join(".")
+                  )[0]);
+            }
+         }
+
+         if (dep?.resolved) return dep.resolved;
+      }
+
       const opts = Object.assign(
          {
             aliases: this._config.bundle.resolve.alias,
@@ -376,21 +441,21 @@ export class Toypack extends Hooks {
     * of the bundling process.
     */
    public async run(isProd = false) {
-      // const oldMode = this._config.bundle.mode;
-      // this._config.bundle.mode = isProd ? "production" : oldMode;
-      // const graph = await getDependencyGraph.call(this);
-      // console.log(graph);
-      // const result = await bundle.call(this, graph);
-      // this._config.bundle.mode = oldMode;
-      // // Set modified flag to false for all assets (used in caching)
-      // this._assets.forEach((asset) => {
-      //    asset.modified = false;
-      // });
-      // // IFrame
-      // if (!isProd && this._iframe) {
-      //    this._iframe.srcdoc = result.html.content;
-      // }
-      // return result;
+      const oldMode = this._config.bundle.mode;
+      this._config.bundle.mode = isProd ? "production" : oldMode;
+      const graph = await getDependencyGraph.call(this);
+      console.log(graph);
+      const result = await bundle.call(this, graph);
+      this._config.bundle.mode = oldMode;
+      // Set modified flag to false for all assets (used in caching)
+      this._assets.forEach((asset) => {
+         asset.modified = false;
+      });
+      // IFrame
+      if (!isProd && this._iframe) {
+         this._iframe.srcdoc = result.html.content;
+      }
+      return result;
    }
 }
 
