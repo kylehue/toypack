@@ -1,3 +1,4 @@
+import { codeFrameColumns } from "@babel/code-frame";
 import {
    parse as parseHTML,
    Node,
@@ -7,6 +8,7 @@ import {
 } from "node-html-parser";
 import { Loader, Plugin } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
+import { indexToPosition } from "../utils/find-code-position.js";
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 let _id = 0;
@@ -50,11 +52,27 @@ function compile(
    const htmlAst = parseHTML(content, htmlPluginOptions?.parserOptions);
    const dependencies: string[] = [];
    let bundledInlineStyles = "";
+   const errors: string[] = [];
    traverse(htmlAst, (node) => {
+      if (!(node instanceof HTMLElement)) return;
       const depSource = extractDepSourceFromNode(node);
       if (depSource) {
          node.remove();
          dependencies.push(depSource);
+      }
+
+      // Import maps aren't supported
+      if (node.tagName == "SCRIPT" && node.attributes.type == "importmap") {
+         const pos = indexToPosition(content, node.range[0]);
+         let message =
+            "ESM import maps are not supported, please install packages instead.";
+         let importMapError =
+            message +
+            "\n" +
+            codeFrameColumns(content, {
+               start: pos,
+            });
+         errors.push(importMapError);
       }
 
       /**
@@ -62,13 +80,12 @@ function compile(
        * This is necessary because the urls inside it needs to
        * be transformed to blobs urls in dev mode.
        */
-      if (node instanceof HTMLElement && node.tagName == "STYLE") {
+      if (node.tagName == "STYLE") {
          bundledInlineStyles += node.structuredText + "\n";
          node.remove();
       }
 
       if (
-         node instanceof HTMLElement &&
          typeof node.attributes.style == "string" &&
          node.attributes.style.length
       ) {
@@ -86,6 +103,7 @@ function compile(
       ast: htmlAst,
       dependencies: dependencies,
       bundledInlineStyles,
+      errors,
    };
 }
 
@@ -140,6 +158,10 @@ const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
             const styleVirtualId = `virtual:${getHash(dep.source)}${_id++}.css`;
             chunks[styleVirtualId] = compiled.bundledInlineStyles;
             mainVirtualModule += this.getImportCode(styleVirtualId);
+         }
+
+         for (const error of compiled.errors) {
+            this.error(error);
          }
 
          return mainVirtualModule;
