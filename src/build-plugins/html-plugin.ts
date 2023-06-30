@@ -6,9 +6,20 @@ import {
    NodeType,
    Options,
 } from "node-html-parser";
-import { Loader, Plugin } from "../types.js";
+import { BuildHookContext, Loader, Plugin } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
 import { indexToPosition } from "../utils/find-code-position.js";
+import path from "path-browserify";
+
+const resourceSrcAttrTags = [
+   "EMBED",
+   "AUDIO",
+   "IMG",
+   "INPUT",
+   "SOURCE",
+   "TRACK",
+   "VIDEO",
+];
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 let _id = 0;
@@ -45,6 +56,7 @@ function extractDepSourceFromNode(node: AST) {
 }
 
 function compile(
+   this: BuildHookContext,
    source: string,
    content: string,
    htmlPluginOptions?: HTMLPluginOptions
@@ -52,7 +64,6 @@ function compile(
    const htmlAst = parseHTML(content, htmlPluginOptions?.parserOptions);
    const dependencies: string[] = [];
    let bundledInlineStyles = "";
-   const errors: string[] = [];
    traverse(htmlAst, (node) => {
       if (!(node instanceof HTMLElement)) return;
       const depSource = extractDepSourceFromNode(node);
@@ -72,7 +83,7 @@ function compile(
             codeFrameColumns(content, {
                start: pos,
             });
-         errors.push(importMapError);
+         this.error(importMapError);
       }
 
       /**
@@ -97,13 +108,27 @@ function compile(
          node.setAttribute(nodeId, "");
          node.removeAttribute("style");
       }
+
+      /**
+       * As for html elements with `src` attribute, we can process the
+       * urls ourselves.
+       */
+      if (resourceSrcAttrTags.includes(node.tagName) && node.attributes.src) {
+         const usableSource = this.getUsableResourcePath(
+            "./" + node.attributes.src,
+            path.dirname(source)
+         );
+
+         if (usableSource) {
+            node.setAttribute("src", usableSource);
+         }
+      }
    });
 
    return {
       ast: htmlAst,
       dependencies: dependencies,
       bundledInlineStyles,
-      errors,
    };
 }
 
@@ -145,7 +170,7 @@ const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
             return;
          }
 
-         const compiled = compile(dep.source, dep.content, options);
+         const compiled = compile.call(this, dep.source, dep.content, options);
          astToInject = compiled.ast;
 
          // Import dependencies
@@ -158,10 +183,6 @@ const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
             const styleVirtualId = `virtual:${getHash(dep.source)}${_id++}.css`;
             chunks[styleVirtualId] = compiled.bundledInlineStyles;
             mainVirtualModule += this.getImportCode(styleVirtualId);
-         }
-
-         for (const error of compiled.errors) {
-            this.error(error);
          }
 
          return mainVirtualModule;

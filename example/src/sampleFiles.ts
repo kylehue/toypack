@@ -30,4 +30,9 @@ export const sampleFiles: Record<string, string | Blob> = {
          new URL("@test/images/kitty-cat-sandwich.gif", import.meta.url).href
       )
    ).blob(),
+   "videos/cat-milk.mp4": await (
+      await fetch(
+         new URL("@test/videos/cat-milk.mp4", import.meta.url).href
+      )
+   ).blob(),
 };
