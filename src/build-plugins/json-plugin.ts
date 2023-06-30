@@ -7,7 +7,14 @@ const jsonPlugin: Plugin = () => {
       loaders: [
          {
             test: /\.json$/,
-            compile: (dep) => "export default " + dep.content,
+            compile(dep) {
+               if (typeof dep.content != "string") {
+                  this.error("Blob contents are not supported.");
+                  return;
+               }
+               
+               return this.getDefaultExportCode(dep.content);
+            },
          },
       ],
    };

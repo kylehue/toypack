@@ -11,9 +11,14 @@ const rawPlugin: Plugin = () => {
             },
             disableChaining: true,
             compile(dep) {
+               if (typeof dep.content != "string") {
+                  this.error("Blob contents are not supported.");
+                  return;
+               }
+
                return {
                   type: "script",
-                  content: `export default \`${dep.content}\`;`,
+                  content: this.getDefaultExportCode(`\`${dep.content}\`;`),
                };
             },
          },
