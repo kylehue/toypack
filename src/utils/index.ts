@@ -3,6 +3,7 @@ export * from "./create-asset.js";
 export * as DEBUG from "./debug.js";
 export * as ERRORS from "./errors.js";
 export * as EXTENSIONS from "./extensions.js";
+export * from "./escape-regex.js";
 export * from "./find-code-position.js";
 export * from "./get-hash.js";
 export * from "./get-source-map-url.js";

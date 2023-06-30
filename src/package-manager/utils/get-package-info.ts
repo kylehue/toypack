@@ -1,5 +1,6 @@
 import path from "path-browserify";
 import { PackageProvider } from "..";
+import { escapeRegex } from "../../utils";
 
 const packageInfoPatterns = [
    new RegExp(
@@ -10,10 +11,6 @@ const packageInfoPatterns = [
 
 function trimTrailingSlashes(str: string) {
    return str.replace(/^\//, "").replace(/\/$/, "");
-}
-
-function escapeRegex(str: string) {
-   return str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 }
 
 export function getPossibleFilename(url: string, provider: PackageProvider) {
