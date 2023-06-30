@@ -19,10 +19,18 @@ export function assetNotFound(source: string) {
    };
 }
 
-export function resolveFailure(source: string, parentSource: string) {
+export function resolveFailure(
+   source: string,
+   parentSource: string,
+   codeFrame = ""
+) {
+   let reason = `Failed to resolve '${source}' from '${parentSource}'`;
+   if (codeFrame) {
+      reason += "\n" + codeFrame;
+   }
    return {
       code: 3,
-      reason: `Failed to resolve '${source}' from '${parentSource}'`,
+      reason,
    };
 }
 

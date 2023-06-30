@@ -3,11 +3,41 @@ import { CssNode } from "css-tree";
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
-import { TextAsset, Asset, ResourceAsset } from "../types.js";
-import { ERRORS, mergeSourceMaps, parseURL } from "../utils";
+import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
+import {
+   ERRORS,
+   escapeRegex,
+   indexToPosition,
+   parseURL,
+} from "../utils";
 import { loadChunk } from "./load-chunk.js";
 import { parseScriptAsset } from "./parse-script-chunk.js";
 import { parseStyleAsset } from "./parse-style-chunk.js";
+import { codeFrameColumns } from "@babel/code-frame";
+
+function getImportPosition(
+   content: string,
+   importSource: string,
+   moduleType: ModuleTypeConfig
+) {
+   let index: number | null = null;
+   if (moduleType == "esm") {
+      const esmImportRegex = new RegExp(
+         `(?:import|export).*(?:from)?.*(["']${escapeRegex(importSource)}["'])`,
+         "dg"
+      );
+      index = esmImportRegex.exec(content)?.indices?.[1][0] || null;
+   } else {
+      const cjsRequireRegex = new RegExp(
+         `require\\s*\\(\\s*(["']${escapeRegex(importSource)}["'])\\s*\\)`,
+         "dg"
+      );
+      index = cjsRequireRegex.exec(content)?.indices?.[1][0] || null;
+   }
+
+   if (!index) return null;
+   return indexToPosition(content, index);
+}
 
 /**
  * Recursively get the dependency graph of an asset.
@@ -122,11 +152,27 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             });
 
             if (!nonVirtualResolution) {
+               const asset = this.getAsset(loaded.asset.source || rawSource);
+               let codeFrame = "";
+               if (asset?.type == "text") {
+                  const pos = getImportPosition(
+                     asset.content,
+                     depSource,
+                     config.bundle.moduleType
+                  );
+                  codeFrame = !pos
+                     ? ""
+                     : codeFrameColumns(asset.content, {
+                          start: pos,
+                       });
+               }
+
                this._trigger(
                   "onError",
                   ERRORS.resolveFailure(
                      depSource,
-                     loaded.asset.source || rawSource
+                     loaded.asset.source || rawSource,
+                     codeFrame
                   )
                );
             } else {
