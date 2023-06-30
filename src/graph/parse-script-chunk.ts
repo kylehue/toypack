@@ -60,7 +60,7 @@ export async function parseScriptAsset(
       result.ast = babelParse(content, parserOptions);
    } catch (error: any) {
       let message = "";
-      if (error.loc && error.pos) {
+      if (error.loc) {
          const result = codeFrameColumns(content, {
             start: error.loc,
          });
@@ -139,7 +139,7 @@ export async function parseScriptAsset(
 
          /**
           * inspectDependencies() will be useless here because we passed
-          * a fake node. One solution is to change comment's value ourselves.
+          * a fake node. Solution is to change comment's value ourselves.
           */
          comment.value = `/ <reference path="${fakeNode.value}" />`;
       }
