@@ -5,25 +5,17 @@ import { getSourceMapUrl, isUrl, removeSourceMapUrl } from "../utils";
 import path from "path-browserify";
 
 const importUrlPlugin: Plugin = () => {
-   const urls: Record<string, string> = {};
    return {
       name: "import-url-plugin",
-      resolve(id) {
-         if (isUrl(id)) {
-            const virtualId = `virtual:${id}`;
-            urls[virtualId] = id;
-            return virtualId;
-         }
-      },
       load: {
          async: true,
          async handler(dep) {
-            if (dep.source in urls) {
-               const url = urls[dep.source];
+            if (isUrl(dep.source)) {
+               const url = dep.source;
                const response = await fetch(url);
                const content = await response.text();
                let map: RawSourceMap | null = null;
-               
+
                if (!!this.bundler.getConfig().bundle.sourceMap) {
                   const mapUrl = getSourceMapUrl(content);
                   if (mapUrl) {
@@ -43,7 +35,7 @@ const importUrlPlugin: Plugin = () => {
                return {
                   type: type || "script",
                   content: removeSourceMapUrl(content),
-                  map
+                  map,
                };
             }
          },
