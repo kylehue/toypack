@@ -168,14 +168,13 @@ export function resolve(
    // Resolve.alias
    const aliasData = getResolveAliasData(opts.aliases, sourceToResolve);
    if (aliasData) {
-      let aliased = path.join(
+      const isExternal = isUrl(aliasData.replacement);
+      let aliased = isExternal ? aliasData.replacement : path.join(
          aliasData.replacement,
          sourceToResolve.replace(aliasData.alias, "")
       );
-      const aliasIsCoreModule =
-         !isLocal(aliasData.replacement) && !isUrl(aliasData.replacement);
 
-      if (!aliasIsCoreModule) {
+      if (isLocal(aliasData.replacement) && !isExternal) {
          aliased = "./" + path.relative(opts.baseDir, aliased);
       }
 
