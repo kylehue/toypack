@@ -92,7 +92,10 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    if (config.bundle.mode == "production") {
       let { code, map } = babelMinify(
          result.content,
-         {},
+         {
+            builtIns: false,
+            ...config.babel.minify
+         },
          {
             sourceMaps: true,
             comments: false,

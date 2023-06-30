@@ -64,6 +64,10 @@ export const defaultConfig = {
       parse: {
          plugins: [],
       } as BabelParseConfig,
+      /**
+       * @see https://babeljs.io/docs/babel-preset-minify#options
+       */
+      minify: {} as Record<string, any>,
    },
    /**
     * Log level.
