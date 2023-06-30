@@ -49,7 +49,7 @@ export async function fetchPackage(
 ): Promise<Package> {
    const assets = new Map<string, PackageAsset>();
    const config = this.getConfig();
-   const subpath = parsePackageName(name).path;
+   let subpath = parsePackageName(name).path;
    let provider = providers[0];
    let entryUrl = getFetchUrlFromProvider(provider, name, version);
 
@@ -62,7 +62,7 @@ export async function fetchPackage(
          name,
          version,
          url,
-         subpath,
+         "",
          fallbackFilename,
          provider
       );
@@ -125,7 +125,7 @@ export async function fetchPackage(
          name,
          version,
          response.url,
-         subpath,
+         isEntry ? subpath : "",
          type == "script"
             ? extension == ".d.ts"
                ? "index.d.ts"
