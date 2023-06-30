@@ -58,9 +58,9 @@ function compile(
       }
 
       /**
-       * Save the styles so that the bundler can process the styles.
-       * This is necessary so that the urls inside it get transformed
-       * to blobs urls in dev mode.
+       * Save the styles so that the bundler can process it.
+       * This is necessary because the urls inside it needs to
+       * be transformed to blobs urls in dev mode.
        */
       if (node instanceof HTMLElement && node.tagName == "STYLE") {
          bundledInlineStyles += node.structuredText + "\n";
@@ -89,29 +89,27 @@ function compile(
    };
 }
 
-function injectAstToHtml(content: string, astsToInject: HTMLElement[]) {
+function injectAstToHtml(content: string, astToInject: HTMLElement) {
    const htmlAst = parseHTML(content);
    const bodyAst = htmlAst.querySelector("body")!;
    const headAst = htmlAst.querySelector("head")!;
 
-   for (const ast of astsToInject) {
-      // Inject body in body
-      const bodyToInject = ast.querySelector("body");
-      if (bodyToInject) {
-         bodyToInject.childNodes.forEach((node) => {
-            bodyAst.appendChild(node.clone());
-         });
-         for (const [key, value] of Object.entries(bodyToInject.attributes)) {
-            bodyAst.setAttribute(key, value);
-         }
-      }
-
-      // Inject head in head
-      const headToInject = ast.querySelector("head");
-      headToInject?.childNodes.forEach((node) => {
-         headAst.appendChild(node.clone());
+   // Inject body in body
+   const bodyToInject = astToInject.querySelector("body");
+   if (bodyToInject) {
+      bodyToInject.childNodes.forEach((node) => {
+         bodyAst.appendChild(node.clone());
       });
+      for (const [key, value] of Object.entries(bodyToInject.attributes)) {
+         bodyAst.setAttribute(key, value);
+      }
    }
+
+   // Inject head in head
+   const headToInject = astToInject.querySelector("head");
+   headToInject?.childNodes.forEach((node) => {
+      headAst.appendChild(node.clone());
+   });
 
    return htmlAst.toString();
 }
@@ -119,7 +117,7 @@ function injectAstToHtml(content: string, astsToInject: HTMLElement[]) {
 const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
    let mainVirtualModule = "";
    const chunks: Record<string, string> = {};
-   const astsToInject: HTMLElement[] = [];
+   let astToInject: HTMLElement | null = null;
 
    const htmlLoader: Loader = {
       test: /\.html$/,
@@ -130,7 +128,7 @@ const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
          }
 
          const compiled = compile(dep.source, dep.content, options);
-         astsToInject.push(compiled.ast);
+         astToInject = compiled.ast;
 
          // Import dependencies
          for (const depSource of compiled.dependencies) {
@@ -158,9 +156,10 @@ const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
          }
       },
       buildEnd(result) {
+         if (!astToInject) return;
          result.html.content = injectAstToHtml(
             result.html.content,
-            astsToInject
+            astToInject
          );
       },
    };
