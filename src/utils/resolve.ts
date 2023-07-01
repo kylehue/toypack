@@ -125,7 +125,7 @@ function getResolved(
       sourceToResolve.startsWith("/") ||
       typeof assets[sourceToResolve] == "string"
    ) {
-      return loadAsFile(assets, sourceToResolve, options);
+      return loadAsDirectory(assets, sourceToResolve, options);
    }
 
    if (
