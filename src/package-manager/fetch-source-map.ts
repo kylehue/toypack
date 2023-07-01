@@ -14,18 +14,18 @@ export async function fetchSourceMapInContent(
    if (cached?.map) {
       sourceMap = cached.map;
    } else {
-      // const sourceMapUrl = getSourceMapUrl(content);
-      // if (sourceMapUrl) {
-      //    const resolvedMapUrl = resolve(
-      //       sourceMapUrl,
-      //       url,
-      //       getUrlFromProviderHost(provider)
-      //    );
-      //    const mapResponse = await fetch(resolvedMapUrl);
-      //    if (mapResponse) {
-      //       sourceMap = await mapResponse.json();
-      //    }
-      // }
+      const sourceMapUrl = getSourceMapUrl(content);
+      if (sourceMapUrl) {
+         const resolvedMapUrl = resolve(
+            sourceMapUrl,
+            url,
+            getUrlFromProviderHost(provider)
+         );
+         const mapResponse = await fetch(resolvedMapUrl);
+         if (mapResponse) {
+            sourceMap = await mapResponse.json();
+         }
+      }
    }
 
    return sourceMap;

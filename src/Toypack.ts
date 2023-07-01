@@ -30,7 +30,6 @@ import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
 import { PackageProvider, getPackage, test } from "./package-manager/index.js";
-import { getPackageInfoFromUrl } from "./package-manager/utils";
 
 interface PackageDependency {
    name: string;
@@ -57,7 +56,7 @@ export class Toypack extends Hooks {
       compiled: new Map(),
       nodeModules: new Map(),
    };
-   protected _dependencies: Record<string, PackageDependency> = {};
+   protected _dependencies: Record<string, string> = {};
    constructor(config?: PartialDeep<ToypackConfig>) {
       super();
       if (config) this.setConfig(config);
@@ -82,49 +81,29 @@ export class Toypack extends Hooks {
       }
 
       this.usePackageProvider({
-         host: "cdn.skypack.dev",
-         dtsHeader: "X-Typescript-Types",
-         queryParams: {
-            dts: true,
-         },
-         isBadResponse(response, { name }) {
-            if (
-               new RegExp(`cdn\\.skypack\\.dev/error/.*${name}@.*`).test(
-                  response.url
-               )
-            ) {
-               return true;
-            }
-
-            return false;
-         },
-         // We can get the entry's version in dts
-         handleEntryVersion({ response }) {
-            const dtsUrl = response.headers.get(this.dtsHeader!);
-            if (!dtsUrl) return;
-            return getPackageInfoFromUrl(dtsUrl, this, "")?.version;
-         },
-      });
-
-      this.usePackageProvider({
          host: "cdn.jsdelivr.net",
          postpath: "+esm",
          prepath: "npm",
-         // We can get the entry's version in the banner
-         handleEntryVersion({ rawContent, name }) {
-            const banner = /^\/\*\*(?<banner>(?:\n|.)*)\*\//.exec(rawContent)
-               ?.groups?.banner;
-            if (!banner) return;
-            const version = new RegExp(
-               `.*Original file: /npm/${name}@v?(?<version>[\\.a-z0-9]+).*/`
-            ).exec(banner)?.groups?.version;
-            return version;
-         },
       });
 
       this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
+      });
+
+      this.usePackageProvider({
+         host: "cdn.skypack.dev",
+         dtsHeader: "X-Typescript-Types",
+         queryParams: {
+            dts: true,
+         },
+         isBadResponse(response) {
+            if (new RegExp(`cdn\\.skypack\\.dev/error/.*`).test(response.url)) {
+               return true;
+            }
+
+            return false;
+         },
       });
    }
 
@@ -181,45 +160,63 @@ export class Toypack extends Hooks {
       return this._packageProviders;
    }
 
-   protected _findDependency(depSource: string) {
-      const matches: PackageDependency[] = [];
-      const parsed = parsePackageName(depSource);
-
-      for (const dep of Object.values(this._dependencies)) {
-         if (dep.name != parsed.name) continue;
-         if (dep.subpath != parsed.path) continue;
-         if (dep.version != parsed.version && parsed.version != "latest")
-            continue;
-
-         matches.push(dep);
-      }
-
-      return matches;
-   }
-
    /**
     * Install a package from npm.
     * @param name The name of the package to install.
     * @param version The version of the package to install. Defaults
     * to latest.
     */
-   public async installPackage(name: string, version?: string) {
-      const pkg = await getPackage.call(this, name, version);
-      for (const pkgAsset of Object.values(pkg.assets)) {
-         const { name, version, subpath, content, map, source } = pkgAsset;
-         const key = `${name}${subpath} ${version}`;
-         this._dependencies[key] = {
-            name,
-            version,
-            resolved: source,
-            subpath,
-            isEntry: this._dependencies[key]?.isEntry || pkgAsset.isEntry,
-         };
-         this.addOrUpdateAsset(source, content);
-         this._cachedDeps.nodeModules.set(source, {
-            map: map,
-         });
+   public async installPackage(packageSource: string) {
+      const pkg = await getPackage.call(this, packageSource);
+      if (!pkg.assets.length) return;
+
+      const { name, version } = parsePackageName(packageSource);
+      this._dependencies[name] = version;
+
+      const findDuplicateAsset = (url: string) => {
+         for (const [_, asset] of this._assets) {
+            if (asset.type != "text") continue;
+            if (!asset.source.startsWith("/node_modules/")) continue;
+            if (asset.metadata.url != url) continue;
+            return asset;
+         }
+
+         for (const urls of this._config.packageManager.dedupe || []) {
+            // if (url == urls[0]) continue;
+            if (!urls.includes(url)) continue;
+            console.log(url);
+            return Object.values(this._assets).find(a => a.metadata.url == url);
+         }
+      };
+
+      for (const { url, source, content } of pkg.assets) {
+         const asset = this.addOrUpdateAsset(source, content);
+         asset.metadata.url = url;
+         
+         // dedupe same urls
+         const duplicateAsset = findDuplicateAsset(url);
+         if (duplicateAsset && duplicateAsset.source != asset.source) {
+            asset.content =
+               `export * from "${duplicateAsset.source}";` +
+               `export {default} from "${duplicateAsset.source}";`;
+         }
       }
+
+      // for (const pkgAsset of Object.values(pkg.assets)) {
+      //    const { name, version, subpath, content, map, source } = pkgAsset;
+      //    const key = `${name}${subpath} ${version}`;
+      //    this._dependencies[key] = {
+      //       name,
+      //       version,
+      //       resolved: source,
+      //       subpath,
+      //       isEntry: this._dependencies[key]?.isEntry || pkgAsset.isEntry,
+      //    };
+      //    this.addOrUpdateAsset(source, content);
+      //    this._cachedDeps.nodeModules.set(source, {
+      //       map: map,
+      //    });
+      // }
    }
 
    /**
@@ -279,36 +276,39 @@ export class Toypack extends Hooks {
    public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
       const isNodeModule = !isLocal(relativeSource) && !isUrl(relativeSource);
       if (isNodeModule) {
-         const deps = this._findDependency(relativeSource);
-         let dep: PackageDependency | undefined = undefined;
-         if (deps.length == 1) {
-            dep = deps[0];
-         } else if (deps.length > 1) {
-            /**
-             * If there are 2 or more matches, return the one
-             * that is not installed just because it's a dependency of
-             * a dependency.
-             */
-            dep = deps.find((d) => d.isEntry);
+         const { name, subpath } = parsePackageName(relativeSource);
+         const version = this._dependencies[name];
+         relativeSource = `${name}@${version}${subpath}`;
+         // const deps = this._findDependency(relativeSource);
+         // let dep: PackageDependency | undefined = undefined;
+         // if (deps.length == 1) {
+         //    dep = deps[0];
+         // } else if (deps.length > 1) {
+         //    /**
+         //     * If there are 2 or more matches, return the one
+         //     * that is not installed just because it's a dependency of
+         //     * a dependency.
+         //     */
+         //    dep = deps.find((d) => d.isEntry);
 
-            /**
-             * If every dep is just a dependency of a dependency,
-             * return the one that has the latest version.
-             */
-            if (!dep) {
-               // Sort versions
-               // https://stackoverflow.com/a/40201629/16446474
-               // prettier-ignore
-               dep = deps.find((d) => d.version == "latest") ??
-                  deps.find((d) => d.version == deps
-                     .map((a) => a.version.split(".").map((n) => +n + 100000)
-                     .join(".")).sort()
-                     .map((a) => a.split(".").map((n) => +n - 100000).join(".")
-                  )[0]);
-            }
-         }
+         //    /**
+         //     * If every dep is just a dependency of a dependency,
+         //     * return the one that has the latest version.
+         //     */
+         //    if (!dep) {
+         //       // Sort versions
+         //       // https://stackoverflow.com/a/40201629/16446474
+         //       // prettier-ignore
+         //       dep = deps.find((d) => d.version == "latest") ??
+         //          deps.find((d) => d.version == deps
+         //             .map((a) => a.version.split(".").map((n) => +n + 100000)
+         //             .join(".")).sort()
+         //             .map((a) => a.split(".").map((n) => +n - 100000).join(".")
+         //          )[0]);
+         //    }
+         // }
 
-         if (dep?.resolved) return dep.resolved;
+         // if (dep?.resolved) return dep.resolved;
       }
 
       const opts = Object.assign(

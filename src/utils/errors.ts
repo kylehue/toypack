@@ -70,13 +70,12 @@ export function plugin(pluginName: string, reason: string) {
 }
 
 export function packageInstallFailure(
-   name: string,
-   version: string,
+   packageSource: string,
    stack?: string
 ) {
    return {
       code: 9,
-      reason: `Failed to install ${name}@${version}. ${
+      reason: `Failed to install ${packageSource}. ${
          stack ? `\n\n${stack}` : ""
       }`,
    };

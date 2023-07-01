@@ -9,229 +9,115 @@ import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import type { Toypack } from "../types.js";
-import {
-   DEBUG,
-   ERRORS,
-   EXTENSIONS,
-   getSourceMapUrl,
-   mergeSourceMaps,
-   parsePackageName,
-   removeSourceMapUrl,
-} from "../utils/index.js";
-import { PackageProvider, Package } from "./index.js";
+import { mergeSourceMaps, parsePackageName } from "../utils/index.js";
+import { PackageProvider } from "./index.js";
 import {
    getFetchUrlFromProvider,
-   getExtension,
    getType,
    resolve,
-   getPackageInfoFromUrl,
-   removeProviderHostFromUrl,
    getUrlFromProviderHost,
-   getOptimizedPath,
-} from "./utils/index.js";
-import { fetchWithProviders } from "./fetch-with-providers.js";
+   getNodeModulesPath,
+   getSource,
+} from "./utils.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 
 export const _cache = new Map<
    string,
    {
-      content: string;
+      rawContent: string;
       response: Response;
       map?: RawSourceMap | null;
+      asset: PackageAsset;
    }
 >();
 
 export async function fetchPackage(
-   this: Toypack,
+   bundler: Toypack,
    providers: PackageProvider[],
-   name: string,
-   version: string
-): Promise<Package> {
-   const assets = new Map<string, PackageAsset>();
-   const config = this.getConfig();
-   let subpath = parsePackageName(name).path;
-   let provider = providers[0];
-   let entryUrl = getFetchUrlFromProvider(provider, name, version);
+   packageSource: string
+) {
+   const config = bundler.getConfig();
+   let providerIndex = 0;
+   let provider = providers[providerIndex];
+   let entryUrl = getFetchUrlFromProvider(provider, packageSource);
+   let assets: Record<string, PackageAsset> = {};
+   let dtsAssets: Record<string, PackageAsset> = {};
+   const { name, version, subpath } = parsePackageName(packageSource);
 
-   const inspectDependencies = (
-      node: { value: string },
-      url: string,
-      fallbackFilename: string
-   ) => {
-      const optimizedPath = getOptimizedPath(
-         name,
-         version,
-         url,
-         "",
-         fallbackFilename,
-         provider
-      );
+   const recurse = async (url: string) => {
+      if (url in assets || url in dtsAssets) return false;
 
-      node.value = optimizedPath.importPath;
-   };
-
-   const recurse: (url: string) => Promise<boolean> = async (url: string) => {
-      if (assets.get(url)) return false;
-      const isEntry = url === entryUrl;
-      const fetched = await fetchWithProviders(providers, url, name, version);
-
-      if (!fetched) {
-         assets.clear();
-         this._trigger(
-            "onError",
-            ERRORS.any(
-               `[package-manager] Error: Failed to fetch ${name}@${version} because none of the providers could fetch one of its dependencies.`
-            )
-         );
-
-         return false;
-      }
-
-      const response = fetched.response;
-      if (isEntry) {
-         provider = fetched.provider;
-         entryUrl = fetched.url;
-      }
-
-      // Is it a script or a style? (this is needed when parsing)
-      const extension = getExtension(url, provider);
-      const type = getType(extension, response);
-
-      if (!type) {
-         this._trigger(
-            "onError",
-            ERRORS.any(
-               "[package-manager] Error: Couldn't determine the type of " + url
-            )
-         );
-
-         return false;
-      }
-
+      const isEntry = entryUrl == url;
       const cached = _cache.get(url);
-      const rawContent = cached ? cached.content : await response.text();
-      let forcedVersion: string | undefined = undefined;
-      if (isEntry && typeof provider.handleEntryVersion == "function") {
-         forcedVersion =
-            provider.handleEntryVersion({
-               response,
-               rawContent,
-               name,
-               version,
-            }) || undefined;
+      const response = cached ? cached.response : await fetch(url);
+      url = response.url;
+
+      // Use backup providers when response is bad
+      if (!response.ok || (await provider.isBadResponse?.(response))) {
+         assets = {};
+         dtsAssets = {};
+         let backupProvider = providers[++providerIndex];
+         if (!provider || backupProvider === provider) {
+            throw new Error(
+               `[package-manager] Error: Couldn't fetch '${packageSource}'.`
+            );
+         } else {
+            provider = backupProvider;
+            entryUrl = getFetchUrlFromProvider(provider, packageSource);
+            await recurse(entryUrl);
+         }
+
+         return false;
       }
 
-      const optimizedPath = getOptimizedPath(
-         name,
-         version,
-         response.url,
-         isEntry ? subpath : "",
-         type == "script"
-            ? extension == ".d.ts"
-               ? "index.d.ts"
-               : "index.js"
-            : "index.css",
-         provider,
-         forcedVersion
-      );
-
-      const pkgInfo = getPackageInfoFromUrl(optimizedPath.path, provider, "");
-
-      if (isEntry) {
-         version = pkgInfo.version;
+      const type = getType(response);
+      if (!type) {
+         throw new Error(
+            `[package-manager] Error: Couldn't determine the type of ${url}`
+         );
       }
 
-      let content = "";
-      let map: RawSourceMap | null = null;
-      const isDts = getExtension(optimizedPath.path, provider) == ".d.ts";
+      const rawContent = cached ? cached.rawContent : await response.text();
+      let source = getSource(name, version, subpath, url, isEntry, type);
+      let content: string = rawContent;
+      let dependencies: string[] = [];
+      let map: any;
 
-      // Parse and compile
-      let ast: CssNode | Node, rawDependencies: string[];
+      // Parse, get dependencies, and recompile
       if (type == "script") {
          const parserOptions: ParserOptions = {
-            plugins: isDts ? [["typescript", { dts: true }]] : [],
+            //plugins: isDts ? [["typescript", { dts: true }]] : [],
          };
 
          const parsedScript = await parseScriptAsset.call(
-            this,
-            optimizedPath.path,
+            bundler,
+            source,
             rawContent,
             {
                parserOptions,
                inspectDependencies(node) {
-                  const resolvedUrl = resolve(
+                  const resolved = resolve(
                      node.value,
-                     response.url,
+                     url,
                      getUrlFromProviderHost(provider)
                   );
 
-                  inspectDependencies(
-                     node,
-                     resolvedUrl,
-                     isDts ? "index.d.ts" : "index.js"
-                  );
+                  node.value = getNodeModulesPath(resolved, name, version);
                },
             }
          );
 
-         ast = parsedScript.ast;
-         rawDependencies = parsedScript.dependencies;
+         dependencies = parsedScript.dependencies;
+
          const generated = generateScript(parsedScript.ast, {
-            sourceFileName: optimizedPath.path,
-            filename: optimizedPath.path,
+            sourceFileName: url,
+            filename: url,
             sourceMaps: !!config.bundle.sourceMap,
-            comments: true,
+            comments: false,
          });
 
          content = generated.code;
          map = generated.map as any;
-      } else {
-         const parsedStyle = await parseStyleAsset.call(
-            this,
-            optimizedPath.path,
-            rawContent,
-            {
-               inspectDependencies(node) {
-                  const resolvedUrl = resolve(
-                     node.value,
-                     response.url,
-                     getUrlFromProviderHost(provider)
-                  );
-                  inspectDependencies(node, resolvedUrl, "index.css");
-               },
-            }
-         );
-         ast = parsedStyle.ast;
-         rawDependencies = parsedStyle.dependencies;
-
-         const generated = generateStyle(parsedStyle.ast, {
-            sourceMap: !!config.bundle.sourceMap,
-         }) as CSSTreeGeneratedResult;
-
-         if (typeof generated == "string") {
-            content = generated;
-         } else {
-            content = generated.css;
-            map = MapConverter.fromJSON(generated.map.toString()).toObject();
-         }
-      }
-
-      const asset: PackageAsset = {
-         type,
-         source: optimizedPath.path,
-         ast,
-         isEntry,
-         url: response.url,
-         content: removeSourceMapUrl(content),
-         name: `${pkgInfo.scope ? `@${pkgInfo.scope}/` : ""}${pkgInfo.name}`,
-         version: pkgInfo.version,
-         subpath: isEntry ? subpath : ""
-      } as PackageAsset;
-
-      assets.set(url, asset);
-
-      if (asset.type == "script") {
-         asset.dts = isDts;
       }
 
       // Get source map
@@ -239,58 +125,34 @@ export async function fetchPackage(
          !!config.bundle.sourceMap &&
          config.packageManager.overrides?.sourceMap !== false
       ) {
-         let sourceMap = await fetchSourceMapInContent(
-            rawContent,
-            url,
-            provider
-         );
+         let sourceMap = cached
+            ? cached.map
+            : await fetchSourceMapInContent(rawContent, url, provider);
 
          if (sourceMap && map) {
-            asset.map = mergeSourceMaps(sourceMap, map);
+            map = mergeSourceMaps(sourceMap, map);
          } else {
-            asset.map = sourceMap || map;
+            map = sourceMap || map;
          }
       }
 
-      // Cache
-      if (!cached) {
-         _cache.set(url, { content: rawContent, response, map: asset.map });
-      }
+      const asset: PackageAsset = {
+         type,
+         url: config.packageManager.dedupe?.find((a) => a.includes(url)) || url,
+         source,
+         content,
+         packageSource,
+         map,
+         isEntry,
+      } as PackageAsset;
 
-      // If entry and not a dts, fetch dts
-      if (
-         (config.packageManager.dts || name.startsWith("@types/")) &&
-         isEntry &&
-         asset.type == "script" &&
-         !asset.dts &&
-         provider.dtsHeader
-      ) {
-         const entryExtension = getExtension(entryUrl, provider);
-         if (
-            entryExtension != ".d.ts" &&
-            (EXTENSIONS.script.includes(entryExtension) ||
-               !EXTENSIONS.style.includes(entryExtension))
-         ) {
-            const dtsUrl = response.headers.get(provider.dtsHeader);
-            if (dtsUrl) {
-               await recurse(
-                  resolve(dtsUrl, entryUrl, getUrlFromProviderHost(provider))
-               );
-            } else {
-               DEBUG.warn(
-                  this.getConfig().logLevel,
-                  "[package-manager] Error: Couldn't get the declaration types for " +
-                     entryUrl
-               );
-            }
-         }
-      }
+      assets[url] = asset;
 
-      // Get dependency's dependencies recursively
-      for (const depSource of rawDependencies) {
+      // Fetch dependencies recursively
+      for (const depSource of dependencies) {
          const resolved = resolve(
             depSource,
-            response.url,
+            url,
             getUrlFromProviderHost(provider)
          );
 
@@ -299,23 +161,28 @@ export async function fetchPackage(
          if (!isSuccess) return false;
       }
 
+      // Cache
+      if (!cached) {
+         _cache.set(url, {
+            rawContent: rawContent,
+            response,
+            map: asset.map,
+            asset,
+         });
+      }
+
       return true;
    };
 
    await recurse(entryUrl);
 
-   const finalizedAssets: Record<string, PackageAsset> = {};
-   for (const [_, asset] of assets) {
-      finalizedAssets[asset.source] = asset;
-   }
+   return { assets, dtsAssets };
+}
 
-   console.log(finalizedAssets);
-
-   return {
-      name,
-      version,
-      assets: finalizedAssets,
-   };
+export interface Package {
+   name: string;
+   version: string;
+   assets: Record<string, PackageAsset>;
 }
 
 interface PackageAssetBase {
@@ -324,9 +191,7 @@ interface PackageAssetBase {
    map?: RawSourceMap | null;
    isEntry: boolean;
    content: string;
-   name: string;
-   version: string;
-   subpath: string;
+   packageSource: string;
 }
 
 export interface PackageScriptAsset extends PackageAssetBase {

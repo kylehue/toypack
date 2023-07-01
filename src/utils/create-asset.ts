@@ -7,6 +7,7 @@ export function createAsset<T extends string | Blob>(
       type,
       source,
       content,
+      metadata: {},
    } as Asset<T>;
 
    if (asset.type == "text") {
@@ -21,6 +22,7 @@ export function createAsset<T extends string | Blob>(
 interface AssetBase {
    source: string;
    modified: boolean;
+   metadata: Record<string, any>;
 }
 
 export interface ResourceAsset extends AssetBase {

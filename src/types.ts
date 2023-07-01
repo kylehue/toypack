@@ -30,7 +30,6 @@ export type {
    ModuleTypeConfig,
 } from "./config.js";
 export type {
-   Package,
    PackageManagerConfig,
    PackageProvider,
 } from "./package-manager/index.js";
