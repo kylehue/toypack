@@ -17,6 +17,6 @@ export function parsePackageName(input: string) {
    return {
       name: m[1] || "",
       version: m[2] || "latest",
-      path: m[3] || "",
+      subpath: m[3] || "",
    };
 }
