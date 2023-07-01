@@ -118,6 +118,16 @@ export function getPackageInfoFromUrl(
 
    const fullPath = path.join(fullPackageName, filename);
 
+   console.log({
+      scope,
+      name,
+      version,
+      filename,
+      fullPackageName,
+      fullPath,
+   });
+   
+
    return {
       scope,
       name,

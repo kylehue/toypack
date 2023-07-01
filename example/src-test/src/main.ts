@@ -4,9 +4,9 @@
 // import path from "path";
 // console.log(path);
 import "../react";
-import confetti from "https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/+esm";
-const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
-meowButton.onclick = () => confetti();
+// import confetti from "canvas-confetti";
+// const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
+// meowButton.onclick = () => confetti();
 
 // import Matter from "matter-js";
 // console.log(Matter);
@@ -21,7 +21,7 @@ meowButton.onclick = () => confetti();
 
 // console.log(3);
 // console.log(123456);
-// import pkgjson from "../package";
+// import pkgjson from "../package?raw";
 // console.log(pkgjson);
 // const foo: string = "bar";
 // console.log(foo);

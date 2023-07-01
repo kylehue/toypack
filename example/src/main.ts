@@ -49,6 +49,7 @@ const toypack = new ToypackESM({
 // await toypack.installPackage("vue");
 await toypack.installPackage("react");
 await toypack.installPackage("react-dom/client");
+await toypack.installPackage("canvas-confetti");
 
 (window as any).toypack = toypack;
 console.log(toypack, Babel.availablePlugins, Babel.availablePresets);

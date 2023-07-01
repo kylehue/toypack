@@ -9,6 +9,17 @@ interface FetchResult {
    provider: PackageProvider;
 }
 
+function getMimeType(response: Response) {
+   return response.headers.get("Content-Type")?.split(";")?.[0];
+}
+
+function isAppOrStyle(response: Response) {
+   const mimeType = getMimeType(response);
+   return (
+      mimeType?.startsWith("application") || mimeType?.startsWith("text/css")
+   );
+}
+
 /**
  * Fetch a url. If it fails, use other providers.
  */
@@ -30,6 +41,7 @@ export async function fetchWithProviders(
       if (
          !response.ok ||
          isBadUrl ||
+         !isAppOrStyle(response) ||
          (await provider.isBadResponse?.(response, { name, version }))
       ) {
          // Put in bad urls
@@ -46,7 +58,7 @@ export async function fetchWithProviders(
             backupProvider =
                providers[++currentProviderIndex % providers.length];
 
-            if (backupProvider == provider) {
+            if (backupProvider == providers[0]) {
                isOutOfProviders = true;
                break;
             }
@@ -73,5 +85,7 @@ export async function fetchWithProviders(
       }
    };
 
-   return await recurse();
+   const result = await recurse();
+
+   return result;
 }

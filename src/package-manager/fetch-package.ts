@@ -225,7 +225,7 @@ export async function fetchPackage(
          content: removeSourceMapUrl(content),
          name: `${pkgInfo.scope ? `@${pkgInfo.scope}/` : ""}${pkgInfo.name}`,
          version: pkgInfo.version,
-         subpath
+         subpath: isEntry ? subpath : ""
       } as PackageAsset;
 
       assets.set(url, asset);
@@ -308,6 +308,8 @@ export async function fetchPackage(
    for (const [_, asset] of assets) {
       finalizedAssets[asset.source] = asset;
    }
+
+   console.log(finalizedAssets);
 
    return {
       name,

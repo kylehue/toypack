@@ -24,6 +24,7 @@ import {
    parsePackageName,
    isLocal,
    isUrl,
+   DEBUG,
 } from "./utils";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
@@ -81,27 +82,6 @@ export class Toypack extends Hooks {
       }
 
       this.usePackageProvider({
-         host: "esm.sh",
-         dtsHeader: "X-Typescript-Types",
-      });
-
-      this.usePackageProvider({
-         host: "cdn.jsdelivr.net",
-         postpath: "+esm",
-         prepath: "npm",
-         // We can get the entry's version in the banner
-         handleEntryVersion({ rawContent, name }) {
-            const banner = /^\/\*\*(?<banner>(?:\n|.)*)\*\//.exec(rawContent)
-               ?.groups?.banner;
-            if (!banner) return;
-            const version = new RegExp(
-               `.*Original file: /npm/${name}@v?(?<version>[\\.a-z0-9]+).*/`
-            ).exec(banner)?.groups?.version;
-            return version;
-         },
-      });
-
-      this.usePackageProvider({
          host: "cdn.skypack.dev",
          dtsHeader: "X-Typescript-Types",
          queryParams: {
@@ -124,6 +104,27 @@ export class Toypack extends Hooks {
             if (!dtsUrl) return;
             return getPackageInfoFromUrl(dtsUrl, this, "")?.version;
          },
+      });
+
+      this.usePackageProvider({
+         host: "cdn.jsdelivr.net",
+         postpath: "+esm",
+         prepath: "npm",
+         // We can get the entry's version in the banner
+         handleEntryVersion({ rawContent, name }) {
+            const banner = /^\/\*\*(?<banner>(?:\n|.)*)\*\//.exec(rawContent)
+               ?.groups?.banner;
+            if (!banner) return;
+            const version = new RegExp(
+               `.*Original file: /npm/${name}@v?(?<version>[\\.a-z0-9]+).*/`
+            ).exec(banner)?.groups?.version;
+            return version;
+         },
+      });
+
+      this.usePackageProvider({
+         host: "esm.sh",
+         dtsHeader: "X-Typescript-Types",
       });
    }
 
@@ -183,11 +184,12 @@ export class Toypack extends Hooks {
    protected _findDependency(depSource: string) {
       const matches: PackageDependency[] = [];
       const parsed = parsePackageName(depSource);
-      
+
       for (const dep of Object.values(this._dependencies)) {
          if (dep.name != parsed.name) continue;
          if (dep.subpath != parsed.path) continue;
-         if (dep.version != parsed.version && parsed.version != "latest") continue;
+         if (dep.version != parsed.version && parsed.version != "latest")
+            continue;
 
          matches.push(dep);
       }
@@ -407,6 +409,7 @@ export class Toypack extends Hooks {
    public clearCache() {
       this._cachedDeps.compiled.clear();
       this._cachedDeps.parsed.clear();
+      this._cachedDeps.nodeModules.clear();
    }
 
    /**
@@ -448,9 +451,13 @@ export class Toypack extends Hooks {
    public async run(isProd = false) {
       const oldMode = this._config.bundle.mode;
       this._config.bundle.mode = isProd ? "production" : oldMode;
+      const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
+      const timeAfterGraph = performance.now();
       console.log(graph);
+      const timeBeforeBundle = performance.now();
       const result = await bundle.call(this, graph);
+      const timeAfterBundle = performance.now();
       this._config.bundle.mode = oldMode;
       // Set modified flag to false for all assets (used in caching)
       this._assets.forEach((asset) => {
@@ -460,6 +467,13 @@ export class Toypack extends Hooks {
       if (!isProd && this._iframe) {
          this._iframe.srcdoc = result.html.content;
       }
+      const totalGraphTime = Math.round(timeAfterGraph - timeBeforeGraph);
+      const totalBundleTime = Math.round(timeAfterBundle - timeBeforeBundle);
+      const message =
+         `⏲ Graph  - ${totalGraphTime} ms\n` +
+         `⏲ Bundle - ${totalBundleTime} ms\n` +
+         `⏲ Total  - ${totalGraphTime + totalBundleTime} ms`;
+      DEBUG.info(this._config.logLevel, message);
       return result;
    }
 }
