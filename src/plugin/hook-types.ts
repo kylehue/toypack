@@ -6,7 +6,6 @@ import {
    StyleDependency,
 } from "../graph/index.js";
 import { Toypack } from "../Toypack.js";
-import { parseURL } from "../utils";
 import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
 import { BundleResult, Asset } from "../types";
@@ -76,7 +75,6 @@ export interface BuildHookContext {
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
    getImportCode: (importSource: string) => string;
    getDefaultExportCode: (exportCode: string) => string;
-   parseSource: typeof parseURL;
    error: (message: string) => void;
    warn: (message: string) => void;
    info: (message: string) => void;

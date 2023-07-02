@@ -1,7 +1,6 @@
 import Toypack from "../Toypack.js";
 import { DependencyGraph, Plugin } from "../types";
 import {
-   parseURL,
    getUsableResourcePath,
    DEBUG,
    ERRORS,
@@ -113,14 +112,14 @@ export class PluginManager {
             partialContext.importer
                ? partialContext.graph[partialContext.importer]
                : null,
-         getUsableResourcePath: (source: string, baseDir = ".") => {
+         getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(
-               partialContext.bundler,
+               this.bundler,
                source,
                baseDir
             );
          },
-         getImportCode: (importSource: string) => {
+         getImportCode(importSource: string) {
             const config = this.bundler.getConfig();
             if (config.bundle.moduleType == "esm") {
                return `import "${importSource}";`;
@@ -128,7 +127,7 @@ export class PluginManager {
                return `require("${importSource}");`;
             }
          },
-         getDefaultExportCode: (exportCode: string) => {
+         getDefaultExportCode(exportCode: string) {
             const config = this.bundler.getConfig();
             if (config.bundle.moduleType == "esm") {
                return `export default ${exportCode};`;
@@ -136,20 +135,12 @@ export class PluginManager {
                return `module.exports = ${exportCode};`;
             }
          },
-         parseSource: parseURL,
          error: (message) => {
-            const logLevel = partialContext.bundler.getConfig().logLevel;
-            if (
-               logLevel == "error" ||
-               logLevel == "warn" ||
-               logLevel == "info"
-            ) {
-               // @ts-ignore
-               this.bundler._trigger(
-                  "onError",
-                  ERRORS.plugin(plugin.name, message)
-               );
-            }
+            // @ts-ignore
+            this.bundler._trigger(
+               "onError",
+               ERRORS.plugin(plugin.name, message)
+            );
          },
          warn: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
