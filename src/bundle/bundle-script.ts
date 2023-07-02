@@ -2,7 +2,7 @@ import babelMinify from "babel-minify";
 import MapConverter from "convert-source-map";
 import { SourceMapGenerator, SourceMapConsumer } from "source-map-js";
 import { DependencyGraph } from "../graph";
-import { CodeComposer, Toypack } from "../Toypack.js";
+import { Toypack } from "../Toypack.js";
 import { mergeSourceMapToBundle, getUsableResourcePath } from "../utils";
 import { mergeSourceMaps } from "../utils/merge-source-maps.js";
 import { compileScript } from "./compile-script.js";
@@ -11,12 +11,12 @@ import { requireFunction, requireCall, moduleWrap } from "./runtime.js";
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
-   const bundle = new CodeComposer();
+   let bundle = "";
    const smg = !!sourceMapConfig ? new SourceMapGenerator() : null;
 
    const finalizeBundleContent = () => {
-      const bundleClone = bundle.clone();
-      bundleClone.prepend(requireFunction());
+      let bundleClone = bundle;
+      bundleClone = requireFunction() + bundleClone;
 
       // Call if entry
       const entry = Object.values(graph).find(
@@ -24,16 +24,13 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       );
 
       if (entry && entry.type == "script") {
-         bundleClone.breakLine().append(requireCall(entry.source));
+         bundleClone += "\n";
+         bundleClone += requireCall(entry.source);
       }
 
-      bundleClone.wrap(`
-      (function () {
-         <CODE_BODY>
-      })();
-      `);
+      bundleClone = "(function () {\n" + bundleClone + "\n})();";
 
-      return bundleClone.toString();
+      return bundleClone;
    };
 
    for (const source in graph) {
@@ -42,7 +39,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          const compiled = await compileScript.call(this, chunk, graph);
 
          const wrapped = moduleWrap(source, compiled.content);
-         bundle.breakLine().append(wrapped);
+         bundle += "\n" + wrapped;
 
          if (smg && compiled.map && typeof chunk.asset.content == "string") {
             let originalContent: string | undefined = undefined;
@@ -78,7 +75,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
             )}";`
          );
 
-         bundle.breakLine().append(cjsModuleContents);
+         bundle += "\n" + cjsModuleContents;
       }
    }
 

@@ -1,6 +1,6 @@
 import MapConverter from "convert-source-map";
 import { SourceMapGenerator } from "source-map-js";
-import { CodeComposer, Toypack } from "../Toypack.js";
+import { Toypack } from "../Toypack.js";
 import { compileStyle } from "./compile-style.js";
 import { mergeSourceMapToBundle } from "../utils";
 import { DependencyGraph } from "../types";
@@ -8,7 +8,7 @@ import { DependencyGraph } from "../types";
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
-   const bundle = new CodeComposer();
+   let bundle = "";
    const smg = !!sourceMapConfig ? new SourceMapGenerator() : null;
 
    for (const source in graph) {
@@ -18,7 +18,7 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
       const compiled = compileStyle.call(this, chunk, graph);
       if (!compiled.content) continue;
 
-      bundle.append(compiled.content).breakLine();
+      bundle += compiled.content + "\n";
 
       if (smg && compiled.map && typeof chunk.asset.content == "string") {
          let originalContent: string | undefined = undefined;
@@ -41,14 +41,14 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
             compiled.map,
             chunk.asset.source,
             compiled.content,
-            bundle.toString(),
+            bundle,
             originalContent
          );
       }
    }
 
    return {
-      content: bundle.toString(),
+      content: bundle,
       map: smg ? MapConverter.fromJSON(smg.toString()) : null,
    };
 }

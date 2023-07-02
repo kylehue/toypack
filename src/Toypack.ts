@@ -438,7 +438,6 @@ export class Toypack extends Hooks {
 // Lib exports & types
 export default Toypack;
 export * as Babel from "@babel/standalone";
-export { CodeComposer } from "./utils/CodeComposer.js";
 export type { ToypackConfig, Asset };
 
 interface ICache {
