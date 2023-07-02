@@ -62,14 +62,14 @@ function compile(
    htmlPluginOptions?: HTMLPluginOptions
 ) {
    const htmlAst = parseHTML(content, htmlPluginOptions?.parserOptions);
-   const dependencies: string[] = [];
+   const dependencies = new Set<string>();
    let bundledInlineStyles = "";
    traverse(htmlAst, (node) => {
       if (!(node instanceof HTMLElement)) return;
       const depSource = extractDepSourceFromNode(node);
       if (depSource) {
          node.remove();
-         dependencies.push(depSource);
+         dependencies.add(depSource);
       }
 
       // Import maps aren't supported
@@ -114,13 +114,15 @@ function compile(
        * urls ourselves.
        */
       if (resourceSrcAttrTags.includes(node.tagName) && node.attributes.src) {
+         const relativeSource = "./" + node.attributes.src;
          const usableSource = this.getUsableResourcePath(
-            "./" + node.attributes.src,
+            relativeSource,
             path.dirname(source)
          );
 
          if (usableSource) {
             node.setAttribute("src", usableSource);
+            dependencies.add(relativeSource);
          }
       }
    });
