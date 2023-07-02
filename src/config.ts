@@ -48,10 +48,11 @@ export const defaultConfig = {
          extensions: [] as string[],
       },
       /**
-       * Indicates whether to generate source maps for the bundled code.
+       * Set to true to produce source maps. Can also be an object containing
+       * the source map configuration.
        * @default true
        */
-      sourceMap: true as SourceMapConfig,
+      sourceMap: true as SourceMapConfig | boolean,
    },
    /**
     * Configuration for Babel.
@@ -84,7 +85,14 @@ export type ToypackConfig = typeof defaultConfig;
 export type ModuleTypeConfig = "esm" | "cjs";
 export type ModeConfig = "production" | "development";
 export type LogLevelConfig = "error" | "warn" | "info" | "none";
-export type SourceMapConfig = boolean | "nosources";
+export type SourceMapConfig = {
+   /** Whether to include the source contents or not. */
+   includeContent?: boolean;
+   /** Paths to include from source maps. */
+   include?: string[];
+   /** Paths to exclude from source maps. */
+   exclude?: string[];
+};
 export type BabelTransformConfig = Pick<
    TransformOptions,
    | "plugins"

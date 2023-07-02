@@ -9,7 +9,8 @@ import MapConverter from "convert-source-map";
 import { RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
 import { mergeSourceMaps } from "../utils";
-import { DependencyGraph, ScriptDependency } from "src/types.js";
+import { DependencyGraph, ScriptDependency } from "../types.js";
+import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 
 const importantPresets: PluginItem[] = ["env"];
 const importantPlugins: PluginItem[] = [
@@ -22,6 +23,11 @@ export async function compileScript(
    graph: DependencyGraph
 ): Promise<CompiledScriptResult> {
    const config = this.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
+   const shouldMap = shouldProduceSourceMap(
+      chunk.asset.source,
+      sourceMapConfig
+   );
 
    // Check cache
    const bundleMode = config.bundle.mode;
@@ -117,7 +123,7 @@ export async function compileScript(
       ],
       sourceFileName: chunk.source,
       filename: chunk.source,
-      sourceMaps: !!config.bundle.sourceMap,
+      sourceMaps: shouldMap,
       envName: mode,
       minified: false,
       cloneInputAst: false,
@@ -128,10 +134,12 @@ export async function compileScript(
       ...importantBabelOptions,
    }) as any as BabelFileResult;
 
-   let map = MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap;
-
-   if (chunk.map) {
-      map = mergeSourceMaps(chunk.map, map);
+   let map: RawSourceMap | null = null;
+   if (shouldMap) {
+      map = MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap;
+      if (chunk.map) {
+         map = mergeSourceMaps(chunk.map, map);
+      }
    }
 
    const result = {

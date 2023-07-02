@@ -3,10 +3,7 @@ import type { ParserOptions } from "@babel/parser";
 import { RawSourceMap } from "source-map-js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import type { Toypack } from "../types.js";
-import {
-   mergeSourceMaps,
-   parsePackageName,
-} from "../utils/index.js";
+import { mergeSourceMaps, parsePackageName } from "../utils/index.js";
 import { PackageProvider } from "./index.js";
 import {
    _cache,
@@ -16,9 +13,10 @@ import {
    getUrlFromProviderHost,
    getNodeModulesPath,
    getSource,
-   findDuplicateAsset
+   findDuplicateAsset,
 } from "./utils.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
+import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 
 export async function fetchPackage(
    bundler: Toypack,
@@ -26,6 +24,7 @@ export async function fetchPackage(
    packageSource: string
 ) {
    const config = bundler.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
    let providerIndex = 0;
    let provider = providers[providerIndex];
    let entryUrl = getFetchUrlFromProvider(provider, packageSource);
@@ -93,6 +92,7 @@ export async function fetchPackage(
       let content: string = rawContent;
       let dependencies: string[] = [];
       let map: any;
+      const shouldMap = shouldProduceSourceMap(source, sourceMapConfig);
 
       // Parse, get dependencies, and recompile
       if (type == "script") {
@@ -123,7 +123,7 @@ export async function fetchPackage(
          const generated = generateScript(parsedScript.ast, {
             sourceFileName: source,
             filename: source,
-            sourceMaps: !!config.bundle.sourceMap,
+            sourceMaps: shouldMap,
             comments: false,
          });
 
@@ -132,10 +132,7 @@ export async function fetchPackage(
       }
 
       // Get source map
-      if (
-         !!config.bundle.sourceMap &&
-         config.packageManager.overrides?.sourceMap !== false
-      ) {
+      if (shouldMap) {
          let sourceMap = cached
             ? cached.map
             : await fetchSourceMapInContent(rawContent, url, provider);

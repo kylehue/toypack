@@ -146,9 +146,6 @@ export interface PackageManagerConfig {
     * @default false
     */
    dts?: boolean;
-   overrides?: {
-      sourceMap?: boolean;
-   };
    /**
     * Use this option to remove copies of the same package.
     */

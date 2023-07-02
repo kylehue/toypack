@@ -1,16 +1,18 @@
 import babelMinify from "babel-minify";
 import MapConverter from "convert-source-map";
-import { SourceMapGenerator } from "source-map-js";
+import { SourceMapGenerator, SourceMapConsumer } from "source-map-js";
 import { DependencyGraph } from "../graph";
 import { CodeComposer, Toypack } from "../Toypack.js";
 import { mergeSourceMapToBundle, getUsableResourcePath } from "../utils";
 import { mergeSourceMaps } from "../utils/merge-source-maps.js";
 import { compileScript } from "./compile-script.js";
 import { requireFunction, requireCall, moduleWrap } from "./runtime.js";
+
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
    const bundle = new CodeComposer();
-   const smg = config.bundle.sourceMap ? new SourceMapGenerator() : null;
+   const smg = !!sourceMapConfig ? new SourceMapGenerator() : null;
 
    const finalizeBundleContent = () => {
       const bundleClone = bundle.clone();
@@ -80,10 +82,6 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       }
    }
 
-   if (smg && config.bundle.sourceMap == "nosources") {
-      (smg as any)._sourcesContents = [];
-   }
-
    const result = {
       content: finalizeBundleContent(),
       map: smg ? MapConverter.fromJSON(smg.toString()) : null,
@@ -94,7 +92,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          result.content,
          {
             builtIns: false,
-            ...config.babel.minify
+            ...config.babel.minify,
          },
          {
             sourceMaps: true,

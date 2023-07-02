@@ -4,6 +4,7 @@ import { SourceMapGenerator, RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
 import { mergeSourceMaps } from "../utils";
 import { DependencyGraph, StyleDependency } from "../types";
+import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 
 export function compileStyle(
    this: Toypack,
@@ -11,6 +12,11 @@ export function compileStyle(
    graph: DependencyGraph
 ) {
    const config = this.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
+   const shouldMap = shouldProduceSourceMap(
+      chunk.asset.source,
+      sourceMapConfig
+   );
 
    // Check cache
    const bundleMode = config.bundle.mode;
@@ -45,7 +51,7 @@ export function compileStyle(
    });
 
    const compiled = CSSTree.generate(chunk.ast, {
-      sourceMap: !!config.bundle.sourceMap,
+      sourceMap: shouldMap,
    }) as any as CSSTreeGeneratedResult;
 
    const result = {
@@ -58,12 +64,12 @@ export function compileStyle(
       result.content = compiled;
    } else {
       result.content = compiled.css;
-      result.map = !!config.bundle.sourceMap
+      result.map = shouldMap
          ? MapConverter.fromJSON(compiled.map.toString()).toObject()
          : null;
    }
 
-   if (result.map && chunk.map) {
+   if (shouldMap && result.map && chunk.map) {
       result.map = mergeSourceMaps(chunk.map, result.map);
    }
 

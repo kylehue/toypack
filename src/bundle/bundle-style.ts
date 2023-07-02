@@ -7,8 +7,9 @@ import { DependencyGraph } from "../types";
 
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
    const bundle = new CodeComposer();
-   const smg = config.bundle.sourceMap ? new SourceMapGenerator() : null;
+   const smg = !!sourceMapConfig ? new SourceMapGenerator() : null;
 
    for (const source in graph) {
       const chunk = graph[source];
@@ -21,10 +22,7 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
 
       if (smg && compiled.map && typeof chunk.asset.content == "string") {
          let originalContent: string | undefined = undefined;
-         if (
-            config.bundle.sourceMap != "nosources" &&
-            chunk.asset.type == "text"
-         ) {
+         if (chunk.asset.type == "text") {
             originalContent = chunk.asset.content;
          }
 

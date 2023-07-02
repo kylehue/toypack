@@ -1,13 +1,9 @@
 import { BuildHookContext, LoadResult } from "../plugin/hook-types.js";
 import { PartialContext } from "../plugin/PluginManager.js";
 import { Toypack } from "../Toypack.js";
-import {
-   mergeSourceMaps,
-   isSupported,
-   ERRORS,
-   Asset,
-   ResourceAsset,
-} from "../utils";
+import { mergeSourceMaps, isSupported, ERRORS } from "../utils";
+import { Asset, ResourceAsset } from "../types";
+import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 
 /**
  * Load a chunk by its source.
@@ -20,14 +16,17 @@ export async function loadChunk(
    isEntry: boolean,
    { graph, importer }: PartialContext
 ) {
+   const realAsset = this.getAsset(rawSource);
    /**
     * Importer can't possibly be undefined if the asset with the rawSource
     * is undefined.
     * Importer only becomes undefined if the rawSource asset is the entry.
     */
-   const realAsset = this.getAsset(rawSource);
    const asset = realAsset || graph[importer!].asset;
    const type = this._getTypeFromSource(rawSource);
+   const config = this.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
+   const shouldMap = shouldProduceSourceMap(asset.source, sourceMapConfig);
 
    const loaded: LoadChunkResult = {
       type: type,
@@ -36,7 +35,7 @@ export async function loadChunk(
             ? asset.content
             : undefined,
       asset: asset,
-      map: realAsset?.type == "text" ? realAsset.map : null
+      map: realAsset?.type == "text" ? realAsset.map : null,
    } as LoadChunkResult;
 
    await this._pluginManager.triggerHook({
@@ -63,7 +62,10 @@ export async function loadChunk(
                loaded.type = result.type;
             }
 
-            if (loaded.type == "script" || loaded.type == "style") {
+            if (
+               shouldMap &&
+               (loaded.type == "script" || loaded.type == "style")
+            ) {
                if (loaded.map && result.map) {
                   loaded.map = mergeSourceMaps(loaded.map, result.map);
                } else if (!loaded.map && result.map) {
@@ -102,7 +104,7 @@ export async function loadChunk(
             loaded.type = loaderResult.type;
          }
 
-         if (loaded.type == "script" || loaded.type == "style") {
+         if (shouldMap && (loaded.type == "script" || loaded.type == "style")) {
             if (loaded.map && loaderResult.map) {
                loaded.map = mergeSourceMaps(loaded.map, loaderResult.map);
             } else if (!loaded.map && loaderResult.map) {

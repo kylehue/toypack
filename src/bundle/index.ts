@@ -28,9 +28,18 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
    };
 
    const config = this.getConfig();
+   const sourceMapConfig = config.bundle.sourceMap;
    const mode = config.bundle.mode;
    const js = await bundleScript.call(this, graph);
    const css = await bundleStyle.call(this, graph);
+
+   if (
+      typeof sourceMapConfig == "object" &&
+      sourceMapConfig.includeContent === false
+   ) {
+      if (js.map) js.map.sourcemap.sourcesContent = undefined;
+      if (css.map) css.map.sourcemap.sourcesContent = undefined;
+   }
 
    result.js.content = js.content;
    result.css.content = css.content;
