@@ -25,7 +25,8 @@ export async function loadChunk(
     * is undefined.
     * Importer only becomes undefined if the rawSource asset is the entry.
     */
-   const asset = this.getAsset(rawSource) || graph[importer!].asset;
+   const realAsset = this.getAsset(rawSource);
+   const asset = realAsset || graph[importer!].asset;
    const type = this._getTypeFromSource(rawSource);
 
    const loaded: LoadChunkResult = {
@@ -35,15 +36,8 @@ export async function loadChunk(
             ? asset.content
             : undefined,
       asset: asset,
+      map: realAsset?.type == "text" ? realAsset.map : null
    } as LoadChunkResult;
-
-   // Merge source map from node modules
-   if (loaded.type == "script" || loaded.type == "style") {
-      const cacheFromNodeModules = this._cachedDeps.nodeModules.get(rawSource);
-      if (cacheFromNodeModules?.map) {
-         loaded.map = cacheFromNodeModules.map;
-      }
-   }
 
    await this._pluginManager.triggerHook({
       name: "load",

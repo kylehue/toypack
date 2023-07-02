@@ -9,7 +9,7 @@ import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import type { Toypack } from "../types.js";
-import { mergeSourceMaps, parsePackageName } from "../utils/index.js";
+import { mergeSourceMaps, parsePackageName, removeSourceMapUrl } from "../utils/index.js";
 import { PackageProvider } from "./index.js";
 import {
    getFetchUrlFromProvider,
@@ -110,8 +110,8 @@ export async function fetchPackage(
          dependencies = parsedScript.dependencies;
 
          const generated = generateScript(parsedScript.ast, {
-            sourceFileName: url,
-            filename: url,
+            sourceFileName: source,
+            filename: source,
             sourceMaps: !!config.bundle.sourceMap,
             comments: false,
          });
@@ -128,7 +128,7 @@ export async function fetchPackage(
          let sourceMap = cached
             ? cached.map
             : await fetchSourceMapInContent(rawContent, url, provider);
-
+         
          if (sourceMap && map) {
             map = mergeSourceMaps(sourceMap, map);
          } else {

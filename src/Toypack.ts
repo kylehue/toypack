@@ -25,6 +25,7 @@ import {
    isLocal,
    isUrl,
    DEBUG,
+   TextAsset,
 } from "./utils";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
@@ -54,7 +55,6 @@ export class Toypack extends Hooks {
    protected _cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
-      nodeModules: new Map(),
    };
    protected _dependencies: Record<string, string> = {};
    constructor(config?: PartialDeep<ToypackConfig>) {
@@ -180,19 +180,13 @@ export class Toypack extends Hooks {
             if (asset.metadata.url != url) continue;
             return asset;
          }
-
-         for (const urls of this._config.packageManager.dedupe || []) {
-            // if (url == urls[0]) continue;
-            if (!urls.includes(url)) continue;
-            console.log(url);
-            return Object.values(this._assets).find(a => a.metadata.url == url);
-         }
       };
 
-      for (const { url, source, content } of pkg.assets) {
-         const asset = this.addOrUpdateAsset(source, content);
+      for (const { url, source, content, map } of pkg.assets) {
+         const asset = this.addOrUpdateAsset<TextAsset>(source, content);
          asset.metadata.url = url;
-         
+         asset.map = map;
+
          // dedupe same urls
          const duplicateAsset = findDuplicateAsset(url);
          if (duplicateAsset && duplicateAsset.source != asset.source) {
@@ -278,6 +272,7 @@ export class Toypack extends Hooks {
       if (isNodeModule) {
          const { name, subpath } = parsePackageName(relativeSource);
          const version = this._dependencies[name];
+         /** @todo if no version, find one that works in this._assets */
          relativeSource = `${name}@${version}${subpath}`;
          // const deps = this._findDependency(relativeSource);
          // let dep: PackageDependency | undefined = undefined;
@@ -360,10 +355,13 @@ export class Toypack extends Hooks {
     * @param {string | Blob} [content=""] The content of the asset.
     * @returns {Asset} The created or updated Asset object.
     */
-   public addOrUpdateAsset(source: string, content: string | Blob = "") {
+   public addOrUpdateAsset<T = Asset>(
+      source: string,
+      content: string | Blob = ""
+   ): T {
       if (!isValidAssetSource(source)) {
          this._trigger("onError", ERRORS.invalidAssetSource(source));
-         return {} as Asset;
+         return {} as T;
       }
 
       source = path.join("/", source);
@@ -381,7 +379,7 @@ export class Toypack extends Hooks {
          asset.modified = true;
       }
 
-      return asset;
+      return asset as T;
    }
 
    /**
@@ -409,7 +407,6 @@ export class Toypack extends Hooks {
    public clearCache() {
       this._cachedDeps.compiled.clear();
       this._cachedDeps.parsed.clear();
-      this._cachedDeps.nodeModules.clear();
    }
 
    /**
@@ -498,12 +495,6 @@ interface ICache {
       {
          asset: Asset;
          content: string;
-         map?: RawSourceMap | null;
-      }
-   >;
-   nodeModules: Map<
-      string,
-      {
          map?: RawSourceMap | null;
       }
    >;
