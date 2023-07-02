@@ -1,35 +1,24 @@
 import generateScript from "@babel/generator";
 import type { ParserOptions } from "@babel/parser";
-import type { Node } from "@babel/traverse";
-import MapConverter from "convert-source-map";
-import { CssNode, generate as generateStyle } from "css-tree";
-import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
-import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import type { Toypack } from "../types.js";
-import { mergeSourceMaps, parsePackageName, removeSourceMapUrl } from "../utils/index.js";
+import {
+   mergeSourceMaps,
+   parsePackageName,
+} from "../utils/index.js";
 import { PackageProvider } from "./index.js";
 import {
+   _cache,
    getFetchUrlFromProvider,
    getType,
    resolve,
    getUrlFromProviderHost,
    getNodeModulesPath,
    getSource,
+   findDuplicateAsset
 } from "./utils.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
-
-export const _cache = new Map<
-   string,
-   {
-      rawContent: string;
-      response: Response;
-      map?: RawSourceMap | null;
-      asset: PackageAsset;
-   }
->();
 
 export async function fetchPackage(
    bundler: Toypack,
@@ -46,8 +35,30 @@ export async function fetchPackage(
 
    const recurse = async (url: string) => {
       if (url in assets || url in dtsAssets) return false;
-
       const isEntry = entryUrl == url;
+
+      // Dedupe
+      const duplicateAsset = findDuplicateAsset(
+         url,
+         config.packageManager.dedupe || []
+      );
+      if (duplicateAsset) {
+         const asset: PackageAsset = {
+            type: "script",
+            packageSource,
+            url,
+            isEntry,
+            source: getSource(name, version, subpath, url, isEntry, "script"),
+            content:
+               `export * from "${duplicateAsset.source}";\n` +
+               `export { default } from "${duplicateAsset.source}";`,
+            dts: false,
+         };
+
+         assets[url] = asset;
+         return true;
+      }
+
       const cached = _cache.get(url);
       const response = cached ? cached.response : await fetch(url);
       url = response.url;
@@ -128,7 +139,7 @@ export async function fetchPackage(
          let sourceMap = cached
             ? cached.map
             : await fetchSourceMapInContent(rawContent, url, provider);
-         
+
          if (sourceMap && map) {
             map = mergeSourceMaps(sourceMap, map);
          } else {
@@ -138,7 +149,7 @@ export async function fetchPackage(
 
       const asset: PackageAsset = {
          type,
-         url: config.packageManager.dedupe?.find((a) => a.includes(url)) || url,
+         url,
          source,
          content,
          packageSource,
@@ -196,13 +207,11 @@ interface PackageAssetBase {
 
 export interface PackageScriptAsset extends PackageAssetBase {
    type: "script";
-   ast: Node;
    dts: boolean;
 }
 
 export interface PackageStyleAsset extends PackageAssetBase {
    type: "style";
-   ast: CssNode;
 }
 
 export type PackageAsset = PackageScriptAsset | PackageStyleAsset;

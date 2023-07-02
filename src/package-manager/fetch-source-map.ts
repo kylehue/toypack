@@ -1,8 +1,7 @@
 import { RawSourceMap } from "source-map-js";
 import { PackageProvider } from ".";
-import { _cache } from "./fetch-package";
 import { getSourceMapUrl } from "../utils";
-import { getUrlFromProviderHost, resolve } from "./utils";
+import { getUrlFromProviderHost, resolve, _cache } from "./utils";
 
 export async function fetchSourceMapInContent(
    content: string,

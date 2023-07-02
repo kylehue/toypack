@@ -1,6 +1,18 @@
 import path from "path-browserify";
 import { PackageProvider } from ".";
 import { EXTENSIONS, isUrl, parsePackageName } from "../utils";
+import { PackageAsset } from "./fetch-package";
+import { RawSourceMap } from "source-map-js";
+
+export const _cache = new Map<
+   string,
+   {
+      rawContent: string;
+      response: Response;
+      map?: RawSourceMap | null;
+      asset: PackageAsset;
+   }
+>();
 
 export function queryParamsToString(params?: Record<string, string | true>) {
    if (!params) return "";
@@ -122,4 +134,12 @@ export function getType(response: Response) {
    const isStyle =
       mimeType == "text/css" || EXTENSIONS.style.includes(extension);
    return isScript ? "script" : isStyle ? "style" : null;
+}
+
+export function findDuplicateAsset(url: string, dedupeConfig: string[][]) {
+   const group = dedupeConfig.find((a) => a.includes(url));
+   if (!group || !group.length) return null;
+   const duplicateUrl = group[0] == url ? null : group[0];
+   if (!duplicateUrl) return null;
+   return _cache.get(duplicateUrl)?.asset || null;
 }
