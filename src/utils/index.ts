@@ -1,5 +1,4 @@
 export * from "./CodeComposer.js";
-export * from "./create-asset.js";
 export * as DEBUG from "./debug.js";
 export * as ERRORS from "./errors.js";
 export * as EXTENSIONS from "./extensions.js";
@@ -18,4 +17,3 @@ export * from "./merge-source-map-bundle.js";
 export * from "./merge-source-maps.js";
 export * from "./parse-package-name.js";
 export * from "./parse-url.js";
-export * from "./resolve.js";

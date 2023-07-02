@@ -12,21 +12,19 @@ import { ToypackConfig, defaultConfig } from "./config.js";
 import { getDependencyGraph } from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
-import { Asset, ResolveOptions, Plugin, Loader } from "./types.js";
+import { Asset, ResolveOptions, Plugin, Loader, TextAsset } from "./types.js";
 import {
-   resolve,
    mergeObjects,
-   createAsset,
    isValidAssetSource,
    ERRORS,
    EXTENSIONS,
-   isNodeModule,
    parsePackageName,
    isLocal,
    isUrl,
    DEBUG,
-   TextAsset,
 } from "./utils";
+import { createAsset } from "./utils/create-asset.js";
+import { resolve } from "./utils/resolve.js";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";

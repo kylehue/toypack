@@ -6,10 +6,10 @@ import {
    StyleDependency,
 } from "../graph/index.js";
 import { Toypack } from "../Toypack.js";
-import { parseURL, Asset } from "../utils";
+import { parseURL } from "../utils";
 import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
-import { BundleResult } from "src/bundle/index.js";
+import { BundleResult, Asset } from "../types";
 
 // Interfaces
 export interface ModuleInfo {

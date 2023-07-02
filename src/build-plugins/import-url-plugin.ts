@@ -1,5 +1,5 @@
 import { RawSourceMap } from "source-map-js";
-import { resolve, getType, getExtension } from "../package-manager/utils";
+import { resolve, getType } from "../package-manager/utils";
 import { Plugin } from "../types.js";
 import { getSourceMapUrl, isUrl, removeSourceMapUrl } from "../utils";
 import path from "path-browserify";
@@ -27,7 +27,7 @@ const importUrlPlugin: Plugin = () => {
                   }
                }
 
-               const type = getType(path.extname(url), response);
+               const type = getType(response);
                if (!type) {
                   this.warn(`Could not determine the type of ${url}.`);
                }
