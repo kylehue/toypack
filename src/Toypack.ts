@@ -243,17 +243,6 @@ export class Toypack extends Hooks {
     * @returns {string} The resolved absolute path.
     */
    public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
-      const isNodeModule = !isLocal(relativeSource) && !isUrl(relativeSource);
-      if (isNodeModule) {
-         const {
-            name,
-            subpath,
-            version: _version,
-         } = parsePackageName(relativeSource);
-         const version = this._dependencies[name] || _version;
-         relativeSource = `${name}@${version}${subpath}`;
-      }
-
       const opts = Object.assign(
          {
             aliases: this._config.bundle.resolve.alias,
@@ -278,7 +267,30 @@ export class Toypack extends Hooks {
          assets[source] = typeof asset.content == "string" ? asset.content : "";
       }
 
-      return resolve(assets, relativeSource, opts);
+      const result = resolve(assets, relativeSource, opts);
+
+      if (!result) {
+         const isNodeModule =
+            !isLocal(relativeSource) && !isUrl(relativeSource);
+         /**
+          * If still not resolved, and it's an import from node_modules,
+          * we'd probably need to resolve it with version. This is because
+          * Toypack's paths of installed packages has the version in it.
+          */
+         if (isNodeModule) {
+            const {
+               name,
+               subpath,
+               version: _version,
+            } = parsePackageName(relativeSource);
+            const version = this._dependencies[name] || _version;
+            relativeSource = `${name}@${version}${subpath}`;
+         }
+
+         return resolve(assets, relativeSource, opts);
+      } else {
+         return result;
+      }
    }
 
    /**
