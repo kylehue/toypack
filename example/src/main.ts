@@ -32,6 +32,9 @@ const toypack = new ToypackESM({
          },
       },
       mode: "development",
+      sourceMap: {
+         exclude: ["/node_modules/"]
+      },
    },
    babel: {
       transform: {
@@ -40,6 +43,14 @@ const toypack = new ToypackESM({
       parse: {
          plugins: ["typescript", "jsx"],
       },
+   },
+   packageManager: {
+      dedupe: [
+         [
+            "https://cdn.jsdelivr.net/npm/react@latest/+esm",
+            "https://cdn.jsdelivr.net/npm/react@18.2.0/+esm",
+         ],
+      ],
    },
 });
 

@@ -1,9 +1,6 @@
-import type { Node } from "@babel/traverse";
-import type { CssNode } from "css-tree";
-import type { RawSourceMap } from "source-map-js";
-import type { SourceMapConfig, Toypack } from "../types";
+import type { Toypack } from "../types";
 import { DEBUG, ERRORS } from "../utils";
-import { Package, PackageAsset, fetchPackage } from "./fetch-package.js";
+import { PackageAsset, fetchPackage } from "./fetch-package.js";
 
 /**
  * Fetch a package from the specified provider(s).
@@ -114,13 +111,11 @@ export interface PackageProvider {
     */
    host: string;
    /**
-    * If provided, the package manager will use it to fetch
-    * .d.ts files.
+    * If provided, the package manager will use it to fetch .d.ts files.
     */
    dtsHeader?: string;
    /**
-    * Additional query parameters to be appended to the package
-    * manager requests.
+    * Additional query parameters to be appended to the package requests.
     */
    queryParams?: Record<string, string | true>;
    /**
@@ -134,8 +129,8 @@ export interface PackageProvider {
     */
    prepath?: string;
    /**
-    * Function to check whether the fetch response is ok or not. Return true
-    * if not ok and false if ok.
+    * Function to check whether the fetch response is ok or not.
+    * Return true if not ok and false if ok.
     */
    isBadResponse?: (response: Response) => Promise<boolean> | boolean;
 }
@@ -147,7 +142,9 @@ export interface PackageManagerConfig {
     */
    dts?: boolean;
    /**
-    * Use this option to remove copies of the same package.
+    * An array of URLs used to remove duplicate packages. If a package's
+    * URL is in that array, it won't use `fetch()` and will just simply
+    * export everything from the package that has the same URL.
     */
    dedupe?: string[][];
 }

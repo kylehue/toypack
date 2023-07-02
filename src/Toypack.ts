@@ -30,14 +30,6 @@ import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
 import { PackageProvider, getPackage, test } from "./package-manager/index.js";
 
-interface PackageDependency {
-   name: string;
-   subpath: string;
-   version: string;
-   resolved: string;
-   isEntry: boolean;
-}
-
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
    private _extensions = {
@@ -159,7 +151,7 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Install a package from npm.
+    * Install a package from registered providers.
     * @param name The name of the package to install.
     * @param version The version of the package to install. Defaults
     * to latest.
@@ -185,7 +177,8 @@ export class Toypack extends Hooks {
          asset.metadata.url = url;
          asset.map = map;
 
-         // dedupe same urls
+         // auto-dedupe same urls
+         // note: this isn't the same as the dedupe in package manager
          const duplicateAsset = findDuplicateAsset(url);
          if (duplicateAsset && duplicateAsset.source != asset.source) {
             asset.content =
@@ -193,22 +186,6 @@ export class Toypack extends Hooks {
                `export {default} from "${duplicateAsset.source}";`;
          }
       }
-
-      // for (const pkgAsset of Object.values(pkg.assets)) {
-      //    const { name, version, subpath, content, map, source } = pkgAsset;
-      //    const key = `${name}${subpath} ${version}`;
-      //    this._dependencies[key] = {
-      //       name,
-      //       version,
-      //       resolved: source,
-      //       subpath,
-      //       isEntry: this._dependencies[key]?.isEntry || pkgAsset.isEntry,
-      //    };
-      //    this.addOrUpdateAsset(source, content);
-      //    this._cachedDeps.nodeModules.set(source, {
-      //       map: map,
-      //    });
-      // }
    }
 
    /**
@@ -268,40 +245,13 @@ export class Toypack extends Hooks {
    public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
       const isNodeModule = !isLocal(relativeSource) && !isUrl(relativeSource);
       if (isNodeModule) {
-         const { name, subpath } = parsePackageName(relativeSource);
-         const version = this._dependencies[name];
-         /** @todo if no version, find one that works in this._assets */
+         const {
+            name,
+            subpath,
+            version: _version,
+         } = parsePackageName(relativeSource);
+         const version = this._dependencies[name] || _version;
          relativeSource = `${name}@${version}${subpath}`;
-         // const deps = this._findDependency(relativeSource);
-         // let dep: PackageDependency | undefined = undefined;
-         // if (deps.length == 1) {
-         //    dep = deps[0];
-         // } else if (deps.length > 1) {
-         //    /**
-         //     * If there are 2 or more matches, return the one
-         //     * that is not installed just because it's a dependency of
-         //     * a dependency.
-         //     */
-         //    dep = deps.find((d) => d.isEntry);
-
-         //    /**
-         //     * If every dep is just a dependency of a dependency,
-         //     * return the one that has the latest version.
-         //     */
-         //    if (!dep) {
-         //       // Sort versions
-         //       // https://stackoverflow.com/a/40201629/16446474
-         //       // prettier-ignore
-         //       dep = deps.find((d) => d.version == "latest") ??
-         //          deps.find((d) => d.version == deps
-         //             .map((a) => a.version.split(".").map((n) => +n + 100000)
-         //             .join(".")).sort()
-         //             .map((a) => a.split(".").map((n) => +n - 100000).join(".")
-         //          )[0]);
-         //    }
-         // }
-
-         // if (dep?.resolved) return dep.resolved;
       }
 
       const opts = Object.assign(

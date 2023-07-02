@@ -4,9 +4,11 @@
 // import path from "path";
 // console.log(path);
 import "../react";
-// import confetti from "canvas-confetti";
-// const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
-// meowButton.onclick = () => confetti();
+import confetti from "canvas-confetti";
+const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
+meowButton.onclick = () => confetti();
+// import * as Vue from "vue";
+// console.log(Vue);
 
 // import Matter from "matter-js";
 // console.log(Matter);
