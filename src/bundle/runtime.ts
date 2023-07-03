@@ -56,8 +56,8 @@ export function moduleWrap(source: string, code: string) {
    const varStr = `${identifiers.modules}["${source}"]`;
    return `
 ${varStr} = function (module, exports, require) {
-   ${code}
-   return module.exports;
+${code}
+return module.exports;
 }
 `;
 }
