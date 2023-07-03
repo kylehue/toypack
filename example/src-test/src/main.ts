@@ -3,6 +3,7 @@
 // console.log(path.join("src", "classes"));
 // import path from "path";
 // console.log(path);
+import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "../react";
 import confetti from "canvas-confetti";
 const meowButton = document.getElementById<HTMLButtonElement>("meow")!;

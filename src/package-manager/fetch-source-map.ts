@@ -10,7 +10,7 @@ export async function fetchSourceMapInContent(
 ) {
    let sourceMap: RawSourceMap | null = null;
    const cached = _cache.get(url);
-   if (cached?.map) {
+   if (cached && cached.type != "resource" && cached.map) {
       sourceMap = cached.map;
    } else {
       const sourceMapUrl = getSourceMapUrl(content);

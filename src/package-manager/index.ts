@@ -128,21 +128,45 @@ export interface PackageProvider {
    /**
     * If provided, the package manager will use it to fetch .d.ts files.
     */
-   dtsHeader?: string;
+   dtsHeader?:
+      | string
+      | ((packageInfo: {
+           name: string;
+           subpath: string;
+           version: string;
+        }) => string | void);
    /**
     * Additional query parameters to be appended to the package requests.
     */
-   queryParams?: Record<string, string | true>;
+   queryParams?:
+      | Record<string, string | true>
+      | ((packageInfo: {
+           name: string;
+           subpath: string;
+           version: string;
+        }) => Record<string, string | true>);
    /**
     * Specifies an additional path segment to be appended to the
     * package manager requests.
     */
-   postpath?: string;
+   postpath?:
+      | string
+      | ((packageInfo: {
+           name: string;
+           subpath: string;
+           version: string;
+        }) => string | void);
    /**
     * Specifies an additional path segment to be prepended to the
     * package manager requests.
     */
-   prepath?: string;
+   prepath?:
+      | string
+      | ((packageInfo: {
+           name: string;
+           subpath: string;
+           version: string;
+        }) => string | void);
    /**
     * Function to check whether the fetch response is ok or not.
     * Return true if not ok and false if ok.

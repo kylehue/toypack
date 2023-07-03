@@ -1,7 +1,7 @@
 import * as cssTree from "css-tree";
 import path from "path-browserify";
 import { Toypack } from "../Toypack.js";
-import { getUsableResourcePath, ERRORS } from "../utils";
+import { getUsableResourcePath, ERRORS, isNodeModule, isLocal, isUrl } from "../utils";
 
 /**
  * Parses and extracts the dependencies of a CSS asset.
@@ -46,20 +46,19 @@ export async function parseStyleAsset(
    cssTree.walk(AST, (node, item, list) => {
       // property: url(...);
       if (node.type === "Url") {
-         const sourceValue = node.value;
          let isValidDep = true;
          // Scroll-to-element-id urls are not a dependency
-         if (isValidDep && sourceValue.startsWith("#")) isValidDep = false;
+         if (isValidDep && node.value.startsWith("#")) isValidDep = false;
          // No need to add data urls to dependencies
-         if (isValidDep && sourceValue.startsWith("data:")) isValidDep = false;
+         if (isValidDep && node.value.startsWith("data:")) isValidDep = false;
          // url()'s source path can't be .js or .css.
-         if (isValidDep && !this._hasExtension("resource", sourceValue)) {
+         if (isValidDep && !this._hasExtension("resource", node.value)) {
             this._trigger(
                "onError",
                ERRORS.parse(
                   `'url()' tokens can't be used to reference ${path.extname(
-                     sourceValue
-                  )} files. '${sourceValue}' is not a valid resource file.`
+                     node.value
+                  )} files. '${node.value}' is not a valid resource file.`
                )
             );
 
@@ -67,18 +66,28 @@ export async function parseStyleAsset(
          }
 
          if (isValidDep) {
+            result.dependencies.push(node.value);
+            options?.inspectDependencies?.(node);
+
+            /**
+             * We have to convert the path to relative path if
+             * it doesn't begin with `./`, `../`, or `/`.
+             * https://developer.mozilla.org/en-US/docs/Web/CSS/url
+             */
+            if (!isLocal(node.value) && !isUrl(node.value)) {
+               node.value = "./" + node.value.replace(/^\//, "");
+            }
+
+            // Edit to usable source
             const resourceUseableSource = getUsableResourcePath(
                this,
-               "./" + sourceValue.replace(/^\//, ""),
+               node.value,
                path.dirname(source)
             );
 
             if (resourceUseableSource) {
                node.value = resourceUseableSource;
             }
-
-            result.dependencies.push(sourceValue);
-            options?.inspectDependencies?.(node);
          }
       }
 
@@ -94,7 +103,7 @@ export async function parseStyleAsset(
             atImportValueNode.type == "String" &&
             atImportValueNode.value
          ) {
-            result.dependencies.push(path.join("/", atImportValueNode.value));
+            result.dependencies.push(atImportValueNode.value);
             list.remove(item);
             options?.inspectDependencies?.(atImportValueNode);
          }
@@ -110,9 +119,7 @@ export async function parseStyleAsset(
             atImportURLValueNode.type == "Url" &&
             atImportURLValueNode.value
          ) {
-            result.dependencies.push(
-               path.join("/", atImportURLValueNode.value)
-            );
+            result.dependencies.push(atImportURLValueNode.value);
             list.remove(item);
             options?.inspectDependencies?.(atImportURLValueNode);
          }

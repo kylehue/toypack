@@ -1,17 +1,24 @@
 import path from "path-browserify";
 import { PackageProvider } from ".";
 import { EXTENSIONS, isUrl, parsePackageName } from "../utils";
-import { PackageAsset } from "./fetch-package";
+import { PackageAsset, PackageResourceAsset } from "./fetch-package";
 import { RawSourceMap } from "source-map-js";
 
 export const _cache = new Map<
    string,
-   {
-      rawContent: string;
-      response: Response;
-      map?: RawSourceMap | null;
-      asset: PackageAsset;
-   }
+   | {
+        type: "resource";
+        rawContent: Blob;
+        response: Response;
+        asset: PackageResourceAsset;
+     }
+   | {
+        type: "script" | "style";
+        rawContent: string;
+        response: Response;
+        map?: RawSourceMap | null;
+        asset: PackageAsset;
+     }
 >();
 
 export function queryParamsToString(params?: Record<string, string | true>) {
@@ -43,17 +50,25 @@ export function getFetchUrlFromProvider(
    version: string,
    subpath: string
 ) {
+   const args = { name, version, subpath };
+   const prepath =
+      typeof provider.prepath == "function"
+         ? provider.prepath(args)
+         : provider.prepath;
+   const postpath =
+      typeof provider.postpath == "function"
+         ? provider.postpath(args)
+         : provider.postpath;
+   const queryParams =
+      typeof provider.queryParams == "function"
+         ? provider.queryParams(args)
+         : provider.queryParams;
    return (
       getUrlFromProviderHost(provider) +
       path
-         .join(
-            provider.prepath || "",
-            name + "@" + version,
-            subpath,
-            provider.postpath || ""
-         )
+         .join(prepath || "", name + "@" + version, subpath, postpath || "")
          .replace(/^\//, "") +
-      queryParamsToString(provider.queryParams)
+      queryParamsToString(queryParams)
    );
 }
 
@@ -73,7 +88,8 @@ export function resolve(
    // If relative
    importerSource = importerSource.replace(root, "");
    return (
-      root + path.join(path.dirname(importerSource), importSource).replace(/^\//, "")
+      root +
+      path.join(path.dirname(importerSource), importSource).replace(/^\//, "")
    );
 }
 
@@ -83,31 +99,27 @@ export function getSource(
    subpath: string,
    url: string,
    isEntry: boolean,
-   type: "script" | "style"
+   type: "script" | "style" | "resource"
 ) {
+   let extname = path.extname(subpath.split("?")[0]);
+   if (!extname) extname = type == "script" ? ".js" : ".css";
+   
    let source = isEntry
       ? path.join(
            "/node_modules",
            `${name}@${version}`,
-           subpath,
-           path.extname(subpath)
-              ? ""
-              : "index" + (type == "script" ? ".js" : ".css")
+           subpath || "index" + extname,
         )
       : getNodeModulesPath(url, name, version);
 
    if (!path.extname(source)) {
-      source += "/index" + (type == "script" ? ".js" : ".css");
+      source += "/index" + extname;
    }
 
-   return source;
+   return source.split("?")[0];
 }
 
-export function getNodeModulesPath(
-   url: string,
-   name: string,
-   version: string
-) {
+export function getNodeModulesPath(url: string, name: string, version: string) {
    return path.join(
       "/node_modules",
       `${name}@${version}`,
@@ -127,14 +139,11 @@ export function getMimeType(response: Response) {
  */
 export function getType(response: Response) {
    const mimeType = getMimeType(response);
-   const extension = path.extname(response.url);
    const isScript =
       mimeType == "application/javascript" ||
-      mimeType == "application/typescript" ||
-      EXTENSIONS.script.includes(extension);
-   const isStyle =
-      mimeType == "text/css" || EXTENSIONS.style.includes(extension);
-   return isScript ? "script" : isStyle ? "style" : null;
+      mimeType == "application/typescript";
+   const isStyle = mimeType == "text/css";
+   return isScript ? "script" : isStyle ? "style" : "resource";
 }
 
 export function findDuplicateAsset(url: string, dedupeConfig: string[][]) {
@@ -143,12 +152,4 @@ export function findDuplicateAsset(url: string, dedupeConfig: string[][]) {
    const duplicateUrl = group[0] == url ? null : group[0];
    if (!duplicateUrl) return null;
    return _cache.get(duplicateUrl)?.asset || null;
-}
-
-export function hasAppContent(response: Response) {
-   const mimeType = getMimeType(response);
-   if (!mimeType) return false;
-   return (
-      mimeType.startsWith("application/") || mimeType.startsWith("text/css")
-   );
 }

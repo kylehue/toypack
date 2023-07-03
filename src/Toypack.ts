@@ -72,7 +72,9 @@ export class Toypack extends Hooks {
 
       this.usePackageProvider({
          host: "cdn.jsdelivr.net",
-         postpath: "+esm",
+         postpath: ({ subpath }) => {
+            if (!/\.css$/.test(subpath)) return "+esm";
+         },
          prepath: "npm",
       });
 
@@ -177,14 +179,20 @@ export class Toypack extends Hooks {
          }
       };
 
-      for (const { url, source, content, map } of pkg.assets) {
-         const asset = this.addOrUpdateAsset<TextAsset>(source, content);
-         asset.metadata.packageInfo = { url };
-         asset.map = map;
+      for (const pkgAsset of pkg.assets) {
+         const asset = this.addOrUpdateAsset<TextAsset>(
+            pkgAsset.source,
+            pkgAsset.content
+         );
+         
+         asset.metadata.packageInfo = { url: pkgAsset.url };
+         if (pkgAsset.type != "resource") {
+            asset.map = pkgAsset.map;
+         }
 
          // auto-dedupe same urls
          // note: this isn't the same as the dedupe in package manager
-         const duplicateAsset = findDuplicateAsset(url);
+         const duplicateAsset = findDuplicateAsset(pkgAsset.url);
          if (duplicateAsset && duplicateAsset.source != asset.source) {
             asset.content =
                `export * from "${duplicateAsset.source}";` +

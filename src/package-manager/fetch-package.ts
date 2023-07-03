@@ -1,4 +1,5 @@
 import generateScript from "@babel/generator";
+import { generate as generateStyle } from "css-tree";
 import type { ParserOptions } from "@babel/parser";
 import { RawSourceMap } from "source-map-js";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
@@ -14,11 +15,12 @@ import {
    getNodeModulesPath,
    getSource,
    findDuplicateAsset,
-   hasAppContent,
 } from "./utils.js";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
+import { parseStyleAsset } from "../graph/parse-style-chunk.js";
+import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
 
 export async function fetchPackage(
    bundler: Toypack,
@@ -69,7 +71,6 @@ export async function fetchPackage(
       // Use backup providers when response is bad
       if (
          !response.ok ||
-         !hasAppContent(response) ||
          (await provider.isBadResponse?.(response))
       ) {
          assets = {};
@@ -77,7 +78,7 @@ export async function fetchPackage(
          let backupProvider = providers[++providerIndex % providers.length];
          if (!provider || backupProvider === providers[0]) {
             throw new Error(
-               `[package-manager] Error: Couldn't fetch '${name}@${version}${subpath}'.`
+               `[package-manager] Error: Couldn't fetch '${url}'.`
             );
          } else {
             provider = backupProvider;
@@ -87,10 +88,10 @@ export async function fetchPackage(
                version,
                subpath
             );
-            
+
             await recurse(entryUrl);
          }
-         
+
          return false;
       }
 
@@ -101,8 +102,42 @@ export async function fetchPackage(
          );
       }
 
-      const rawContent = cached ? cached.rawContent : await response.text();
       let source = getSource(name, version, subpath, url, isEntry, type);
+
+      if (type == "resource") {
+         const content =
+            cached?.type == "resource"
+               ? cached.rawContent
+               : await response.blob();
+         const asset: PackageResourceAsset = {
+            type: "resource",
+            url,
+            source,
+            content,
+            isEntry,
+         };
+
+         assets[url] = asset;
+
+         // Cache resource
+         if (!cached) {
+            _cache.set(url, {
+               type: "resource",
+               rawContent: content,
+               response,
+               asset,
+            });
+         }
+
+         // We don't need to parse the resource so we return
+         // Return true to continue scanning other sibling deps
+         return true;
+      }
+
+      const rawContent =
+         typeof cached?.rawContent == "string"
+            ? cached.rawContent
+            : await response.text();
       let content: string = rawContent;
       let dependencies: string[] = [];
       let map: any;
@@ -143,11 +178,41 @@ export async function fetchPackage(
 
          content = generated.code;
          map = generated.map as any;
+      } else {
+         const parsedStyle = await parseStyleAsset.call(
+            bundler,
+            source,
+            rawContent,
+            {
+               inspectDependencies(node) {
+                  const resolved = resolve(
+                     node.value,
+                     url,
+                     getUrlFromProviderHost(provider)
+                  );
+
+                  node.value = getNodeModulesPath(resolved, name, version);
+               },
+            }
+         );
+
+         dependencies = parsedStyle.dependencies;
+
+         const generated = generateStyle(parsedStyle.ast, {
+            sourceMap: shouldMap,
+         }) as any as CSSTreeGeneratedResult;
+
+         if (typeof generated == "string") {
+            content = generated;
+         } else {
+            content = generated.css;
+            map = generated.map;
+         }
       }
 
       // Get source map
       if (shouldMap) {
-         let sourceMap = cached
+         let sourceMap = cached && cached.type != "resource"
             ? cached.map
             : await fetchSourceMapInContent(rawContent, url, provider);
 
@@ -183,12 +248,13 @@ export async function fetchPackage(
       }
 
       // Cache
-      if (!cached) {
+      if (!cached && asset.type != "resource") {
          _cache.set(url, {
+            type,
             rawContent: rawContent,
             response,
-            map: asset.map,
             asset,
+            map: asset.map,
          });
       }
 
@@ -209,18 +275,28 @@ export interface Package {
 interface PackageAssetBase {
    source: string;
    url: string;
-   map?: RawSourceMap | null;
    isEntry: boolean;
-   content: string;
 }
 
 export interface PackageScriptAsset extends PackageAssetBase {
    type: "script";
    dts: boolean;
+   map?: RawSourceMap | null;
+   content: string;
 }
 
 export interface PackageStyleAsset extends PackageAssetBase {
    type: "style";
+   map?: RawSourceMap | null;
+   content: string;
 }
 
-export type PackageAsset = PackageScriptAsset | PackageStyleAsset;
+export interface PackageResourceAsset extends PackageAssetBase {
+   type: "resource";
+   content: Blob;
+}
+
+export type PackageAsset =
+   | PackageScriptAsset
+   | PackageStyleAsset
+   | PackageResourceAsset;
