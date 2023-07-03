@@ -157,19 +157,12 @@ export class Toypack extends Hooks {
 
    /**
     * Install a package from providers.
-    * @param packageSource The source of the package to install.
-    * @example
-    * // Package source format
-    * installPackage("@scope/name@version/path/to/package");
-    * // e.g.
-    * installPackage("uuid");
-    * installPackage("react@18");
-    * installPackage("react-dom@18/client");
-    * installPackage("@vue/compiler-sfc@3.3.4");
-    * installPackage("bootstrap@5.3.0/dist/css/bootstrap.min.css");
+    * @param name The source of the package to install.
+    * @param version The version of the package to install. Defaults to
+    * latest.
     */
-   public async installPackage(packageSource: string) {
-      const pkg = await getPackage.call(this, packageSource);
+   public async installPackage(name: string, version = "latest") {
+      const pkg = await getPackage.call(this, name, version);
       if (!pkg.assets.length) return;
 
       this._dependencies[pkg.name] = pkg.version;

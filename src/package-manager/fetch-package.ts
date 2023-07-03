@@ -22,7 +22,8 @@ import { fetchVersion } from "./fetch-version.js";
 export async function fetchPackage(
    bundler: Toypack,
    providers: PackageProvider[],
-   packageSource: string
+   packagePath: string,
+   packageVersion: string = "latest"
 ) {
    const config = bundler.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
@@ -30,8 +31,8 @@ export async function fetchPackage(
    let provider = providers[providerIndex];
    let assets: Record<string, PackageAsset> = {};
    let dtsAssets: Record<string, PackageAsset> = {};
-   let { name, version, subpath } = parsePackageName(packageSource);
-   version = await fetchVersion(name, version);
+   let { name, subpath } = parsePackageName(packagePath);
+   let version = await fetchVersion(name, packageVersion);
 
    let entryUrl = getFetchUrlFromProvider(provider, name, version, subpath);
 
@@ -47,7 +48,6 @@ export async function fetchPackage(
       if (duplicateAsset) {
          const asset: PackageAsset = {
             type: "script",
-            packageSource,
             url,
             isEntry,
             source: getSource(name, version, subpath, url, isEntry, "script"),
@@ -72,7 +72,7 @@ export async function fetchPackage(
          let backupProvider = providers[++providerIndex];
          if (!provider || backupProvider === provider) {
             throw new Error(
-               `[package-manager] Error: Couldn't fetch '${packageSource}'.`
+               `[package-manager] Error: Couldn't fetch '${name}@${version}${subpath}'.`
             );
          } else {
             provider = backupProvider;
@@ -157,7 +157,6 @@ export async function fetchPackage(
          url,
          source,
          content,
-         packageSource,
          map,
          isEntry,
       } as PackageAsset;
@@ -207,7 +206,6 @@ interface PackageAssetBase {
    map?: RawSourceMap | null;
    isEntry: boolean;
    content: string;
-   packageSource: string;
 }
 
 export interface PackageScriptAsset extends PackageAssetBase {

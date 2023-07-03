@@ -8,7 +8,11 @@ import { PackageAsset, fetchPackage } from "./fetch-package.js";
  * @param version The version of the package.
  * @returns An object containing the assets of the package.
  */
-export async function getPackage(this: Toypack, packageSource: string) {
+export async function getPackage(
+   this: Toypack,
+   packagePath: string,
+   packageVersion: string = "latest"
+) {
    const result = {
       name: "",
       version: "",
@@ -29,7 +33,12 @@ export async function getPackage(this: Toypack, packageSource: string) {
    }
 
    try {
-      const pkg = await fetchPackage(this, providers, packageSource);
+      const pkg = await fetchPackage(
+         this,
+         providers,
+         packagePath,
+         packageVersion
+      );
       result.name = pkg.name;
       result.version = pkg.version;
       result.subpath = pkg.subpath;
@@ -39,12 +48,12 @@ export async function getPackage(this: Toypack, packageSource: string) {
       const assetCount = result.assets.length + result.dtsAssets.length;
       DEBUG.info(
          config.logLevel,
-         `[package-manager]: Successfully fetched ${assetCount} assets in ${packageSource}.`
+         `[package-manager]: Successfully fetched ${assetCount} assets in ${packagePath}.`
       );
    } catch (error: any) {
       this._trigger(
          "onError",
-         ERRORS.packageInstallFailure(packageSource, error)
+         ERRORS.packageInstallFailure(packagePath, error)
       );
    }
 
