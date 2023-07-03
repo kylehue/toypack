@@ -1,6 +1,6 @@
 import { Loader, Plugin } from "../types.js";
 
-const sassPlugin: Plugin = () => {
+export default function (): Plugin {
    const sassLoader: Loader = {
       test: /\.s[ac]ss$/,
       compile(dep) {
@@ -14,8 +14,6 @@ const sassPlugin: Plugin = () => {
       extensions: [
          ["style", ".sass"],
          ["style", ".scss"],
-      ]
+      ],
    };
-};
-
-export default sassPlugin;
+}

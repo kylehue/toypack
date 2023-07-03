@@ -1,9 +1,9 @@
-import { BuildHookContext, LoadResult } from "../plugin/hook-types.js";
 import { PartialContext } from "../plugin/PluginManager.js";
 import { Toypack } from "../Toypack.js";
 import { mergeSourceMaps, isSupported, ERRORS } from "../utils";
 import { Asset, ResourceAsset } from "../types";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
+import { RawSourceMap } from "source-map-js";
 
 /**
  * Load a chunk by its source.
@@ -137,7 +137,7 @@ export interface LoadChunkText {
    type: "script" | "style";
    content: string;
    asset: Asset;
-   map?: LoadResult["map"];
+   map?: RawSourceMap | null;
 }
 
 export type LoadChunkResult = LoadChunkResource | LoadChunkText;

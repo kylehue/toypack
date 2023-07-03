@@ -39,7 +39,7 @@ export class Toypack extends Hooks {
    };
    private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
-   private _loaders: { plugin: ReturnType<Plugin>; loader: Loader }[] = [];
+   private _loaders: { plugin: Plugin; loader: Loader }[] = [];
    private _packageProviders: PackageProvider[] = [];
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
@@ -87,12 +87,9 @@ export class Toypack extends Hooks {
          queryParams: {
             dts: true,
          },
-         isBadResponse(response) {
-            if (new RegExp(`cdn\\.skypack\\.dev/error/.*`).test(response.url)) {
-               return true;
-            }
-
-            return false;
+         isBadResponse(res) {
+            if (res.url == "https://cdn.skypack.dev/error") return false;
+            return /cdn\.skypack\.dev\/error\/.*/.test(res.url);
          },
       });
    }
@@ -207,7 +204,7 @@ export class Toypack extends Hooks {
    /**
     * Add plugins to the bundler.
     */
-   public usePlugin(...plugins: ReturnType<Plugin>[]) {
+   public usePlugin(...plugins: Plugin[]) {
       for (const plugin of plugins) {
          this._pluginManager.registerPlugin(plugin);
 

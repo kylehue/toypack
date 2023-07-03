@@ -1,7 +1,7 @@
 import { Plugin } from "../types.js";
 import { parseURL } from "../utils";
 
-const rawPlugin: Plugin = () => {
+export default function (): Plugin {
    return {
       name: "raw-plugin",
       loaders: [
@@ -24,6 +24,4 @@ const rawPlugin: Plugin = () => {
          },
       ],
    };
-};
-
-export default rawPlugin;
+}

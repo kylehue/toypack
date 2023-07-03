@@ -1,17 +1,36 @@
-import { BuildHooks, Loader } from "./plugin/hook-types.js";
+import { RawSourceMap } from "source-map-js";
+import { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
+import { Asset } from "./utils/create-asset.js";
 
-export type Plugin = () => {
+export interface Plugin extends Partial<BuildHooks> {
    name: string;
    loaders?: Loader[];
    extensions?: ["resource" | "script" | "style", string][];
-} & Partial<BuildHooks>;
-export type {
-   Loader,
-   LoadResult,
-   ModuleInfo,
-   BuildHookContext,
-   BuildHooks,
-} from "./plugin/hook-types.js";
+}
+
+export interface Loader {
+   test: RegExp | ((source: string) => boolean);
+   disableChaining?: boolean;
+   compile: (
+      this: BuildHookContext,
+      moduleInfo: {
+         type: "resource" | "script" | "style";
+         source: string;
+         content: string | Blob;
+         isEntry: boolean;
+         asset: Asset;
+      }
+   ) =>
+      | {
+           content: string;
+           type?: "script" | "style";
+           map?: RawSourceMap | null;
+        }
+      | string
+      | void;
+}
+
+export type { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
 export type {
    Dependency,
    DependencyGraph,

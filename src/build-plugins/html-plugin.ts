@@ -159,7 +159,7 @@ function injectAstToHtml(content: string, astToInject: HTMLElement) {
    return htmlAst.toString();
 }
 
-const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
+export default function (options?: HTMLPluginOptions): Plugin {
    let mainVirtualModule = "";
    const chunks: Record<string, string> = {};
    let astToInject: HTMLElement | null = null;
@@ -208,9 +208,7 @@ const htmlPlugin: Plugin = (options?: HTMLPluginOptions) => {
          );
       },
    };
-};
-
-export default htmlPlugin;
+}
 
 type AST = HTMLElement | Node;
 type ITraverseCallback = (node: AST) => void;

@@ -7,10 +7,9 @@ import {
 } from "../utils";
 import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
 
-type PluginData = ReturnType<Plugin>;
 type BuildHooksGroupMap = {
    [key in keyof BuildHooks]?: {
-      plugin: PluginData;
+      plugin: Plugin;
       hook: BuildHooks[key];
    }[];
 };
@@ -46,7 +45,7 @@ export class PluginManager {
 
    constructor(private bundler: Toypack) {}
 
-   public registerPlugin<T extends PluginData>(plugin: T) {
+   public registerPlugin<T extends Plugin>(plugin: T) {
       for (const prop in plugin) {
          if (prop == "name" || prop == "extensions" || prop == "loader") {
             continue;
@@ -58,7 +57,7 @@ export class PluginManager {
    }
 
    private _registerHook<HookName extends keyof BuildHooks>(
-      plugin: PluginData,
+      plugin: Plugin,
       hookName: HookName,
       hookFunction?: BuildHooks[HookName]
    ) {
@@ -105,7 +104,7 @@ export class PluginManager {
       );
    }
 
-   public createContext(partialContext: PartialContext, plugin: PluginData) {
+   public createContext(partialContext: PartialContext, plugin: Plugin) {
       const result: BuildHookContext = {
          bundler: partialContext.bundler,
          getImporter: () =>
@@ -113,11 +112,7 @@ export class PluginManager {
                ? partialContext.graph[partialContext.importer]
                : null,
          getUsableResourcePath(source: string, baseDir = ".") {
-            return getUsableResourcePath(
-               this.bundler,
-               source,
-               baseDir
-            );
+            return getUsableResourcePath(this.bundler, source, baseDir);
          },
          getImportCode(importSource: string) {
             const config = this.bundler.getConfig();

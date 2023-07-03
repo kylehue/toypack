@@ -8,32 +8,9 @@ import {
 import { Toypack } from "../Toypack.js";
 import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
-import { BundleResult, Asset } from "../types";
+import { BundleResult, Loader } from "../types";
 
 // Interfaces
-export interface ModuleInfo {
-   type: "resource" | "script" | "style";
-   source: string;
-   content: string | Blob;
-   isEntry: boolean;
-   asset: Asset;
-}
-
-export interface LoadResult {
-   content: string;
-   type?: "script" | "style";
-   map?: RawSourceMap | null;
-}
-
-export interface Loader {
-   test: RegExp | ((source: string) => boolean);
-   disableChaining?: boolean;
-   compile: (
-      this: BuildHookContext,
-      moduleInfo: ModuleInfo
-   ) => LoadResult | string | void;
-}
-
 export interface ScriptTransform {
    type: "script";
    chunk: ScriptDependency;
@@ -49,8 +26,8 @@ export interface StyleTransform {
 // Hooks
 export type LoadBuildHook = (
    this: BuildHookContext,
-   moduleInfo: ModuleInfo
-) => LoadResult | string | void;
+   moduleInfo: Parameters<Loader["compile"]>[0]
+) => ReturnType<Loader["compile"]>;
 
 export type ResolveBuildHook = (
    this: BuildHookContext,

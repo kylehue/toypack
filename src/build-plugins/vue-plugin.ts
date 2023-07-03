@@ -1,6 +1,6 @@
 import { Loader, Plugin } from "../types.js";
 
-const vuePlugin: Plugin = () => {
+export default function (): Plugin {
    let sources: any = {};
    const vueLoader: Loader = {
       test: /\.vue$/,
@@ -49,10 +49,7 @@ export default script;
          }
       },
       transform(ctx) {
-         if (ctx.type != "script") return
-         
+         if (ctx.type != "script") return;
       },
    };
-};
-
-export default vuePlugin;
+}

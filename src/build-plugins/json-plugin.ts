@@ -1,6 +1,6 @@
 import { Plugin } from "../types.js";
 
-const jsonPlugin: Plugin = () => {
+export default function (): Plugin {
    return {
       name: "json-plugin",
       extensions: [["script", ".json"]],
@@ -12,12 +12,10 @@ const jsonPlugin: Plugin = () => {
                   this.error("Blob contents are not supported.");
                   return;
                }
-               
+
                return this.getDefaultExportCode(dep.content);
             },
          },
       ],
    };
-};
-
-export default jsonPlugin;
+}

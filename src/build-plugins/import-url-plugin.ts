@@ -2,9 +2,8 @@ import { RawSourceMap } from "source-map-js";
 import { resolve, getType } from "../package-manager/utils";
 import { Plugin } from "../types.js";
 import { getSourceMapUrl, isUrl, removeSourceMapUrl } from "../utils";
-import path from "path-browserify";
 
-const importUrlPlugin: Plugin = () => {
+export default function (): Plugin {
    return {
       name: "import-url-plugin",
       load: {
@@ -41,6 +40,4 @@ const importUrlPlugin: Plugin = () => {
          },
       },
    };
-};
-
-export default importUrlPlugin;
+}
