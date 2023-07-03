@@ -159,12 +159,12 @@ export class Toypack extends Hooks {
 
    /**
     * Install a package from providers.
-    * @param name The source of the package to install.
+    * @param source The source of the package to install.
     * @param version The version of the package to install. Defaults to
     * latest.
     */
-   public async installPackage(name: string, version = "latest") {
-      const pkg = await getPackage.call(this, name, version);
+   public async installPackage(source: string, version = "latest") {
+      const pkg = await getPackage.call(this, source, version);
       if (!pkg.assets.length) return;
 
       this._dependencies[pkg.name] = pkg.version;
@@ -184,7 +184,7 @@ export class Toypack extends Hooks {
             pkgAsset.source,
             pkgAsset.content
          );
-         
+
          asset.metadata.packageInfo = { url: pkgAsset.url };
          if (pkgAsset.type != "resource") {
             asset.map = pkgAsset.map;
