@@ -15,9 +15,9 @@ import {
    getSource,
    findDuplicateAsset,
 } from "./utils.js";
-import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
-import { fetchLatestVersion } from "./fetch-latest-version.js";
+import { fetchSourceMapInContent } from "./fetch-source-map.js";
+import { fetchVersion } from "./fetch-version.js";
 
 export async function fetchPackage(
    bundler: Toypack,
@@ -31,10 +31,8 @@ export async function fetchPackage(
    let assets: Record<string, PackageAsset> = {};
    let dtsAssets: Record<string, PackageAsset> = {};
    let { name, version, subpath } = parsePackageName(packageSource);
-   if (version == "latest") {
-      version = (await fetchLatestVersion(name)) || version;
-   }
-   
+   version = await fetchVersion(name, version);
+
    let entryUrl = getFetchUrlFromProvider(provider, name, version, subpath);
 
    const recurse = async (url: string) => {
