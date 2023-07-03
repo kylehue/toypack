@@ -144,3 +144,11 @@ export function findDuplicateAsset(url: string, dedupeConfig: string[][]) {
    if (!duplicateUrl) return null;
    return _cache.get(duplicateUrl)?.asset || null;
 }
+
+export function hasAppContent(response: Response) {
+   const mimeType = getMimeType(response);
+   if (!mimeType) return false;
+   return (
+      mimeType.startsWith("application/") || mimeType.startsWith("text/css")
+   );
+}

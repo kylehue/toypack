@@ -171,6 +171,7 @@ export class Toypack extends Hooks {
          for (const [_, asset] of this._assets) {
             if (asset.type != "text") continue;
             if (!asset.source.startsWith("/node_modules/")) continue;
+            if (!asset.metadata.packageInfo) continue;
             if (asset.metadata.packageInfo.url != url) continue;
             return asset;
          }

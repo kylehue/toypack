@@ -14,6 +14,7 @@ import {
    getNodeModulesPath,
    getSource,
    findDuplicateAsset,
+   hasAppContent,
 } from "./utils.js";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
@@ -66,11 +67,15 @@ export async function fetchPackage(
       url = response.url;
 
       // Use backup providers when response is bad
-      if (!response.ok || (await provider.isBadResponse?.(response))) {
+      if (
+         !response.ok ||
+         !hasAppContent(response) ||
+         (await provider.isBadResponse?.(response))
+      ) {
          assets = {};
          dtsAssets = {};
-         let backupProvider = providers[++providerIndex];
-         if (!provider || backupProvider === provider) {
+         let backupProvider = providers[++providerIndex % providers.length];
+         if (!provider || backupProvider === providers[0]) {
             throw new Error(
                `[package-manager] Error: Couldn't fetch '${name}@${version}${subpath}'.`
             );
@@ -82,9 +87,10 @@ export async function fetchPackage(
                version,
                subpath
             );
+            
             await recurse(entryUrl);
          }
-
+         
          return false;
       }
 
