@@ -10,8 +10,7 @@ it("should work with relative paths", () => {
    expect(
       resolve(
          "../jsx.d.ts",
-         "https://esm.sh/v118/vue@3.3.4/dist/vue.d.mts",
-         "https://esm.sh/"
+         "https://esm.sh/v118/vue@3.3.4/dist/vue.d.mts"
       )
    ).toEqual("https://esm.sh/v118/vue@3.3.4/jsx.d.ts");
 });
@@ -21,7 +20,6 @@ it("should work with root paths", () => {
       resolve(
          "/jsx.d.ts",
          "https://esm.sh/v118/vue@3.3.4/dist/vue.d.mts",
-         "https://esm.sh/"
       )
    ).toEqual("https://esm.sh/jsx.d.ts");
 });
@@ -31,7 +29,6 @@ it("should work with url", () => {
       resolve(
          "https://esm.sh/vue@3.3.4",
          "https://esm.sh/v118/vue@3.3.4/dist/vue.d.mts",
-         "https://esm.sh/"
       )
    ).toEqual("https://esm.sh/vue@3.3.4");
 });

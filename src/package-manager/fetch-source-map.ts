@@ -1,13 +1,8 @@
 import { RawSourceMap } from "source-map-js";
-import { PackageProvider } from ".";
 import { getSourceMapUrl } from "../utils";
-import { getUrlFromProviderHost, resolve, _cache } from "./utils";
+import { resolve, _cache } from "./utils";
 
-export async function fetchSourceMapInContent(
-   content: string,
-   url: string,
-   provider: PackageProvider
-) {
+export async function fetchSourceMapInContent(content: string, url: string) {
    let sourceMap: RawSourceMap | null = null;
    const cached = _cache.get(url);
    if (cached && cached.type != "resource" && cached.map) {
@@ -15,11 +10,7 @@ export async function fetchSourceMapInContent(
    } else {
       const sourceMapUrl = getSourceMapUrl(content);
       if (sourceMapUrl) {
-         const resolvedMapUrl = resolve(
-            sourceMapUrl,
-            url,
-            getUrlFromProviderHost(provider)
-         );
+         const resolvedMapUrl = resolve(sourceMapUrl, url);
          const mapResponse = await fetch(resolvedMapUrl);
          if (mapResponse) {
             sourceMap = await mapResponse.json();

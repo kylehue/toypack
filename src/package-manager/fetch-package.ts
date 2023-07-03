@@ -2,6 +2,7 @@ import generateScript from "@babel/generator";
 import { generate as generateStyle } from "css-tree";
 import type { ParserOptions } from "@babel/parser";
 import { RawSourceMap } from "source-map-js";
+import MapConverter from "convert-source-map";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import type { Toypack } from "../types.js";
 import { mergeSourceMaps, parsePackageName } from "../utils/index.js";
@@ -69,10 +70,7 @@ export async function fetchPackage(
       url = response.url;
 
       // Use backup providers when response is bad
-      if (
-         !response.ok ||
-         (await provider.isBadResponse?.(response))
-      ) {
+      if (!response.ok || (await provider.isBadResponse?.(response))) {
          assets = {};
          dtsAssets = {};
          let backupProvider = providers[++providerIndex % providers.length];
@@ -140,7 +138,7 @@ export async function fetchPackage(
             : await response.text();
       let content: string = rawContent;
       let dependencies: string[] = [];
-      let map: any;
+      let map: RawSourceMap | null | undefined = null;
       const shouldMap = shouldProduceSourceMap(source, sourceMapConfig);
 
       // Parse, get dependencies, and recompile
@@ -156,11 +154,7 @@ export async function fetchPackage(
             {
                parserOptions,
                inspectDependencies(node) {
-                  const resolved = resolve(
-                     node.value,
-                     url,
-                     getUrlFromProviderHost(provider)
-                  );
+                  const resolved = resolve(node.value, url);
 
                   node.value = getNodeModulesPath(resolved, name, version);
                },
@@ -185,11 +179,7 @@ export async function fetchPackage(
             rawContent,
             {
                inspectDependencies(node) {
-                  const resolved = resolve(
-                     node.value,
-                     url,
-                     getUrlFromProviderHost(provider)
-                  );
+                  const resolved = resolve(node.value, url);
 
                   node.value = getNodeModulesPath(resolved, name, version);
                },
@@ -206,15 +196,16 @@ export async function fetchPackage(
             content = generated;
          } else {
             content = generated.css;
-            map = generated.map;
+            map = MapConverter.fromJSON(generated.map.toString()).toObject();
          }
       }
 
       // Get source map
       if (shouldMap) {
-         let sourceMap = cached && cached.type != "resource"
-            ? cached.map
-            : await fetchSourceMapInContent(rawContent, url, provider);
+         let sourceMap =
+            cached && cached.type != "resource"
+               ? cached.map
+               : await fetchSourceMapInContent(rawContent, url);
 
          if (sourceMap && map) {
             map = mergeSourceMaps(sourceMap, map);
@@ -236,11 +227,7 @@ export async function fetchPackage(
 
       // Fetch dependencies recursively
       for (const depSource of dependencies) {
-         const resolved = resolve(
-            depSource,
-            url,
-            getUrlFromProviderHost(provider)
-         );
+         const resolved = resolve(depSource, url);
 
          const isSuccess = await recurse(resolved);
          // break if a dependency fails

@@ -74,9 +74,13 @@ export function getFetchUrlFromProvider(
 
 export function resolve(
    importSource: string,
-   importerSource: string = "/",
-   root: string = ""
+   importerSource: string = "/"
 ) {
+   let root = "";
+   if (isUrl(importerSource)) {
+      root = new URL(importerSource).origin + "/";
+   }
+
    // If url
    if (isUrl(importSource)) return importSource;
 
