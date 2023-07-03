@@ -26,6 +26,10 @@ export interface Loader {
            type?: "script" | "style";
            map?: RawSourceMap | null;
         }
+      | {
+           content: Blob;
+           type?: "resource";
+        }
       | string
       | void;
 }

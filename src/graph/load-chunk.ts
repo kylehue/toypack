@@ -16,26 +16,30 @@ export async function loadChunk(
    isEntry: boolean,
    { graph, importer }: PartialContext
 ) {
-   const realAsset = this.getAsset(rawSource);
+   const asset = this.getAsset(rawSource);
    /**
     * Importer can't possibly be undefined if the asset with the rawSource
     * is undefined.
     * Importer only becomes undefined if the rawSource asset is the entry.
     */
-   const asset = realAsset || graph[importer!].asset;
+   const parentAsset = asset || graph[importer!].asset;
    const type = this._getTypeFromSource(rawSource);
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
-   const shouldMap = shouldProduceSourceMap(asset.source, sourceMapConfig);
+   const shouldMap = shouldProduceSourceMap(
+      parentAsset.source,
+      sourceMapConfig
+   );
 
    const loaded: LoadChunkResult = {
       type: type,
       content:
-         typeof asset.content == "string" || asset.content instanceof Blob
+         typeof asset?.content == "string" ||
+         asset?.content instanceof Blob
             ? asset.content
             : undefined,
-      asset: asset,
-      map: realAsset?.type == "text" ? realAsset.map : null,
+      asset: parentAsset,
+      map: asset?.type == "text" ? asset.map : null,
    } as LoadChunkResult;
 
    await this._pluginManager.triggerHook({
@@ -64,7 +68,8 @@ export async function loadChunk(
 
             if (
                shouldMap &&
-               (loaded.type == "script" || loaded.type == "style")
+               (loaded.type == "script" || loaded.type == "style") &&
+               (result.type == "script" || result.type == "style")
             ) {
                if (loaded.map && result.map) {
                   loaded.map = mergeSourceMaps(loaded.map, result.map);
@@ -104,7 +109,11 @@ export async function loadChunk(
             loaded.type = loaderResult.type;
          }
 
-         if (shouldMap && (loaded.type == "script" || loaded.type == "style")) {
+         if (
+            shouldMap &&
+            (loaded.type == "script" || loaded.type == "style") &&
+            (loaderResult.type == "script" || loaderResult.type == "style")
+         ) {
             if (loaded.map && loaderResult.map) {
                loaded.map = mergeSourceMaps(loaded.map, loaderResult.map);
             } else if (!loaded.map && loaderResult.map) {
