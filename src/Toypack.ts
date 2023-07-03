@@ -1,6 +1,6 @@
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
-import { PartialDeep } from "type-fest";
+import { PartialDeep, ReadonlyDeep } from "type-fest";
 import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
@@ -41,12 +41,12 @@ export class Toypack extends Hooks {
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
    private _packageProviders: PackageProvider[] = [];
+   private _dependencies: Record<string, string> = {};
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
       compiled: new Map(),
    };
-   protected _dependencies: Record<string, string> = {};
    constructor(config?: PartialDeep<ToypackConfig>) {
       super();
       if (config) this.setConfig(config);
@@ -92,6 +92,14 @@ export class Toypack extends Hooks {
             return /cdn\.skypack\.dev\/error\/.*/.test(res.url);
          },
       });
+   }
+
+   public get dependencies() {
+      return this._dependencies as ReadonlyDeep<typeof this._dependencies>;
+   }
+
+   public get config() {
+      return this._config as ReadonlyDeep<typeof this._config>;
    }
 
    protected _getLoadersFor(source: string) {
@@ -157,21 +165,20 @@ export class Toypack extends Hooks {
       const pkg = await getPackage.call(this, packageSource);
       if (!pkg.assets.length) return;
 
-      const { name, version } = parsePackageName(packageSource);
-      this._dependencies[name] = version;
+      this._dependencies[pkg.name] = pkg.version;
 
       const findDuplicateAsset = (url: string) => {
          for (const [_, asset] of this._assets) {
             if (asset.type != "text") continue;
             if (!asset.source.startsWith("/node_modules/")) continue;
-            if (asset.metadata.url != url) continue;
+            if (asset.metadata.packageInfo.url != url) continue;
             return asset;
          }
       };
 
       for (const { url, source, content, map } of pkg.assets) {
          const asset = this.addOrUpdateAsset<TextAsset>(source, content);
-         asset.metadata.url = url;
+         asset.metadata.packageInfo = { url };
          asset.map = map;
 
          // auto-dedupe same urls

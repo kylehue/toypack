@@ -39,9 +39,10 @@ export function removeProviderHostFromUrl(
 
 export function getFetchUrlFromProvider(
    provider: PackageProvider,
-   packageSource: string
+   name: string,
+   version: string,
+   subpath: string
 ) {
-   const { name, version, subpath } = parsePackageName(packageSource);
    return (
       getUrlFromProviderHost(provider) +
       path

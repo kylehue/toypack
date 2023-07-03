@@ -10,6 +10,9 @@ import { PackageAsset, fetchPackage } from "./fetch-package.js";
  */
 export async function getPackage(this: Toypack, packageSource: string) {
    const result = {
+      name: "",
+      version: "",
+      subpath: "",
       assets: [] as PackageAsset[],
       dtsAssets: [] as PackageAsset[],
    };
@@ -27,6 +30,9 @@ export async function getPackage(this: Toypack, packageSource: string) {
 
    try {
       const pkg = await fetchPackage(this, providers, packageSource);
+      result.name = pkg.name;
+      result.version = pkg.version;
+      result.subpath = pkg.subpath;
       result.assets = Object.values(pkg.assets);
       result.dtsAssets = Object.values(pkg.dtsAssets);
 

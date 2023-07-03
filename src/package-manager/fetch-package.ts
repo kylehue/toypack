@@ -17,6 +17,7 @@ import {
 } from "./utils.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
+import { fetchLatestVersion } from "./fetch-latest-version.js";
 
 export async function fetchPackage(
    bundler: Toypack,
@@ -27,10 +28,14 @@ export async function fetchPackage(
    const sourceMapConfig = config.bundle.sourceMap;
    let providerIndex = 0;
    let provider = providers[providerIndex];
-   let entryUrl = getFetchUrlFromProvider(provider, packageSource);
    let assets: Record<string, PackageAsset> = {};
    let dtsAssets: Record<string, PackageAsset> = {};
-   const { name, version, subpath } = parsePackageName(packageSource);
+   let { name, version, subpath } = parsePackageName(packageSource);
+   if (version == "latest") {
+      version = (await fetchLatestVersion(name)) || version;
+   }
+   
+   let entryUrl = getFetchUrlFromProvider(provider, name, version, subpath);
 
    const recurse = async (url: string) => {
       if (url in assets || url in dtsAssets) return false;
@@ -73,7 +78,12 @@ export async function fetchPackage(
             );
          } else {
             provider = backupProvider;
-            entryUrl = getFetchUrlFromProvider(provider, packageSource);
+            entryUrl = getFetchUrlFromProvider(
+               provider,
+               name,
+               version,
+               subpath
+            );
             await recurse(entryUrl);
          }
 
@@ -184,7 +194,7 @@ export async function fetchPackage(
 
    await recurse(entryUrl);
 
-   return { assets, dtsAssets };
+   return { name, version, subpath, assets, dtsAssets };
 }
 
 export interface Package {
