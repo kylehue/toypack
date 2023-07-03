@@ -1,4 +1,3 @@
-import type { RawSourceMap } from "source-map-js";
 import { Asyncify } from "type-fest";
 import {
    Dependency,
@@ -9,6 +8,8 @@ import { Toypack } from "../Toypack.js";
 import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
 import { BundleResult, Loader } from "../types";
+import { ParsedScriptResult } from "../graph/parse-script-chunk.js";
+import { ParsedStyleResult } from "../graph/parse-style-chunk.js";
 
 // Interfaces
 export interface ScriptTransform {
@@ -22,6 +23,18 @@ export interface StyleTransform {
    chunk: StyleDependency;
    traverse: (traverseOptions: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
 }
+
+export type ParseInfo =
+   | {
+        type: "script";
+        chunk: ScriptDependency;
+        parsed: ParsedScriptResult;
+     }
+   | {
+        type: "style";
+        chunk: StyleDependency;
+        parsed: ParsedStyleResult;
+     };
 
 // Hooks
 export type LoadBuildHook = (
@@ -37,6 +50,11 @@ export type ResolveBuildHook = (
 export type TransformBuildHook = (
    this: BuildHookContext,
    context: ScriptTransform | StyleTransform
+) => void;
+
+export type ParsedBuildHook = (
+   this: BuildHookContext,
+   parseInfo: ParseInfo
 ) => void;
 
 export type StartBuildHook = (this: BuildHookContext) => void;
@@ -82,6 +100,7 @@ export interface BuildHooks {
    transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
    buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
    buildEnd: EndBuildHook | BuildHookConfig<EndBuildHook>;
+   parsed: ParsedBuildHook | BuildHookConfig<ParsedBuildHook>;
    // beforeFinalize: (content: any) => void;
    // afterFinalize: (content: any) => void;
    // start: () => void;

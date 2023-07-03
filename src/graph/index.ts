@@ -1,4 +1,5 @@
 import { Node } from "@babel/traverse";
+import { codeFrameColumns } from "@babel/code-frame";
 import { CssNode } from "css-tree";
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
@@ -8,7 +9,7 @@ import { ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
 import { loadChunk } from "./load-chunk.js";
 import { parseScriptAsset } from "./parse-script-chunk.js";
 import { parseStyleAsset } from "./parse-style-chunk.js";
-import { codeFrameColumns } from "@babel/code-frame";
+import { ParseInfo } from "../plugin/hook-types.js";
 
 function getImportPosition(
    content: string,
@@ -143,6 +144,22 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          importers: _importer ? [_importer] : [],
          type: loaded.type,
       } as ScriptDependency | StyleDependency;
+
+      this._pluginManager.triggerHook({
+         name: "parsed",
+         context: {
+            bundler: this,
+            graph,
+            importer: _importer,
+         },
+         args: [
+            {
+               type: loaded.type,
+               parsed,
+               chunk,
+            } as ParseInfo,
+         ],
+      });
 
       graph[rawSource] = chunk;
 
