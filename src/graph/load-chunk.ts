@@ -16,13 +16,13 @@ export async function loadChunk(
    const type = isVirtual ? "virtual" : this._getTypeFromSource(rawSource);
    if (!type) {
       throw new Error(
-         "[load-chunk] Error: Couldn't determine the type of " + rawSource
+         `[load-chunk] Error: Couldn't determine the type of ${rawSource}`
       );
    }
 
    let asset = this.getAsset(rawSource);
    if (!asset && !isVirtual) {
-      throw new Error("[load-chunk] Error: Asset doesn't exist. " + rawSource);
+      throw new Error(`[load-chunk] Error: ${rawSource} doesn't exist. `);
    } else if (!asset) {
       // Create temporary asset for virtual modules
       asset = this._virtualAssets.get(rawSource);
@@ -88,7 +88,7 @@ export async function loadChunk(
       }
    };
 
-   // Load by plugins
+   // Load with plugins
    await this._pluginManager.triggerHook({
       name: "load",
       args: () => [
@@ -106,7 +106,7 @@ export async function loadChunk(
       },
    });
 
-   // Load by loaders
+   // Load with loaders
    const loaders = this._getLoadersFor(rawSource);
    for (const { loader, plugin } of loaders) {
       const context = this._pluginManager.createContext(

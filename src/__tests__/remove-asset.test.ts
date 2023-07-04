@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { expect, it, beforeAll, beforeEach } from "vitest";
+import { expect, it, beforeEach } from "vitest";
 import { Toypack } from "../Toypack.js";
 
 const toypack = new Toypack({
@@ -14,13 +14,6 @@ const toypack = new Toypack({
 
 const cachedDeps = (toypack as any)._cachedDeps;
 const assetsMap = (toypack as any)._assets;
-
-beforeAll(() => {
-   (window as any).URL = {
-      createObjectURL: () => {},
-      revokeObjectURL: () => {},
-   };
-});
 
 beforeEach(async () => {
    toypack.clearAsset();
