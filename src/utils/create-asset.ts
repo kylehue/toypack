@@ -3,33 +3,46 @@ import { RawSourceMap } from "source-map-js";
 export function createAsset<T extends string | Blob>(
    source: string,
    content: T,
-   options?: {
-      metadata?: AssetBase["metadata"];
-      map?: RawSourceMap | null
-   }
+   options?: AssetOptions
 ): Asset<T> {
-   const type: Asset["type"] = typeof content == "string" ? "text" : "resource";
-   const asset: Asset<T> = {
-      type,
+   const common = {
       source,
-      content,
       metadata: options?.metadata || {},
-      map: options?.map || null,
-   } as Asset<T>;
+      modified: false,
+      forceContentTypeAs: options?.forceContentTypeAs,
+   };
 
-   if (asset.type == "text") {
-      asset.modified = false;
+   let asset: Asset;
+   if (typeof content == "string") {
+      asset = {
+         ...common,
+         type: "text",
+         content,
+         map: options?.map || null,
+      };
    } else {
-      asset.contentURL = URL.createObjectURL(asset.content);
+      asset = {
+         ...common,
+         type: "resource",
+         content,
+         contentURL: URL.createObjectURL(content),
+      };
    }
 
-   return asset;
+   return asset as Asset<T>;
+}
+
+export interface AssetOptions {
+   metadata?: AssetBase["metadata"];
+   map?: RawSourceMap | null;
+   forceContentTypeAs?: "script" | "style";
 }
 
 interface AssetBase {
    source: string;
    modified: boolean;
    metadata: Record<string, any>;
+   forceContentTypeAs?: "script" | "style";
 }
 
 export interface ResourceAsset extends AssetBase {

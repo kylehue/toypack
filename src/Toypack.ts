@@ -23,7 +23,7 @@ import {
    isUrl,
    DEBUG,
 } from "./utils";
-import { createAsset } from "./utils/create-asset.js";
+import { AssetOptions, createAsset } from "./utils/create-asset.js";
 import { resolve } from "./utils/resolve.js";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
@@ -186,7 +186,14 @@ export class Toypack extends Hooks {
             pkgAsset.content
          );
 
-         asset.metadata.packageInfo = { url: pkgAsset.url };
+         asset.metadata.packageInfo = {
+            url: pkgAsset.url,
+            type: pkgAsset.type,
+         };
+
+         asset.forceContentTypeAs ||=
+            pkgAsset.type != "resource" ? pkgAsset.type : undefined;
+
          if (pkgAsset.type != "resource") {
             asset.map = pkgAsset.map;
          }
@@ -370,7 +377,7 @@ export class Toypack extends Hooks {
          const asset = this._virtualAssets.get(source);
          if (asset) return this._virtualAssets.get(source);
       }
-      
+
       source = path.join("/", source.split("?")[0]);
       return this._assets.get(source) || null;
    }

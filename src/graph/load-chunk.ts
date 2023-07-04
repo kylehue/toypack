@@ -13,7 +13,9 @@ export async function loadChunk(
    { graph, importer }: PartialContext
 ) {
    const isVirtual = rawSource.startsWith("virtual:");
-   const type = isVirtual ? "virtual" : this._getTypeFromSource(rawSource);
+   let type: InitialModuleType | null = isVirtual
+      ? "virtual"
+      : this._getTypeFromSource(rawSource);
    if (!type) {
       throw new Error(
          `[load-chunk] Error: Couldn't determine the type of ${rawSource}`
@@ -30,6 +32,10 @@ export async function loadChunk(
          asset = {} as Asset;
          this._virtualAssets.set(rawSource, asset);
       }
+   }
+
+   if (asset.forceContentTypeAs) {
+      type = asset.forceContentTypeAs;
    }
 
    /**
@@ -202,6 +208,8 @@ function getLoadResult(
    (moduleInfo as ModuleInfo).type = typeIfVirtual; // change type
    return getLoadResult(moduleInfo, typeIfVirtual);
 }
+
+type InitialModuleType = "script" | "style" | "resource" | "virtual";
 
 interface ModuleInfoBase {
    source: string;
