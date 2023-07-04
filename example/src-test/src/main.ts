@@ -3,7 +3,8 @@
 // console.log(path.join("src", "classes"));
 // import path from "path";
 // console.log(path);
-import "bootstrap-icons/font/bootstrap-icons.min.css";
+import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
+// import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "../react";
 import confetti from "canvas-confetti";
 const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
@@ -11,41 +12,23 @@ meowButton.onclick = () => confetti();
 // import * as Vue from "vue";
 // console.log(Vue);
 
-// import Matter from "matter-js";
-// console.log(Matter);
-// import path, * as cool from "path-browserify";
-// import { resolve as res, join as wow } from "path-browserify";
-// import { test } from "./testing.mjs";
-// console.log(test);
-// console.log(path, cool, res, 44, test, wow);
-// window.test = test;
-// const script = 43770;
-// console.log(HTMLElement);
+import pkgjson from "../package";
+console.log(pkgjson);
+const foo: string = "bar";
+console.log(foo);
+import { adder } from "@classes/adder?test";
+console.log(adder(4, 6));
+const bingbong = "beepboop";
+console.log(bingbong);
+import "../styles/sample.css";
+export const fourFiveTwo = 452;
+import Appv from "./App";
+console.log(Appv);
 
-// console.log(3);
-// console.log(123456);
-// import pkgjson from "../package?raw";
-// console.log(pkgjson);
-// const foo: string = "bar";
-// console.log(foo);
-// import { adder } from "@classes/adder?test";
-// console.log(adder(4, 6));
-// const bingbong = "beepboop";
-// console.log(bingbong);
-// import "../styles/sample.css";
-// export const fourFiveTwo = 452;
-// import Appv from "./App";
-// console.log(Appv);
-
-// import mainRaw from "./main.ts?raw";
-// console.log(mainRaw);
-// import rawHTML from "../index.html?raw";
-// console.log(rawHTML);
-
-// (async () => {
-//    const test = await import("../index.html?raw");
-//    console.log(test);
-// })();
+(async () => {
+   const test = await import("../index.html?raw");
+   console.log(test);
+})();
 
 /* CJS */
 // require("../react");

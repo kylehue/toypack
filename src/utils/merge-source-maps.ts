@@ -4,7 +4,6 @@ import {
    SourceMapGenerator,
 } from "source-map-js";
 import MapConverter from "convert-source-map";
-import path from "path-browserify";
 
 /**
  * Merge old source map and new source map and return merged.
@@ -19,7 +18,6 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
    const oldMapConsumer = new SourceMapConsumer(oldMap);
    const newMapConsumer = new SourceMapConsumer(newMap);
    const mergedMapGenerator = new SourceMapGenerator();
-   const sourcesWithMappings = new Set<string>();
    const names = new Set<string>();
 
    // iterate on new map and overwrite original position of new map with one of old map
@@ -34,9 +32,6 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
       });
 
       if (origPosInOldMap.source == null) return;
-
-      sourcesWithMappings.add(path.join("/", origPosInOldMap.source));
-
       if (origPosInOldMap.name) names.add(origPosInOldMap.name);
 
       mergedMapGenerator.addMapping({
@@ -63,9 +58,6 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
    // Add sources
    [oldMap, newMap].forEach(function (map) {
       map.sources.forEach(function (sourceFile, index) {
-         sourceFile = path.join("/", sourceFile);
-         // Only add the ones that has mapping
-         if (!sourcesWithMappings.has(sourceFile)) return;
          resultMap.sources.push(sourceFile);
          resultMap.sourcesContent!.push(map.sourcesContent?.[index] || "");
       });

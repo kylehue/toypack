@@ -128,7 +128,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       let chunk;
       if (loaded.type == "resource") {
-         chunk = createChunk(loaded, undefined, _importer, isEntry);
+         chunk = createChunk(rawSource, loaded, undefined, _importer, isEntry);
          graph[rawSource] = chunk;
          /**
           * Resources doesn't have dependencies so we can skip all
@@ -141,7 +141,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
           * but we do this anyway to make typescript happy.
           */
          if (!parsed) return;
-         chunk = createChunk(loaded, parsed, _importer, isEntry);
+         chunk = createChunk(rawSource, loaded, parsed, _importer, isEntry);
          graph[rawSource] = chunk;
       }
 
@@ -221,10 +221,16 @@ function createChunk<
       : K extends ParsedScriptResult
       ? ScriptDependency
       : StyleDependency
->(loaded: T, parsed?: K, importer?: string, isEntry?: boolean): R {
+>(
+   source: string,
+   loaded: T,
+   parsed?: K,
+   importer?: string,
+   isEntry?: boolean
+): R {
    let chunk: ScriptDependency | StyleDependency | ResourceDependency;
    const allCommon = {
-      source: loaded.asset.source,
+      source,
       importers: importer ? [importer] : [],
    };
 
@@ -248,7 +254,9 @@ function createChunk<
    };
 
    if (!parsed) {
-      throw new Error("Parsed object can't be falsy if chunk is not a resource.");
+      throw new Error(
+         "Parsed object can't be falsy if chunk is not a resource."
+      );
    }
 
    if (parsed.type == "script") {

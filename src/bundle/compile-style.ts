@@ -94,6 +94,8 @@ export function compileStyle(
    }
 
    if (shouldMap && result.map && chunk.map) {
+      result.map.sourcesContent = [chunk.content];
+      result.map.sources = [chunk.source];
       result.map = mergeSourceMaps(chunk.map, result.map);
    }
 

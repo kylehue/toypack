@@ -137,6 +137,8 @@ export async function compileScript(
    let map: RawSourceMap | null = null;
    if (shouldMap) {
       map = MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap;
+      map.sourcesContent = [chunk.content];
+      map.sources = [chunk.source];
       if (chunk.map) {
          map = mergeSourceMaps(chunk.map, map);
       }

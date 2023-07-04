@@ -5,6 +5,8 @@ import {
 } from "source-map-js";
 import { Toypack } from "../Toypack.js";
 import { findCodePosition } from "./find-code-position.js";
+import path from "path-browserify";
+import { isLocal } from "./is-local.js";
 
 /**
  * Merge source map to bundle's source map.
@@ -14,15 +16,13 @@ import { findCodePosition } from "./find-code-position.js";
  * @param source The file source path.
  * @param generatedContent The compiled content of the file.
  * @param bundleContent The current content of the bundle.
- * @param originalContent The original content of the file.
  */
 export function mergeSourceMapToBundle(
    targetMap: SourceMapGenerator,
    sourceMap: RawSourceMap,
    source: string,
    generatedContent: string,
-   bundleContent: string,
-   originalContent?: string
+   bundleContent: string
 ) {
    if (!targetMap) return;
    const position = findCodePosition(bundleContent, generatedContent);
@@ -34,13 +34,12 @@ export function mergeSourceMapToBundle(
    }
 
    const smc = new SourceMapConsumer(sourceMap);
-
-   if (originalContent) {
-      targetMap.setSourceContent(source, originalContent);
-   }
+   const sourcesWithMappings = new Set<string>();
 
    smc.eachMapping((map) => {
       if (map.originalLine === null) return;
+      map.source = makeRelativeIfNeeded(map.source);
+      sourcesWithMappings.add(map.source);
 
       targetMap.addMapping({
          source: map.source,
@@ -57,11 +56,23 @@ export function mergeSourceMapToBundle(
    });
 
    // Add source map's sources and contents to target map
-   (smc as any).sources.forEach(function (sourceFile: string) {
+   sourceMap.sources.forEach(function (sourceFile) {
+      sourceFile = makeRelativeIfNeeded(sourceFile);
+
+      // Only add the ones that has mapping to save size
+      if (!sourcesWithMappings.has(sourceFile)) return;
       const sourceContent = smc.sourceContentFor(sourceFile);
       if (sourceContent) {
          (targetMap as any)._sources.add(sourceFile);
          targetMap.setSourceContent(sourceFile, sourceContent);
       }
    });
+}
+
+function makeRelativeIfNeeded(source: string) {
+   if (isLocal(source) && !source.startsWith("virtual:")) {
+      source = path.join("/", source);
+   }
+
+   return source;
 }

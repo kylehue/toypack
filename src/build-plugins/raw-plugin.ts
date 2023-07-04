@@ -18,7 +18,7 @@ export default function (): Plugin {
 
                return {
                   type: "script",
-                  content: this.getDefaultExportCode(`\`${dep.content}\`;`),
+                  content: this.getDefaultExportCode(`\`${dep.content}\``),
                };
             },
          },
