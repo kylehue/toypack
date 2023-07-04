@@ -1,6 +1,5 @@
-import { RawSourceMap } from "source-map-js";
+import { LoadResult, ModuleInfo } from "./graph/load-chunk.js";
 import { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
-import { Asset } from "./utils/create-asset.js";
 
 export interface Plugin extends Partial<BuildHooks> {
    name: string;
@@ -13,25 +12,8 @@ export interface Loader {
    disableChaining?: boolean;
    compile: (
       this: BuildHookContext,
-      moduleInfo: {
-         type: "resource" | "script" | "style";
-         source: string;
-         content: string | Blob;
-         isEntry: boolean;
-         asset: Asset;
-      }
-   ) =>
-      | {
-           content: string;
-           type?: "script" | "style";
-           map?: RawSourceMap | null;
-        }
-      | {
-           content: Blob;
-           type?: "resource";
-        }
-      | string
-      | void;
+      moduleInfo: ModuleInfo
+   ) => LoadResult | string | void;
 }
 
 export type { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
@@ -56,6 +38,7 @@ export type {
    PackageManagerConfig,
    PackageProvider,
 } from "./package-manager/index.js";
+export type { LoadResult, ModuleInfo } from "./graph/load-chunk.js";
 export type { Asset, ResourceAsset, TextAsset } from "./utils/create-asset.js";
 export type { ResolveOptions } from "./utils/resolve.js";
 export type Toypack = InstanceType<typeof import("./Toypack.js").Toypack>;

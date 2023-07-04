@@ -35,6 +35,7 @@ export async function parseScriptAsset(
 ): Promise<ParsedScriptResult> {
    const config = this.getConfig();
    const result: ParsedScriptResult = {
+      type: "script",
       dependencies: [] as string[],
       ast: emptyAST,
    };
@@ -153,8 +154,8 @@ export async function parseScriptAsset(
 }
 
 export interface ParsedScriptResult {
+   type: "script";
    dependencies: string[];
-   sourceMappingUrl?: string;
    ast: Node;
 }
 

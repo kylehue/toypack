@@ -42,6 +42,7 @@ export class Toypack extends Hooks {
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
+   protected _virtualAssets = new Map<string, Asset>();
    protected _pluginManager = new PluginManager(this);
    protected _cachedDeps: ICache = {
       parsed: new Map(),
@@ -256,6 +257,10 @@ export class Toypack extends Hooks {
     * @returns {string} The resolved absolute path.
     */
    public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
+      if (relativeSource.startsWith("virtual:")) {
+         return this._virtualAssets.get(relativeSource)?.source || null;
+      }
+
       const opts = Object.assign(
          {
             aliases: this._config.bundle.resolve.alias,
@@ -361,6 +366,11 @@ export class Toypack extends Hooks {
     * @returns {Asset | null} The Asset object if found, otherwise null.
     */
    public getAsset(source: string) {
+      if (source.startsWith("virtual:")) {
+         const asset = this._virtualAssets.get(source);
+         if (asset) return this._virtualAssets.get(source);
+      }
+      
       source = path.join("/", source.split("?")[0]);
       return this._assets.get(source) || null;
    }

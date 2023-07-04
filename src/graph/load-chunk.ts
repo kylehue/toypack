@@ -4,51 +4,96 @@ import { mergeSourceMaps, isSupported, ERRORS } from "../utils";
 import { Asset, ResourceAsset } from "../types";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 import { RawSourceMap } from "source-map-js";
+import { TextAsset, createAsset } from "../utils/create-asset.js";
 
-/**
- * Load a chunk by its source.
- * @param rawSource The source of the chunk to load.
- * @returns An object containing the loaded contents.
- */
 export async function loadChunk(
    this: Toypack,
    rawSource: string,
    isEntry: boolean,
    { graph, importer }: PartialContext
 ) {
-   const asset = this.getAsset(rawSource);
+   const isVirtual = rawSource.startsWith("virtual:");
+   const type = isVirtual ? "virtual" : this._getTypeFromSource(rawSource);
+   if (!type) {
+      throw new Error(
+         "[load-chunk] Error: Couldn't determine the type of " + rawSource
+      );
+   }
+
+   let asset = this.getAsset(rawSource);
+   if (!asset && !isVirtual) {
+      throw new Error("[load-chunk] Error: Asset doesn't exist. " + rawSource);
+   } else if (!asset) {
+      // Create temporary asset for virtual modules
+      asset = this._virtualAssets.get(rawSource);
+      if (!asset) {
+         asset = {} as Asset;
+         this._virtualAssets.set(rawSource, asset);
+      }
+   }
+
    /**
-    * Importer can't possibly be undefined if the asset with the rawSource
-    * is undefined.
-    * Importer only becomes undefined if the rawSource asset is the entry.
+    * Module info will be repeatedly loaded by multiple plugins
+    * and loaders.
     */
-   const parentAsset = asset || graph[importer!].asset;
-   const type = this._getTypeFromSource(rawSource);
+   const moduleInfo = getModuleInfo(type, rawSource, isEntry, asset);
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
-   const shouldMap = shouldProduceSourceMap(
-      parentAsset.source,
-      sourceMapConfig
-   );
+   const shouldMap = shouldProduceSourceMap(rawSource, sourceMapConfig);
 
-   const loaded: LoadChunkResult = {
-      type: type,
-      content:
-         typeof asset?.content == "string" ||
-         asset?.content instanceof Blob
-            ? asset.content
-            : undefined,
-      asset: parentAsset,
-      map: asset?.type == "text" ? asset.map : null,
-   } as LoadChunkResult;
+   const handleLoad = (loadResult: string | LoadResult) => {
+      /**
+       * Create the actual asset object for the virtual modules.
+       * The first valid result will be the asset's content.
+       */
+      if (
+         moduleInfo.type == "virtual" &&
+         (typeof loadResult == "string" || typeof loadResult == "object") &&
+         asset &&
+         !asset.type
+      ) {
+         Object.assign(
+            asset,
+            createAsset(
+               rawSource,
+               typeof loadResult == "string" ? loadResult : loadResult.content
+            )
+         );
+      }
 
+      /**
+       * Mutate module info so that the next loader will have the
+       * previous loader's result.
+       */
+      if (typeof loadResult == "string") {
+         moduleInfo.content = loadResult;
+      } else {
+         moduleInfo.content = loadResult.content;
+
+         if (loadResult.type) {
+            moduleInfo.type = loadResult.type;
+         }
+
+         if (
+            shouldMap &&
+            (moduleInfo.type == "script" || moduleInfo.type == "style") &&
+            (loadResult.type == "script" || loadResult.type == "style")
+         ) {
+            if (moduleInfo.map && loadResult.map) {
+               moduleInfo.map = mergeSourceMaps(moduleInfo.map, loadResult.map);
+            } else if (!moduleInfo.map && loadResult.map) {
+               moduleInfo.map = loadResult.map;
+            }
+         }
+      }
+   };
+
+   // Load by plugins
    await this._pluginManager.triggerHook({
       name: "load",
       args: () => [
          {
-            ...loaded,
-            source: rawSource,
-            isEntry: isEntry,
+            ...moduleInfo,
          },
       ],
       context: {
@@ -57,30 +102,11 @@ export async function loadChunk(
          importer,
       },
       callback(result) {
-         if (typeof result == "string") {
-            loaded.content = result;
-         } else {
-            loaded.content = result.content;
-
-            if (result.type) {
-               loaded.type = result.type;
-            }
-
-            if (
-               shouldMap &&
-               (loaded.type == "script" || loaded.type == "style") &&
-               (result.type == "script" || result.type == "style")
-            ) {
-               if (loaded.map && result.map) {
-                  loaded.map = mergeSourceMaps(loaded.map, result.map);
-               } else if (!loaded.map && result.map) {
-                  loaded.map = result.map;
-               }
-            }
-         }
+         handleLoad(result);
       },
    });
 
+   // Load by loaders
    const loaders = this._getLoadersFor(rawSource);
    for (const { loader, plugin } of loaders) {
       const context = this._pluginManager.createContext(
@@ -92,49 +118,133 @@ export async function loadChunk(
          plugin
       );
 
-      const loaderResult = loader.compile.call(context, {
-         ...loaded,
-         source: rawSource,
-         isEntry: isEntry,
-      });
-
+      const loaderResult = loader.compile.call(context, moduleInfo);
       if (!loaderResult) continue;
-
-      if (typeof loaderResult == "string") {
-         loaded.content = loaderResult;
-      } else {
-         loaded.content = loaderResult.content;
-
-         if (loaderResult.type) {
-            loaded.type = loaderResult.type;
-         }
-
-         if (
-            shouldMap &&
-            (loaded.type == "script" || loaded.type == "style") &&
-            (loaderResult.type == "script" || loaderResult.type == "style")
-         ) {
-            if (loaded.map && loaderResult.map) {
-               loaded.map = mergeSourceMaps(loaded.map, loaderResult.map);
-            } else if (!loaded.map && loaderResult.map) {
-               loaded.map = loaderResult.map;
-            }
-         }
-      }
+      handleLoad(loaderResult);
    }
 
-   if (
-      typeof loaded.type != "string" ||
-      typeof loaded.content == "undefined" ||
-      (!isSupported(rawSource) &&
-         !loaders.length &&
-         typeof loaded.type != "string")
-   ) {
+   const sourceType = this._getTypeFromSource(rawSource);
+   const isNotLoaded = !isSupported(rawSource) && !loaders.length;
+   const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
+   if (isNotLoaded || isStillVirtual) {
       this._trigger("onError", ERRORS.loaderNotFound(rawSource));
    }
 
-   return loaded;
+   return getLoadResult(moduleInfo, sourceType);
 }
+
+function getModuleInfo(
+   type: "script" | "style" | "resource" | "virtual",
+   source: string,
+   isEntry: boolean,
+   asset: Asset
+) {
+   let moduleInfo: ModuleInfo;
+   if (type == "virtual") {
+      moduleInfo = {
+         type: "virtual",
+         source: source,
+         content: null,
+         isEntry,
+         asset,
+      };
+   } else if (asset.type == "resource" && type == "resource") {
+      moduleInfo = {
+         type: "resource",
+         source: source,
+         content: asset.content,
+         isEntry,
+         asset,
+      };
+      asset.content;
+   } else if (asset.type == "text" && (type == "script" || type == "style")) {
+      moduleInfo = {
+         type: type,
+         source: source,
+         content: asset.content,
+         isEntry,
+         asset,
+      };
+   } else {
+      throw new Error(
+         "[load-chunk] Error: Couldn't determine the type of " + source
+      );
+   }
+
+   return moduleInfo;
+}
+
+function getLoadResult(
+   moduleInfo: ModuleInfo,
+   typeIfVirtual?: "script" | "style" | "resource" | null
+): LoadChunkResult {
+   if (moduleInfo.type == "script" || moduleInfo.type == "style") {
+      return {
+         type: moduleInfo.type,
+         asset: moduleInfo.asset,
+         content: moduleInfo.content,
+         map: moduleInfo.map,
+      };
+   } else if (moduleInfo.type == "resource") {
+      return {
+         type: moduleInfo.type,
+         asset: moduleInfo.asset,
+         content: moduleInfo.content,
+      };
+   }
+
+   if (!typeIfVirtual) {
+      throw new Error(
+         `[load-chunk] Error: Failed to load a virtual module (${moduleInfo.source}). Virtual modules should have a type of script, style, or resource.`
+      );
+   }
+
+   (moduleInfo as ModuleInfo).type = typeIfVirtual; // change type
+   return getLoadResult(moduleInfo, typeIfVirtual);
+}
+
+interface ModuleInfoBase {
+   source: string;
+   isEntry: boolean;
+}
+
+interface ModuleInfoText extends ModuleInfoBase {
+   type: "script" | "style";
+   content: string;
+   asset: TextAsset;
+   map?: RawSourceMap | null;
+}
+
+interface ModuleInfoResource extends ModuleInfoBase {
+   type: "resource";
+   content: Blob;
+   asset: ResourceAsset;
+}
+
+interface ModuleInfoVirtual extends ModuleInfoBase {
+   type: "virtual";
+   content: string | Blob | null;
+   asset: Asset;
+   map?: RawSourceMap | null;
+}
+
+export type ModuleInfo =
+   | ModuleInfoText
+   | ModuleInfoResource
+   | ModuleInfoVirtual;
+
+interface LoadTextResult {
+   type?: "script" | "style";
+   content: string;
+   map?: RawSourceMap | null;
+}
+
+interface LoadResourceResult {
+   type?: "resource";
+   content: Blob;
+}
+
+export type LoadResult = LoadTextResult | LoadResourceResult;
 
 export interface LoadChunkResource {
    type: "resource";

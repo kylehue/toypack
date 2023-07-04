@@ -7,9 +7,10 @@ import {
 import { Toypack } from "../Toypack.js";
 import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
-import { BundleResult, Loader } from "../types";
+import { BundleResult } from "../types";
 import { ParsedScriptResult } from "../graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "../graph/parse-style-chunk.js";
+import { LoadResult, ModuleInfo } from "../graph/load-chunk.js";
 
 // Interfaces
 export interface ScriptTransform {
@@ -39,8 +40,8 @@ export type ParseInfo =
 // Hooks
 export type LoadBuildHook = (
    this: BuildHookContext,
-   moduleInfo: Parameters<Loader["compile"]>[0]
-) => ReturnType<Loader["compile"]>;
+   moduleInfo: ModuleInfo
+) => LoadResult | string | void;
 
 export type ResolveBuildHook = (
    this: BuildHookContext,

@@ -75,7 +75,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
          const useableSource = getUsableResourcePath(this, chunk.asset.source);
          if (!useableSource) continue;
          result.resources.push({
-            source: useableSource.replace(/^\.*\//g, ""),
+            source: useableSource.replace(/^\.*\//g, "").split("?")[0],
             content: chunk.asset.content,
          });
       }
