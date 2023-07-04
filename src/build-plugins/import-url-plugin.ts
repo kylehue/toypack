@@ -53,7 +53,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
       const response = cached?.response ? cached.response : await fetch(url);
       cached.response ??= response;
 
-      const source = url;
+      const source = "virtual:" + url;
       const type = getType(response);
       if (type == "resource") {
          cached.asset ??= assets[url] = {
@@ -85,7 +85,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
             {
                inspectDependencies(node) {
                   const resolved = resolve(node.value, url);
-                  node.value = resolved;
+                  node.value = "virtual:" + resolved;
                },
             }
          );
@@ -109,7 +109,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
             {
                inspectDependencies(node) {
                   const resolved = resolve(node.value, url);
-                  node.value = resolved;
+                  node.value = "virtual:" + resolved;
                },
             }
          );
@@ -165,16 +165,25 @@ export default function (): Plugin {
    let fetchedAssets: Record<string, Asset> = {};
    return {
       name: "import-url-plugin",
+      resolve(id) {
+         if (isUrl(id)) return "virtual:" + id;
+      },
       load: {
          async: true,
          async handler(dep) {
-            if (!isUrl(dep.source)) return;
+            if (dep.type != "virtual") return;
+            const url = dep.source.replace("virtual:", "");
+            if (!isUrl(url)) return;
+
+            // Fetch if it doesn't exist yet
             if (!(dep.source in fetchedAssets)) {
-               Object.assign(
-                  fetchedAssets,
-                  await fetchUrl.call(this.bundler, dep.source)
-               );
+               const fetched = await fetchUrl.call(this.bundler, url);
+               for (const fetchedAsset of Object.values(fetched)) {
+                  fetchedAssets[fetchedAsset.source] = fetchedAsset;
+               }
             }
+
+            // Out
             const asset = fetchedAssets[dep.source];
             if (asset) {
                return asset;
