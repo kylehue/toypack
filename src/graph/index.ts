@@ -1,6 +1,6 @@
 import { Node } from "@babel/traverse";
 import { codeFrameColumns } from "@babel/code-frame";
-import { CssNode } from "css-tree";
+import { CssNode, Url } from "css-tree";
 import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
@@ -145,6 +145,10 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          type: loaded.type,
       } as ScriptDependency | StyleDependency;
 
+      if (chunk.type == "style" && parsed.type == "style") {
+         chunk.urlNodes = parsed.urlNodes;
+      }
+
       this._pluginManager.triggerHook({
          name: "parsed",
          context: {
@@ -265,6 +269,7 @@ export interface StyleDependency extends DependencyBase {
    asset: Asset;
    map?: RawSourceMap | null;
    isEntry: boolean;
+   urlNodes: Url[];
 }
 
 export interface ResourceDependency extends DependencyBase {

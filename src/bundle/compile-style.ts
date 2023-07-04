@@ -2,9 +2,10 @@ import MapConverter from "convert-source-map";
 import * as CSSTree from "css-tree";
 import { SourceMapGenerator, RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
-import { mergeSourceMaps } from "../utils";
+import { getUsableResourcePath, isLocal, isUrl, mergeSourceMaps } from "../utils";
 import { DependencyGraph, StyleDependency } from "../types";
 import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
+import path from "path-browserify";
 
 export function compileStyle(
    this: Toypack,
@@ -49,6 +50,29 @@ export function compileStyle(
          importer: chunk.importers[0],
       },
    });
+
+   for (const node of chunk.urlNodes) {
+      /**
+       * We have to convert the path to relative path if
+       * it doesn't begin with `./`, `../`, or `/` because
+       * url() in css are always relative.
+       * https://developer.mozilla.org/en-US/docs/Web/CSS/url
+       */
+      if (!isLocal(node.value) && !isUrl(node.value)) {
+         node.value = "./" + node.value.replace(/^\//, "");
+      }
+
+      // Change to usable source
+      const resourceUseableSource = getUsableResourcePath(
+         this,
+         node.value,
+         path.dirname(chunk.source)
+      );
+      
+      if (resourceUseableSource) {
+         node.value = resourceUseableSource;
+      }
+   }
 
    const compiled = CSSTree.generate(chunk.ast, {
       sourceMap: shouldMap,

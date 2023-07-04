@@ -15,8 +15,10 @@ export async function parseStyleAsset(
 ): Promise<ParsedStyleResult> {
    const config = this.getConfig();
    const result: ParsedStyleResult = {
+      type: "style",
       dependencies: [] as string[],
       ast: {} as cssTree.CssNode,
+      urlNodes: [],
    };
 
    // Parse
@@ -68,26 +70,7 @@ export async function parseStyleAsset(
          if (isValidDep) {
             result.dependencies.push(node.value);
             options?.inspectDependencies?.(node);
-
-            /**
-             * We have to convert the path to relative path if
-             * it doesn't begin with `./`, `../`, or `/`.
-             * https://developer.mozilla.org/en-US/docs/Web/CSS/url
-             */
-            if (!isLocal(node.value) && !isUrl(node.value)) {
-               node.value = "./" + node.value.replace(/^\//, "");
-            }
-
-            // Edit to usable source
-            const resourceUseableSource = getUsableResourcePath(
-               this,
-               node.value,
-               path.dirname(source)
-            );
-
-            if (resourceUseableSource) {
-               node.value = resourceUseableSource;
-            }
+            result.urlNodes.push(node);
          }
       }
 
@@ -130,8 +113,10 @@ export async function parseStyleAsset(
 }
 
 export interface ParsedStyleResult {
+   type: "style";
    dependencies: string[];
    ast: cssTree.CssNode;
+   urlNodes: cssTree.Url[];
 }
 
 export interface ParseStyleOptions {
