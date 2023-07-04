@@ -18,7 +18,7 @@ export function createAsset<T extends string | Blob>(
    } as Asset<T>;
 
    if (asset.type == "text") {
-      asset.modified = true;
+      asset.modified = false;
    } else {
       asset.contentURL = URL.createObjectURL(asset.content);
    }
