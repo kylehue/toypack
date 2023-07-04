@@ -6,9 +6,9 @@ import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
 import { ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
-import { loadChunk } from "./load-chunk.js";
-import { parseScriptAsset } from "./parse-script-chunk.js";
-import { parseStyleAsset } from "./parse-style-chunk.js";
+import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
+import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
+import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ParseInfo } from "../plugin/hook-types.js";
 
 function getImportPosition(
@@ -77,6 +77,39 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
    const config = this.getConfig();
    const bundleMode = config.bundle.mode;
+
+   const loadAndParse = async (
+      source: string,
+      isEntry: boolean,
+      importer?: string
+   ) => {
+      let loaded, parsed;
+      const cached = this._cachedDeps.parsed.get(source + "." + bundleMode);
+      if (cached && !cached.asset.modified) {
+         loaded = cached.loaded;
+         parsed = cached.parsed;
+      } else {
+         loaded = await loadChunk.call(this, source, isEntry, {
+            bundler: this,
+            graph,
+            importer,
+         });
+         parsed =
+            loaded.type == "script"
+               ? await parseScriptAsset.call(this, source, loaded.content)
+               : loaded.type == "style"
+               ? await parseStyleAsset.call(this, source, loaded.content)
+               : null;
+         this._cachedDeps.parsed.set(source + "." + bundleMode, {
+            asset: loaded.asset,
+            parsed,
+            loaded,
+         });
+      }
+
+      return { loaded, parsed };
+   };
+
    const recurse = async (rawSource: string, _importer?: string) => {
       if (graph[rawSource]) {
          if (_importer && !graph[rawSource].importers.includes(_importer)) {
@@ -87,68 +120,32 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       }
 
       const isEntry = rawSource === entry.source;
+      const { loaded, parsed } = await loadAndParse(
+         rawSource,
+         isEntry,
+         _importer
+      );
 
-      let loaded, parsed;
-
-      // Cache
-      const cached = this._cachedDeps.parsed.get(rawSource + "." + bundleMode);
-
-      if (cached && !cached.asset.modified) {
-         loaded = cached.loaded;
-         parsed = cached.parsed;
-      } else {
-         loaded = await loadChunk.call(this, rawSource, isEntry, {
-            bundler: this,
-            graph,
-            importer: _importer,
-         });
-         parsed =
-            loaded.type == "script"
-               ? await parseScriptAsset.call(this, rawSource, loaded.content)
-               : loaded.type == "style"
-               ? await parseStyleAsset.call(this, rawSource, loaded.content)
-               : null;
-         this._cachedDeps.parsed.set(rawSource + "." + bundleMode, {
-            asset: loaded.asset,
-            parsed,
-            loaded,
-         });
-      }
-
-      // No need to parse resources
+      let chunk;
       if (loaded.type == "resource") {
-         if (loaded.asset) {
-            const chunk: ResourceDependency = {
-               type: "resource",
-               asset: loaded.asset,
-               source: rawSource,
-               importers: _importer ? [_importer] : [],
-            };
-
-            graph[rawSource] = chunk;
-         }
-
+         chunk = createChunk(loaded, undefined, _importer, isEntry);
+         graph[rawSource] = chunk;
+         /**
+          * Resources doesn't have dependencies so we can skip all
+          * the procedures below.
+          */
          return;
+      } else {
+         /**
+          * `parsed` can't possibly be falsy if it's not a resource
+          * but we do this anyway to make typescript happy.
+          */
+         if (!parsed) return;
+         chunk = createChunk(loaded, parsed, _importer, isEntry);
+         graph[rawSource] = chunk;
       }
 
-      if (!parsed) return;
-
-      const chunk: ScriptDependency | StyleDependency = {
-         asset: loaded.asset,
-         source: rawSource,
-         ast: parsed.ast,
-         content: loaded.content,
-         dependencyMap: {},
-         map: loaded.map,
-         isEntry: isEntry,
-         importers: _importer ? [_importer] : [],
-         type: loaded.type,
-      } as ScriptDependency | StyleDependency;
-
-      if (chunk.type == "style" && parsed.type == "style") {
-         chunk.urlNodes = parsed.urlNodes;
-      }
-
+      // Trigger parsed hook
       this._pluginManager.triggerHook({
          name: "parsed",
          context: {
@@ -165,9 +162,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          ],
       });
 
-      graph[rawSource] = chunk;
-
-      // Scan dependency's dependencies
+      // Scan dependency's dependencies recursively
       for (const depSource of parsed.dependencies) {
          let resolved: string = depSource;
          // Resolve source with plugins
@@ -216,6 +211,62 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
    await recurse(entry.source);
    return graph;
+}
+
+function createChunk<
+   T extends LoadChunkResult,
+   K extends ParsedScriptResult | ParsedStyleResult,
+   R extends T extends LoadChunkResource
+      ? ResourceDependency
+      : K extends ParsedScriptResult
+      ? ScriptDependency
+      : StyleDependency
+>(loaded: T, parsed?: K, importer?: string, isEntry?: boolean): R {
+   let chunk: ScriptDependency | StyleDependency | ResourceDependency;
+   const allCommon = {
+      source: loaded.asset.source,
+      importers: importer ? [importer] : [],
+   };
+
+   if (loaded.type == "resource") {
+      chunk = {
+         ...allCommon,
+         type: "resource",
+         asset: loaded.asset,
+      };
+
+      return chunk as R;
+   }
+
+   const textCommon = {
+      ...allCommon,
+      asset: loaded.asset,
+      content: loaded.content,
+      dependencyMap: {},
+      map: loaded.map,
+      isEntry: isEntry || false,
+   };
+
+   if (!parsed) {
+      throw new Error("Parsed object can't be falsy if chunk is not a resource.");
+   }
+
+   if (parsed.type == "script") {
+      chunk = {
+         ...textCommon,
+         type: "script",
+         ast: parsed.ast,
+      };
+   } else {
+      chunk = {
+         ...textCommon,
+         type: "style",
+         ast: parsed.ast,
+         urlNodes: parsed.urlNodes,
+      };
+   }
+
+   return chunk as R;
 }
 
 /**
