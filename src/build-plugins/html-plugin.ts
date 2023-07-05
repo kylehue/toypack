@@ -173,9 +173,9 @@ export default function (options?: HTMLPluginOptions): Plugin {
          content: string;
          ast: HTMLElement;
          resourceDependencies: Set<string>;
+         virtualModules: Record<string, string>;
       }
-      > = {};
-   let htmlModuleCounter = 0;
+   > = {};
    
    const htmlLoader: Loader = {
       test: /\.html$/,
@@ -209,6 +209,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
             content: mainVirtualModule,
             ast: astToInject,
             resourceDependencies: compiled.resourceDependencies,
+            virtualModules,
          };
 
          return mainVirtualModule;
@@ -219,6 +220,18 @@ export default function (options?: HTMLPluginOptions): Plugin {
       name: "html-plugin",
       loaders: [htmlLoader],
       extensions: [["script", ".html"]],
+      buildStart() {
+         // Remove in plugin's cache if the assets doesn't exist anymore
+         for (const [source, compiled] of Object.entries(compiledModules)) {
+            if (!this.bundler.getAsset(compiled.source)) {
+               for (const vkey in compiled.virtualModules) {
+                  delete virtualModules[vkey];
+               }
+
+               delete compiledModules[source];
+            }
+         }
+      },
       load(dep) {
          if (dep.type != "virtual") return;
          if (dep.source in virtualModules) {
