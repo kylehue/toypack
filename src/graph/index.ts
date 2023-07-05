@@ -64,16 +64,6 @@ function getImportCodeFrame(
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};
 
-   await this._pluginManager.triggerHook({
-      name: "buildStart",
-      args: [],
-      context: {
-         bundler: this,
-         graph,
-         importers: {},
-      },
-   });
-
    const loadAndParse = async (
       source: string,
       isEntry: boolean,
@@ -284,7 +274,16 @@ function createChunk<
  * Get the dependency graph of the bundler starting from the entry point.
  */
 export async function getDependencyGraph(this: Toypack) {
-   let graph: DependencyGraph = {};
+   const graph: DependencyGraph = {};
+
+   await this._pluginManager.triggerHook({
+      name: "buildStart",
+      args: [],
+      context: {
+         bundler: this,
+      },
+   });
+
    const config = this.getConfig();
    const entrySource = config.bundle.entry
       ? this.resolve(path.join("/", config.bundle.entry))
@@ -302,8 +301,7 @@ export async function getDependencyGraph(this: Toypack) {
       return graph;
    }
 
-   graph = await getGraphRecursive.call(this, entryAsset);
-
+   Object.assign(graph, await getGraphRecursive.call(this, entryAsset));
    return graph;
 }
 

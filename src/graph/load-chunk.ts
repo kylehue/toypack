@@ -6,7 +6,7 @@ import {
    ERRORS,
    shouldProduceSourceMap,
 } from "../utils";
-import { Asset, ResourceAsset } from "../types";
+import { Asset, BuildHookContext, ResourceAsset } from "../types";
 import { RawSourceMap } from "source-map-js";
 import { TextAsset, createAsset } from "../utils/create-asset.js";
 
@@ -14,7 +14,7 @@ export async function loadChunk(
    this: Toypack,
    rawSource: string,
    isEntry: boolean,
-   { graph, importers }: PartialContext
+   { graph, importers }: PartialContext<BuildHookContext>
 ) {
    const isVirtual = rawSource.startsWith("virtual:");
    let type: InitialModuleType | null = isVirtual
@@ -119,7 +119,7 @@ export async function loadChunk(
    // Load with loaders
    const loaders = this._getLoadersFor(rawSource);
    for (const { loader, plugin } of loaders) {
-      const context = this._pluginManager.createContext(
+      const context = this._pluginManager.createContext<BuildHookContext>(
          {
             bundler: this,
             graph,

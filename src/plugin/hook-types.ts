@@ -58,16 +58,15 @@ export type ParsedBuildHook = (
    parseInfo: ParseInfo
 ) => void;
 
-export type StartBuildHook = (this: BuildHookContext) => void;
+export type StartBuildHook = (this: BuildHookContextBase) => void;
 export type EndBuildHook = (
-   this: BuildHookContext,
+   this: BuildHookContextBase,
    result: BundleResult
 ) => void;
 
 // Context
-export interface BuildHookContext {
+export interface BuildHookContextBase {
    bundler: Toypack;
-   getImporters: () => Importers;
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
    getImportCode: (importSource: string) => string;
    getDefaultExportCode: (exportCode: string) => string;
@@ -75,6 +74,10 @@ export interface BuildHookContext {
    error: (message: string) => void;
    warn: (message: string) => void;
    info: (message: string) => void;
+}
+
+export interface BuildHookContext extends BuildHookContextBase {
+   getImporters: () => Importers;
 }
 
 // Object build hook

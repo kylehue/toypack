@@ -2,7 +2,12 @@ import { Importers } from "../graph/index.js";
 import Toypack from "../Toypack.js";
 import { DependencyGraph, Plugin } from "../types";
 import { getUsableResourcePath, DEBUG, ERRORS } from "../utils";
-import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
+import {
+   BuildHookConfig,
+   BuildHookContext,
+   BuildHookContextBase,
+   BuildHooks,
+} from "./hook-types.js";
 
 type BuildHooksGroupMap = {
    [key in keyof BuildHooks]?: {
@@ -11,11 +16,16 @@ type BuildHooksGroupMap = {
    }[];
 };
 
-export interface PartialContext {
+export type PartialContext<
+   T extends BuildHookContext | BuildHookContextBase = BuildHookContextBase
+> = {
    bundler: Toypack;
-   graph: DependencyGraph;
-   importers: Importers;
-}
+} & (T extends BuildHookContext
+   ? {
+        graph: DependencyGraph;
+        importers: Importers;
+     }
+   : {});
 
 type TriggerOptions<
    HookName extends keyof BuildHooks,
@@ -26,8 +36,8 @@ type TriggerOptions<
 > = {
    name: HookName;
    args: Parameters<HookFunction> | (() => Parameters<HookFunction>);
-} & (ThisParameterType<HookFunction> extends BuildHookContext
-   ? { context: PartialContext }
+} & (ThisParameterType<HookFunction> extends BuildHookContextBase
+   ? { context: PartialContext<ThisParameterType<HookFunction>> }
    : { context?: never }) &
    (HookReturn extends void
       ? {
@@ -101,10 +111,12 @@ export class PluginManager {
       );
    }
 
-   public createContext(partialContext: PartialContext, plugin: Plugin) {
-      const result: BuildHookContext = {
+   public createContext<T extends BuildHookContext | BuildHookContextBase>(
+      partialContext: PartialContext<T>,
+      plugin: Plugin
+   ): T {
+      const baseContext: BuildHookContextBase = {
          bundler: partialContext.bundler,
-         getImporters: () => partialContext.importers,
          getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(this.bundler, source, baseDir);
          },
@@ -144,7 +156,14 @@ export class PluginManager {
          },
       };
 
-      return result;
+      const ctx = partialContext as PartialContext<BuildHookContext>;
+      if (ctx.importers) {
+         Object.assign(baseContext, {
+            getImporters: () => ctx.importers,
+         });
+      }
+
+      return baseContext as T;
    }
 
    public async triggerHook<
