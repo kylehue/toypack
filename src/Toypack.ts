@@ -22,8 +22,9 @@ import {
    isLocal,
    isUrl,
    DEBUG,
+   getHash,
 } from "./utils";
-import { AssetOptions, createAsset } from "./utils/create-asset.js";
+import { createAsset } from "./utils/create-asset.js";
 import { resolve } from "./utils/resolve.js";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
@@ -42,12 +43,13 @@ export class Toypack extends Hooks {
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
-   protected _virtualAssets = new Map<string, Asset>();
-   protected _pluginManager = new PluginManager(this);
-   protected _cachedDeps: ICache = {
+   private _configHash: string = "";
+   private _cachedDeps: Cache = {
       parsed: new Map(),
       compiled: new Map(),
    };
+   protected _virtualAssets = new Map<string, Asset>();
+   protected _pluginManager = new PluginManager(this);
    constructor(config?: PartialDeep<ToypackConfig>) {
       super();
       if (config) this.setConfig(config);
@@ -97,12 +99,22 @@ export class Toypack extends Hooks {
       });
    }
 
-   public get dependencies() {
-      return this._dependencies as ReadonlyDeep<typeof this._dependencies>;
+   protected _getCache<
+      T extends keyof typeof this._cachedDeps,
+      K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
+      R extends K extends Map<string, infer I> ? I : never
+   >(loc: T, source: string): R {
+      const hashedSource = this._configHash + "-" + source;
+      return this._cachedDeps[loc].get(hashedSource) as R;
    }
 
-   public get config() {
-      return this._config as ReadonlyDeep<typeof this._config>;
+   protected _setCache<
+      T extends keyof typeof this._cachedDeps,
+      K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
+      R extends K extends Map<string, infer I> ? I : never
+   >(loc: T, source: string, value: R) {
+      const hashedSource = this._configHash + "-" + source;
+      this._cachedDeps[loc].set(hashedSource, value as any);
    }
 
    protected _getLoadersFor(source: string) {
@@ -159,7 +171,7 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Install a package from providers.
+    * Installs a package from providers.
     * @param source The source of the package to install.
     * @param version The version of the package to install. Defaults to
     * latest.
@@ -210,7 +222,7 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Add a provider to be used in package manager.
+    * Adds a provider to be used in package manager.
     * @param provider The package provider.
     * @param isMainProvider Set to true to always use this provider first.
     */
@@ -226,7 +238,7 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Add plugins to the bundler.
+    * Adds plugins to the bundler.
     */
    public usePlugin(...plugins: Plugin[]) {
       for (const plugin of plugins) {
@@ -249,8 +261,8 @@ export class Toypack extends Hooks {
    }
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
-      this.clearCache();
       this._config = mergeObjects(this._config, config as ToypackConfig);
+      this._configHash = getHash(JSON.stringify(this._config));
    }
 
    public getConfig(): ToypackConfig {
@@ -259,13 +271,13 @@ export class Toypack extends Hooks {
 
    /**
     * Resolve a source path.
-    * @param {string} relativeSource The source path to resolve.
-    * @param {Partial<ResolveOptions>} [options] Optional resolve options.
-    * @returns {string} The resolved absolute path.
+    * @param source The source path to resolve.
+    * @param options Optional resolve options.
+    * @returns The resolved absolute path.
     */
-   public resolve(relativeSource: string, options?: Partial<ResolveOptions>) {
-      if (relativeSource.startsWith("virtual:")) {
-         return this._virtualAssets.get(relativeSource)?.source || null;
+   public resolve(source: string, options?: Partial<ResolveOptions>) {
+      if (source.startsWith("virtual:")) {
+         return this._virtualAssets.get(source)?.source || null;
       }
 
       const opts = Object.assign(
@@ -292,11 +304,10 @@ export class Toypack extends Hooks {
          assets[source] = typeof asset.content == "string" ? asset.content : "";
       }
 
-      const result = resolve(assets, relativeSource, opts);
+      const result = resolve(assets, source, opts);
 
       if (!result) {
-         const isNodeModule =
-            !isLocal(relativeSource) && !isUrl(relativeSource);
+         const isNodeModule = !isLocal(source) && !isUrl(source);
          /**
           * If still not resolved, and it's an import from node_modules,
           * we'd probably need to resolve it with version. This is because
@@ -307,12 +318,12 @@ export class Toypack extends Hooks {
                name,
                subpath,
                version: _version,
-            } = parsePackageName(relativeSource);
+            } = parsePackageName(source);
             const version = this._dependencies[name] || _version;
-            relativeSource = `${name}@${version}${subpath}`;
+            source = `${name}@${version}${subpath}`;
          }
 
-         return resolve(assets, relativeSource, opts);
+         return resolve(assets, source, opts);
       } else {
          return result;
       }
@@ -335,10 +346,10 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Adds or updates an asset with the given source and content.
-    * @param {string} source The source path of the asset.
-    * @param {string | Blob} [content=""] The content of the asset.
-    * @returns {Asset} The created or updated Asset object.
+    * Adds or updates an asset.
+    * @param source The source path of the asset.
+    * @param content The content of the asset.
+    * @returns The Asset object that was added/updated.
     */
    public addOrUpdateAsset<T = Asset>(
       source: string,
@@ -368,11 +379,12 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Retrieves the Asset object associated with the given source.
-    * @param {string} source The source file path of the asset.
-    * @returns {Asset | null} The Asset object if found, otherwise null.
+    * Returns an asset.
+    * @param source The source file path of the asset.
+    * @returns The Asset object if found, otherwise null.
     */
    public getAsset(source: string) {
+      this._cachedDeps.compiled.get;
       if (source.startsWith("virtual:")) {
          const asset = this._virtualAssets.get(source);
          if (asset) return this._virtualAssets.get(source);
@@ -382,6 +394,9 @@ export class Toypack extends Hooks {
       return this._assets.get(source) || null;
    }
 
+   /**
+    * Removes all assets and clears the cache.
+    */
    public clearAsset() {
       /**
        * Don't do this._assets.clear() because that won't revoke the
@@ -400,8 +415,8 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Removes the asset with the given source.
-    * @param {string} source The source file path of the asset to remove.
+    * Removes an asset.
+    * @param source The source file path of the asset to remove.
     */
    public removeAsset(source: string) {
       source = path.join("/", source);
@@ -430,14 +445,10 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Runs the compilation process.
-    * @param {boolean} [isProd=false] Indicates whether to run
-    * in production mode.
+    * Starts the bundling process.
     * @returns An object containing the bundle result.
     */
-   public async run(isProd = false) {
-      const oldMode = this._config.bundle.mode;
-      this._config.bundle.mode = isProd ? "production" : oldMode;
+   public async run() {
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
       const timeAfterGraph = performance.now();
@@ -445,13 +456,10 @@ export class Toypack extends Hooks {
       const timeBeforeBundle = performance.now();
       const result = await bundle.call(this, graph);
       const timeAfterBundle = performance.now();
-      this._config.bundle.mode = oldMode;
-      // Set modified flag to false for all assets (used in caching)
       this._assets.forEach((asset) => {
          asset.modified = false;
       });
-      // IFrame
-      if (!isProd && this._iframe) {
+      if (this._iframe && this._config.bundle.mode == "development") {
          this._iframe.srcdoc = result.html.content;
       }
       const totalGraphTime = Math.round(timeAfterGraph - timeBeforeGraph);
@@ -463,6 +471,14 @@ export class Toypack extends Hooks {
       DEBUG.info(this._config.logLevel, message);
       return result;
    }
+
+   public get dependencies() {
+      return this._dependencies as ReadonlyDeep<typeof this._dependencies>;
+   }
+
+   public get config() {
+      return this._config as ReadonlyDeep<typeof this._config>;
+   }
 }
 
 // Lib exports & types
@@ -470,7 +486,7 @@ export default Toypack;
 export * as Babel from "@babel/standalone";
 export type { ToypackConfig, Asset };
 
-interface ICache {
+interface Cache {
    parsed: Map<
       string,
       {

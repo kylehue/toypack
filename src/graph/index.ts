@@ -5,7 +5,7 @@ import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
-import { ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
+import { ERRORS, escapeRegex, getHash, indexToPosition, parseURL } from "../utils";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
@@ -74,16 +74,13 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       },
    });
 
-   const config = this.getConfig();
-   const bundleMode = config.bundle.mode;
-
    const loadAndParse = async (
       source: string,
       isEntry: boolean,
       importer?: string
    ) => {
       let loaded, parsed;
-      const cached = this._cachedDeps.parsed.get(source + "." + bundleMode);
+      const cached = this._getCache("parsed", source);
       if (cached && !cached.asset.modified) {
          loaded = cached.loaded;
          parsed = cached.parsed;
@@ -99,7 +96,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                : loaded.type == "style"
                ? await parseStyleAsset.call(this, source, loaded.content)
                : null;
-         this._cachedDeps.parsed.set(source + "." + bundleMode, {
+         this._setCache("parsed", source, {
             asset: loaded.asset,
             parsed,
             loaded,

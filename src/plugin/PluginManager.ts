@@ -1,10 +1,6 @@
 import Toypack from "../Toypack.js";
 import { DependencyGraph, Plugin } from "../types";
-import {
-   getUsableResourcePath,
-   DEBUG,
-   ERRORS,
-} from "../utils";
+import { getUsableResourcePath, DEBUG, ERRORS } from "../utils";
 import { BuildHookConfig, BuildHookContext, BuildHooks } from "./hook-types.js";
 
 type BuildHooksGroupMap = {
@@ -129,6 +125,9 @@ export class PluginManager {
             } else {
                return `module.exports = ${exportCode};`;
             }
+         },
+         getConfigHash() {
+            return (this.bundler as any)._configHash;
          },
          error: (message) => {
             // @ts-ignore

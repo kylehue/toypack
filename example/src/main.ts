@@ -33,7 +33,7 @@ const toypack = new ToypackESM({
       },
       mode: "development",
       sourceMap: {
-         exclude: ["/node_modules/"]
+         exclude: ["/node_modules/"],
       },
    },
    babel: {
@@ -62,7 +62,9 @@ runButton.onclick = async () => {
 };
 
 downloadButton.onclick = async () => {
-   let result = await toypack.run(true);
+   toypack.setConfig({ bundle: { mode: "production" } });
+   let result = await toypack.run();
+   toypack.setConfig({ bundle: { mode: "development" } });
 
    for (let resource of result.resources) {
       saveData(resource.content, resource.source, resource.content.type);

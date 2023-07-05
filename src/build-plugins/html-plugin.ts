@@ -63,6 +63,7 @@ function compile(
 ) {
    const htmlAst = parseHTML(content, htmlPluginOptions?.parserOptions);
    const dependencies = new Set<string>();
+   const resourceDependencies = new Set<string>();
    let bundledInlineStyles = "";
    traverse(htmlAst, (node) => {
       if (!(node instanceof HTMLElement)) return;
@@ -75,8 +76,10 @@ function compile(
       // Import maps aren't supported
       if (node.tagName == "SCRIPT" && node.attributes.type == "importmap") {
          const pos = indexToPosition(content, node.range[0]);
-         let message =
-            "ESM import maps are not supported, please install packages instead.";
+         let message = [
+            "ESM import maps are not supported,",
+            "please install packages instead.",
+         ].join(" ");
          let importMapError =
             message +
             "\n" +
@@ -122,14 +125,15 @@ function compile(
 
          if (usableSource) {
             node.setAttribute("src", usableSource);
-            dependencies.add(relativeSource);
+            resourceDependencies.add(relativeSource);
          }
       }
    });
 
    return {
       ast: htmlAst,
-      dependencies: dependencies,
+      dependencies,
+      resourceDependencies,
       bundledInlineStyles,
    };
 }
@@ -160,10 +164,19 @@ function injectAstToHtml(content: string, astToInject: HTMLElement) {
 }
 
 export default function (options?: HTMLPluginOptions): Plugin {
-   let mainVirtualModule = "";
-   const chunks: Record<string, string> = {};
-   let astToInject: HTMLElement | null = null;
-
+   const virtualModules: Record<string, string> = {};
+   const compiledModules: Record<
+      string,
+      {
+         source: string;
+         configHash: string;
+         content: string;
+         ast: HTMLElement;
+         resourceDependencies: Set<string>;
+      }
+      > = {};
+   let htmlModuleCounter = 0;
+   
    const htmlLoader: Loader = {
       test: /\.html$/,
       compile(dep) {
@@ -171,6 +184,9 @@ export default function (options?: HTMLPluginOptions): Plugin {
             this.error("Blob contents are not supported.");
             return;
          }
+
+         let mainVirtualModule = "";
+         let astToInject: HTMLElement | null = null;
 
          const compiled = compile.call(this, dep.source, dep.content, options);
          astToInject = compiled.ast;
@@ -183,9 +199,17 @@ export default function (options?: HTMLPluginOptions): Plugin {
          // Import inline styles as a virtual module
          if (compiled.bundledInlineStyles.length) {
             const styleVirtualId = `virtual:${getHash(dep.source)}${_id++}.css`;
-            chunks[styleVirtualId] = compiled.bundledInlineStyles;
+            virtualModules[styleVirtualId] = compiled.bundledInlineStyles;
             mainVirtualModule += this.getImportCode(styleVirtualId);
          }
+
+         compiledModules[this.getConfigHash() + dep.source] = {
+            source: dep.source,
+            configHash: this.getConfigHash(),
+            content: mainVirtualModule,
+            ast: astToInject,
+            resourceDependencies: compiled.resourceDependencies,
+         };
 
          return mainVirtualModule;
       },
@@ -196,16 +220,24 @@ export default function (options?: HTMLPluginOptions): Plugin {
       loaders: [htmlLoader],
       extensions: [["script", ".html"]],
       load(dep) {
-         if (dep.source in chunks) {
-            return chunks[dep.source];
+         if (dep.type != "virtual") return;
+         if (dep.source in virtualModules) {
+            return virtualModules[dep.source];
          }
       },
       buildEnd(result) {
-         if (!astToInject) return;
-         result.html.content = injectAstToHtml(
-            result.html.content,
-            astToInject
-         );
+         const htmls = Object.values(compiledModules);
+         if (!htmls.length) return;
+         const html = htmls.find(h => h.configHash == this.getConfigHash());
+         if (!html?.ast) return;
+         result.html.content = injectAstToHtml(result.html.content, html.ast);
+      },
+      parsed({ chunk, parsed }) {
+         const source = this.getConfigHash() + chunk.source;
+         if (source in compiledModules) {
+            const load = compiledModules[source];
+            parsed.dependencies.push(...load.resourceDependencies);
+         }
       },
    };
 }

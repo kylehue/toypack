@@ -25,10 +25,7 @@ export function compileStyle(
    );
 
    // Check cache
-   const bundleMode = config.bundle.mode;
-   const cached = this._cachedDeps.compiled.get(
-      chunk.source + "." + bundleMode
-   );
+   const cached = this._getCache("compiled", chunk.source);
 
    if (cached && !chunk.asset.modified) {
       return {
@@ -109,7 +106,7 @@ export function compileStyle(
 
    // Cache
    if (!cached || chunk.asset.modified) {
-      this._cachedDeps.compiled.set(chunk.source + "." + bundleMode, {
+      this._setCache("compiled", chunk.source, {
          content: result.content,
          map: result.map,
          asset: chunk.asset,

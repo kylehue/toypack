@@ -71,6 +71,7 @@ export interface BuildHookContext {
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
    getImportCode: (importSource: string) => string;
    getDefaultExportCode: (exportCode: string) => string;
+   getConfigHash: () => string;
    error: (message: string) => void;
    warn: (message: string) => void;
    info: (message: string) => void;
