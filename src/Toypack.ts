@@ -9,7 +9,12 @@ import sassPlugin from "./build-plugins/sass-plugin.js";
 import vuePlugin from "./build-plugins/vue-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
-import { getDependencyGraph } from "./graph/index.js";
+import {
+   Importers,
+   ScriptDependency,
+   StyleDependency,
+   getDependencyGraph,
+} from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
 import { Asset, ResolveOptions, Plugin, Loader, TextAsset } from "./types.js";
@@ -112,9 +117,10 @@ export class Toypack extends Hooks {
       T extends keyof typeof this._cachedDeps,
       K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
       R extends K extends Map<string, infer I> ? I : never
-   >(loc: T, source: string, value: R) {
+   >(loc: T, source: string, value: Omit<R, "source">) {
       const hashedSource = this._configHash + "-" + source;
-      this._cachedDeps[loc].set(hashedSource, value as any);
+      const cacheData = { source, ...value };
+      this._cachedDeps[loc].set(hashedSource, cacheData as any);
    }
 
    protected _getLoadersFor(source: string) {
@@ -402,8 +408,10 @@ export class Toypack extends Hooks {
        * Don't do this._assets.clear() because that won't revoke the
        * object urls of blobs.
        */
-      this._assets.forEach((asset) => {
-         this.removeAsset(asset.source);
+      [this._assets, this._virtualAssets].forEach((map) => {
+         map.forEach((asset) => {
+            this.removeAsset(asset.source);
+         });
       });
 
       this.clearCache();
@@ -416,31 +424,41 @@ export class Toypack extends Hooks {
 
    /**
     * Removes an asset.
-    * @param source The source file path of the asset to remove.
+    * @param source The source of the asset to remove.
     */
    public removeAsset(source: string) {
-      source = path.join("/", source);
+      const isVirtual = source.startsWith("virtual:");
+      if (!isVirtual) {
+         source = path.join("/", source);
+      }
 
-      const asset = this._assets.get(source);
+      const asset = isVirtual
+         ? this._virtualAssets.get(source)
+         : this._assets.get(source);
       if (!asset) return;
 
       if (asset.type == "resource" && asset.contentURL) {
          URL.revokeObjectURL(asset.contentURL);
       }
 
-      this._assets.delete(source);
+      if (isVirtual) {
+         this._virtualAssets.delete(source);
+      } else {
+         this._assets.delete(source);
+      }
 
       // Remove from cache
-      this._cachedDeps.parsed.forEach((cache, cacheSource) => {
-         if (cache.asset.source === asset.source) {
-            this._cachedDeps.parsed.delete(cacheSource);
-         }
-      });
-
-      this._cachedDeps.compiled.forEach((cache, cacheSource) => {
-         if (cache.asset.source === asset.source) {
-            this._cachedDeps.compiled.delete(cacheSource);
-         }
+      [this._cachedDeps.compiled, this._cachedDeps.parsed].forEach((map) => {
+         map.forEach((item, key) => {
+            const isVirtual = item.source.startsWith("virtual:");
+            const isUnused = Object.values(item.importers).length == 1;
+            const isDependentChunk = !!item.importers[asset.source];
+            const isDisposable = isVirtual && isUnused && isDependentChunk;
+            if (item.source == asset.source || isDisposable) {
+               map.delete(key);
+               if (isVirtual) this.removeAsset(item.source);
+            }
+         });
       });
    }
 
@@ -490,7 +508,8 @@ interface Cache {
    parsed: Map<
       string,
       {
-         asset: Asset;
+         source: string;
+         importers: Importers;
          parsed: ParsedScriptResult | ParsedStyleResult | null;
          loaded: LoadChunkResult;
       }
@@ -498,7 +517,8 @@ interface Cache {
    compiled: Map<
       string,
       {
-         asset: Asset;
+         source: string;
+         importers: Importers;
          content: string;
          map?: RawSourceMap | null;
       }
