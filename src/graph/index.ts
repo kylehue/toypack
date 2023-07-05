@@ -5,7 +5,7 @@ import path from "path-browserify";
 import { RawSourceMap } from "source-map-js";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
-import { ERRORS, escapeRegex, getHash, indexToPosition, parseURL } from "../utils";
+import { ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
@@ -70,25 +70,25 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       context: {
          bundler: this,
          graph,
-         importer: undefined,
+         importers: {},
       },
    });
 
    const loadAndParse = async (
       source: string,
       isEntry: boolean,
-      importer?: string
+      importers: Importers
    ) => {
       let loaded, parsed;
       const cached = this._getCache("parsed", source);
-      if (cached && !cached.asset.modified) {
+      if (cached && !cached.loaded.asset.modified) {
          loaded = cached.loaded;
          parsed = cached.parsed;
       } else {
          loaded = await loadChunk.call(this, source, isEntry, {
             bundler: this,
             graph,
-            importer,
+            importers,
          });
          parsed =
             loaded.type == "script"
@@ -97,7 +97,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                ? await parseStyleAsset.call(this, source, loaded.content)
                : null;
          this._setCache("parsed", source, {
-            asset: loaded.asset,
+            importers,
             parsed,
             loaded,
          });
@@ -106,12 +106,19 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       return { loaded, parsed };
    };
 
-   const recurse = async (rawSource: string, _importer?: string) => {
-      if (graph[rawSource]) {
-         if (_importer && !graph[rawSource].importers.includes(_importer)) {
-            graph[rawSource].importers.push(_importer);
-         }
+   const importersMap: Record<string, Importers> = {};
+   const recurse = async (
+      rawSource: string,
+      previous: ScriptDependency | StyleDependency | null
+   ) => {
+      importersMap[rawSource] ??= {};
+      if (previous) {
+         importersMap[rawSource][previous.source] = previous;
+      }
 
+      const importers = importersMap[rawSource];
+
+      if (graph[rawSource]) {
          return;
       }
 
@@ -119,12 +126,12 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       const { loaded, parsed } = await loadAndParse(
          rawSource,
          isEntry,
-         _importer
+         importers
       );
 
       let chunk;
       if (loaded.type == "resource") {
-         chunk = createChunk(rawSource, loaded, undefined, _importer, isEntry);
+         chunk = createChunk(rawSource, loaded, importers, undefined, isEntry);
          graph[rawSource] = chunk;
          /**
           * Resources doesn't have dependencies so we can skip all
@@ -137,7 +144,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
           * but we do this anyway to make typescript happy.
           */
          if (!parsed) return;
-         chunk = createChunk(rawSource, loaded, parsed, _importer, isEntry);
+         chunk = createChunk(rawSource, loaded, importers, parsed, isEntry);
          graph[rawSource] = chunk;
       }
 
@@ -147,7 +154,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          context: {
             bundler: this,
             graph,
-            importer: _importer,
+            importers,
          },
          args: [
             {
@@ -168,7 +175,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             context: {
                bundler: this,
                graph,
-               importer: rawSource,
+               importers: { [chunk.source]: chunk },
             },
             callback(result) {
                if (result) resolved = result;
@@ -201,11 +208,11 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          resolved = resolved.split("?")[0] + parsed.query;
 
          chunk.dependencyMap[depSource] = resolved;
-         await recurse(resolved, rawSource);
+         await recurse(resolved, chunk);
       }
    };
 
-   await recurse(entry.source);
+   await recurse(entry.source, null);
    return graph;
 }
 
@@ -220,14 +227,14 @@ function createChunk<
 >(
    source: string,
    loaded: T,
+   importers: Importers,
    parsed?: K,
-   importer?: string,
    isEntry?: boolean
 ): R {
    let chunk: ScriptDependency | StyleDependency | ResourceDependency;
    const allCommon = {
       source,
-      importers: importer ? [importer] : [],
+      importers,
    };
 
    if (loaded.type == "resource") {
@@ -303,8 +310,10 @@ export async function getDependencyGraph(this: Toypack) {
 interface DependencyBase {
    type: "script" | "style" | "resource";
    source: string;
-   importers: string[];
+   importers: Importers;
 }
+
+export type Importers = Record<string, ScriptDependency | StyleDependency>;
 
 export interface ScriptDependency extends DependencyBase {
    type: "script";

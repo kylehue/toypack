@@ -112,7 +112,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       context: {
          bundler: this,
          graph,
-         importer: undefined,
+         importers: {},
       },
    });
 

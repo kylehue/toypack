@@ -14,7 +14,7 @@ export async function loadChunk(
    this: Toypack,
    rawSource: string,
    isEntry: boolean,
-   { graph, importer }: PartialContext
+   { graph, importers }: PartialContext
 ) {
    const isVirtual = rawSource.startsWith("virtual:");
    let type: InitialModuleType | null = isVirtual
@@ -109,7 +109,7 @@ export async function loadChunk(
       context: {
          bundler: this,
          graph,
-         importer,
+         importers,
       },
       callback(result) {
          handleLoad(result);
@@ -123,7 +123,7 @@ export async function loadChunk(
          {
             bundler: this,
             graph,
-            importer,
+            importers,
          },
          plugin
       );

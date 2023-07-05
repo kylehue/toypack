@@ -65,7 +65,7 @@ it("should load", async () => {
    const loaded = await loadChunk.call(toypack, "/index.js", true, {
       bundler: toypack,
       graph: {},
-      importer: "",
+      importers: {},
    });
 
    expect(loaded.content).toEqual(
@@ -79,7 +79,7 @@ it("should not accept unknown extensions", async () => {
       loadChunk.call(toypack, "/index.abc", true, {
          bundler: toypack,
          graph: {},
-         importer: "",
+         importers: {},
       })
    ).rejects.toThrow(/Couldn't determine the type/gi);
 });
@@ -89,7 +89,7 @@ it("should accept new extensions", async () => {
    const loaded = await loadChunk.call(toypack, "/index.cba", true, {
       bundler: toypack,
       graph: {},
-      importer: "",
+      importers: {},
    });
    expect(loaded).toEqual({
       type: "style",

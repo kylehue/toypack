@@ -1,3 +1,4 @@
+import { Importers } from "../graph/index.js";
 import Toypack from "../Toypack.js";
 import { DependencyGraph, Plugin } from "../types";
 import { getUsableResourcePath, DEBUG, ERRORS } from "../utils";
@@ -13,7 +14,7 @@ type BuildHooksGroupMap = {
 export interface PartialContext {
    bundler: Toypack;
    graph: DependencyGraph;
-   importer: string | undefined;
+   importers: Importers;
 }
 
 type TriggerOptions<
@@ -103,10 +104,7 @@ export class PluginManager {
    public createContext(partialContext: PartialContext, plugin: Plugin) {
       const result: BuildHookContext = {
          bundler: partialContext.bundler,
-         getImporter: () =>
-            partialContext.importer
-               ? partialContext.graph[partialContext.importer]
-               : null,
+         getImporters: () => partialContext.importers,
          getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(this.bundler, source, baseDir);
          },

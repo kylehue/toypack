@@ -61,7 +61,7 @@ export async function compileScript(
       context: {
          bundler: this,
          graph,
-         importer: chunk.importers[0],
+         importers: chunk.importers,
       },
    });
 
@@ -151,7 +151,7 @@ export async function compileScript(
       this._setCache("compiled", chunk.source, {
          content: result.content,
          map: result.map,
-         asset: chunk.asset,
+         importers: chunk.importers
       });
    }
 

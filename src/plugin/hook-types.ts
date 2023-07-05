@@ -1,6 +1,6 @@
 import { Asyncify } from "type-fest";
 import {
-   Dependency,
+   Importers,
    ScriptDependency,
    StyleDependency,
 } from "../graph/index.js";
@@ -67,7 +67,7 @@ export type EndBuildHook = (
 // Context
 export interface BuildHookContext {
    bundler: Toypack;
-   getImporter: () => Dependency | null;
+   getImporters: () => Importers;
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
    getImportCode: (importSource: string) => string;
    getDefaultExportCode: (exportCode: string) => string;

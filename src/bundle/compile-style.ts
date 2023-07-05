@@ -49,7 +49,7 @@ export function compileStyle(
       context: {
          bundler: this,
          graph: graph,
-         importer: chunk.importers[0],
+         importers: chunk.importers,
       },
    });
 
@@ -109,7 +109,7 @@ export function compileStyle(
       this._setCache("compiled", chunk.source, {
          content: result.content,
          map: result.map,
-         asset: chunk.asset,
+         importers: chunk.importers
       });
    }
 
