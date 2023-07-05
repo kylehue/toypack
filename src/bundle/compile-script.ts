@@ -8,9 +8,8 @@ import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
 import MapConverter from "convert-source-map";
 import { RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
-import { mergeSourceMaps } from "../utils";
+import { mergeSourceMaps, shouldProduceSourceMap } from "../utils";
 import { DependencyGraph, ScriptDependency } from "../types.js";
-import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 
 const importantPresets: PluginItem[] = ["env"];
 const importantPlugins: PluginItem[] = [

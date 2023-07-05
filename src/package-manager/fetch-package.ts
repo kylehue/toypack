@@ -5,19 +5,21 @@ import { RawSourceMap } from "source-map-js";
 import MapConverter from "convert-source-map";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import type { Toypack } from "../types.js";
-import { mergeSourceMaps, parsePackageName } from "../utils/index.js";
+import {
+   mergeSourceMaps,
+   parsePackageName,
+   shouldProduceSourceMap,
+} from "../utils";
 import { PackageProvider } from "./index.js";
 import {
    _cache,
    getFetchUrlFromProvider,
    getType,
    resolve,
-   getUrlFromProviderHost,
    getNodeModulesPath,
    getSource,
    findDuplicateAsset,
 } from "./utils.js";
-import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";

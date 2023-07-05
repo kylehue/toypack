@@ -60,7 +60,6 @@ function getImportCodeFrame(
 
 /**
  * Recursively get the dependency graph of an asset.
- * @returns An array of dependency objects.
  */
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};

@@ -1,8 +1,12 @@
 import { PartialContext } from "../plugin/PluginManager.js";
 import { Toypack } from "../Toypack.js";
-import { mergeSourceMaps, isSupported, ERRORS } from "../utils";
+import {
+   mergeSourceMaps,
+   isSupported,
+   ERRORS,
+   shouldProduceSourceMap,
+} from "../utils";
 import { Asset, ResourceAsset } from "../types";
-import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 import { RawSourceMap } from "source-map-js";
 import { TextAsset, createAsset } from "../utils/create-asset.js";
 

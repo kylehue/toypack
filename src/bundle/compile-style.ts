@@ -2,9 +2,14 @@ import MapConverter from "convert-source-map";
 import * as CSSTree from "css-tree";
 import { SourceMapGenerator, RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
-import { getUsableResourcePath, isLocal, isUrl, mergeSourceMaps } from "../utils";
+import {
+   getUsableResourcePath,
+   isLocal,
+   isUrl,
+   mergeSourceMaps,
+   shouldProduceSourceMap,
+} from "../utils";
 import { DependencyGraph, StyleDependency } from "../types";
-import { shouldProduceSourceMap } from "../utils/should-produce-source-map.js";
 import path from "path-browserify";
 
 export function compileStyle(
@@ -88,15 +93,18 @@ export function compileStyle(
       result.content = compiled;
    } else {
       result.content = compiled.css;
-      result.map = shouldMap
-         ? MapConverter.fromJSON(compiled.map.toString()).toObject()
-         : null;
    }
 
-   if (shouldMap && result.map && chunk.map) {
-      result.map.sourcesContent = [chunk.content];
-      result.map.sources = [chunk.source];
-      result.map = mergeSourceMaps(chunk.map, result.map);
+   let map: RawSourceMap | null = null;
+   if (shouldMap && typeof compiled != "string" && compiled.map) {
+      map = MapConverter.fromObject(compiled.map).toObject() as RawSourceMap;
+      map.sourcesContent = [chunk.content];
+      map.sources = [chunk.source];
+      if (chunk.map) {
+         map = mergeSourceMaps(chunk.map, map);
+      }
+
+      result.map = map;
    }
 
    // Cache

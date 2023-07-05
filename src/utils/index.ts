@@ -16,3 +16,4 @@ export { mergeSourceMapToBundle } from "./merge-source-map-bundle.js";
 export { mergeSourceMaps } from "./merge-source-maps.js";
 export { parsePackageName } from "./parse-package-name.js";
 export { parseURL } from "./parse-url.js";
+export { shouldProduceSourceMap } from "./should-produce-source-map.js";
