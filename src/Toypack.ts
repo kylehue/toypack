@@ -45,7 +45,6 @@ export class Toypack extends Hooks {
    };
    private _assets = new Map<string, Asset>();
    private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
-   private _loaders: { plugin: Plugin; loader: Loader }[] = [];
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
    private _configHash: string = "";
@@ -121,25 +120,6 @@ export class Toypack extends Hooks {
       const hashedSource = this._configHash + "-" + source;
       const cacheData = { source, ...value };
       this._cachedDeps[loc].set(hashedSource, cacheData as any);
-   }
-
-   protected _getLoadersFor(source: string) {
-      const result: typeof this._loaders = [];
-      for (const { loader, plugin } of this._loaders) {
-         let hasMatched = false;
-         if (typeof loader.test == "function" && loader.test(source)) {
-            hasMatched = true;
-         } else if (loader.test instanceof RegExp && loader.test.test(source)) {
-            hasMatched = true;
-         }
-
-         if (hasMatched) {
-            result.push({ loader, plugin });
-            if (loader.disableChaining === true) break;
-         }
-      }
-
-      return result;
    }
 
    protected _getTypeFromSource(source: string) {
@@ -250,17 +230,9 @@ export class Toypack extends Hooks {
       for (const plugin of plugins) {
          this._pluginManager.registerPlugin(plugin);
 
-         if (plugin.extensions) {
-            for (const ext of plugin.extensions) {
-               if (!this._hasExtension(ext[0], ext[1])) {
-                  this._extensions[ext[0]].push(ext[1]);
-               }
-            }
-         }
-
-         if (plugin.loaders) {
-            for (const loader of plugin.loaders) {
-               this._loaders.push({ loader, plugin });
+         for (const ext of plugin.extensions || []) {
+            if (!this._hasExtension(ext[0], ext[1])) {
+               this._extensions[ext[0]].push(ext[1]);
             }
          }
       }

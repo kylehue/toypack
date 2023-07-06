@@ -65,7 +65,6 @@ export async function parseScriptAsset(
          const result = codeFrameColumns(content, {
             start: error.loc,
          });
-         console.dir(error)
          message = `${error.name}: ${error.message} in "${source}"\n${result}`;
       } else {
          message = error;

@@ -117,24 +117,20 @@ export async function loadChunk(
    });
 
    // Load with loaders
-   const loaders = this._getLoadersFor(rawSource);
-   for (const { loader, plugin } of loaders) {
-      const context = this._pluginManager.createContext<BuildHookContext>(
-         {
-            bundler: this,
-            graph,
-            importers,
-         },
-         plugin
-      );
-
-      const loaderResult = loader.compile.call(context, moduleInfo);
-      if (!loaderResult) continue;
-      handleLoad(loaderResult);
-   }
+   let isLoaded = false;
+   this._pluginManager.useLoaders(
+      rawSource,
+      graph,
+      importers,
+      moduleInfo,
+      (result) => {
+         isLoaded = true;
+         handleLoad(result);
+      }
+   );
 
    const sourceType = this._getTypeFromSource(rawSource);
-   const isNotLoaded = !isSupported(rawSource) && !loaders.length;
+   const isNotLoaded = !isSupported(rawSource) && !isLoaded;
    const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
    if (isNotLoaded || isStillVirtual) {
       this._trigger("onError", ERRORS.loaderNotFound(rawSource));

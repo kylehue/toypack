@@ -1,6 +1,12 @@
 import { Importers } from "../graph/index.js";
 import Toypack from "../Toypack.js";
-import { DependencyGraph, Plugin } from "../types";
+import {
+   DependencyGraph,
+   Loader,
+   LoadResult,
+   ModuleInfo,
+   Plugin,
+} from "../types";
 import { getUsableResourcePath, DEBUG, ERRORS } from "../utils";
 import {
    BuildHookConfig,
@@ -49,18 +55,27 @@ type TriggerOptions<
 
 export class PluginManager {
    private _hooks: BuildHooksGroupMap = {};
+   private _loaders: { plugin: Plugin; loader: Loader }[] = [];
 
    constructor(private bundler: Toypack) {}
 
-   public registerPlugin<T extends Plugin>(plugin: T) {
-      for (const prop in plugin) {
-         if (prop == "name" || prop == "extensions" || prop == "loader") {
-            continue;
+   private _getLoadersFor(source: string) {
+      const result: typeof this._loaders = [];
+      for (const { loader, plugin } of this._loaders) {
+         let hasMatched = false;
+         if (typeof loader.test == "function" && loader.test(source)) {
+            hasMatched = true;
+         } else if (loader.test instanceof RegExp && loader.test.test(source)) {
+            hasMatched = true;
          }
 
-         const hookName = prop as keyof BuildHooks;
-         this._registerHook(plugin, hookName, plugin[hookName]);
+         if (hasMatched) {
+            result.push({ loader, plugin });
+            if (loader.disableChaining === true) break;
+         }
       }
+
+      return result;
    }
 
    private _registerHook<HookName extends keyof BuildHooks>(
@@ -111,7 +126,7 @@ export class PluginManager {
       );
    }
 
-   public createContext<T extends BuildHookContext | BuildHookContextBase>(
+   private _createContext<T extends BuildHookContext | BuildHookContextBase>(
       partialContext: PartialContext<T>,
       plugin: Plugin
    ): T {
@@ -166,6 +181,45 @@ export class PluginManager {
       return baseContext as T;
    }
 
+   public registerPlugin<T extends Plugin>(plugin: T) {
+      for (const loader of plugin.loaders || []) {
+         this._loaders.push({ loader, plugin });
+      }
+
+      for (const prop in plugin) {
+         if (prop == "name" || prop == "extensions" || prop == "loader") {
+            continue;
+         }
+
+         const hookName = prop as keyof BuildHooks;
+         this._registerHook(plugin, hookName, plugin[hookName]);
+      }
+   }
+
+   public useLoaders(
+      source: string,
+      graph: DependencyGraph,
+      importers: Importers,
+      moduleInfo: ModuleInfo,
+      callback: (loadResult: string | LoadResult) => void
+   ) {
+      const loaders = this._getLoadersFor(source);
+      for (const { loader, plugin } of loaders) {
+         const context = this._createContext<BuildHookContext>(
+            {
+               bundler: this.bundler,
+               graph,
+               importers,
+            },
+            plugin
+         );
+
+         const loaderResult = loader.compile.call(context, moduleInfo);
+         if (!loaderResult) continue;
+         callback(loaderResult);
+      }
+   }
+
    public async triggerHook<
       T extends keyof BuildHooks,
       H extends BuildHooks[T],
@@ -175,7 +229,7 @@ export class PluginManager {
       const hookGroup = this._hooks[name];
       if (!hookGroup) return;
       for (const { hook, plugin } of hookGroup) {
-         const ctx = context ? this.createContext(context, plugin) : null;
+         const ctx = context ? this._createContext(context, plugin) : null;
          const args = typeof rawArgs == "function" ? rawArgs() : rawArgs;
          let result: R;
          if (typeof hook == "function") {
