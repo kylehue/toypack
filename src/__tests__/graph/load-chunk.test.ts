@@ -55,7 +55,7 @@ function dummyPlugin(): Plugin {
 toypack.usePlugin(dummyPlugin());
 
 beforeEach(async () => {
-   toypack.clearAsset();
+   toypack.clearAssets();
    toypack.addOrUpdateAsset("index.js", indexJsContent);
    const errorRegex = new RegExp(escapeRegex(shouldNotLoadPath), "gi");
    await expect(toypack.run()).rejects.toThrow(errorRegex);

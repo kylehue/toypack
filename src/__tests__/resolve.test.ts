@@ -26,7 +26,7 @@ const toypack = new Toypack({
 });
 
 beforeAll(() => {
-   toypack.clearAsset();
+   toypack.clearAssets();
    toypack.addOrUpdateAsset("local/index.js");
    toypack.addOrUpdateAsset("src/main.js");
    toypack.addOrUpdateAsset("assets/image.jpg");
@@ -66,15 +66,21 @@ it("should resolve", () => {
 it("should resolve absolute paths", () => {
    expect(
       toypack.resolve("/assets/image.jpg", {
-         baseDir: path.dirname("/src/main.js"),
+         baseDir: "this/should/not/matter",
       })
    ).toBe("/assets/image.jpg");
 
    expect(
       toypack.resolve("/assets/image", {
-         baseDir: path.dirname("/src/main.js"),
+         baseDir: "this/should/not/matter",
       })
    ).toBe("/assets/image.jpg");
+
+   expect(
+      toypack.resolve("/test/utils/tester", {
+         baseDir: "this/should/not/matter",
+      })
+   ).toBe("/test/utils/tester/index.js");
 });
 
 it("should resolve with base directory", () => {
