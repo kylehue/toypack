@@ -9,32 +9,27 @@ import sassPlugin from "./build-plugins/sass-plugin.js";
 import vuePlugin from "./build-plugins/vue-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
-import {
-   Importers,
-   ScriptDependency,
-   StyleDependency,
-   getDependencyGraph,
-} from "./graph/index.js";
+import { Importers, getDependencyGraph } from "./graph/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
-import { Asset, ResolveOptions, Plugin, Loader, TextAsset } from "./types.js";
+import { Asset, ResolveOptions, Plugin, TextAsset } from "./types.js";
 import {
-   mergeObjects,
-   isValidAssetSource,
+   DEBUG,
    ERRORS,
    EXTENSIONS,
-   parsePackageName,
+   getHash,
    isLocal,
    isUrl,
-   DEBUG,
-   getHash,
+   isValidAssetSource,
+   mergeObjects,
+   parsePackageName,
 } from "./utils";
 import { createAsset } from "./utils/create-asset.js";
 import { resolve } from "./utils/resolve.js";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
-import { PackageProvider, getPackage, test } from "./package-manager/index.js";
+import { PackageProvider, getPackage } from "./package-manager/index.js";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -362,10 +357,10 @@ export class Toypack extends Hooks {
     * @returns The Asset object if found, otherwise null.
     */
    public getAsset(source: string) {
-      this._cachedDeps.compiled.get;
+      if (!source) return null;
       if (source.startsWith("virtual:")) {
          const asset = this._virtualAssets.get(source);
-         if (asset) return this._virtualAssets.get(source);
+         if (asset) return asset;
       }
 
       source = path.join("/", source.split("?")[0]);
@@ -375,7 +370,7 @@ export class Toypack extends Hooks {
    /**
     * Removes all assets and clears the cache.
     */
-   public clearAsset() {
+   public clearAssets() {
       /**
        * Don't do this._assets.clear() because that won't revoke the
        * object urls of blobs.
@@ -399,6 +394,7 @@ export class Toypack extends Hooks {
     * @param source The source of the asset to remove.
     */
    public removeAsset(source: string) {
+      if (!source) return;
       const isVirtual = source.startsWith("virtual:");
       if (!isVirtual) {
          source = path.join("/", source);
