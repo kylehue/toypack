@@ -16,5 +16,6 @@ it("should not be a url", () => {
    expect(isUrl("../path/to/file.js")).toBeFalsy();
    expect(isUrl("./path/to/file.js")).toBeFalsy();
    expect(isUrl("/path/to/file.js")).toBeFalsy();
+   expect(isUrl("virtual:" + url)).toBeFalsy();
    expect(isUrl("")).toBeFalsy();
 });
