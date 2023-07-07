@@ -1,31 +1,41 @@
 import path from "path-browserify";
 import { SourceMapConfig } from "../types";
 
-export function shouldProduceSourceMap(
+function testIncludeConfig(
    source: string,
-   sourceMapConfig: SourceMapConfig | boolean
+   config: Exclude<SourceMapConfig["include"], undefined>
 ) {
-   if (typeof sourceMapConfig == "boolean") {
-      return !!sourceMapConfig;
-   }
-
-   if (sourceMapConfig.include) {
-      for (const dir of sourceMapConfig.include) {
+   if (typeof config == "function") {
+      return !!config(source);
+   } else if (Array.isArray(config)) {
+      for (const dir of config) {
          if (source.startsWith(path.join("/", dir))) {
             return true;
          }
       }
-
-      return false;
-   } else if (sourceMapConfig.exclude) {
-      for (const dir of sourceMapConfig.exclude) {
-         if (source.startsWith(path.join("/", dir))) {
-            return false;
-         }
-      }
-
-      return true;
    } else {
-      return true;
+      return config.test(source);
    }
+
+   return false;
+}
+
+export function shouldProduceSourceMap(
+   source: string,
+   sourceMapConfig: SourceMapConfig | boolean
+) {
+   let result = true;
+   if (typeof sourceMapConfig == "boolean") {
+      return sourceMapConfig;
+   }
+   
+   if (sourceMapConfig.exclude) {
+      result = !testIncludeConfig(source, sourceMapConfig.exclude);
+   }
+
+   if (sourceMapConfig.include) {
+      result = testIncludeConfig(source, sourceMapConfig.include);
+   }
+
+   return result;
 }
