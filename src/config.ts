@@ -7,9 +7,8 @@ export const defaultConfig = {
     */
    bundle: {
       /**
-       * The entry point of the program. If not specified, entry will be
-       * `/index.js` or `/index.html`. If those files doesn't exist, entry
-       * will be the path specified in the `main` field of `/package.json`.
+       * The entry point of the program. If not specified, the bundler will
+       * try to find it using `resolve("/")`.
        */
       entry: "",
       /**
@@ -18,9 +17,9 @@ export const defaultConfig = {
        */
       moduleType: "esm" as ModuleTypeConfig,
       /**
-       * The mode of the bundle. `development` is optimized for a fast
-       * and flexible workflow during the development process. `production`
-       * is optimized for performance and efficiency in a live production
+       * The mode of the bundle. Development mode is optimized for fast
+       * workflow during the development process. Production mode is
+       * optimized for performance and efficiency in a live production
        * environment.
        * @default "development"
        */
@@ -30,13 +29,11 @@ export const defaultConfig = {
        */
       resolve: {
          /**
-          * An object mapping aliases to their corresponding paths or modules.
+          * Used to import certain modules more easily.
           */
          alias: {} as Record<string, string>,
          /**
-          * An object mapping fallback module names to their corresponding
-          * paths or modules. Allows for providing fallback modules when a
-          * module is not found in the normal resolution process.
+          * Used to redirect module paths when resolving fails.
           */
          fallback: {} as Record<string, string | false>,
          /**
@@ -54,8 +51,8 @@ export const defaultConfig = {
          } as Record<string, string[]>,
       },
       /**
-       * Set to true to produce source maps. Can also be an object containing
-       * the source map configuration.
+       * A boolean indicating whether to produce source maps or not.
+       * It can also be an object containing the source map configuration.
        * @default true
        */
       sourceMap: true as SourceMapConfig | boolean,

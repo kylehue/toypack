@@ -102,9 +102,9 @@ export class Toypack extends Hooks {
       T extends keyof typeof this._cachedDeps,
       K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
       R extends K extends Map<string, infer I> ? I : never
-   >(loc: T, source: string): R {
+   >(loc: T, source: string): R | null {
       const hashedSource = this._configHash + "-" + source;
-      return this._cachedDeps[loc].get(hashedSource) as R;
+      return (this._cachedDeps[loc].get(hashedSource) || null) as R | null;
    }
 
    protected _setCache<
@@ -489,10 +489,8 @@ export class Toypack extends Hooks {
    }
 }
 
-// Lib exports & types
 export default Toypack;
 export * as Babel from "@babel/standalone";
-export type { ToypackConfig, Asset };
 
 interface Cache {
    parsed: Map<
