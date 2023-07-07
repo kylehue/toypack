@@ -242,6 +242,10 @@ export class Toypack extends Hooks {
       return this._config;
    }
 
+   public getAssetSources() {
+      return Object.keys(Object.fromEntries(this._assets));
+   }
+
    /**
     * Resolve a source path.
     * @param source The source path to resolve.
@@ -272,11 +276,12 @@ export class Toypack extends Hooks {
          ]),
       ];
 
-      const assets: Record<string, string> = {};
-
-      for (const [source, asset] of this._assets) {
-         assets[source] = typeof asset.content == "string" ? asset.content : "";
-      }
+      const assets = this.getAssetSources().reduce((acc, source) => {
+         const asset = this.getAsset(source);
+         if (!asset) return acc;
+         acc[source] = asset.type == "text" ? asset.content : "";
+         return acc;
+      }, {} as Record<string, string>);
 
       const result = resolve(assets, source, opts);
 
@@ -388,6 +393,22 @@ export class Toypack extends Hooks {
    public clearCache() {
       this._cachedDeps.compiled.clear();
       this._cachedDeps.parsed.clear();
+   }
+
+   /**
+    * Removes all assets that is located in the provided source.
+    * @param source The source where all the assets will be removed.
+    */
+   public removeDirectory(source: string) {
+      if (!source) return;
+      if (source.startsWith("virtual:")) return;
+      source = path.join("/", source);
+
+      for (const [_, asset] of this._assets) {
+         if (asset.source.startsWith(source) && asset.source != source) {
+            this.removeAsset(asset.source);
+         }
+      }
    }
 
    /**
