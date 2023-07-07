@@ -31,7 +31,7 @@ export async function loadChunk(
       throw new Error(`[load-chunk] Error: ${rawSource} doesn't exist. `);
    } else if (!asset) {
       // Create temporary asset for virtual modules
-      asset = this._virtualAssets.get(rawSource);
+      asset = this._virtualAssets.get(rawSource) || null;
       if (!asset) {
          asset = {} as Asset;
          this._virtualAssets.set(rawSource, asset);
@@ -42,10 +42,6 @@ export async function loadChunk(
       type = asset.forceContentTypeAs;
    }
 
-   /**
-    * Module info will be repeatedly loaded by multiple plugins
-    * and loaders.
-    */
    const moduleInfo = getModuleInfo(type, rawSource, isEntry, asset);
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;

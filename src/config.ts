@@ -89,9 +89,9 @@ export type SourceMapConfig = {
    /** Whether to include the source contents or not. */
    includeContent?: boolean;
    /** Paths to include from source maps. */
-   include?: string[];
+   include?: string[] | RegExp | ((source: string) => boolean | void);
    /** Paths to exclude from source maps. */
-   exclude?: string[];
+   exclude?: string[] | RegExp | ((source: string) => boolean | void);
 };
 export type BabelTransformConfig = Pick<
    TransformOptions,
