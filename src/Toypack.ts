@@ -255,9 +255,10 @@ export class Toypack extends Hooks {
 
       const opts = Object.assign(
          {
-            aliases: this._config.bundle.resolve.alias,
-            fallbacks: this._config.bundle.resolve.fallback,
-            extensions: this._config.bundle.resolve.extensions,
+            aliases: this.config.bundle.resolve.alias,
+            fallbacks: this.config.bundle.resolve.fallback,
+            extensions: this.config.bundle.resolve.extensions,
+            extensionAlias: this.config.bundle.resolve.extensionAlias,
          } as ResolveOptions,
          options || {}
       );

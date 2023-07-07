@@ -42,10 +42,16 @@ export const defaultConfig = {
          /**
           * Additional extensions to consider for imported sources without
           * an explicit extension.
-          * @default
-          * []
           */
          extensions: [] as string[],
+         /**
+          * An object which maps extension to extension aliases.
+          * @default
+          * { ".js": [".js", ".ts"] }
+          */
+         extensionAlias: {
+            ".js": [".js", ".ts"],
+         } as Record<string, string[]>,
       },
       /**
        * Set to true to produce source maps. Can also be an object containing

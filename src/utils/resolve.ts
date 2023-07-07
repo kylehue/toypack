@@ -84,21 +84,51 @@ function loadAsDirectory(
    return tryFileThenIndex(assets, sourceToResolve, options);
 }
 
+function getSourceWithExtension(
+   assets: Record<string, string>,
+   extension: string,
+   sourceWithoutExtension: string,
+   options: ResolveOptions
+) {
+   const source = sourceWithoutExtension + extension;
+   if (typeof assets[source] == "string") return source;
+   if (extension in options.extensionAlias) {
+      for (const extAlias of options.extensionAlias[extension]) {
+         const source = sourceWithoutExtension + extAlias;
+         if (typeof assets[source] == "string") return source;
+      }
+   }
+
+   return null;
+}
+
 function loadAsFile(
    assets: Record<string, string>,
    sourceToResolve: string,
    options: ResolveOptions
 ) {
-   if (
-      path.extname(sourceToResolve) &&
-      typeof assets[sourceToResolve] == "string"
-   ) {
-      return sourceToResolve;
+   const extension = path.extname(sourceToResolve);
+   if (extension) {
+      const sourceWithoutExtension = sourceToResolve.substring(
+         0,
+         sourceToResolve.length - extension.length
+      );
+
+      return getSourceWithExtension(
+         assets,
+         extension,
+         sourceWithoutExtension,
+         options
+      );
    } else {
-      for (let i = 0; i < options.extensions.length; i++) {
-         const extension = options.extensions[i];
-         const sourceWithGuessedExtension = sourceToResolve + extension;
-         if (typeof assets[sourceWithGuessedExtension] == "string") {
+      for (const extension of options.extensions) {
+         const sourceWithGuessedExtension = getSourceWithExtension(
+            assets,
+            extension,
+            sourceToResolve,
+            options
+         );
+         if (sourceWithGuessedExtension) {
             return sourceWithGuessedExtension;
          }
       }
@@ -128,14 +158,11 @@ function getResolved(
       return loadAsDirectory(assets, sourceToResolve, options);
    }
 
-   if (
-      options.includeCoreModules &&
-      !isLocal(sourceToResolve) &&
-      !isUrl(sourceToResolve)
-   ) {
+   const isExternal = isUrl(sourceToResolve);
+   if (options.includeCoreModules && !isLocal(sourceToResolve) && !isExternal) {
       const pre = path.join("/", "node_modules", sourceToResolve);
       return loadAsDirectory(assets, pre, options);
-   } else if (isUrl(sourceToResolve)) {
+   } else if (isExternal) {
       return sourceToResolve;
    } else {
       const pre = path.join("/", options.baseDir, sourceToResolve);
@@ -169,10 +196,12 @@ export function resolve(
    const aliasData = getResolveAliasData(opts.aliases, sourceToResolve);
    if (aliasData) {
       const isExternal = isUrl(aliasData.replacement);
-      let aliased = isExternal ? aliasData.replacement : path.join(
-         aliasData.replacement,
-         sourceToResolve.replace(aliasData.alias, "")
-      );
+      let aliased = isExternal
+         ? aliasData.replacement
+         : path.join(
+              aliasData.replacement,
+              sourceToResolve.replace(aliasData.alias, "")
+           );
 
       if (isLocal(aliasData.replacement) && !isExternal) {
          aliased = "./" + path.relative(opts.baseDir, aliased);
@@ -201,6 +230,7 @@ const defaultResolveOptions = {
    baseDir: "",
    includeCoreModules: true,
    extensions: [".js", ".json"],
+   extensionAlias: {} as Record<string, string[]>,
    aliases: {} as Record<string, string>,
    fallbacks: {} as Record<string, string | false>,
 };

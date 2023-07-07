@@ -21,6 +21,9 @@ const toypack = new Toypack({
             path: false,
             assert: "assert-browserify",
          },
+         extensionAlias: {
+            ".test": [".bar", ".foo", ".test"],
+         },
       },
    },
 });
@@ -159,4 +162,11 @@ it("should leave urls as it is", () => {
    ).toBe(
       "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
    );
+});
+
+it("should map extension alias", () => {
+   toypack.addOrUpdateAsset("/foo/bar.foo");
+   toypack.addOrUpdateAsset("/foo/bar.bar");
+   // `.bar` is the first one the the alias array so it should be the result
+   expect(toypack.resolve("/foo/bar.test")).toBe("/foo/bar.bar");
 });
