@@ -6,7 +6,6 @@ import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
 import importUrlPlugin from "./build-plugins/import-url-plugin.js";
 import sassPlugin from "./build-plugins/sass-plugin.js";
-import vuePlugin from "./build-plugins/vue-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./graph/index.js";
@@ -53,10 +52,13 @@ export class Toypack extends Hooks {
       super();
       if (config) this.setConfig(config);
 
+      for (const plugin of this.config.plugins) {
+         this.usePlugin(plugin as any);
+      }
+
       this.usePlugin(
          jsonPlugin(),
          htmlPlugin(),
-         vuePlugin(),
          sassPlugin(),
          rawPlugin(),
          importUrlPlugin()

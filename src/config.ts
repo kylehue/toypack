@@ -1,5 +1,6 @@
 import { ParserOptions, TransformOptions } from "@babel/core";
 import { PackageManagerConfig } from "./package-manager";
+import { Plugin } from "./types";
 
 export const defaultConfig = {
    /**
@@ -82,6 +83,10 @@ export const defaultConfig = {
     * Configuration for the package manager.
     */
    packageManager: {} as PackageManagerConfig,
+   /**
+    * Toypack plugins.
+    */
+   plugins: [] as Plugin[]
 };
 
 export type ToypackConfig = typeof defaultConfig;
