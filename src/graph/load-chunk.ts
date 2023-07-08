@@ -76,8 +76,13 @@ export async function loadChunk(
       } else {
          moduleInfo.content = loadResult.content;
 
-         if (loadResult.type) {
-            moduleInfo.type = loadResult.type;
+         moduleInfo.type = loadResult.type || moduleInfo.type;
+
+         if (
+            moduleInfo.type != "resource" &&
+            (loadResult.type == "script" || loadResult.type == "style")
+         ) {
+            moduleInfo.lang = loadResult.lang || moduleInfo.lang;
          }
 
          if (
@@ -186,6 +191,7 @@ function getLoadResult(
          asset: moduleInfo.asset,
          content: moduleInfo.content,
          map: moduleInfo.map,
+         lang: moduleInfo.lang
       };
    } else if (moduleInfo.type == "resource") {
       return {
@@ -217,6 +223,7 @@ interface ModuleInfoText extends ModuleInfoBase {
    content: string;
    asset: TextAsset;
    map?: RawSourceMap | null;
+   lang?: string;
 }
 
 interface ModuleInfoResource extends ModuleInfoBase {
@@ -230,6 +237,7 @@ interface ModuleInfoVirtual extends ModuleInfoBase {
    content: string | Blob | null;
    asset: Asset;
    map?: RawSourceMap | null;
+   lang?: string;
 }
 
 export type ModuleInfo =
@@ -241,6 +249,7 @@ interface LoadTextResult {
    type?: "script" | "style";
    content: string;
    map?: RawSourceMap | null;
+   lang?: string;
 }
 
 interface LoadResourceResult {
@@ -261,6 +270,7 @@ export interface LoadChunkText {
    content: string;
    asset: Asset;
    map?: RawSourceMap | null;
+   lang?: string;
 }
 
 export type LoadChunkResult = LoadChunkResource | LoadChunkText;

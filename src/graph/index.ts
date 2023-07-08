@@ -255,6 +255,7 @@ function createChunk<
       dependencyMap: {},
       map: loaded.map,
       isEntry: isEntry || false,
+      lang: loaded.lang,
    };
 
    if (!parsed) {
@@ -332,6 +333,7 @@ export interface ScriptDependency extends DependencyBase {
    asset: Asset;
    map?: RawSourceMap | null;
    isEntry: boolean;
+   lang?: string;
 }
 
 export interface StyleDependency extends DependencyBase {
@@ -343,6 +345,7 @@ export interface StyleDependency extends DependencyBase {
    map?: RawSourceMap | null;
    isEntry: boolean;
    urlNodes: Url[];
+   lang?: string;
 }
 
 export interface ResourceDependency extends DependencyBase {
