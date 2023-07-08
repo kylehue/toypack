@@ -68,20 +68,41 @@ export type EndBuildHook = (
 // Context
 export interface BuildHookContextBase {
    bundler: Toypack;
+   /**
+    * Convert a resource's source path to a useable source path.
+    * If in development mode, the resource path will become a blob url.
+    * If in production mode, the resource path will have a unique hash as
+    * its basename.
+    */
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
+   /** Constructs an import code using the provided request and specifiers. */
    getImportCode: (
       request: string,
       specifiers?: (SpecifierOptions | string)[]
    ) => string;
+   /**
+    * Returns the default export code.
+    * - e.g. `export default ... ;` or `module.exports = ... ;`
+    */
    getDefaultExportCode: (exportCode: string) => string;
+   /**
+    * Returns the hash of the bundler's config.
+    * This is helpful when caching to avoid using cached modules
+    * that was compiled with different configurations.
+    */
    getConfigHash: () => string;
+   /** Emits an error message. */
    error: (message: string) => void;
+   /** Emits a warning message. */
    warn: (message: string) => void;
+   /** Emits an info message. */
    info: (message: string) => void;
 }
 
 export interface BuildHookContext extends BuildHookContextBase {
+   /** Returns the modules that imported the current module. */
    getImporters: () => Importers;
+   /** Returns true if the current module should have source maps or not. */
    shouldMap: () => boolean;
 }
 
