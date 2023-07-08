@@ -62,6 +62,7 @@ export async function compileScript(
          bundler: this,
          graph,
          importers: chunk.importers,
+         source: chunk.source,
       },
    });
 
@@ -112,7 +113,7 @@ export async function compileScript(
    if (chunk.lang) {
       filename += "." + chunk.lang;
    }
-   
+
    const importantBabelOptions = {
       sourceType: moduleType == "esm" ? "module" : "script",
       presets: [
@@ -155,7 +156,7 @@ export async function compileScript(
       this._setCache("compiled", chunk.source, {
          content: result.content,
          map: result.map,
-         importers: chunk.importers
+         importers: chunk.importers,
       });
    }
 

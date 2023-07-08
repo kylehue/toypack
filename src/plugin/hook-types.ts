@@ -82,6 +82,7 @@ export interface BuildHookContextBase {
 
 export interface BuildHookContext extends BuildHookContextBase {
    getImporters: () => Importers;
+   shouldMap: () => boolean;
 }
 
 // Object build hook

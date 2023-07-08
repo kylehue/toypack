@@ -80,6 +80,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                bundler: this,
                graph,
                importers,
+               source,
             });
             parsed =
                loaded.type == "script"
@@ -151,6 +152,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             bundler: this,
             graph,
             importers,
+            source: rawSource,
          },
          args: [
             {
@@ -172,6 +174,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                bundler: this,
                graph,
                importers: { [chunk.source]: chunk },
+               source: resolved,
             },
             callback(result) {
                if (result) resolved = result;

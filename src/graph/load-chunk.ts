@@ -111,6 +111,7 @@ export async function loadChunk(
          bundler: this,
          graph,
          importers,
+         source: rawSource,
       },
       callback(result) {
          handleLoad(result);
@@ -191,7 +192,7 @@ function getLoadResult(
          asset: moduleInfo.asset,
          content: moduleInfo.content,
          map: moduleInfo.map,
-         lang: moduleInfo.lang
+         lang: moduleInfo.lang,
       };
    } else if (moduleInfo.type == "resource") {
       return {

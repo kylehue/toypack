@@ -8,7 +8,13 @@ import {
    ModuleInfo,
    Plugin,
 } from "../types";
-import { getImportCode, getUsableResourcePath, DEBUG, ERRORS } from "../utils";
+import {
+   getImportCode,
+   getUsableResourcePath,
+   DEBUG,
+   ERRORS,
+   shouldProduceSourceMap,
+} from "../utils";
 import {
    BuildHookConfig,
    BuildHookContext,
@@ -31,6 +37,7 @@ export type PartialContext<
    ? {
         graph: DependencyGraph;
         importers: Importers;
+        source: string;
      }
    : {});
 
@@ -180,6 +187,16 @@ export class PluginManager {
             getImporters: () => ctx.importers,
          });
       }
+      if (ctx.source) {
+         Object.assign(baseContext, {
+            shouldMap: () => {
+               return shouldProduceSourceMap(
+                  ctx.source,
+                  this.bundler.getConfig().bundle.sourceMap
+               );
+            },
+         });
+      }
 
       return baseContext as T;
    }
@@ -213,6 +230,7 @@ export class PluginManager {
                bundler: this.bundler,
                graph,
                importers,
+               source,
             },
             plugin
          );

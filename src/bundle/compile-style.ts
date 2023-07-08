@@ -50,6 +50,7 @@ export function compileStyle(
          bundler: this,
          graph: graph,
          importers: chunk.importers,
+         source: chunk.source,
       },
    });
 
@@ -70,7 +71,7 @@ export function compileStyle(
          node.value,
          path.dirname(chunk.source)
       );
-      
+
       if (resourceUseableSource) {
          node.value = resourceUseableSource;
       }
@@ -109,7 +110,7 @@ export function compileStyle(
       this._setCache("compiled", chunk.source, {
          content: result.content,
          map: result.map,
-         importers: chunk.importers
+         importers: chunk.importers,
       });
    }
 
