@@ -1,6 +1,7 @@
 import "./style.css";
 import { sampleFiles } from "./sampleFiles.js";
 import { Toypack as ToypackESM, Babel } from "toypack";
+import vuePlugin from "toypack-vue";
 
 var saveData = (function () {
    var a = document.createElement("a");
@@ -44,12 +45,15 @@ const toypack = new ToypackESM({
          plugins: ["typescript", "jsx"],
       },
    },
+   plugins: [
+      vuePlugin()
+   ]
 });
 
 // await toypack.installPackage("react");
 // await toypack.installPackage("vue", "3.1.2");
 // await toypack.installPackage("matter-js");
-await toypack.installPackage("bootstrap-icons/font/bootstrap-icons.min.css");
+await toypack.installPackage("vue");
 await toypack.installPackage("react", "18");
 await toypack.installPackage("react-dom/client", "18");
 await toypack.installPackage("canvas-confetti");

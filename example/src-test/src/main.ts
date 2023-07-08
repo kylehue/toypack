@@ -22,8 +22,9 @@ const bingbong = "beepboop";
 console.log(bingbong);
 import "../styles/sample.css";
 export const fourFiveTwo = 452;
-import Appv from "./App";
-console.log(Appv);
+import App from "./App";
+import { createApp } from "vue";
+createApp(App).mount("#vueApp");
 
 (async () => {
    const test = await import("../index.html?raw");

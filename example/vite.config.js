@@ -20,5 +20,6 @@ export default defineConfig({
             }),
          ],
       },
+      include: ["@vue/compiler-sfc"],
    },
 });

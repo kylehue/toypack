@@ -3,13 +3,12 @@ import React, { useState, useEffect } from "react";
 export function App(props) {
    const [counter, setCount] = useState(1);
    useEffect(() => {
-      console.log("Hello console");
+      console.log("Hello react");
    }, []);
    return (
       <div className="App">
-         <button onClick={() => setCount(counter + 1)}>Click me!</button>
          <h1>Hello React.</h1>
-         <h2>{counter}</h2>
+         <button onClick={() => setCount(counter + 1)}>{counter}</button>
       </div>
    );
 }
