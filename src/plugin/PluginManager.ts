@@ -1,3 +1,4 @@
+import { SpecifierOptions } from "src/utils/get-import-code.js";
 import { Importers } from "../graph/index.js";
 import Toypack from "../Toypack.js";
 import {
@@ -7,7 +8,7 @@ import {
    ModuleInfo,
    Plugin,
 } from "../types";
-import { getUsableResourcePath, DEBUG, ERRORS } from "../utils";
+import { getImportCode, getUsableResourcePath, DEBUG, ERRORS } from "../utils";
 import {
    BuildHookConfig,
    BuildHookContext,
@@ -135,13 +136,15 @@ export class PluginManager {
          getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(this.bundler, source, baseDir);
          },
-         getImportCode(importSource: string) {
-            const config = this.bundler.getConfig();
-            if (config.bundle.moduleType == "esm") {
-               return `import "${importSource}";`;
-            } else {
-               return `require("${importSource}");`;
-            }
+         getImportCode(
+            request: string,
+            specifiers?: (SpecifierOptions | string)[]
+         ) {
+            return getImportCode(
+               this.bundler.config.bundle.moduleType,
+               request,
+               specifiers
+            );
          },
          getDefaultExportCode(exportCode: string) {
             const config = this.bundler.getConfig();

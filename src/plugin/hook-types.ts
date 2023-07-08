@@ -11,6 +11,7 @@ import { BundleResult } from "../types";
 import { ParsedScriptResult } from "../graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "../graph/parse-style-chunk.js";
 import { LoadResult, ModuleInfo } from "../graph/load-chunk.js";
+import { SpecifierOptions } from "../utils/get-import-code.js";
 
 // Interfaces
 export interface ScriptTransform {
@@ -68,7 +69,10 @@ export type EndBuildHook = (
 export interface BuildHookContextBase {
    bundler: Toypack;
    getUsableResourcePath: (source: string, baseDir: string) => string | null;
-   getImportCode: (importSource: string) => string;
+   getImportCode: (
+      request: string,
+      specifiers?: (SpecifierOptions | string)[]
+   ) => string;
    getDefaultExportCode: (exportCode: string) => string;
    getConfigHash: () => string;
    error: (message: string) => void;
