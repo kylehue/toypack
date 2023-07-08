@@ -6,6 +6,7 @@
 import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "../react";
+import "../vue";
 import confetti from "canvas-confetti";
 const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
 meowButton.onclick = () => confetti();
@@ -22,9 +23,6 @@ const bingbong = "beepboop";
 console.log(bingbong);
 import "../styles/sample.css";
 export const fourFiveTwo = 452;
-import App from "./App";
-import { createApp } from "vue";
-createApp(App).mount("#vueApp");
 
 (async () => {
    const test = await import("../index.html?raw");

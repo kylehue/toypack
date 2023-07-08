@@ -1,10 +1,12 @@
 <template>
    <h1 class="green">Hello Vue</h1>
    <button @click="increment">{{ test }}</button>
+   <VueComponent :msg="'Hello' + test"></VueComponent>
 </template>
 
 <script setup>
 import { ref } from "vue";
+import VueComponent from "./Comp.vue";
 let test = ref(1);
 
 function increment() {
@@ -19,3 +21,4 @@ console.log("Hello vue");
    color: rgb(95, 199, 124) !important;
 }
 </style>
+<style src="../styles/sample.css" scoped></style>

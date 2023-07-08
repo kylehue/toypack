@@ -3,11 +3,13 @@ export const sampleFiles: Record<string, string | Blob> = {
    "package.json": (await import("@test/package.json?raw")).default,
    "index.html": (await import("@test/index.html?raw")).default,
    "src/main.ts": (await import("@test/src/main.ts?raw")).default,
-   "src/App.vue": (await import("@test/src/App.vue?raw")).default,
    "src/testing.cjs": (await import("@test/src/testing.cjs?raw")).default,
    "src/testing.mjs": (await import("@test/src/testing.mjs?raw")).default,
    "react/index.jsx": (await import("@test/react/index.jsx?raw")).default,
    "react/App.jsx": (await import("@test/react/App.jsx?raw")).default,
+   "vue/App.vue": (await import("@test/vue/App.vue?raw")).default,
+   "vue/Comp.vue": (await import("@test/vue/Comp.vue?raw")).default,
+   "vue/index.ts": (await import("@test/vue/index.ts?raw")).default,
    "classes/adder.js": (await import("@test/classes/adder.js?raw")).default,
    "classes/createNum.js": (await import("@test/classes/createNum.js?raw"))
       .default,
@@ -31,8 +33,6 @@ export const sampleFiles: Record<string, string | Blob> = {
       )
    ).blob(),
    "videos/cat-milk.mp4": await (
-      await fetch(
-         new URL("@test/videos/cat-milk.mp4", import.meta.url).href
-      )
+      await fetch(new URL("@test/videos/cat-milk.mp4", import.meta.url).href)
    ).blob(),
 };
