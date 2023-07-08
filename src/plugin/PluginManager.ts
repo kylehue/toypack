@@ -187,7 +187,7 @@ export class PluginManager {
       }
 
       for (const prop in plugin) {
-         if (prop == "name" || prop == "extensions" || prop == "loader") {
+         if (prop == "name" || prop == "extensions" || prop == "loaders") {
             continue;
          }
 

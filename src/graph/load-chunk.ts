@@ -87,8 +87,8 @@ export async function loadChunk(
          ) {
             if (moduleInfo.map && loadResult.map) {
                moduleInfo.map = mergeSourceMaps(moduleInfo.map, loadResult.map);
-            } else if (!moduleInfo.map && loadResult.map) {
-               moduleInfo.map = loadResult.map;
+            } else {
+               moduleInfo.map ||= loadResult.map;
             }
          }
       }
@@ -126,7 +126,7 @@ export async function loadChunk(
    );
 
    const sourceType = this._getTypeFromSource(rawSource);
-   const isNotLoaded = !isSupported(rawSource) && !isLoaded;
+   const isNotLoaded = !sourceType && !isLoaded;
    const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
    if (isNotLoaded || isStillVirtual) {
       this._trigger("onError", ERRORS.loaderNotFound(rawSource));
@@ -169,7 +169,7 @@ function getModuleInfo(
       };
    } else {
       throw new Error(
-         "[load-chunk] Error: Couldn't determine the type of " + source
+         "[load-chunk] Error: Couldn't determine the type of " + asset.source
       );
    }
 

@@ -75,22 +75,26 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          loaded = cached.loaded;
          parsed = cached.parsed;
       } else {
-         loaded = await loadChunk.call(this, source, isEntry, {
-            bundler: this,
-            graph,
-            importers,
-         });
-         parsed =
-            loaded.type == "script"
-               ? await parseScriptAsset.call(this, source, loaded.content)
-               : loaded.type == "style"
-               ? await parseStyleAsset.call(this, source, loaded.content)
-               : null;
-         this._setCache("parsed", source, {
-            importers,
-            parsed,
-            loaded,
-         });
+         try {
+            loaded = await loadChunk.call(this, source, isEntry, {
+               bundler: this,
+               graph,
+               importers,
+            });
+            parsed =
+               loaded.type == "script"
+                  ? await parseScriptAsset.call(this, source, loaded.content)
+                  : loaded.type == "style"
+                  ? await parseStyleAsset.call(this, source, loaded.content)
+                  : null;
+            this._setCache("parsed", source, {
+               importers,
+               parsed,
+               loaded,
+            });
+         } catch (error: any) {
+            this._trigger("onError", ERRORS.parse(error));
+         }
       }
 
       return { loaded, parsed };
@@ -118,6 +122,8 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          isEntry,
          importers
       );
+
+      if (!loaded) return;
 
       let chunk;
       if (loaded.type == "resource") {
@@ -175,7 +181,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
             const nonVirtualResolution = this.resolve(resolved, {
-               baseDir: path.dirname(rawSource),
+               baseDir: path.dirname(rawSource.replace(/^virtual:/, "")),
             });
 
             if (!nonVirtualResolution) {
@@ -193,12 +199,17 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             }
          }
 
-         // Fix query's order to avoid duplicates
+         /**
+          * In dependency graph, we have to put the queries in order
+          * to avoid duplicates.
+          */
          const parsed = parseURL(depSource);
-         resolved = resolved.split("?")[0] + parsed.query;
-
-         chunk.dependencyMap[depSource] = resolved;
-         await recurse(resolved, chunk);
+         const rawQuery = depSource.split("?")[1];
+         chunk.dependencyMap[depSource] = resolved.split("?")[0] + parsed.query;
+         await recurse(
+            resolved.split("?")[0] + (rawQuery ? "?" + rawQuery : ""),
+            chunk
+         );
       }
    };
 
