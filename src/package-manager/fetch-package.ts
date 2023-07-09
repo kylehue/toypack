@@ -43,7 +43,7 @@ export async function fetchPackage(
    let entryUrl = getFetchUrlFromProvider(provider, name, version, subpath);
 
    const recurse = async (url: string) => {
-      if (url in assets || url in dtsAssets) return false;
+      if (url in assets || url in dtsAssets) return true;
       const isEntry = entryUrl == url;
 
       // Dedupe
