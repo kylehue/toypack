@@ -109,11 +109,6 @@ export async function compileScript(
    traverseAST(chunk.ast, traverseOptions);
 
    const userBabelOptions = config.babel.transform;
-   let filename = chunk.source.split("?")[0];
-   if (chunk.lang) {
-      filename += "." + chunk.lang;
-   }
-
    const importantBabelOptions = {
       sourceType: moduleType == "esm" ? "module" : "script",
       presets: [
@@ -123,7 +118,8 @@ export async function compileScript(
          ...new Set([...importantPlugins, ...(userBabelOptions.plugins || [])]),
       ],
       sourceFileName: chunk.source,
-      filename,
+      filename:
+         chunk.source.split("?")[0] + (chunk.lang ? `.${chunk.lang}` : ""),
       sourceMaps: shouldMap,
       envName: mode,
       minified: false,

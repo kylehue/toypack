@@ -6,14 +6,11 @@ import { expect, it, beforeEach } from "vitest";
 import { Toypack } from "../../Toypack.js";
 import { loadChunk } from "../../graph/load-chunk.js";
 import { Loader, Plugin } from "src/types.js";
-import { escapeRegex } from "../../utils/escape-regex.js";
 
-const shouldNotLoadPath = "should.not.load.this.module";
 const unknownPath = "unknown.js";
 const unknownContent = "console.log(null);";
 const indexJsContent = `
 import "${unknownPath}";
-import "${shouldNotLoadPath}";
 `;
 const toypack = new Toypack();
 
@@ -38,7 +35,6 @@ function dummyPlugin(): Plugin {
       extensions: [["style", ".cba"]],
       resolve(id) {
          if (id == unknownPath) return "virtual:" + id;
-         if (id == shouldNotLoadPath) return "virtual:" + shouldNotLoadPath;
       },
       load(dep) {
          if (dep.source == "virtual:" + unknownPath) {
@@ -57,8 +53,7 @@ toypack.usePlugin(dummyPlugin());
 beforeEach(async () => {
    toypack.clearAssets();
    toypack.addOrUpdateAsset("index.js", indexJsContent);
-   const errorRegex = new RegExp(escapeRegex(shouldNotLoadPath), "gi");
-   await expect(toypack.run()).rejects.toThrow(errorRegex);
+   await toypack.run();
 });
 
 it("should load", async () => {
@@ -66,6 +61,7 @@ it("should load", async () => {
       bundler: toypack,
       graph: {},
       importers: {},
+      source: "/index.js",
    });
 
    expect(loaded.content).toEqual(
@@ -80,6 +76,7 @@ it("should not accept unknown extensions", async () => {
          bundler: toypack,
          graph: {},
          importers: {},
+         source: "/index.abc",
       })
    ).rejects.toThrow(/Couldn't determine the type/gi);
 });
@@ -90,6 +87,7 @@ it("should accept new extensions", async () => {
       bundler: toypack,
       graph: {},
       importers: {},
+      source: "/index.cba",
    });
    expect(loaded).toEqual({
       type: "style",

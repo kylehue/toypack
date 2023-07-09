@@ -119,9 +119,10 @@ export async function loadChunk(
    });
 
    // Load with loaders
+   const formattedSource = appendLangToRawSource(rawSource, moduleInfo);
    let isLoaded = false;
    this._pluginManager.useLoaders(
-      rawSource,
+      formattedSource,
       graph,
       importers,
       moduleInfo,
@@ -130,15 +131,22 @@ export async function loadChunk(
          handleLoad(result);
       }
    );
-
-   const sourceType = this._getTypeFromSource(rawSource);
-   const isNotLoaded = !sourceType && !isLoaded;
+   
+   const sourceType = this._getTypeFromSource(formattedSource);
+   const isNotLoaded = !isSupported(formattedSource) && !isLoaded;
    const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
    if (isNotLoaded || isStillVirtual) {
       this._trigger("onError", ERRORS.loaderNotFound(rawSource));
    }
 
    return getLoadResult(moduleInfo, sourceType);
+}
+
+function appendLangToRawSource(rawSource: string, moduleInfo: ModuleInfo) {
+   if (moduleInfo.type == "resource") return rawSource;
+   if (!moduleInfo.lang) return rawSource;
+   const [source, query] = rawSource.split("?");
+   return moduleInfo.lang ? `${source}.${moduleInfo.lang}?${query}` : rawSource;
 }
 
 function getModuleInfo(
