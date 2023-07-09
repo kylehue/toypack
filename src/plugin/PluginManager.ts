@@ -73,7 +73,10 @@ export class PluginManager {
          let hasMatched = false;
          if (typeof loader.test == "function" && loader.test(source)) {
             hasMatched = true;
-         } else if (loader.test instanceof RegExp && loader.test.test(source)) {
+         } else if (
+            loader.test instanceof RegExp &&
+            loader.test.test(source.split("?")[0])
+         ) {
             hasMatched = true;
          }
 
