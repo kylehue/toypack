@@ -5,8 +5,7 @@ import type {
 } from "@babel/core";
 import { transformFromAst } from "@babel/standalone";
 import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
-import MapConverter from "convert-source-map";
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { Toypack } from "../Toypack.js";
 import { mergeSourceMaps, shouldProduceSourceMap } from "../utils";
 import { DependencyGraph, ScriptDependency } from "../types.js";
@@ -131,9 +130,9 @@ export async function compileScript(
       ...importantBabelOptions,
    }) as any as BabelFileResult;
 
-   let map: RawSourceMap | null = null;
+   let map: EncodedSourceMap | null = null;
    if (shouldMap) {
-      map = MapConverter.fromObject(transpiled.map).toObject() as RawSourceMap;
+      map = transpiled.map as EncodedSourceMap;
       map.sourcesContent = [chunk.content];
       map.sources = [chunk.source];
       if (chunk.map) {
@@ -210,5 +209,5 @@ export type ITraverseOptionGroups = {
 export interface CompiledScriptResult {
    source: string;
    content: string;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
 }

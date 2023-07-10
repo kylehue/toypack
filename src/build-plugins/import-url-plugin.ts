@@ -1,4 +1,4 @@
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MapConverter from "convert-source-map";
 import generateScript from "@babel/generator";
 import { generate as generateStyle } from "css-tree";
@@ -16,13 +16,13 @@ interface AssetBase {
 interface ScriptAsset extends AssetBase {
    type: "script";
    content: string;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
 }
 
 interface StyleAsset extends AssetBase {
    type: "style";
    content: string;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
 }
 
 interface ResourceAsset extends AssetBase {
@@ -124,9 +124,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
             asset.content = generated;
          } else {
             asset.content = generated.css;
-            asset.map = MapConverter.fromJSON(
-               generated.map.toString()
-            ).toObject();
+            asset.map = MapConverter.fromObject(generated.map).toObject();
          }
       }
 

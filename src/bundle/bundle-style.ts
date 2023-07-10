@@ -1,15 +1,15 @@
 import MapConverter from "convert-source-map";
-import { SourceMapGenerator } from "source-map-js";
 import { Toypack } from "../Toypack.js";
 import { compileStyle } from "./compile-style.js";
 import { mergeSourceMapToBundle } from "../utils";
 import { DependencyGraph } from "../types";
+import { GenMapping, toEncodedMap } from "@jridgewell/gen-mapping";
 
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
    let bundle = "";
-   const smg = !!sourceMapConfig ? new SourceMapGenerator() : null;
+   const smg = !!sourceMapConfig ? new GenMapping() : null;
 
    for (const source in graph) {
       const chunk = graph[source];
@@ -33,6 +33,6 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
 
    return {
       content: bundle,
-      map: smg ? MapConverter.fromJSON(smg.toString()) : null,
+      map: smg ? MapConverter.fromObject(toEncodedMap(smg)) : null,
    };
 }

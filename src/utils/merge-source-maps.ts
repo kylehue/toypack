@@ -1,32 +1,34 @@
 import {
-   RawSourceMap,
-   SourceMapConsumer,
-   SourceMapGenerator,
-} from "source-map-js";
-import MapConverter from "convert-source-map";
+   EncodedSourceMap,
+   GenMapping,
+   toEncodedMap,
+   setSourceContent,
+   maybeAddMapping,
+} from "@jridgewell/gen-mapping";
+import {
+   eachMapping,
+   sourceContentFor,
+   originalPositionFor,
+   TraceMap,
+} from "@jridgewell/trace-mapping";
 
-/**
- * Merge old source map and new source map and return merged.
- * If old or new source map value is falsy, return another one as it is.
- *
- * https://github.com/keik/merge-source-map
- */
-export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
-   if (!oldMap) return newMap;
-   if (!newMap) return oldMap;
+export function mergeSourceMaps(
+   oldMap: EncodedSourceMap,
+   newMap: EncodedSourceMap
+) {
+   const oldMapConsumer = new TraceMap(oldMap);
+   const newMapConsumer = new TraceMap(newMap);
+   const mergedMapGenerator = new GenMapping({
+      file: oldMap.file,
+      sourceRoot: oldMap.sourceRoot,
+   });
 
-   const oldMapConsumer = new SourceMapConsumer(oldMap);
-   const newMapConsumer = new SourceMapConsumer(newMap);
-   const mergedMapGenerator = new SourceMapGenerator();
    const names = new Set<string>();
 
-   // iterate on new map and overwrite original position of new map with one of old map
-   newMapConsumer.eachMapping(function (map) {
-      // pass when `originalLine` is null.
-      // It occurs in case that the node does not have origin in original code.
+   eachMapping(newMapConsumer, function (map) {
       if (map.originalLine == null) return;
 
-      const origPosInOldMap = oldMapConsumer.originalPositionFor({
+      const origPosInOldMap = originalPositionFor(oldMapConsumer, {
          line: map.originalLine,
          column: map.originalColumn,
       });
@@ -34,7 +36,7 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
       if (origPosInOldMap.source == null) return;
       if (origPosInOldMap.name) names.add(origPosInOldMap.name);
 
-      mergedMapGenerator.addMapping({
+      maybeAddMapping(mergedMapGenerator, {
          original: {
             line: origPosInOldMap.line,
             column: origPosInOldMap.column,
@@ -44,27 +46,22 @@ export function mergeSourceMaps(oldMap: RawSourceMap, newMap: RawSourceMap) {
             column: map.generatedColumn,
          },
          source: origPosInOldMap.source,
-         name: origPosInOldMap.name,
+         name: map.name || "",
       });
    });
-
-   const resultMap = MapConverter.fromJSON(
-      mergedMapGenerator.toString()
-   ).toObject() as RawSourceMap;
-   resultMap.sources = [];
-   resultMap.sourcesContent = [];
-   resultMap.names = [...names];
 
    // Add sources
-   [oldMap, newMap].forEach(function (map) {
-      map.sources.forEach(function (sourceFile, index) {
-         resultMap.sources.push(sourceFile);
-         resultMap.sourcesContent!.push(map.sourcesContent?.[index] || "");
+   [newMapConsumer, oldMapConsumer].forEach(function (mapConsumer) {
+      mapConsumer.sources.forEach(function (source, index) {
+         if (!source) return;
+         setSourceContent(
+            mergedMapGenerator,
+            source,
+            sourceContentFor(mapConsumer, source)
+         );
       });
    });
 
-   resultMap.sourceRoot = oldMap.sourceRoot;
-   resultMap.file = oldMap.file;
-
+   const resultMap = toEncodedMap(mergedMapGenerator);
    return resultMap;
 }

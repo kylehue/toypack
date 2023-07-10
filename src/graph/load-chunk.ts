@@ -7,7 +7,7 @@ import {
    shouldProduceSourceMap,
 } from "../utils";
 import { Asset, BuildHookContext, ResourceAsset } from "../types";
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { TextAsset, createAsset } from "../utils/create-asset.js";
 
 export async function loadChunk(
@@ -231,7 +231,7 @@ interface ModuleInfoText extends ModuleInfoBase {
    type: "script" | "style";
    content: string;
    asset: TextAsset;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    lang?: string;
 }
 
@@ -245,7 +245,7 @@ interface ModuleInfoVirtual extends ModuleInfoBase {
    type: "virtual";
    content: string | Blob | null;
    asset: Asset;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    lang?: string;
 }
 
@@ -257,7 +257,7 @@ export type ModuleInfo =
 interface LoadTextResult {
    type?: "script" | "style";
    content: string;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    lang?: string;
 }
 
@@ -278,7 +278,7 @@ export interface LoadChunkText {
    type: "script" | "style";
    content: string;
    asset: Asset;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    lang?: string;
 }
 

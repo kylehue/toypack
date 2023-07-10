@@ -1,6 +1,5 @@
 import MapConverter from "convert-source-map";
 import * as CSSTree from "css-tree";
-import { SourceMapGenerator, RawSourceMap } from "source-map-js";
 import { Toypack } from "../Toypack.js";
 import {
    getUsableResourcePath,
@@ -11,6 +10,8 @@ import {
 } from "../utils";
 import { DependencyGraph, StyleDependency } from "../types";
 import path from "path-browserify";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
+import { SourceMapGenerator } from "source-map-js";
 
 export function compileStyle(
    this: Toypack,
@@ -84,7 +85,7 @@ export function compileStyle(
    const result = {
       source: chunk.source,
       content: "",
-      map: null as RawSourceMap | null,
+      map: null as EncodedSourceMap | null,
    };
 
    if (typeof compiled == "string") {
@@ -93,9 +94,9 @@ export function compileStyle(
       result.content = compiled.css;
    }
 
-   let map: RawSourceMap | null = null;
+   let map: EncodedSourceMap | null = null;
    if (shouldMap && typeof compiled != "string" && compiled.map) {
-      map = MapConverter.fromObject(compiled.map).toObject() as RawSourceMap;
+      map = MapConverter.fromJSON(compiled.map.toString()).toObject() as EncodedSourceMap;
       map.sourcesContent = [chunk.content];
       map.sources = [chunk.source];
       if (chunk.map) {

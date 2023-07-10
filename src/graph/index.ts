@@ -2,7 +2,7 @@ import { Node } from "@babel/traverse";
 import { codeFrameColumns } from "@babel/code-frame";
 import { CssNode, Url } from "css-tree";
 import path from "path-browserify";
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
 import { ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
@@ -334,7 +334,7 @@ export interface ScriptDependency extends DependencyBase {
    content: string;
    dependencyMap: Record<string, string>;
    asset: Asset;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    isEntry: boolean;
    lang?: string;
 }
@@ -345,7 +345,7 @@ export interface StyleDependency extends DependencyBase {
    content: string;
    dependencyMap: Record<string, string>;
    asset: Asset;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    isEntry: boolean;
    urlNodes: Url[];
    lang?: string;

@@ -1,18 +1,18 @@
 import babelMinify from "babel-minify";
 import MapConverter from "convert-source-map";
-import { SourceMapGenerator, SourceMapConsumer } from "source-map-js";
 import { DependencyGraph } from "../graph";
 import { Toypack } from "../Toypack.js";
 import { mergeSourceMapToBundle, getUsableResourcePath } from "../utils";
 import { mergeSourceMaps } from "../utils/merge-source-maps.js";
 import { compileScript } from "./compile-script.js";
 import { requireFunction, requireCall, moduleWrap } from "./runtime.js";
+import { GenMapping, toEncodedMap } from "@jridgewell/gen-mapping";
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
    let bundle = "";
-   const smg = !!sourceMapConfig ? new SourceMapGenerator() : null;
+   const smg = !!sourceMapConfig ? new GenMapping() : null;
 
    const finalizeBundleContent = () => {
       let bundleClone = bundle;
@@ -65,7 +65,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    const result = {
       content: finalizeBundleContent(),
-      map: smg ? MapConverter.fromJSON(smg.toString()) : null,
+      map: smg ? MapConverter.fromObject(toEncodedMap(smg)) : null,
    };
 
    if (config.bundle.mode == "production") {

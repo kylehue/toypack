@@ -1,7 +1,7 @@
 import generateScript from "@babel/generator";
 import { generate as generateStyle } from "css-tree";
 import type { ParserOptions } from "@babel/parser";
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MapConverter from "convert-source-map";
 import { parseScriptAsset } from "../graph/parse-script-chunk.js";
 import type { Toypack } from "../types.js";
@@ -140,7 +140,7 @@ export async function fetchPackage(
             : await response.text();
       let content: string = rawContent;
       let dependencies: string[] = [];
-      let map: RawSourceMap | null | undefined = null;
+      let map: EncodedSourceMap | null | undefined = null;
       const shouldMap = shouldProduceSourceMap(source, sourceMapConfig);
 
       // Parse, get dependencies, and recompile
@@ -270,13 +270,13 @@ interface PackageAssetBase {
 export interface PackageScriptAsset extends PackageAssetBase {
    type: "script";
    dts: boolean;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    content: string;
 }
 
 export interface PackageStyleAsset extends PackageAssetBase {
    type: "style";
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    content: string;
 }
 

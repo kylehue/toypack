@@ -1,12 +1,18 @@
-import {
-   RawSourceMap,
-   SourceMapConsumer,
-   SourceMapGenerator,
-} from "source-map-js";
-import { Toypack } from "../Toypack.js";
 import { findCodePosition } from "./find-code-position.js";
 import path from "path-browserify";
 import { isLocal } from "./is-local.js";
+
+import {
+   maybeAddMapping,
+   EncodedSourceMap,
+   GenMapping,
+   setSourceContent,
+} from "@jridgewell/gen-mapping";
+import {
+   eachMapping,
+   sourceContentFor,
+   TraceMap,
+} from "@jridgewell/trace-mapping";
 
 /**
  * Merge source map to bundle's source map.
@@ -18,8 +24,8 @@ import { isLocal } from "./is-local.js";
  * @param bundleContent The current content of the bundle.
  */
 export function mergeSourceMapToBundle(
-   targetMap: SourceMapGenerator,
-   sourceMap: RawSourceMap,
+   targetMap: GenMapping,
+   sourceMap: EncodedSourceMap,
    source: string,
    generatedContent: string,
    bundleContent: string
@@ -33,15 +39,13 @@ export function mergeSourceMapToBundle(
       );
    }
 
-   const smc = new SourceMapConsumer(sourceMap);
-   const sourcesWithMappings = new Set<string>();
+   const smc = new TraceMap(sourceMap);
 
-   smc.eachMapping((map) => {
+   eachMapping(smc, (map) => {
       if (map.originalLine === null) return;
+      if (!map.source) return;
       map.source = makeRelativeIfNeeded(map.source);
-      sourcesWithMappings.add(map.source);
-
-      targetMap.addMapping({
+      maybeAddMapping(targetMap, {
          source: map.source,
          original: {
             line: map.originalLine,
@@ -51,20 +55,20 @@ export function mergeSourceMapToBundle(
             line: map.generatedLine + position.line - 1,
             column: map.generatedColumn + position.column,
          },
-         name: map.name,
+         name: map.name || "",
       });
    });
 
    // Add source map's sources and contents to target map
-   sourceMap.sources.forEach(function (sourceFile) {
-      sourceFile = makeRelativeIfNeeded(sourceFile);
+   smc.sources.forEach(function (source) {
+      if (!source) return;
+      // source = makeRelativeIfNeeded(source);
 
       // Only add the ones that has mapping to save size
-      if (!sourcesWithMappings.has(sourceFile)) return;
-      const sourceContent = smc.sourceContentFor(sourceFile);
+      // if (!sourcesWithMappings.has(source)) return;
+      const sourceContent = sourceContentFor(smc, source);
       if (sourceContent) {
-         (targetMap as any)._sources.add(sourceFile);
-         targetMap.setSourceContent(sourceFile, sourceContent);
+         setSourceContent(targetMap, source, sourceContent);
       }
    });
 }
