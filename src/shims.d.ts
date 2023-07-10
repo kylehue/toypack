@@ -1,9 +1,9 @@
 declare module "babel-minify" {
-   import { RawSourceMap } from "source-map-js";
+   import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
    export interface Overrides {
       sourceMaps?: boolean;
-      inputSourceMap?: RawSourceMap;
+      inputSourceMap?: EncodedSourceMap;
       comments?: Function | RegExp | boolean;
       babel?: any;
       minifyPreset?: any;
@@ -13,5 +13,5 @@ declare module "babel-minify" {
       code: string,
       options?: Record<string, any>,
       overrides?: Overrides
-   ): { code: string; map: RawSourceMap };
+   ): { code: string; map: EncodedSourceMap };
 }

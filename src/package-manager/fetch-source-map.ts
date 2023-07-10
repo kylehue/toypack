@@ -1,9 +1,9 @@
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { getSourceMapUrl } from "../utils";
 import { resolve, _cache } from "./utils";
 
 export async function fetchSourceMapInContent(content: string, url: string) {
-   let sourceMap: RawSourceMap | null = null;
+   let sourceMap: EncodedSourceMap | null = null;
    const cached = _cache.get(url);
    if (cached && cached.type != "resource" && cached.map) {
       sourceMap = cached.map;

@@ -2,7 +2,7 @@ import path from "path-browserify";
 import { PackageProvider } from ".";
 import { EXTENSIONS, isUrl, parsePackageName } from "../utils";
 import { PackageAsset, PackageResourceAsset } from "./fetch-package";
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
 export const _cache = new Map<
    string,
@@ -16,7 +16,7 @@ export const _cache = new Map<
         type: "script" | "style";
         rawContent: string;
         response: Response;
-        map?: RawSourceMap | null;
+        map?: EncodedSourceMap | null;
         asset: PackageAsset;
      }
 >();

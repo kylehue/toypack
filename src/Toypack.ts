@@ -1,5 +1,4 @@
 import path from "path-browserify";
-import { RawSourceMap } from "source-map-js";
 import { PartialDeep, ReadonlyDeep } from "type-fest";
 import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
@@ -29,6 +28,7 @@ import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
 export class Toypack extends Hooks {
    private _iframe: HTMLIFrameElement | null = null;
@@ -85,6 +85,9 @@ export class Toypack extends Hooks {
       this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
+         queryParams: {
+            dev: true,
+         },
       });
 
       this.usePackageProvider({
@@ -510,7 +513,7 @@ interface Cache {
          source: string;
          importers: Importers;
          content: string;
-         map?: RawSourceMap | null;
+         map?: EncodedSourceMap | null;
       }
    >;
 }

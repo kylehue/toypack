@@ -1,4 +1,4 @@
-import { RawSourceMap } from "source-map-js";
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
 export function createAsset<T extends string | Blob>(
    source: string,
@@ -34,7 +34,7 @@ export function createAsset<T extends string | Blob>(
 
 export interface AssetOptions {
    metadata?: AssetBase["metadata"];
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
    forceContentTypeAs?: "script" | "style";
 }
 
@@ -54,7 +54,7 @@ export interface ResourceAsset extends AssetBase {
 export interface TextAsset extends AssetBase {
    type: "text";
    content: string;
-   map?: RawSourceMap | null;
+   map?: EncodedSourceMap | null;
 }
 
 export type Asset<T = unknown> = T extends string

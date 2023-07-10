@@ -1,16 +1,17 @@
 <template>
    <h1 class="green">Hello Vue</h1>
-   <button @click="increment">{{ test }}</button>
-   <VueComponent :msg="'Hello' + test"></VueComponent>
+   <button @click="increment">{{ counter }}</button>
+   <button @click="() => log(counter)">Log</button>
+   <VueComponent :msg="'Hello' + counter"></VueComponent>
 </template>
 
 <script setup>
 import { ref } from "vue";
 import VueComponent from "./Comp.vue";
-let test = ref(1);
-
+let counter = ref(1);
+const log = console.log;
 function increment() {
-   test.value += 1;
+   counter.value += 1;
 }
 
 console.log("Hello vue");
