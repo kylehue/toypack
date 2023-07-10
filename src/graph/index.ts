@@ -5,7 +5,13 @@ import path from "path-browserify";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
-import { ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
+import {
+   ERRORS,
+   escapeRegex,
+   indexToPosition,
+   isNodeModule,
+   parseURL,
+} from "../utils";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
@@ -317,7 +323,36 @@ export async function getDependencyGraph(this: Toypack) {
    }
 
    Object.assign(graph, await getGraphRecursive.call(this, entryAsset));
-   return graph;
+
+   const sortedGraph = Object.values(graph)
+      .sort((a, b) => {
+         if (isNodeModule(a.source) && !isNodeModule(b.source)) {
+            return -1;
+         } else if (isNodeModule(b.source) && !isNodeModule(a.source)) {
+            return 1;
+         }
+
+         if (a.type == "resource" && b.type != "resource") {
+            return -1;
+         } else if (b.type == "resource" && a.type != "resource") {
+            return 1;
+         }
+
+         if (a.source != entrySource && b.source == entrySource) {
+            return -1;
+         } else if (b.source != entrySource && a.source == entrySource) {
+            return 1;
+         }
+
+         if (a.type == "resource" || b.type == "resource") return 0;
+         return b.content.length - a.content.length;
+      })
+      .reduce((acc, cur) => {
+         acc[cur.source] = cur;
+         return acc;
+      }, {} as DependencyGraph);
+   
+   return sortedGraph;
 }
 
 interface DependencyBase {

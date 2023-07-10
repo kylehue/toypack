@@ -28,12 +28,15 @@ export function mergeSourceMapToBundle(
    sourceMap: EncodedSourceMap,
    source: string,
    generatedContent: string,
-   bundleContent: string
+   bundleContent: string,
+   position: { line: number; column: number }
 ) {
    if (!targetMap) return;
-   const position = findCodePosition(bundleContent, generatedContent);
+   const pos = position
+      ? position
+      : findCodePosition(bundleContent, generatedContent);
 
-   if (position.line == -1) {
+   if (pos.line == -1) {
       console.warn(
          `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
       );
@@ -52,8 +55,8 @@ export function mergeSourceMapToBundle(
             column: map.originalColumn,
          },
          generated: {
-            line: map.generatedLine + position.line - 1,
-            column: map.generatedColumn + position.column,
+            line: map.generatedLine + pos.line - 1,
+            column: map.generatedColumn + pos.column,
          },
          name: map.name || "",
       });

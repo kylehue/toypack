@@ -75,19 +75,19 @@ export class Toypack extends Hooks {
       }
 
       this.usePackageProvider({
-         host: "cdn.jsdelivr.net",
-         postpath: ({ subpath }) => {
-            if (!/\.css$/.test(subpath)) return "+esm";
-         },
-         prepath: "npm",
-      });
-
-      this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
          queryParams: {
             dev: true,
          },
+      });
+
+      this.usePackageProvider({
+         host: "cdn.jsdelivr.net",
+         postpath: ({ subpath }) => {
+            if (!/\.css$/.test(subpath)) return "+esm";
+         },
+         prepath: "npm",
       });
 
       this.usePackageProvider({

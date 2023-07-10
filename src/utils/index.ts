@@ -1,3 +1,4 @@
+export { BundleGenerator } from "./BundleGenerator.js";
 export * as DEBUG from "./debug.js";
 export * as ERRORS from "./errors.js";
 export * as EXTENSIONS from "./extensions.js";
