@@ -4,13 +4,13 @@ import { isLocal } from "./is-local.js";
 
 import {
    maybeAddMapping,
-   EncodedSourceMap,
    GenMapping,
    setSourceContent,
 } from "@jridgewell/gen-mapping";
 import {
    eachMapping,
    sourceContentFor,
+   SourceMapInput,
    TraceMap,
 } from "@jridgewell/trace-mapping";
 
@@ -25,7 +25,7 @@ import {
  */
 export function mergeSourceMapToBundle(
    targetMap: GenMapping,
-   sourceMap: EncodedSourceMap,
+   sourceMap: SourceMapInput,
    source: string,
    generatedContent: string,
    bundleContent: string
@@ -39,12 +39,11 @@ export function mergeSourceMapToBundle(
       );
    }
 
-   const smc = new TraceMap(sourceMap);
+   const trace = new TraceMap(sourceMap);
 
-   eachMapping(smc, (map) => {
+   eachMapping(trace, (map) => {
       if (map.originalLine === null) return;
       if (!map.source) return;
-      map.source = makeRelativeIfNeeded(map.source);
       maybeAddMapping(targetMap, {
          source: map.source,
          original: {
@@ -60,23 +59,11 @@ export function mergeSourceMapToBundle(
    });
 
    // Add source map's sources and contents to target map
-   smc.sources.forEach(function (source) {
+   trace.sources.forEach(function (source) {
       if (!source) return;
-      // source = makeRelativeIfNeeded(source);
-
-      // Only add the ones that has mapping to save size
-      // if (!sourcesWithMappings.has(source)) return;
-      const sourceContent = sourceContentFor(smc, source);
+      const sourceContent = sourceContentFor(trace, source);
       if (sourceContent) {
          setSourceContent(targetMap, source, sourceContent);
       }
    });
-}
-
-function makeRelativeIfNeeded(source: string) {
-   if (isLocal(source) && !source.startsWith("virtual:")) {
-      source = path.join("/", source);
-   }
-
-   return source;
 }

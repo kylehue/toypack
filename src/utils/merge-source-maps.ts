@@ -10,20 +10,16 @@ import {
    sourceContentFor,
    originalPositionFor,
    TraceMap,
+   SourceMapInput,
 } from "@jridgewell/trace-mapping";
 
 export function mergeSourceMaps(
-   oldMap: EncodedSourceMap,
-   newMap: EncodedSourceMap
+   oldMap: SourceMapInput,
+   newMap: SourceMapInput
 ) {
    const oldMapConsumer = new TraceMap(oldMap);
    const newMapConsumer = new TraceMap(newMap);
-   const mergedMapGenerator = new GenMapping({
-      file: oldMap.file,
-      sourceRoot: oldMap.sourceRoot,
-   });
-
-   const names = new Set<string>();
+   const mergedMapGenerator = new GenMapping();
 
    eachMapping(newMapConsumer, function (map) {
       if (map.originalLine == null) return;
@@ -34,7 +30,6 @@ export function mergeSourceMaps(
       });
 
       if (origPosInOldMap.source == null) return;
-      if (origPosInOldMap.name) names.add(origPosInOldMap.name);
 
       maybeAddMapping(mergedMapGenerator, {
          original: {
