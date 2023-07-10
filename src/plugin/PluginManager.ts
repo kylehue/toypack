@@ -176,11 +176,17 @@ export class PluginManager {
          },
          warn: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
-            DEBUG.warn(logLevel, `[${plugin.name}] Warning: ` + message);
+            DEBUG.warn(
+               logLevel,
+               console.warn
+            )?.(`[${plugin.name}] Warning: ` + message);
          },
          info: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
-            DEBUG.info(logLevel, `[${plugin.name}]: ` + message);
+            DEBUG.warn(
+               logLevel,
+               console.info
+            )?.(`[${plugin.name}]: ` + message);
          },
       };
 

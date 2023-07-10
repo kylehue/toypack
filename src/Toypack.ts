@@ -64,15 +64,9 @@ export class Toypack extends Hooks {
          importUrlPlugin()
       );
 
-      if (
-         this._config.logLevel == "error" ||
-         this._config.logLevel == "warn" ||
-         this._config.logLevel == "info"
-      ) {
-         this.onError((error) => {
-            console.error(error.reason);
-         });
-      }
+      this.onError((error) => {
+         DEBUG.error(this.config.logLevel, console.error)?.(error.reason);
+      });
 
       this.usePackageProvider({
          host: "cdn.jsdelivr.net",
@@ -488,7 +482,7 @@ export class Toypack extends Hooks {
          `⏲ Graph  - ${totalGraphTime} ms\n` +
          `⏲ Bundle - ${totalBundleTime} ms\n` +
          `⏲ Total  - ${totalGraphTime + totalBundleTime} ms`;
-      DEBUG.info(this._config.logLevel, message);
+      DEBUG.info(this._config.logLevel, console.info)?.(message);
       return result;
    }
 

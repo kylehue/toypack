@@ -48,6 +48,8 @@ export async function getPackage(
       const assetCount = result.assets.length + result.dtsAssets.length;
       DEBUG.info(
          config.logLevel,
+         console.info
+      )?.(
          `[package-manager]: Successfully fetched ${assetCount} assets in ${packagePath}.`
       );
    } catch (error: any) {
