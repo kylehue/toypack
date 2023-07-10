@@ -359,6 +359,13 @@ export class Toypack extends Hooks {
          asset.modified = true;
       }
 
+      // Virtual modules that depends on the asset should be flagged as modified
+      for (const [_, virtual] of this._virtualAssets) {
+         if (virtual.source.startsWith("virtual:" + asset.source)) {
+            virtual.modified = true;
+         }
+      }
+
       return asset as T;
    }
 
