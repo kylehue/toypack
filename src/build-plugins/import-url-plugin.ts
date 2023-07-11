@@ -90,7 +90,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
             }
          );
 
-         dependencies = parsedScript.dependencies;
+         dependencies = [...parsedScript.dependencies];
 
          const generated = generateScript(parsedScript.ast, {
             sourceFileName: source,
@@ -114,7 +114,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
             }
          );
 
-         dependencies = parsedStyle.dependencies;
+         dependencies = [...parsedStyle.dependencies];
 
          const generated = generateStyle(parsedStyle.ast, {
             sourceMap: shouldMap,

@@ -36,7 +36,7 @@ export async function parseScriptAsset(
    const config = this.getConfig();
    const result: ParsedScriptResult = {
       type: "script",
-      dependencies: [] as string[],
+      dependencies: new Set(),
       ast: emptyAST,
    };
 
@@ -80,16 +80,16 @@ export async function parseScriptAsset(
    if (moduleType == "esm") {
       traverseOptions = {
          ImportDeclaration(path) {
-            result.dependencies.push(path.node.source.value);
+            result.dependencies.add(path.node.source.value);
             options?.inspectDependencies?.(path.node.source, path);
          },
          ExportAllDeclaration(path) {
-            result.dependencies.push(path.node.source.value);
+            result.dependencies.add(path.node.source.value);
             options?.inspectDependencies?.(path.node.source, path);
          },
          ExportNamedDeclaration(path) {
             if (path.node.source) {
-               result.dependencies.push(path.node.source.value);
+               result.dependencies.add(path.node.source.value);
                options?.inspectDependencies?.(path.node.source, path);
             }
          },
@@ -98,12 +98,12 @@ export async function parseScriptAsset(
             const callee = path.node.callee;
             const isDynamicImport = callee.type == "Import";
             if (isDynamicImport && argNode.type == "StringLiteral") {
-               result.dependencies.push(argNode.value);
+               result.dependencies.add(argNode.value);
                options?.inspectDependencies?.(argNode, path);
             }
          },
          TSImportType(path) {
-            result.dependencies.push(path.node.argument.value);
+            result.dependencies.add(path.node.argument.value);
             options?.inspectDependencies?.(path.node.argument, path);
          },
       };
@@ -115,7 +115,7 @@ export async function parseScriptAsset(
             const isRequire =
                callee.type == "Identifier" && callee.name == "require";
             if (isRequire && argNode.type == "StringLiteral") {
-               result.dependencies.push(argNode.value);
+               result.dependencies.add(argNode.value);
                options?.inspectDependencies?.(argNode, path);
             }
          },
@@ -138,7 +138,7 @@ export async function parseScriptAsset(
             value: match,
          };
 
-         result.dependencies.push(fakeNode.value);
+         result.dependencies.add(fakeNode.value);
          options?.inspectDependencies?.(fakeNode, result.ast);
 
          /**
@@ -151,14 +151,12 @@ export async function parseScriptAsset(
 
    traverseAST(result.ast, traverseOptions);
 
-   result.dependencies = [...new Set(result.dependencies)];
-
    return result;
 }
 
 export interface ParsedScriptResult {
    type: "script";
-   dependencies: string[];
+   dependencies: Set<string>;
    ast: Node;
 }
 

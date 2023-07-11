@@ -249,7 +249,9 @@ export default function (options?: HTMLPluginOptions): Plugin {
          const source = this.getConfigHash() + chunk.source;
          if (source in compiledModules) {
             const load = compiledModules[source];
-            parsed.dependencies.push(...load.resourceDependencies);
+            load.resourceDependencies.forEach((item) =>
+               parsed.dependencies.add(item)
+            );
          }
       },
    };

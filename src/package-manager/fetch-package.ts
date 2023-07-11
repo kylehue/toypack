@@ -231,7 +231,7 @@ export async function fetchPackage(
             }
          );
 
-         dependencies = parsedScript.dependencies;
+         dependencies = [...parsedScript.dependencies];
 
          if (isDts) {
             // skip non-dts deps
@@ -265,7 +265,7 @@ export async function fetchPackage(
             }
          );
 
-         dependencies = parsedStyle.dependencies;
+         dependencies = [...parsedStyle.dependencies];
 
          const generated = generateStyle(parsedStyle.ast, {
             sourceMap: shouldMap,

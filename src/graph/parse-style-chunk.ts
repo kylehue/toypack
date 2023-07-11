@@ -16,7 +16,7 @@ export async function parseStyleAsset(
    const config = this.getConfig();
    const result: ParsedStyleResult = {
       type: "style",
-      dependencies: [] as string[],
+      dependencies: new Set(),
       ast: {} as cssTree.CssNode,
       urlNodes: [],
    };
@@ -68,7 +68,7 @@ export async function parseStyleAsset(
          }
 
          if (isValidDep) {
-            result.dependencies.push(node.value);
+            result.dependencies.add(node.value);
             options?.inspectDependencies?.(node);
             result.urlNodes.push(node);
          }
@@ -86,7 +86,7 @@ export async function parseStyleAsset(
             atImportValueNode.type == "String" &&
             atImportValueNode.value
          ) {
-            result.dependencies.push(atImportValueNode.value);
+            result.dependencies.add(atImportValueNode.value);
             list.remove(item);
             options?.inspectDependencies?.(atImportValueNode);
          }
@@ -102,7 +102,7 @@ export async function parseStyleAsset(
             atImportURLValueNode.type == "Url" &&
             atImportURLValueNode.value
          ) {
-            result.dependencies.push(atImportURLValueNode.value);
+            result.dependencies.add(atImportURLValueNode.value);
             list.remove(item);
             options?.inspectDependencies?.(atImportURLValueNode);
          }
@@ -114,7 +114,7 @@ export async function parseStyleAsset(
 
 export interface ParsedStyleResult {
    type: "style";
-   dependencies: string[];
+   dependencies: Set<string>;
    ast: cssTree.CssNode;
    urlNodes: cssTree.Url[];
 }
