@@ -9,39 +9,42 @@ import { parseScriptAsset } from "../graph/parse-script-chunk";
 import { parseStyleAsset } from "../graph/parse-style-chunk";
 import { CSSTreeGeneratedResult } from "../bundle/compile-style";
 import { fetchSourceMapInContent } from "../package-manager/fetch-source-map";
-interface AssetBase {
+interface ExternalAssetBase {
    url: string;
    source: string;
 }
-interface ScriptAsset extends AssetBase {
+interface ExternalScriptAsset extends ExternalAssetBase {
    type: "script";
    content: string;
    map?: EncodedSourceMap | null;
 }
 
-interface StyleAsset extends AssetBase {
+interface ExternalStyleAsset extends ExternalAssetBase {
    type: "style";
    content: string;
    map?: EncodedSourceMap | null;
 }
 
-interface ResourceAsset extends AssetBase {
+interface ExternalResourceAsset extends ExternalAssetBase {
    type: "resource";
    content: Blob;
 }
 
-type Asset = ScriptAsset | StyleAsset | ResourceAsset;
+type ExternalAsset =
+   | ExternalScriptAsset
+   | ExternalStyleAsset
+   | ExternalResourceAsset;
 
 interface CacheData {
    response?: Response;
-   asset?: Asset;
+   asset?: ExternalAsset;
 }
 
 const cache = new Map<string, CacheData>();
 async function fetchUrl(this: Toypack, entryUrl: string) {
    const config = this.getConfig();
    const shouldMap = !!config.bundle.sourceMap;
-   let assets: Record<string, Asset> = {};
+   let assets: Record<string, ExternalAsset> = {};
    const recurse = async (url: string) => {
       if (assets[url]) return;
       let cached = cache.get(url);
@@ -70,7 +73,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
          type,
          url,
          source,
-      } as ScriptAsset | StyleAsset;
+      } as ExternalScriptAsset | ExternalStyleAsset;
       cached.asset ??= asset;
       assets[url] = asset;
 
@@ -160,7 +163,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
 }
 
 export default function (): Plugin {
-   let fetchedAssets: Record<string, Asset> = {};
+   let fetchedAssets: Record<string, ExternalAsset> = {};
    return {
       name: "import-url-plugin",
       resolve(id) {

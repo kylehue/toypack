@@ -6,9 +6,9 @@ import {
    ERRORS,
    shouldProduceSourceMap,
 } from "../utils";
-import { Asset, BuildHookContext, ResourceAsset } from "../types";
+import { Asset, BuildHookContext, ResourceAsset, TextAsset } from "../types";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
-import { TextAsset, createAsset } from "../utils/create-asset.js";
+import { createAsset } from "../utils/create-asset.js";
 import path from "path-browserify";
 
 export async function loadChunk(
@@ -234,9 +234,10 @@ type InitialModuleType = "script" | "style" | "resource" | "virtual";
 interface ModuleInfoBase {
    source: string;
    isEntry: boolean;
+   asset: Asset;
 }
 
-interface ModuleInfoText extends ModuleInfoBase {
+export interface ModuleInfoText extends ModuleInfoBase {
    type: "script" | "style";
    content: string;
    asset: TextAsset;
@@ -244,14 +245,14 @@ interface ModuleInfoText extends ModuleInfoBase {
    lang: string;
 }
 
-interface ModuleInfoResource extends ModuleInfoBase {
+export interface ModuleInfoResource extends ModuleInfoBase {
    type: "resource";
    content: Blob;
    asset: ResourceAsset;
    lang: string;
 }
 
-interface ModuleInfoVirtual extends ModuleInfoBase {
+export interface ModuleInfoVirtual extends ModuleInfoBase {
    type: "virtual";
    content: string | Blob | null;
    asset: Asset;
