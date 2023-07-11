@@ -264,9 +264,14 @@ export class Toypack extends Hooks {
             fallbacks: this.config.bundle.resolve.fallback,
             extensions: this.config.bundle.resolve.extensions,
             extensionAlias: this.config.bundle.resolve.extensionAlias,
+            baseDir: ".",
          } as ResolveOptions,
          options || {}
       );
+
+      if (opts.baseDir.startsWith("virtual:")) {
+         opts.baseDir = opts.baseDir.replace("virtual:", "");
+      }
 
       opts.extensions = [
          ...new Set([

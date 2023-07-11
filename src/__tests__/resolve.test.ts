@@ -162,6 +162,13 @@ it("should leave urls as it is", () => {
    ).toBe(
       "https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.min.js"
    );
+   expect(
+      toypack.resolve(
+         "data:text/javascript;base64,ZXhwb3J0IGRlZmF1bHQgT2JqZWN0LmFzc2lnbg=="
+      )
+   ).toBe(
+      "data:text/javascript;base64,ZXhwb3J0IGRlZmF1bHQgT2JqZWN0LmFzc2lnbg=="
+   );
 });
 
 it("should map extension alias", () => {
@@ -169,4 +176,14 @@ it("should map extension alias", () => {
    toypack.addOrUpdateAsset("/foo/bar.bar");
    // `.bar` is the first one the the alias array so it should be the result
    expect(toypack.resolve("/foo/bar.test")).toBe("/foo/bar.bar");
+});
+
+it("should resolve virtual baseDir", () => {
+   toypack.addOrUpdateAsset("src/main.js");
+   toypack.addOrUpdateAsset("foo.js");
+   expect(
+      toypack.resolve("../foo.js", {
+         baseDir: "virtual:/src/",
+      })
+   ).toBe("/foo.js");
 });
