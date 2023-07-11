@@ -255,6 +255,7 @@ function createChunk<
    const allCommon = {
       source,
       importers,
+      lang: loaded.lang,
    };
 
    if (loaded.type == "resource") {
@@ -274,7 +275,6 @@ function createChunk<
       dependencyMap: {},
       map: loaded.map,
       isEntry: isEntry || false,
-      lang: loaded.lang,
    };
 
    if (!parsed) {
@@ -340,6 +340,7 @@ interface DependencyBase {
    type: "script" | "style" | "resource";
    source: string;
    importers: Importers;
+   lang: string;
 }
 
 export type Importers = Record<string, ScriptDependency | StyleDependency>;
@@ -352,7 +353,6 @@ export interface ScriptDependency extends DependencyBase {
    asset: Asset;
    map?: EncodedSourceMap | null;
    isEntry: boolean;
-   lang?: string;
 }
 
 export interface StyleDependency extends DependencyBase {
@@ -364,7 +364,6 @@ export interface StyleDependency extends DependencyBase {
    map?: EncodedSourceMap | null;
    isEntry: boolean;
    urlNodes: Url[];
-   lang?: string;
 }
 
 export interface ResourceDependency extends DependencyBase {

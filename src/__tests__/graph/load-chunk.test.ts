@@ -93,6 +93,7 @@ it("should accept new extensions", async () => {
       type: "style",
       content: "",
       asset,
+      lang: "cba",
    });
 });
 

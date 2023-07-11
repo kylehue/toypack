@@ -9,6 +9,7 @@ import {
 import { Asset, BuildHookContext, ResourceAsset } from "../types";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { TextAsset, createAsset } from "../utils/create-asset.js";
+import path from "path-browserify";
 
 export async function loadChunk(
    this: Toypack,
@@ -28,7 +29,7 @@ export async function loadChunk(
 
    let asset = this.getAsset(rawSource);
    if (!asset && !isVirtual) {
-      throw new Error(`[load-chunk] Error: ${rawSource} doesn't exist. `);
+      throw new Error(`[load-chunk] Error: ${rawSource} doesn't exist.`);
    } else if (!asset) {
       // Create temporary asset for virtual modules
       asset = this._virtualAssets.get(rawSource) || null;
@@ -42,7 +43,8 @@ export async function loadChunk(
       type = asset.forceContentTypeAs;
    }
 
-   const moduleInfo = getModuleInfo(type, rawSource, isEntry, asset);
+   const lang = path.extname(rawSource.split("?")[0]).replace(".", "");
+   const moduleInfo = getModuleInfo(type, rawSource, isEntry, asset, lang);
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(rawSource, sourceMapConfig);
@@ -78,10 +80,7 @@ export async function loadChunk(
 
          moduleInfo.type = loadResult.type || moduleInfo.type;
 
-         if (
-            moduleInfo.type != "resource" &&
-            (loadResult.type == "script" || loadResult.type == "style")
-         ) {
+         if (loadResult.type == "script" || loadResult.type == "style") {
             moduleInfo.lang = loadResult.lang || moduleInfo.lang;
          }
 
@@ -159,7 +158,8 @@ function getModuleInfo(
    type: "script" | "style" | "resource" | "virtual",
    source: string,
    isEntry: boolean,
-   asset: Asset
+   asset: Asset,
+   lang: string
 ) {
    let moduleInfo: ModuleInfo;
    if (type == "virtual") {
@@ -169,6 +169,7 @@ function getModuleInfo(
          content: null,
          isEntry,
          asset,
+         lang,
       };
    } else if (asset.type == "resource" && type == "resource") {
       moduleInfo = {
@@ -177,8 +178,8 @@ function getModuleInfo(
          content: asset.content,
          isEntry,
          asset,
+         lang,
       };
-      asset.content;
    } else if (asset.type == "text" && (type == "script" || type == "style")) {
       moduleInfo = {
          type: type,
@@ -186,6 +187,7 @@ function getModuleInfo(
          content: asset.content,
          isEntry,
          asset,
+         lang,
       };
    } else {
       throw new Error(
@@ -213,6 +215,7 @@ function getLoadResult(
          type: moduleInfo.type,
          asset: moduleInfo.asset,
          content: moduleInfo.content,
+         lang: moduleInfo.lang,
       };
    }
 
@@ -238,13 +241,14 @@ interface ModuleInfoText extends ModuleInfoBase {
    content: string;
    asset: TextAsset;
    map?: EncodedSourceMap | null;
-   lang?: string;
+   lang: string;
 }
 
 interface ModuleInfoResource extends ModuleInfoBase {
    type: "resource";
    content: Blob;
    asset: ResourceAsset;
+   lang: string;
 }
 
 interface ModuleInfoVirtual extends ModuleInfoBase {
@@ -252,7 +256,7 @@ interface ModuleInfoVirtual extends ModuleInfoBase {
    content: string | Blob | null;
    asset: Asset;
    map?: EncodedSourceMap | null;
-   lang?: string;
+   lang: string;
 }
 
 export type ModuleInfo =
@@ -260,6 +264,7 @@ export type ModuleInfo =
    | ModuleInfoResource
    | ModuleInfoVirtual;
 
+/** Load result type for loaders */
 interface LoadTextResult {
    type?: "script" | "style";
    content: string;
@@ -274,10 +279,12 @@ interface LoadResourceResult {
 
 export type LoadResult = LoadTextResult | LoadResourceResult;
 
+/** Load result type for `loadChunk` */
 export interface LoadChunkResource {
    type: "resource";
    content: Blob;
    asset: ResourceAsset;
+   lang: string;
 }
 
 export interface LoadChunkText {
@@ -285,7 +292,7 @@ export interface LoadChunkText {
    content: string;
    asset: Asset;
    map?: EncodedSourceMap | null;
-   lang?: string;
+   lang: string;
 }
 
 export type LoadChunkResult = LoadChunkResource | LoadChunkText;
