@@ -121,7 +121,7 @@ export async function loadChunk(
    // Load with loaders
    const formattedSource = appendLangToRawSource(rawSource, moduleInfo);
    let isLoaded = false;
-   this._pluginManager.useLoaders(
+   await this._pluginManager.useLoaders(
       formattedSource,
       graph,
       importers,

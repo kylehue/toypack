@@ -251,7 +251,7 @@ export class PluginManager {
       }
    }
 
-   public useLoaders(
+   public async useLoaders(
       source: string,
       graph: DependencyGraph,
       importers: Importers,
@@ -270,7 +270,12 @@ export class PluginManager {
             plugin
          );
 
-         const loaderResult = loader.compile.call(context, moduleInfo);
+         const loaderResult =
+            typeof loader.compile == "function"
+               ? loader.compile.call(context, moduleInfo)
+               : loader.compile.async === true
+               ? await loader.compile.handler.call(context, moduleInfo)
+               : loader.compile.handler.call(context, moduleInfo);
          if (!loaderResult) continue;
          callback(loaderResult);
       }

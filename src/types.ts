@@ -1,5 +1,9 @@
 import { LoadResult, ModuleInfo } from "./graph/load-chunk.js";
-import { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
+import {
+   BuildHookContext,
+   BuildHooks,
+   BuildHookConfig,
+} from "./plugin/hook-types.js";
 
 export interface Plugin extends Partial<BuildHooks> {
    name: string;
@@ -7,13 +11,14 @@ export interface Plugin extends Partial<BuildHooks> {
    extensions?: ["resource" | "script" | "style", string][];
 }
 
+type CompileHandler = (
+   this: BuildHookContext,
+   moduleInfo: ModuleInfo
+) => LoadResult | string | void;
 export interface Loader {
    test: RegExp | ((source: string) => boolean);
    disableChaining?: boolean;
-   compile: (
-      this: BuildHookContext,
-      moduleInfo: ModuleInfo
-   ) => LoadResult | string | void;
+   compile: CompileHandler | BuildHookConfig<CompileHandler>;
 }
 
 export type { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
