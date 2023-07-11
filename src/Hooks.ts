@@ -1,5 +1,11 @@
+import { PackageAsset } from "./package-manager/fetch-package";
+import { Asset } from "./types";
+
 const eventMap = {
-   onError: (event: ErrorEvent) => {},
+   onError: (event: ErrorEvent) => undefined,
+   onInstallPackage: (event: InstallPackageEvent) => undefined,
+   onAddOrUpdateAsset: (event: AddOrUpdateAssetEvent) => undefined,
+   onRemoveAsset: (event: RemoveAssetEvent) => undefined,
 } as const;
 
 export class Hooks implements IHooks {
@@ -58,6 +64,27 @@ export class Hooks implements IHooks {
    onError(callback: EventMap["onError"]): Function {
       return this._createListener("onError", callback);
    }
+
+   /**
+    * Listen to errors.
+    */
+   onAddOrUpdateAsset(callback: EventMap["onAddOrUpdateAsset"]): Function {
+      return this._createListener("onAddOrUpdateAsset", callback);
+   }
+
+   /**
+    * Listen to errors.
+    */
+   onInstallPackage(callback: EventMap["onInstallPackage"]): Function {
+      return this._createListener("onInstallPackage", callback);
+   }
+
+   /**
+    * Listen to errors.
+    */
+   onRemoveAsset(callback: EventMap["onRemoveAsset"]): Function {
+      return this._createListener("onRemoveAsset", callback);
+   }
 }
 
 export type EventMap = typeof eventMap;
@@ -69,6 +96,22 @@ export type IHooks = {
 export interface ErrorEvent {
    code: number;
    reason: string;
+}
+
+export interface AddOrUpdateAssetEvent {
+   asset: Asset;
+}
+
+export interface RemoveAssetEvent {
+   asset: Asset;
+}
+
+export interface InstallPackageEvent {
+   name: string;
+   version: string;
+   subpath: string;
+   assets: PackageAsset[];
+   dtsAssets: PackageAsset[];
 }
 
 interface Listener {

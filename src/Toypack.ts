@@ -4,7 +4,6 @@ import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
 import importUrlPlugin from "./build-plugins/import-url-plugin.js";
-import sassPlugin from "./build-plugins/sass-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./graph/index.js";
@@ -27,7 +26,7 @@ import { resolve } from "./utils/resolve.js";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
-import { PackageProvider, getPackage, getPackageTest } from "./package-manager/index.js";
+import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
 export class Toypack extends Hooks {
@@ -59,7 +58,6 @@ export class Toypack extends Hooks {
       this.usePlugin(
          jsonPlugin(),
          htmlPlugin(),
-         sassPlugin(),
          rawPlugin(),
          importUrlPlugin()
       );
@@ -71,9 +69,6 @@ export class Toypack extends Hooks {
       this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
-         queryParams: {
-            dev: true,
-         },
       });
 
       this.usePackageProvider({
@@ -199,6 +194,8 @@ export class Toypack extends Hooks {
                `export {default} from "${duplicateAsset.source}";`;
          }
       }
+
+      this._trigger("onInstallPackage", pkg);
    }
 
    /**
@@ -360,6 +357,7 @@ export class Toypack extends Hooks {
          }
       }
 
+      this._trigger("onAddOrUpdateAsset", { asset });
       return asset as T;
    }
 
@@ -441,6 +439,7 @@ export class Toypack extends Hooks {
          this._virtualAssets.delete(source);
       } else {
          this._assets.delete(source);
+         this._trigger("onRemoveAsset", { asset });
       }
 
       // Remove from cache
