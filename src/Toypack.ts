@@ -453,7 +453,6 @@ export class Toypack extends Hooks {
          this._virtualAssets.delete(source);
       } else {
          this._assets.delete(source);
-         this._trigger("onRemoveAsset", { asset });
       }
 
       // Remove from cache
@@ -470,6 +469,8 @@ export class Toypack extends Hooks {
             }
          });
       });
+
+      this._trigger("onRemoveAsset", { asset });
    }
 
    /**
