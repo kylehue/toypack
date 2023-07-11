@@ -14,7 +14,7 @@ export function html(scriptSrc = "", linkHref = "") {
    <body>
    </body>
 </html>
-`;
+`.trim();
 }
 
 export function requireFunction() {
@@ -47,7 +47,7 @@ function ${identifiers.require}(path) {
    init(module, module.exports, localRequire);
    return module.exports;
 }
-`;
+`.trim();
 
    return result;
 }
@@ -59,7 +59,7 @@ ${varStr} = function (module, exports, require) {
 ${code}
 return module.exports;
 }
-`;
+`.trim();
 }
 
 export function requireCall(source: string) {

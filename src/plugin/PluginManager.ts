@@ -197,12 +197,14 @@ export class PluginManager {
          });
       }
       if (ctx.source) {
+         const shouldMap = shouldProduceSourceMap(
+            ctx.source,
+            this.bundler.getConfig().bundle.sourceMap
+         );
+         
          Object.assign(baseContext, {
             shouldMap: () => {
-               return shouldProduceSourceMap(
-                  ctx.source,
-                  this.bundler.getConfig().bundle.sourceMap
-               );
+               return shouldMap;
             },
          });
       }

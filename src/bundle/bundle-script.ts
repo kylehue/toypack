@@ -16,19 +16,23 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    const finalizeBundleContent = () => {
       let bundleClone = bundle;
-      bundleClone = requireFunction() + bundleClone;
+      bundleClone = requireFunction() + "\n" + bundleClone;
 
-      // Call if entry
+      // Require the entry at the bottom
       const entry = Object.values(graph).find(
          (g) => g.type == "script" && g.isEntry
       );
 
       if (entry && entry.type == "script") {
          bundleClone += "\n";
-         bundleClone += requireCall(entry.source);
+         bundleClone += "return " + requireCall(entry.source);
       }
 
       bundleClone = "(function () {\n" + bundleClone + "\n})();";
+
+      if (typeof config.bundle.globalName) {
+         bundleClone = `var ${config.bundle.globalName} = ${bundleClone}`;
+      }
 
       return bundleClone;
    };

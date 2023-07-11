@@ -57,6 +57,11 @@ export const defaultConfig = {
        * @default true
        */
       sourceMap: true as SourceMapConfig | boolean,
+      /**
+       * The global name under which the exports of the output code
+       * will be accessible.
+       */
+      globalName: undefined as string | undefined,
    },
    /**
     * Configuration for Babel.
@@ -86,7 +91,7 @@ export const defaultConfig = {
    /**
     * Toypack plugins.
     */
-   plugins: [] as Plugin[]
+   plugins: [] as Plugin[],
 };
 
 export type ToypackConfig = typeof defaultConfig;

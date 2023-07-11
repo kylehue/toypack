@@ -36,6 +36,7 @@ const toypack = new ToypackESM({
       sourceMap: {
          exclude: ["/node_modules/"],
       },
+      globalName: "MyLib"
    },
    babel: {
       transform: {
