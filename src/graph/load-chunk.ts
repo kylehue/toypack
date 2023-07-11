@@ -161,33 +161,33 @@ function getModuleInfo(
    asset: Asset,
    lang: string
 ) {
+   const common = {
+      source,
+      isEntry,
+      lang,
+   };
+
    let moduleInfo: ModuleInfo;
    if (type == "virtual") {
       moduleInfo = {
+         ...common,
          type: "virtual",
-         source: source,
          content: null,
-         isEntry,
          asset,
-         lang,
       };
    } else if (asset.type == "resource" && type == "resource") {
       moduleInfo = {
+         ...common,
          type: "resource",
-         source: source,
          content: asset.content,
-         isEntry,
          asset,
-         lang,
       };
    } else if (asset.type == "text" && (type == "script" || type == "style")) {
       moduleInfo = {
+         ...common,
          type: type,
-         source: source,
          content: asset.content,
-         isEntry,
          asset,
-         lang,
       };
    } else {
       throw new Error(
@@ -265,14 +265,17 @@ export type ModuleInfo =
    | ModuleInfoVirtual;
 
 /** Load result type for loaders */
-interface LoadTextResult {
-   type?: "script" | "style";
-   content: string;
-   map?: EncodedSourceMap | null;
+interface LoadResultBase {
    lang?: string;
 }
 
-interface LoadResourceResult {
+interface LoadTextResult extends LoadResultBase {
+   type?: "script" | "style";
+   content: string;
+   map?: EncodedSourceMap | null;
+}
+
+interface LoadResourceResult extends LoadResultBase {
    type?: "resource";
    content: Blob;
 }
