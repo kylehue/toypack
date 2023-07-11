@@ -58,48 +58,62 @@ function getImportCodeFrame(
    return codeFrame;
 }
 
+async function loadAndParse(
+   this: Toypack,
+   graph: DependencyGraph,
+   source: string,
+   isEntry: boolean,
+   importers: Importers
+) {
+   let loaded, parsed;
+   let cached = this._getCache("parsed", source);
+
+   if (cached && cached.loaded && !cached.loaded.asset.modified) {
+      loaded = cached.loaded;
+      parsed = cached.parsed;
+   }
+
+   if (!loaded) {
+      try {
+         loaded = await loadChunk.call(this, source, isEntry, {
+            bundler: this,
+            graph,
+            importers,
+            source,
+         });
+         this._setCache("parsed", source, {
+            importers,
+            loaded,
+         });
+      } catch (error: any) {
+         this._trigger("onError", ERRORS.parse(error));
+      }
+   }
+
+   if (!parsed && loaded && loaded.type != "resource") {
+      try {
+         parsed =
+            loaded.type == "script"
+               ? await parseScriptAsset.call(this, source, loaded.content)
+               : await parseStyleAsset.call(this, source, loaded.content);
+         this._setCache("parsed", source, {
+            importers,
+            parsed,
+            loaded,
+         });
+      } catch (error: any) {
+         this._trigger("onError", ERRORS.parse(error));
+      }
+   }
+
+   return { loaded, parsed };
+}
+
 /**
  * Recursively get the dependency graph of an asset.
  */
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = {};
-
-   const loadAndParse = async (
-      source: string,
-      isEntry: boolean,
-      importers: Importers
-   ) => {
-      let loaded, parsed;
-      const cached = this._getCache("parsed", source);
-      if (cached && !cached.loaded.asset.modified) {
-         loaded = cached.loaded;
-         parsed = cached.parsed;
-      } else {
-         try {
-            loaded = await loadChunk.call(this, source, isEntry, {
-               bundler: this,
-               graph,
-               importers,
-               source,
-            });
-            parsed =
-               loaded.type == "script"
-                  ? await parseScriptAsset.call(this, source, loaded.content)
-                  : loaded.type == "style"
-                  ? await parseStyleAsset.call(this, source, loaded.content)
-                  : null;
-            this._setCache("parsed", source, {
-               importers,
-               parsed,
-               loaded,
-            });
-         } catch (error: any) {
-            this._trigger("onError", ERRORS.parse(error));
-         }
-      }
-
-      return { loaded, parsed };
-   };
 
    const importersMap: Record<string, Importers> = {};
    const recurse = async (
@@ -118,7 +132,9 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       }
 
       const isEntry = rawSource === entry.source;
-      const { loaded, parsed } = await loadAndParse(
+      const { loaded, parsed } = await loadAndParse.call(
+         this,
+         graph,
          rawSource,
          isEntry,
          importers

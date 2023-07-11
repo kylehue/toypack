@@ -108,7 +108,12 @@ export class Toypack extends Hooks {
    >(loc: T, source: string, value: Omit<R, "source">) {
       const hashedSource = this._configHash + "-" + source;
       const cacheData = { source, ...value };
-      this._cachedDeps[loc].set(hashedSource, cacheData as any);
+      const cached = this._getCache(loc, source);
+      if (cached) {
+         Object.assign(cached, cacheData);
+      } else {
+         this._cachedDeps[loc].set(hashedSource, cacheData);
+      }
    }
 
    protected _getTypeFromSource(source: string) {
@@ -445,6 +450,7 @@ export class Toypack extends Hooks {
       // Remove from cache
       [this._cachedDeps.compiled, this._cachedDeps.parsed].forEach((map) => {
          map.forEach((item, key) => {
+            if (!item.source || !item.importers) return;
             const isVirtual = item.source.startsWith("virtual:");
             const isUnused = Object.values(item.importers).length == 1;
             const isDependentChunk = !!item.importers[asset.source];
@@ -469,8 +475,10 @@ export class Toypack extends Hooks {
       const timeBeforeBundle = performance.now();
       const result = await bundle.call(this, graph);
       const timeAfterBundle = performance.now();
-      this._assets.forEach((asset) => {
-         asset.modified = false;
+      [this._assets, this._virtualAssets].forEach((assets) => {
+         assets.forEach((asset) => {
+            asset.modified = false;
+         });
       });
       if (this._iframe && this._config.bundle.mode == "development") {
          this._iframe.srcdoc = result.html.content;
@@ -501,18 +509,18 @@ interface Cache {
    parsed: Map<
       string,
       {
-         source: string;
-         importers: Importers;
-         parsed: ParsedScriptResult | ParsedStyleResult | null;
-         loaded: LoadChunkResult;
+         source?: string;
+         importers?: Importers;
+         parsed?: ParsedScriptResult | ParsedStyleResult | null;
+         loaded?: LoadChunkResult;
       }
    >;
    compiled: Map<
       string,
       {
-         source: string;
-         importers: Importers;
-         content: string;
+         source?: string;
+         importers?: Importers;
+         content?: string;
          map?: EncodedSourceMap | null;
       }
    >;

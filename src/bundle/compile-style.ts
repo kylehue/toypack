@@ -28,7 +28,7 @@ export function compileStyle(
    // Check cache
    const cached = this._getCache("compiled", chunk.source);
 
-   if (cached && !chunk.asset.modified) {
+   if (cached && !chunk.asset.modified && cached.content) {
       return {
          source: chunk.source,
          content: cached.content,
