@@ -102,6 +102,10 @@ export async function parseScriptAsset(
                options?.inspectDependencies?.(argNode, path);
             }
          },
+         TSImportType(path) {
+            result.dependencies.push(path.node.argument.value);
+            options?.inspectDependencies?.(path.node.argument, path);
+         },
       };
    } else {
       traverseOptions = {
@@ -169,6 +173,7 @@ export interface ParseScriptOptions {
               | t.ExportAllDeclaration
               | t.ExportNamedDeclaration
               | t.CallExpression
+              | t.TSImportType
            >
          | t.File
    ) => void;
