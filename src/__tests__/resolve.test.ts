@@ -2,63 +2,23 @@
  * @vitest-environment jsdom
  */
 
-import path from "path-browserify";
-import { expect, it, beforeAll } from "vitest";
+import { expect, it, beforeEach } from "vitest";
 import { Toypack } from "../Toypack.js";
 
-const toypack = new Toypack({
-   bundle: {
-      entry: "src/main.js",
-      resolve: {
-         alias: {
-            "@utils": "/test/utils/",
-            react: "reactlib",
-            "react-dom": "reactlib-dom",
-            "react/css": "/node_modules/reactlib/test/hello.css",
-            "../local": "/assets/image.jpg",
-         },
-         fallback: {
-            path: false,
-            assert: "assert-browserify",
-         },
-         extensionAlias: {
-            ".test": [".bar", ".foo", ".test"],
-         },
-      },
-   },
-});
+const toypack = new Toypack();
 
-beforeAll(() => {
+beforeEach(() => {
    toypack.clearAssets();
-   toypack.addOrUpdateAsset("local/index.js");
-   toypack.addOrUpdateAsset("src/main.js");
-   toypack.addOrUpdateAsset("assets/image.jpg");
-   toypack.addOrUpdateAsset("someFile.js");
-   toypack.addOrUpdateAsset("someFolder/file.js");
-   toypack.addOrUpdateAsset(
-      "someFolder/package.json",
-      JSON.stringify({
-         main: "file.js",
-      })
-   );
-   toypack.addOrUpdateAsset("anotherFolder/index.js");
-   toypack.addOrUpdateAsset("test/utils/tester/index.js");
-   toypack.addOrUpdateAsset("test/utils/tester/stuff.js");
-   toypack.addOrUpdateAsset("test/utils/foo/bar.js");
-   toypack.addOrUpdateAsset("node_modules/hello/index.js");
-   toypack.addOrUpdateAsset("node_modules/reactlib/index.js");
-   toypack.addOrUpdateAsset("node_modules/reactlib/test/hello.css");
-   toypack.addOrUpdateAsset("node_modules/reactlib-dom/index.js");
-   toypack.addOrUpdateAsset("node_modules/reactlib-dom/test/hello.css");
+   toypack.resetConfig();
 });
 
 it("should resolve", () => {
+   toypack.addOrUpdateAsset("src/main.js");
    expect(
       toypack.resolve("./src/main.js", {
          baseDir: ".",
       })
    ).toBe("/src/main.js");
-
    expect(
       toypack.resolve("./src/main.js?raw&sample=2", {
          baseDir: ".",
@@ -67,91 +27,138 @@ it("should resolve", () => {
 });
 
 it("should resolve absolute paths", () => {
+   toypack.addOrUpdateAsset("assets/image.jpg");
    expect(
       toypack.resolve("/assets/image.jpg", {
          baseDir: "this/should/not/matter",
       })
-   ).toBe("/assets/image.jpg");
-
+   ).toEqual("/assets/image.jpg");
    expect(
       toypack.resolve("/assets/image", {
          baseDir: "this/should/not/matter",
       })
-   ).toBe("/assets/image.jpg");
-
-   expect(
-      toypack.resolve("/test/utils/tester", {
-         baseDir: "this/should/not/matter",
-      })
-   ).toBe("/test/utils/tester/index.js");
+   ).toEqual("/assets/image.jpg");
 });
 
-it("should resolve with base directory", () => {
+it("should resolve with baseDir", () => {
+   toypack.addOrUpdateAsset("assets/image.jpg");
    expect(
       toypack.resolve("../assets/image.jpg", {
          baseDir: "src",
       })
-   ).toBe("/assets/image.jpg");
-
+   ).toEqual("/assets/image.jpg");
+   expect(
+      toypack.resolve("../../../assets/image.jpg", {
+         baseDir: "src/deep/even-deeper",
+      })
+   ).toEqual("/assets/image.jpg");
+   toypack.addOrUpdateAsset("src/main.js");
    expect(
       toypack.resolve("./src/main.js", {
          baseDir: "src",
       })
-   ).not.toBe("/src/main.js");
+   ).not.toEqual("/src/main.js");
 });
 
 it("should resolve folders", () => {
-   expect(toypack.resolve("./someFolder")).toBe("/someFolder/file.js");
-
-   expect(toypack.resolve("./anotherFolder")).toBe("/anotherFolder/index.js");
+   toypack.addOrUpdateAsset("someFolder/index.js");
+   expect(toypack.resolve("./someFolder")).toEqual("/someFolder/index.js");
+   toypack.addOrUpdateAsset("anotherFolder/deep/file.js");
+   toypack.addOrUpdateAsset(
+      "anotherFolder/package.json",
+      JSON.stringify({
+         main: "./deep/file.js",
+      })
+   );
+   expect(toypack.resolve("./anotherFolder")).toEqual(
+      "/anotherFolder/deep/file.js"
+   );
 });
 
 it("should resolve aliases", () => {
-   expect(toypack.resolve("@utils/foo/bar")).toBe("/test/utils/foo/bar.js");
-
-   expect(toypack.resolve("@utils/tester")).toBe("/test/utils/tester/index.js");
-
-   expect(toypack.resolve("react/test/hello.css")).toBe(
-      "/node_modules/reactlib/test/hello.css"
+   toypack.setConfig({
+      bundle: {
+         resolve: {
+            alias: {
+               "@utils": "./test/utils/", // 1
+               react: "reactlib", // 2
+               "react-dom": "reactlib-dom", // 3
+               "react/css": "/node_modules/reactlib/deep/foo.css", // 4
+            },
+         },
+      },
+   });
+   // 1
+   toypack.addOrUpdateAsset("/test/utils/getFoo.js");
+   toypack.addOrUpdateAsset("/test/utils/deep/getBar.js");
+   expect(toypack.resolve("@utils/getFoo")).toEqual("/test/utils/getFoo.js");
+   expect(toypack.resolve("@utils/deep/getBar")).toEqual(
+      "/test/utils/deep/getBar.js"
    );
-
-   expect(toypack.resolve("react")).toBe("/node_modules/reactlib/index.js");
-
-   expect(toypack.resolve("react-dom/test/hello.css")).toBe(
-      "/node_modules/reactlib-dom/test/hello.css"
+   // 2
+   toypack.addOrUpdateAsset("/node_modules/reactlib/index.js");
+   toypack.addOrUpdateAsset("/node_modules/reactlib/deep/foo.css");
+   expect(toypack.resolve("react")).toEqual("/node_modules/reactlib/index.js");
+   expect(toypack.resolve("react/deep/foo")).toEqual(
+      "/node_modules/reactlib/deep/foo.css"
    );
-
-   expect(toypack.resolve("react-dom")).toBe(
+   // 3
+   toypack.addOrUpdateAsset("/node_modules/reactlib-dom/index.js");
+   toypack.addOrUpdateAsset("/node_modules/reactlib-dom/deep/foo.css");
+   expect(toypack.resolve("react-dom")).toEqual(
       "/node_modules/reactlib-dom/index.js"
    );
-
-   expect(toypack.resolve("react/css")).toBe(
-      "/node_modules/reactlib/test/hello.css"
+   expect(toypack.resolve("react-dom/deep/foo")).toEqual(
+      "/node_modules/reactlib-dom/deep/foo.css"
    );
-
-   expect(
-      toypack.resolve("../local", {
-         baseDir: path.dirname("/src/main.js"),
-      })
-   ).toBe("/assets/image.jpg");
+   // 4
+   expect(toypack.resolve("react/css")).toEqual(
+      "/node_modules/reactlib/deep/foo.css"
+   );
 });
 
 it("should resolve fallback", () => {
-   const expected = "/node_modules/assert-browserify/index.js";
-   toypack.addOrUpdateAsset(expected);
-   expect(toypack.resolve("assert")).toBe(expected);
-   expect(toypack.resolve("path")).toBe("virtual:empty");
+   toypack.setConfig({
+      bundle: {
+         resolve: {
+            fallback: {
+               "bad-module": "good-module",
+               "another-bad-module": false,
+            },
+         },
+      },
+   });
+   toypack.addOrUpdateAsset("/node_modules/good-module/index.js");
+   expect(toypack.resolve("bad-module")).toBe(
+      "/node_modules/good-module/index.js"
+   );
+   expect(toypack.resolve("another-bad-module")).toBe("virtual:empty");
 });
 
 it("should resolve node_modules", () => {
-   const expected = "/node_modules/hello/index.js";
-   expect(toypack.resolve("hello")).toBe(expected);
-   expect(
-      toypack.resolve("hello", {
-         baseDir: ".",
-         includeCoreModules: false,
+   toypack.addOrUpdateAsset("/node_modules/foo/index.js");
+   expect(toypack.resolve("foo")).toEqual("/node_modules/foo/index.js");
+   toypack.addOrUpdateAsset("/node_modules/bar/src/main.js");
+   toypack.addOrUpdateAsset(
+      "/node_modules/bar/package.json",
+      JSON.stringify({
+         main: "./src/main.js",
       })
-   ).toBeNull();
+   );
+   expect(toypack.resolve("bar")).toEqual("/node_modules/bar/src/main.js");
+});
+
+it("should not resolve node_modules", () => {
+   toypack.addOrUpdateAsset("/node_modules/foo/index.js");
+   expect(toypack.resolve("foo", { includeCoreModules: false })).toBeNull();
+   toypack.addOrUpdateAsset("/node_modules/bar/src/main.js");
+   toypack.addOrUpdateAsset(
+      "/node_modules/bar/package.json",
+      JSON.stringify({
+         main: "./src/main.js",
+      })
+   );
+   expect(toypack.resolve("bar", { includeCoreModules: false })).toBeNull();
 });
 
 it("should leave urls as it is", () => {
@@ -172,6 +179,15 @@ it("should leave urls as it is", () => {
 });
 
 it("should map extension alias", () => {
+   toypack.setConfig({
+      bundle: {
+         resolve: {
+            extensionAlias: {
+               ".test": [".bar", ".foo", ".test"],
+            },
+         },
+      },
+   });
    toypack.addOrUpdateAsset("/foo/bar.foo");
    toypack.addOrUpdateAsset("/foo/bar.bar");
    // `.bar` is the first one the the alias array so it should be the result
