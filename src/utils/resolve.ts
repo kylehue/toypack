@@ -9,14 +9,12 @@ export function getResolveFallbackData(
    fallbacks: Record<string, string | false>,
    moduleId: string
 ) {
-   if (fallbacks) {
-      for (const [id, fallback] of Object.entries(fallbacks)) {
-         if (moduleId.startsWith(id)) {
-            return {
-               id,
-               fallback,
-            };
-         }
+   for (const [id, fallback] of Object.entries(fallbacks)) {
+      if (moduleId.startsWith(id)) {
+         return {
+            id,
+            fallback,
+         };
       }
    }
 }
@@ -28,25 +26,23 @@ export function getResolveAliasData(
    aliases: Record<string, string>,
    moduleId: string
 ) {
-   if (aliases) {
-      // Find strict equals first
-      for (const [alias, replacement] of Object.entries(aliases)) {
-         if (moduleId === alias) {
-            return {
-               alias,
-               replacement,
-            };
-         }
+   // Find strict equals first
+   for (const [alias, replacement] of Object.entries(aliases)) {
+      if (moduleId === alias) {
+         return {
+            alias,
+            replacement,
+         };
       }
+   }
 
-      for (const [alias, replacement] of Object.entries(aliases)) {
-         const aliasRegex = new RegExp(`^${alias}/`);
-         if (aliasRegex.test(moduleId)) {
-            return {
-               alias,
-               replacement,
-            };
-         }
+   for (const [alias, replacement] of Object.entries(aliases)) {
+      const aliasRegex = new RegExp(`^${alias}/`);
+      if (aliasRegex.test(moduleId)) {
+         return {
+            alias,
+            replacement,
+         };
       }
    }
 }
@@ -202,7 +198,7 @@ export function resolve(
               aliasData.replacement,
               sourceToResolve.replace(aliasData.alias, "")
            );
-
+      
       if (isLocal(aliasData.replacement) && !isExternal) {
          aliased = "./" + path.relative(opts.baseDir, aliased);
       }
