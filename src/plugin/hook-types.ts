@@ -64,6 +64,7 @@ export type EndBuildHook = (
    this: BuildHookContextBase,
    result: BundleResult
 ) => void;
+export type SetupBuildHook = (this: BuildHookContextBase) => void;
 
 // Context
 export interface BuildHookContextBase {
@@ -130,13 +131,18 @@ export type BuildHookConfig<
 
 // Build hooks interface
 export interface BuildHooks {
+   /** A hook called everytime a module needs to be loaded. */
    load: LoadBuildHook | BuildHookConfig<LoadBuildHook>;
+   /** A hook called everytime a module needs to be resolved. */
    resolve: ResolveBuildHook | BuildHookConfig<ResolveBuildHook>;
+   /** A hook called everytime a module needs to be transformed. */
    transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
+   /** A hook called at the start of getting the dependency graph. */
    buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
+   /** A hook called at the end of the bundling process. */
    buildEnd: EndBuildHook | BuildHookConfig<EndBuildHook>;
+   /** A hook called everytime a module is parsed. */
    parsed: ParsedBuildHook | BuildHookConfig<ParsedBuildHook>;
-   // beforeFinalize: (content: any) => void;
-   // afterFinalize: (content: any) => void;
-   // start: () => void;
+   /** A hook called only once, useful to setup things in the bundler. */
+   setup: SetupBuildHook;
 }

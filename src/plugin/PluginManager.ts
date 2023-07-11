@@ -237,8 +237,22 @@ export class PluginManager {
          this._loaders.push({ loader, plugin });
       }
 
+      plugin.setup?.call(
+         this._createContext(
+            {
+               bundler: this.bundler,
+            },
+            plugin
+         )
+      );
+
       for (const prop in plugin) {
-         if (prop == "name" || prop == "extensions" || prop == "loaders") {
+         if (
+            prop == "name" ||
+            prop == "extensions" ||
+            prop == "loaders" ||
+            prop == "setup"
+         ) {
             continue;
          }
 
