@@ -212,17 +212,16 @@ export class PluginManager {
       if (ctx.graph) {
          Object.assign(baseContext, {
             load: async (source: string) => {
-               const result = await loadChunk.call(
-                  this.bundler,
-                  source,
-                  false,
-                  {
-                     bundler: this.bundler,
-                     graph: ctx.graph,
-                     importers: ctx.importers,
-                     source,
-                  }
-               );
+               // @ts-ignore
+               const cached = this.bundler._getCache("parsed", source);
+               const result = cached?.loaded
+                  ? cached.loaded
+                  : await loadChunk.call(this.bundler, source, false, {
+                       bundler: this.bundler,
+                       graph: ctx.graph,
+                       importers: ctx.importers,
+                       source,
+                    });
 
                // @ts-ignore
                this.bundler._setCache("parsed", source, {
