@@ -21,6 +21,7 @@ import {
    BuildHookContextBase,
    BuildHooks,
 } from "./hook-types.js";
+import { loadChunk } from "../graph/load-chunk.js";
 
 type BuildHooksGroupMap = {
    [key in keyof BuildHooks]?: {
@@ -201,10 +202,34 @@ export class PluginManager {
             ctx.source,
             this.bundler.getConfig().bundle.sourceMap
          );
-         
+
          Object.assign(baseContext, {
             shouldMap: () => {
                return shouldMap;
+            },
+         });
+      }
+      if (ctx.graph) {
+         Object.assign(baseContext, {
+            load: async (source: string) => {
+               const result = await loadChunk.call(
+                  this.bundler,
+                  source,
+                  false,
+                  {
+                     bundler: this.bundler,
+                     graph: ctx.graph,
+                     importers: ctx.importers,
+                     source,
+                  }
+               );
+
+               // @ts-ignore
+               this.bundler._setCache("parsed", source, {
+                  loaded: result,
+               });
+
+               return result;
             },
          });
       }

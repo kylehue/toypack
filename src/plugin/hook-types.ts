@@ -104,6 +104,8 @@ export interface BuildHookContext extends BuildHookContextBase {
    getImporters: () => Importers;
    /** Returns true if the current module should have source maps or not. */
    shouldMap: () => boolean;
+   /** Pre-loads an asset. */
+   load: (source: string) => Promise<LoadResult>;
 }
 
 // Object build hook
