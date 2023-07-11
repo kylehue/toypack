@@ -243,6 +243,10 @@ export class Toypack extends Hooks {
       return this._config;
    }
 
+   public resetConfig() {
+      this.setConfig(JSON.parse(JSON.stringify(defaultConfig)));
+   }
+
    public getAssetSources() {
       return Object.keys(Object.fromEntries(this._assets));
    }
