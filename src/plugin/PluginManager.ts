@@ -192,25 +192,19 @@ export class PluginManager {
       };
 
       const ctx = partialContext as PartialContext<BuildHookContext>;
-      if (ctx.importers) {
-         Object.assign(baseContext, {
-            getImporters: () => ctx.importers,
-         });
-      }
-      if (ctx.source) {
+      if (ctx.source && ctx.importers && ctx.graph) {
          const shouldMap = shouldProduceSourceMap(
             ctx.source,
             this.bundler.getConfig().bundle.sourceMap
          );
-
-         Object.assign(baseContext, {
+         const fullContext: BuildHookContext = {
+            ...baseContext,
+            getImporters: () => ctx.importers,
+            // last importer is guaranteed to be defined
+            getCurrentImporter: () => Object.values(ctx.importers).pop()!,
             shouldMap: () => {
                return shouldMap;
             },
-         });
-      }
-      if (ctx.graph) {
-         Object.assign(baseContext, {
             load: async (source: string) => {
                // @ts-ignore
                const cached = this.bundler._getCache("parsed", source);
@@ -230,7 +224,9 @@ export class PluginManager {
 
                return result;
             },
-         });
+         };
+
+         return fullContext as T;
       }
 
       return baseContext as T;

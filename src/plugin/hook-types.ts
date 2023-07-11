@@ -102,6 +102,8 @@ export interface BuildHookContextBase {
 export interface BuildHookContext extends BuildHookContextBase {
    /** Returns the modules that imported the current module. */
    getImporters: () => Importers;
+   /** Returns the module that imported the current module. */
+   getCurrentImporter: () => ScriptDependency | StyleDependency;
    /** Returns true if the current module should have source maps or not. */
    shouldMap: () => boolean;
    /** Pre-loads an asset. */
