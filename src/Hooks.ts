@@ -59,28 +59,28 @@ export class Hooks implements IHooks {
    }
 
    /**
-    * Listen to errors.
+    * Emit a function everytime an error occurs.
     */
    onError(callback: EventMap["onError"]): Function {
       return this._createListener("onError", callback);
    }
 
    /**
-    * Listen to errors.
+    * Emit a function everytime an asset gets added or updated.
     */
    onAddOrUpdateAsset(callback: EventMap["onAddOrUpdateAsset"]): Function {
       return this._createListener("onAddOrUpdateAsset", callback);
    }
 
    /**
-    * Listen to errors.
+    * Emit a function everytime a package is installed.
     */
    onInstallPackage(callback: EventMap["onInstallPackage"]): Function {
       return this._createListener("onInstallPackage", callback);
    }
 
    /**
-    * Listen to errors.
+    * Emit a function everytime an asset gets deleted.
     */
    onRemoveAsset(callback: EventMap["onRemoveAsset"]): Function {
       return this._createListener("onRemoveAsset", callback);
