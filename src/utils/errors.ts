@@ -5,10 +5,12 @@ export function any(reason: string) {
    };
 }
 
-export function loaderNotFound(source: string) {
+export function loadFailure(source: string, lang?: string) {
    return {
       code: 1,
-      reason: `Failed to load '${source}'.`,
+      reason: `Failed to load '${source}'. You might want to add a plugin for ${
+         lang ? `'${lang}'` : "this"
+      } file type.`,
    };
 }
 
@@ -69,10 +71,7 @@ export function plugin(pluginName: string, reason: string) {
    };
 }
 
-export function packageInstallFailure(
-   packageSource: string,
-   stack?: string
-) {
+export function packageInstallFailure(packageSource: string, stack?: string) {
    return {
       code: 9,
       reason: `Failed to install ${packageSource}. ${

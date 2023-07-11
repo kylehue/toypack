@@ -131,12 +131,18 @@ export async function loadChunk(
          handleLoad(result);
       }
    );
-   
+
    const sourceType = this._getTypeFromSource(formattedSource);
    const isNotLoaded = !isSupported(formattedSource) && !isLoaded;
    const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
    if (isNotLoaded || isStillVirtual) {
-      this._trigger("onError", ERRORS.loaderNotFound(rawSource));
+      this._trigger(
+         "onError",
+         ERRORS.loadFailure(
+            rawSource,
+            moduleInfo.type != "resource" ? moduleInfo.lang : undefined
+         )
+      );
    }
 
    return getLoadResult(moduleInfo, sourceType);
