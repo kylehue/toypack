@@ -65,13 +65,17 @@ export async function getPackage(
 /**
  * For testing.
  */
-export async function test(this: Toypack, name?: string, version = "latest") {
+export async function getPackageTest(
+   this: Toypack,
+   name?: string,
+   version = "latest"
+) {
    const testCases: { name: string; version: string }[] = [
       { name: "vue/compiler-sfc", version: "3.2.13" },
       { name: "bootstrap/dist/css/bootstrap.min.css", version: "5.1.2" },
       { name: "vue", version: "3.2.13" },
       { name: "@kylehue/drawer", version: "latest" },
-      { name: "react", version: "17.0.2" },
+      { name: "react", version: "latest" },
       { name: "@types/babel__core", version: "latest" },
    ];
 
@@ -82,45 +86,51 @@ export async function test(this: Toypack, name?: string, version = "latest") {
       (p) => p.host == "cdn.jsdelivr.net"
    )!;
    console.log(skypackProvider, esmshProvider, jsdelivrProvider);
-   // for (const testCase of testCases) {
-   //    (this as any)._packageProviders = [
-   //       skypackProvider,
-   //       esmshProvider,
-   //       jsdelivrProvider,
-   //    ];
-   //    const esmsh = await getPackage.call(
-   //       this,
-   //       testCase.name,
-   //       testCase.version
-   //    );
-   //    console.info("esm.sh:", testCase.name, esmsh.assets);
-   //    (this as any)._packageProviders = [
-   //       esmshProvider,
-   //       skypackProvider,
-   //       jsdelivrProvider,
-   //    ];
-   //    const skypack = await getPackage.call(
-   //       this,
-   //       testCase.name,
-   //       testCase.version
-   //    );
-   //    console.info("skypack:", testCase.name, skypack.assets);
-   //    // jsdelvr doesn't support @types/*
-   //    if (testCase.name != "@types/babel__core") {
-   //       (this as any)._packageProviders = [
-   //          jsdelivrProvider,
-   //          skypackProvider,
-   //          esmshProvider,
-   //       ];
-   //       const jsdelvr = await getPackage.call(
-   //          this,
-   //          testCase.name,
-   //          testCase.version
-   //       );
-   //       console.info("jsdelvr:", testCase.name, jsdelvr.assets);
-   //    }
-   // }
+   for (const testCase of testCases) {
+      (this as any)._packageProviders = [
+         esmshProvider,
+         skypackProvider,
+         jsdelivrProvider,
+      ];
+      const esmsh = await getPackage.call(
+         this,
+         testCase.name,
+         testCase.version
+      );
+      console.info("esm.sh:", testCase.name, esmsh);
+      (this as any)._packageProviders = [
+         skypackProvider,
+         esmshProvider,
+         jsdelivrProvider,
+      ];
+      const skypack = await getPackage.call(
+         this,
+         testCase.name,
+         testCase.version
+      );
+      console.info("skypack:", testCase.name, skypack);
+      // jsdelvr doesn't support @types/*
+      if (testCase.name != "@types/babel__core") {
+         (this as any)._packageProviders = [
+            jsdelivrProvider,
+            skypackProvider,
+            esmshProvider,
+         ];
+         const jsdelvr = await getPackage.call(
+            this,
+            testCase.name,
+            testCase.version
+         );
+         console.info("jsdelvr:", testCase.name, jsdelvr);
+      }
+   }
 }
+
+type PackageFilterFunction<T> = (packageInfo: {
+   name: string;
+   subpath: string;
+   version: string;
+}) => T;
 
 export interface PackageProvider {
    /**
@@ -130,45 +140,23 @@ export interface PackageProvider {
    /**
     * If provided, the package manager will use it to fetch .d.ts files.
     */
-   dtsHeader?:
-      | string
-      | ((packageInfo: {
-           name: string;
-           subpath: string;
-           version: string;
-        }) => string | void);
+   dtsHeader?: string | PackageFilterFunction<string | void>;
    /**
     * Additional query parameters to be appended to the package requests.
     */
    queryParams?:
       | Record<string, string | true>
-      | ((packageInfo: {
-           name: string;
-           subpath: string;
-           version: string;
-        }) => Record<string, string | true>);
+      | PackageFilterFunction<Record<string, string | true>>;
    /**
     * Specifies an additional path segment to be appended to the
     * package manager requests.
     */
-   postpath?:
-      | string
-      | ((packageInfo: {
-           name: string;
-           subpath: string;
-           version: string;
-        }) => string | void);
+   postpath?: string | PackageFilterFunction<string | void>;
    /**
     * Specifies an additional path segment to be prepended to the
     * package manager requests.
     */
-   prepath?:
-      | string
-      | ((packageInfo: {
-           name: string;
-           subpath: string;
-           version: string;
-        }) => string | void);
+   prepath?: string | PackageFilterFunction<string | void>;
    /**
     * Function to check whether the fetch response is ok or not.
     * Return true if not ok and false if ok.
@@ -182,6 +170,15 @@ export interface PackageManagerConfig {
     * @default false
     */
    dts?: boolean;
+   /**
+    * Callback function triggered whenever a dts asset is fetched.
+    */
+   onDts?: (dts: {
+      source: string;
+      content: string;
+      packagePath: string;
+      packageVersion: string;
+   }) => void;
    /**
     * An array of URLs used to remove duplicate packages. If a package's
     * URL is in that array, it won't use `fetch()` and will just simply

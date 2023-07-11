@@ -45,9 +45,13 @@ const toypack = new ToypackESM({
          plugins: ["typescript", "jsx"],
       },
    },
-   plugins: [
-      vuePlugin()
-   ]
+   plugins: [vuePlugin()],
+   packageManager: {
+      dts: true,
+      onDts(dts) {
+         // console.log(dts);
+      },
+   },
 });
 
 // await toypack.installPackage("react");

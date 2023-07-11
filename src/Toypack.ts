@@ -27,7 +27,7 @@ import { resolve } from "./utils/resolve.js";
 import { LoadChunkResult } from "./graph/load-chunk.js";
 import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
-import { PackageProvider, getPackage } from "./package-manager/index.js";
+import { PackageProvider, getPackage, getPackageTest } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
 export class Toypack extends Hooks {
@@ -69,19 +69,19 @@ export class Toypack extends Hooks {
       });
 
       this.usePackageProvider({
-         host: "cdn.jsdelivr.net",
-         postpath: ({ subpath }) => {
-            if (!/\.css$/.test(subpath)) return "+esm";
-         },
-         prepath: "npm",
-      });
-
-      this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
          queryParams: {
             dev: true,
          },
+      });
+
+      this.usePackageProvider({
+         host: "cdn.jsdelivr.net",
+         postpath: ({ subpath }) => {
+            if (!/\.css$/.test(subpath)) return "+esm";
+         },
+         prepath: "npm",
       });
 
       this.usePackageProvider({

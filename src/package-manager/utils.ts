@@ -1,6 +1,6 @@
 import path from "path-browserify";
 import { PackageProvider } from ".";
-import { EXTENSIONS, isUrl, parsePackageName } from "../utils";
+import { isUrl } from "../utils";
 import { PackageAsset, PackageResourceAsset } from "./fetch-package";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
@@ -76,13 +76,13 @@ export function resolve(
    importSource: string,
    importerSource: string = "/"
 ) {
+   // If url
+   if (isUrl(importSource)) return importSource;
+   
    let root = "";
    if (isUrl(importerSource)) {
       root = new URL(importerSource).origin + "/";
    }
-
-   // If url
-   if (isUrl(importSource)) return importSource;
 
    // If absolute
    if (importSource.startsWith("/")) {
@@ -103,10 +103,11 @@ export function getSource(
    subpath: string,
    url: string,
    isEntry: boolean,
-   type: "script" | "style" | "resource"
+   type: "script" | "style" | "resource",
+   isDts = false
 ) {
    let extname = path.extname(subpath.split("?")[0]);
-   if (!extname) extname = type == "script" ? ".js" : ".css";
+   if (!extname) extname = type == "script" ? isDts ? ".d.ts" : ".js" : ".css";
    
    let source = isEntry
       ? path.join(

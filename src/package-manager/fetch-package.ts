@@ -19,11 +19,23 @@ import {
    getNodeModulesPath,
    getSource,
    findDuplicateAsset,
+   getMimeType,
 } from "./utils.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
 import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
+
+function getDtsHeader(
+   optionDtsHeader: PackageProvider["dtsHeader"],
+   name: string,
+   version: string,
+   subpath: string
+) {
+   if (!optionDtsHeader) return;
+   if (typeof optionDtsHeader == "string") return optionDtsHeader;
+   return optionDtsHeader({ name, version, subpath });
+}
 
 export async function fetchPackage(
    bundler: Toypack,
@@ -38,11 +50,16 @@ export async function fetchPackage(
    let assets: Record<string, PackageAsset> = {};
    let dtsAssets: Record<string, PackageAsset> = {};
    let { name, subpath } = parsePackageName(packagePath);
-   let version = await fetchVersion(name, packageVersion);
+   packageVersion = await fetchVersion(name, packageVersion);
+   let isDtsEntry = packagePath.startsWith("@types/");
+   let entryUrl = getFetchUrlFromProvider(
+      provider,
+      name,
+      packageVersion,
+      subpath
+   );
 
-   let entryUrl = getFetchUrlFromProvider(provider, name, version, subpath);
-
-   const recurse = async (url: string) => {
+   const recurse = async (url: string, isDts = false) => {
       if (url in assets || url in dtsAssets) return true;
       const isEntry = entryUrl == url;
 
@@ -56,7 +73,15 @@ export async function fetchPackage(
             type: "script",
             url,
             isEntry,
-            source: getSource(name, version, subpath, url, isEntry, "script"),
+            source: getSource(
+               name,
+               packageVersion,
+               subpath,
+               url,
+               isEntry,
+               "script",
+               isDts
+            ),
             content:
                `export * from "${duplicateAsset.source}";\n` +
                `export { default } from "${duplicateAsset.source}";`,
@@ -68,13 +93,17 @@ export async function fetchPackage(
       }
 
       const cached = _cache.get(url);
-      const response = cached ? cached.response : await fetch(url);
+      let response = cached ? cached.response : await fetch(url);
       url = response.url;
 
       // Use backup providers when response is bad
       if (!response.ok || (await provider.isBadResponse?.(response))) {
-         assets = {};
-         dtsAssets = {};
+         // no need to reset if it's just a dts asset
+         if (!isDts) {
+            assets = {};
+            dtsAssets = {};
+         }
+         
          let backupProvider = providers[++providerIndex % providers.length];
          if (!provider || backupProvider === providers[0]) {
             throw new Error(
@@ -85,7 +114,7 @@ export async function fetchPackage(
             entryUrl = getFetchUrlFromProvider(
                provider,
                name,
-               version,
+               packageVersion,
                subpath
             );
 
@@ -95,6 +124,33 @@ export async function fetchPackage(
          return false;
       }
 
+      /**
+       * If we're looking for a dts file but the response's content
+       * isn't typescript, we should change the response by fetching
+       * the url in provider's `dtsHeader`.
+       * 
+       * This is for providers like skypack that stores the @types/...
+       * types in dts header instead of storing it in the response's
+       * content itself (like esm.sh).
+       */
+      if (
+         isDts &&
+         getMimeType(response) != "application/typescript" &&
+         provider.dtsHeader
+      ) {
+         const dtsHeader = getDtsHeader(
+            provider.dtsHeader,
+            name,
+            packageVersion,
+            subpath
+         );
+         const dtsUrl = response.headers.get(dtsHeader || "");
+         if (dtsUrl) {
+            response = await fetch(resolve(dtsUrl, url));
+            url = response.url;
+         }
+      }
+
       const type = getType(response);
       if (!type) {
          throw new Error(
@@ -102,20 +158,28 @@ export async function fetchPackage(
          );
       }
 
-      let source = getSource(name, version, subpath, url, isEntry, type);
+      let source = getSource(
+         name,
+         packageVersion,
+         subpath,
+         url,
+         isEntry,
+         type,
+         isDts
+      );
 
       if (type == "resource") {
          const content =
             cached?.type == "resource"
                ? cached.rawContent
                : await response.blob();
-         const asset: PackageResourceAsset = {
-            type: "resource",
-            url,
+         const asset = createPackageAsset(
+            "resource",
             source,
             content,
-            isEntry,
-         };
+            url,
+            isEntry
+         );
 
          assets[url] = asset;
 
@@ -146,7 +210,7 @@ export async function fetchPackage(
       // Parse, get dependencies, and recompile
       if (type == "script") {
          const parserOptions: ParserOptions = {
-            //plugins: isDts ? [["typescript", { dts: true }]] : [],
+            plugins: isDts ? [["typescript", { dts: true }]] : [],
          };
 
          const parsedScript = await parseScriptAsset.call(
@@ -158,12 +222,21 @@ export async function fetchPackage(
                inspectDependencies(node) {
                   const resolved = resolve(node.value, url);
 
-                  node.value = getNodeModulesPath(resolved, name, version);
+                  node.value = getNodeModulesPath(
+                     resolved,
+                     name,
+                     packageVersion
+                  );
                },
             }
          );
 
          dependencies = parsedScript.dependencies;
+
+         if (isDts) {
+            // skip non-dts deps
+            dependencies = dependencies.filter((d) => d.endsWith(".d.ts"));
+         }
 
          const generated = generateScript(parsedScript.ast, {
             sourceFileName: source,
@@ -183,7 +256,11 @@ export async function fetchPackage(
                inspectDependencies(node) {
                   const resolved = resolve(node.value, url);
 
-                  node.value = getNodeModulesPath(resolved, name, version);
+                  node.value = getNodeModulesPath(
+                     resolved,
+                     name,
+                     packageVersion
+                  );
                },
             }
          );
@@ -203,7 +280,7 @@ export async function fetchPackage(
       }
 
       // Get source map
-      if (shouldMap) {
+      if (shouldMap && !isDts) {
          let sourceMap =
             cached && cached.type != "resource"
                ? cached.map
@@ -216,28 +293,53 @@ export async function fetchPackage(
          }
       }
 
-      const asset: PackageAsset = {
+      // Get dts
+      if (config.packageManager.dts && isEntry && provider.dtsHeader) {
+         const dtsHeader = getDtsHeader(
+            provider.dtsHeader,
+            name,
+            packageVersion,
+            subpath
+         );
+         const dtsUrl = response.headers.get(dtsHeader || "");
+         if (dtsUrl) {
+            recurse(resolve(dtsUrl, url), true);
+         }
+      }
+
+      const asset = createPackageAsset(
          type,
-         url,
          source,
          content,
-         map,
+         url,
          isEntry,
-      } as PackageAsset;
+         map,
+         isDts
+      );
 
-      assets[url] = asset;
+      if (asset.type == "script" && asset.dts) {
+         dtsAssets[url] = asset;
+         config.packageManager.onDts?.({
+            source: asset.source,
+            content: asset.content,
+            packagePath,
+            packageVersion,
+         });
+      } else {
+         assets[url] = asset;
+      }
 
       // Fetch dependencies recursively
       for (const depSource of dependencies) {
          const resolved = resolve(depSource, url);
 
-         const isSuccess = await recurse(resolved);
+         const isSuccess = await recurse(resolved, isDts);
          // break if a dependency fails
          if (!isSuccess) return false;
       }
 
       // Cache
-      if (!cached && asset.type != "resource") {
+      if (!cached) {
          _cache.set(url, {
             type,
             rawContent: rawContent,
@@ -250,9 +352,60 @@ export async function fetchPackage(
       return true;
    };
 
-   await recurse(entryUrl);
+   await recurse(entryUrl, isDtsEntry);
 
-   return { name, version, subpath, assets, dtsAssets };
+   return { name, version: packageVersion, subpath, assets, dtsAssets };
+}
+
+function createPackageAsset<
+   T extends "script" | "style" | "resource",
+   U extends T extends "script"
+      ? PackageScriptAsset
+      : T extends "style"
+      ? PackageStyleAsset
+      : T extends "resource"
+      ? PackageResourceAsset
+      : PackageAsset
+>(
+   type: T,
+   source: string,
+   content: T extends "resource" ? Blob : string,
+   url: string,
+   isEntry: boolean,
+   map: EncodedSourceMap | null = null,
+   isDts = false
+): U {
+   const common = {
+      source,
+      url,
+      isEntry,
+   };
+
+   let asset: PackageAsset;
+   if (type == "resource") {
+      asset = {
+         ...common,
+         type: "resource",
+         content: content as Blob,
+      };
+   } else if (type == "style") {
+      asset = {
+         ...common,
+         type: "style",
+         content: content as string,
+         map,
+      };
+   } else {
+      asset = {
+         ...common,
+         type: "script",
+         content: content as string,
+         map,
+         dts: isDts,
+      };
+   }
+
+   return asset as U;
 }
 
 export interface Package {
