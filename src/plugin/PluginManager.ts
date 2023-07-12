@@ -185,6 +185,12 @@ export class PluginManager {
             }
          },
          emitError: (message) => {
+            const logLevel = partialContext.bundler.getConfig().logLevel;
+            DEBUG.error(
+               logLevel,
+               console.error
+            )?.(`[${plugin.name}] Warning: ` + message);
+            
             // @ts-ignore
             this.bundler._trigger(
                "onError",
