@@ -64,10 +64,6 @@ export class Toypack extends Hooks {
          importUrlPlugin()
       );
 
-      this.onError((error) => {
-         DEBUG.error(this.config.logLevel, console.error)?.(error.reason);
-      });
-
       this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
@@ -79,18 +75,6 @@ export class Toypack extends Hooks {
             if (!/\.css$/.test(subpath)) return "+esm";
          },
          prepath: "npm",
-      });
-
-      this.usePackageProvider({
-         host: "cdn.skypack.dev",
-         dtsHeader: "X-Typescript-Types",
-         queryParams: {
-            dts: true,
-         },
-         isBadResponse(res) {
-            if (res.url == "https://cdn.skypack.dev/error") return false;
-            return /cdn\.skypack\.dev\/error\/.*/.test(res.url);
-         },
       });
    }
 
