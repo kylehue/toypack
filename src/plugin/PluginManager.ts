@@ -179,21 +179,21 @@ export class PluginManager {
          getConfigHash() {
             return (this.bundler as any)._configHash;
          },
-         error: (message) => {
+         emitError: (message) => {
             // @ts-ignore
             this.bundler._trigger(
                "onError",
                ERRORS.plugin(plugin.name, message)
             );
          },
-         warn: (message) => {
+         emitWarning: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
             DEBUG.warn(
                logLevel,
                console.warn
             )?.(`[${plugin.name}] Warning: ` + message);
          },
-         info: (message) => {
+         emitInfo: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;
             DEBUG.warn(
                logLevel,

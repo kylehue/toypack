@@ -12,7 +12,7 @@ export default function (): Plugin {
             disableChaining: true,
             compile(dep) {
                if (typeof dep.content != "string") {
-                  this.error("Blob contents are not supported.");
+                  this.emitError("Blob contents are not supported.");
                   return;
                }
 

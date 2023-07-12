@@ -9,7 +9,7 @@ export default function (): Plugin {
             test: /\.json$/,
             compile(dep) {
                if (typeof dep.content != "string") {
-                  this.error("Blob contents are not supported.");
+                  this.emitError("Blob contents are not supported.");
                   return;
                }
 

@@ -86,7 +86,7 @@ function compile(
             codeFrameColumns(content, {
                start: pos,
             });
-         this.error(importMapError);
+         this.emitError(importMapError);
       }
 
       /**
@@ -181,7 +181,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
       test: /\.html$/,
       compile(dep) {
          if (typeof dep.content != "string") {
-            this.error("Blob contents are not supported.");
+            this.emitError("Blob contents are not supported.");
             return;
          }
 

@@ -93,11 +93,11 @@ export interface BuildHookContextBase {
     */
    getConfigHash: () => string;
    /** Emits an error message. */
-   error: (message: string) => void;
+   emitError: (message: string) => void;
    /** Emits a warning message. */
-   warn: (message: string) => void;
+   emitWarning: (message: string) => void;
    /** Emits an info message. */
-   info: (message: string) => void;
+   emitInfo: (message: string) => void;
    /** Adds an item in the plugin's cache. */
    setCache: (key: string, value: any, isConfigConstrained?: boolean) => void;
    /** Retrieves an item in the plugin's cache. */
