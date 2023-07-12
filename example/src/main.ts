@@ -54,6 +54,7 @@ const toypack = new ToypackESM({
       //    console.log(dts);
       // },
    },
+   logLevel: "debug"
 });
 
 // await toypack.installPackage("react");

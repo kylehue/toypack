@@ -81,9 +81,9 @@ export const defaultConfig = {
    },
    /**
     * Log level.
-    * @default "info"
+    * @default "warn"
     */
-   logLevel: "info" as LogLevelConfig,
+   logLevel: "warn" as LogLevelConfig,
    /**
     * Configuration for the package manager.
     */
@@ -97,7 +97,7 @@ export const defaultConfig = {
 export type ToypackConfig = typeof defaultConfig;
 export type ModuleTypeConfig = "esm" | "cjs";
 export type ModeConfig = "production" | "development";
-export type LogLevelConfig = "error" | "warn" | "info" | "none";
+export type LogLevelConfig = "error" | "warn" | "info" | "debug" | "none";
 export type SourceMapConfig = {
    /** Whether to include the source contents or not. */
    includeContent?: boolean;

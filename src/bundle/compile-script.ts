@@ -7,7 +7,7 @@ import { transformFromAst } from "@babel/standalone";
 import traverseAST, { NodePath, Node, TraverseOptions } from "@babel/traverse";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { Toypack } from "../Toypack.js";
-import { mergeSourceMaps, shouldProduceSourceMap } from "../utils";
+import { DEBUG, mergeSourceMaps, shouldProduceSourceMap } from "../utils";
 import { DependencyGraph, ScriptDependency } from "../types.js";
 
 const importantPresets: PluginItem[] = ["env"];
@@ -153,6 +153,11 @@ export async function compileScript(
          map: result.map,
          importers: chunk.importers,
       });
+
+      DEBUG.debug(
+         config.logLevel,
+         console.info
+      )?.(`Compiling ${chunk.source}...`);
    }
 
    return result;
