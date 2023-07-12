@@ -1,11 +1,9 @@
 import { defineConfig } from "vite";
 import path from "path";
-import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 export default defineConfig({
    resolve: {
       alias: {
-         path: "path-browserify",
          "@test": path.resolve(__dirname, "./src-test"),
       },
    },
@@ -14,12 +12,16 @@ export default defineConfig({
          define: {
             global: "globalThis",
          },
-         plugins: [
-            NodeGlobalsPolyfillPlugin({
-               buffer: true,
-            }),
-         ],
       },
-      include: ["@vue/compiler-sfc"],
+      include: ["@vue/compiler-sfc", "sass.js"],
    },
+   plugins: [
+      nodePolyfills({
+         globals: {
+            Buffer: true, // can also be 'build', 'dev', or false
+            global: true,
+            process: true,
+         },
+      }),
+   ],
 });

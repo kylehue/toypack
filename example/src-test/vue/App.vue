@@ -1,5 +1,5 @@
 <template>
-   <h1 class="green">Hello Vue</h1>
+   <h1 class="green">Hello <span>Vue</span></h1>
    <button @click="increment">{{ counter }}</button>
    <button @click="() => log(counter)">Log</button>
    <VueComponent :msg="'Hello' + counter"></VueComponent>
@@ -18,8 +18,15 @@ console.log("Hello vue");
 </script>
 
 <style lang="scss" scoped>
+@import "../styles/mixins.scss";
 .green {
-   color: rgb(95, 199, 124) !important;
+   color: rgb(159, 233, 180) !important;
+
+   span {
+      color: rgb(18, 170, 99);
+      @include black;
+   }
 }
 </style>
 <style src="../styles/sample.css" scoped></style>
+<style src="../styles/sample.sass" scoped></style>

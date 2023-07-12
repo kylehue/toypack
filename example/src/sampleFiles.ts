@@ -16,6 +16,8 @@ export const sampleFiles: Record<string, string | Blob> = {
    "classes/createNum2.js": (await import("@test/classes/createNum2.js?raw"))
       .default,
    "styles/sample.css": (await import("@test/styles/sample.css?raw")).default,
+   "styles/mixins.scss": (await import("@test/styles/mixins.scss?raw")).default,
+   "styles/sample.sass": (await import("@test/styles/sample.sass?raw")).default,
    /* node_modules */
    "node_modules/path-browserify/index.js": (
       await import("@test/nm/path-browserify/index.js?raw")

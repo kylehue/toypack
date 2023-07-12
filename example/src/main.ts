@@ -2,6 +2,7 @@ import "./style.css";
 import { sampleFiles } from "./sampleFiles.js";
 import { Toypack as ToypackESM, Babel } from "toypack";
 import vuePlugin from "toypack-vue";
+import sassPlugin from "toypack-sass";
 
 var saveData = (function () {
    var a = document.createElement("a");
@@ -36,7 +37,7 @@ const toypack = new ToypackESM({
       sourceMap: {
          exclude: ["/node_modules/"],
       },
-      globalName: "MyLib"
+      globalName: "MyLib",
    },
    babel: {
       transform: {
@@ -46,12 +47,12 @@ const toypack = new ToypackESM({
          plugins: ["typescript", "jsx"],
       },
    },
-   plugins: [vuePlugin()],
+   plugins: [vuePlugin(), sassPlugin()],
    packageManager: {
-      dts: true,
-      onDts(dts) {
-         // console.log(dts);
-      },
+      // dts: true,
+      // onDts(dts) {
+      //    console.log(dts);
+      // },
    },
 });
 
