@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { shouldProduceSourceMap } from "../../utils";
+import { shouldProduceSourceMap } from "../../src/utils";
 
 it("should produce source map", () => {
    expect(shouldProduceSourceMap("/src/main.js", {})).toBe(true);

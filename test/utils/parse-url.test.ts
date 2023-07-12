@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { parseURL } from "../../utils";
+import { parseURL } from "../../src/utils";
 
 it("should emit a result", () => {
    expect(parseURL("path/to/file?hello&world=2")).toEqual({

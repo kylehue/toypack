@@ -4,7 +4,7 @@
 
 import path from "path-browserify";
 import { expect, it, beforeAll } from "vitest";
-import { resolve } from "../../package-manager/utils";
+import { resolve } from "../../src/package-manager/utils";
 
 it("should work with relative paths", () => {
    expect(

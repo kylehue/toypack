@@ -3,7 +3,7 @@
  */
 
 import { expect, it, beforeEach } from "vitest";
-import { Toypack } from "../Toypack.js";
+import { Toypack } from "..";
 
 const toypack = new Toypack({
    bundle: {

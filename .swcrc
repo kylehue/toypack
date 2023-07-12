@@ -9,6 +9,6 @@
       "type": "es6",
       "noInterop": false
    },
-   "exclude": ["__tests__", "shims.d.ts"],
+   "exclude": ["shims.d.ts"],
    "sourceMaps": true
 }

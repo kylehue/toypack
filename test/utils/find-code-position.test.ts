@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { findCodePosition, indexToPosition } from "../../utils";
+import { findCodePosition, indexToPosition } from "../../src/utils";
 
 const sample = `
 <!DOCTYPE html>

@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { isUrl } from "../../utils";
+import { isUrl } from "../../src/utils";
 
 const url = "https://example.com/app";
 const dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAX0";
