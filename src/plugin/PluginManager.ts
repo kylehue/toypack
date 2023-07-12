@@ -211,6 +211,7 @@ export class PluginManager {
          setCache: (key, value, isConfigDependent) => {
             key = createCacheKey(key, isConfigDependent);
             this._cache.set(key, value);
+            return value;
          },
       };
 

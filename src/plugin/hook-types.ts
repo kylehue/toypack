@@ -99,7 +99,11 @@ export interface BuildHookContextBase {
    /** Emits an info message. */
    emitInfo: (message: string) => void;
    /** Adds an item in the plugin's cache. */
-   setCache: (key: string, value: any, isConfigConstrained?: boolean) => void;
+   setCache: <T = any>(
+      key: string,
+      value: any,
+      isConfigConstrained?: boolean
+   ) => T;
    /** Retrieves an item in the plugin's cache. */
    getCache: <T = any>(
       key: string,
