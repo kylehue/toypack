@@ -207,11 +207,17 @@ export class PluginManager {
          },
          getCache: (key, isConfigDependent) => {
             key = createCacheKey(key, isConfigDependent);
-            return this._cache.get(key)?.value;
+            const cache = this._cache.get(key);
+            if (cache?.plugin === plugin) {
+               return cache.value;
+            }
          },
          removeCache: (key, isConfigDependent) => {
             key = createCacheKey(key, isConfigDependent);
-            this._cache.delete(key);
+            const cache = this._cache.get(key);
+            if (cache?.plugin === plugin) {
+               this._cache.delete(key);
+            }
          },
          setCache: (key, value, isConfigDependent) => {
             const formattedKey = createCacheKey(key, isConfigDependent);
