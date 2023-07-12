@@ -6,7 +6,7 @@ import {
    NodeType,
    Options,
 } from "node-html-parser";
-import { BuildHookContext, Loader, Plugin } from "../types.js";
+import { PluginContext, Loader, Plugin } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
 import { indexToPosition } from "../utils/find-code-position.js";
 import path from "path-browserify";
@@ -21,6 +21,7 @@ const resourceSrcAttrTags = [
    "VIDEO",
 ];
 
+const injectHtmlKey = "***html***";
 const linkTagRelDeps = ["stylesheet", "icon"];
 let _id = 0;
 
@@ -56,7 +57,7 @@ function extractDepSourceFromNode(node: AST) {
 }
 
 function compile(
-   this: BuildHookContext,
+   this: PluginContext,
    source: string,
    content: string,
    htmlPluginOptions?: HTMLPluginOptions
@@ -163,33 +164,28 @@ function injectAstToHtml(content: string, astToInject: HTMLElement) {
    return htmlAst.toString();
 }
 
-export default function (options?: HTMLPluginOptions): Plugin {
-   const virtualModules: Record<string, string> = {};
-   const compiledModules: Record<
-      string,
-      {
-         source: string;
-         configHash: string;
-         content: string;
-         ast: HTMLElement;
-         resourceDependencies: Set<string>;
-         virtualModules: Record<string, string>;
-      }
-   > = {};
-   
-   const htmlLoader: Loader = {
+interface HTMLModule {
+   source: string;
+   ast: HTMLElement;
+}
+
+function htmlLoader(options?: HTMLPluginOptions): Loader {
+   return {
       test: /\.html$/,
-      compile(dep) {
-         if (typeof dep.content != "string") {
+      compile(moduleInfo) {
+         if (typeof moduleInfo.content != "string") {
             this.emitError("Blob contents are not supported.");
             return;
          }
 
          let mainVirtualModule = "";
-         let astToInject: HTMLElement | null = null;
 
-         const compiled = compile.call(this, dep.source, dep.content, options);
-         astToInject = compiled.ast;
+         const compiled = compile.call(
+            this,
+            moduleInfo.source,
+            moduleInfo.content,
+            options
+         );
 
          // Import dependencies
          for (const depSource of compiled.dependencies) {
@@ -198,61 +194,82 @@ export default function (options?: HTMLPluginOptions): Plugin {
 
          // Import inline styles as a virtual module
          if (compiled.bundledInlineStyles.length) {
-            const styleVirtualId = `virtual:${getHash(dep.source)}${_id++}.css`;
-            virtualModules[styleVirtualId] = compiled.bundledInlineStyles;
+            const styleVirtualId = `virtual:${
+               moduleInfo.source
+            }?style&index=${_id++}`;
+            this.setCache(
+               styleVirtualId,
+               {
+                  type: "style",
+                  lang: "css",
+                  content: compiled.bundledInlineStyles,
+               },
+               true
+            );
             mainVirtualModule += this.getImportCode(styleVirtualId);
          }
 
-         compiledModules[this.getConfigHash() + dep.source] = {
-            source: dep.source,
-            configHash: this.getConfigHash(),
-            content: mainVirtualModule,
-            ast: astToInject,
-            resourceDependencies: compiled.resourceDependencies,
-            virtualModules,
-         };
+         this.setCache(
+            moduleInfo.source,
+            {
+               source: moduleInfo.source,
+               content: mainVirtualModule,
+               resourceDependencies: compiled.resourceDependencies,
+            },
+            true
+         );
+
+         this.setCache<HTMLModule>(
+            injectHtmlKey,
+            {
+               source: moduleInfo.source,
+               ast: compiled.ast,
+            },
+            true
+         );
 
          return mainVirtualModule;
       },
    };
+}
 
+export default function (options?: HTMLPluginOptions): Plugin {
+   let injectedHtml: HTMLModule | null = null;
    return {
       name: "html-plugin",
-      loaders: [htmlLoader],
+      loaders: [htmlLoader(options)],
       extensions: [["script", ".html"]],
       buildStart() {
-         // Remove in plugin's cache if the assets doesn't exist anymore
-         for (const [source, compiled] of Object.entries(compiledModules)) {
-            if (!this.bundler.getAsset(compiled.source)) {
-               for (const vkey in compiled.virtualModules) {
-                  delete virtualModules[vkey];
-               }
-
-               delete compiledModules[source];
+         // Remove in plugin's cache if the asset no longer exists
+         this.eachCache((_, source) => {
+            if (this.bundler.getAsset(source)) return;
+            if (source != injectHtmlKey) {
+               this.removeCache(source, true);
             }
-         }
+            if (injectedHtml?.source == source) {
+               this.removeCache(injectHtmlKey, true);
+            }
+         });
       },
-      load(dep) {
-         if (dep.type != "virtual") return;
-         if (dep.source in virtualModules) {
-            return virtualModules[dep.source];
-         }
+      load(moduleInfo) {
+         if (moduleInfo.type != "virtual") return;
+         return this.getCache(moduleInfo.source, true);
       },
       buildEnd(result) {
-         const htmls = Object.values(compiledModules);
-         if (!htmls.length) return;
-         const html = htmls.find(h => h.configHash == this.getConfigHash());
-         if (!html?.ast) return;
-         result.html.content = injectAstToHtml(result.html.content, html.ast);
+         const htmlToInject = this.getCache<HTMLModule>(injectHtmlKey, true);
+         if (!htmlToInject) return;
+         injectedHtml = htmlToInject;
+         result.html.content = injectAstToHtml(
+            result.html.content,
+            injectedHtml.ast
+         );
       },
       parsed({ chunk, parsed }) {
-         const source = this.getConfigHash() + chunk.source;
-         if (source in compiledModules) {
-            const load = compiledModules[source];
-            load.resourceDependencies.forEach((item) =>
-               parsed.dependencies.add(item)
-            );
-         }
+         const cached = this.getCache(chunk.source, true);
+         if (!cached) return;
+         cached.resourceDependencies?.forEach((item: any) =>
+            parsed.dependencies.add(item)
+         );
       },
    };
 }
