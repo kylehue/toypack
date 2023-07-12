@@ -65,7 +65,15 @@ type TriggerOptions<
 export class PluginManager {
    private _hooks: BuildHooksGroupMap = {};
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
-   private _cache = new Map<string, any>();
+   private _cache = new Map<
+      string,
+      {
+         formattedKey: string;
+         originalKey: string;
+         value: any;
+         plugin: Plugin;
+      }
+   >();
 
    constructor(private bundler: Toypack) {}
 
@@ -202,16 +210,27 @@ export class PluginManager {
          },
          getCache: (key, isConfigDependent) => {
             key = createCacheKey(key, isConfigDependent);
-            return this._cache.get(key);
+            return this._cache.get(key)?.value;
          },
          removeCache: (key, isConfigDependent) => {
             key = createCacheKey(key, isConfigDependent);
             this._cache.delete(key);
          },
          setCache: (key, value, isConfigDependent) => {
-            key = createCacheKey(key, isConfigDependent);
-            this._cache.set(key, value);
+            const formattedKey = createCacheKey(key, isConfigDependent);
+            this._cache.set(formattedKey, {
+               originalKey: key,
+               formattedKey,
+               value,
+               plugin
+            });
             return value;
+         },
+         eachCache: (callback) => {
+            this._cache.forEach((value) => {
+               if (value.plugin !== plugin) return;
+               callback(value.value, value.originalKey);
+            });
          },
       };
 

@@ -111,6 +111,8 @@ export interface BuildHookContextBase {
    ) => T | undefined;
    /** Removes an item in the plugin's cache. */
    removeCache: (key: string, isConfigConstrained?: boolean) => void;
+   /** Performs the specified action for each cache. */
+   eachCache: (callback: (value: any, key: string) => void) => void;
 }
 
 export interface BuildHookContext extends BuildHookContextBase {
