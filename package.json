@@ -26,7 +26,7 @@
       "build:main": "swc ./src -d ./build",
       "build:bundle": "webpack",
       "clean": "rimraf build browser coverage nyc_output",
-      "type:dts": "tsc --emitDeclarationOnly --project tsconfig.build.json",
+      "type:dts": "tsc --emitDeclarationOnly",
       "type:check": "tsc --noEmit",
       "format": "prettier \"src/**/*.ts\" --write",
       "format:check": "prettier \"src/**/*.ts\" --check",
