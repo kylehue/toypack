@@ -14,13 +14,13 @@ import { LoadResult, ModuleInfo } from "../graph/load-chunk.js";
 import { SpecifierOptions } from "../utils/get-import-code.js";
 
 // Interfaces
-export interface ScriptTransform {
+export interface ScriptTransformDescriptor {
    type: "script";
    chunk: ScriptDependency;
    traverse: (traverseOptions: ITraverseOptions) => void;
 }
 
-export interface StyleTransform {
+export interface StyleTransformDescriptor {
    type: "style";
    chunk: StyleDependency;
    traverse: (traverseOptions: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
@@ -39,35 +39,35 @@ export type ParseInfo =
      };
 
 // Hooks
-export type LoadBuildHook = (
-   this: BuildHookContext,
+export type LoadHook = (
+   this: PluginContext,
    moduleInfo: ModuleInfo
 ) => LoadResult | string | void;
 
-export type ResolveBuildHook = (
-   this: BuildHookContext,
+export type ResolveHook = (
+   this: PluginContext,
    id: string
 ) => string | void;
 
-export type TransformBuildHook = (
-   this: BuildHookContext,
-   context: ScriptTransform | StyleTransform
+export type TransformHook = (
+   this: PluginContext,
+   context: ScriptTransformDescriptor | StyleTransformDescriptor
 ) => void;
 
-export type ParsedBuildHook = (
-   this: BuildHookContext,
+export type ParsedHook = (
+   this: PluginContext,
    parseInfo: ParseInfo
 ) => void;
 
-export type StartBuildHook = (this: BuildHookContextBase) => void;
-export type EndBuildHook = (
-   this: BuildHookContextBase,
+export type StartHook = (this: PluginContextBase) => void;
+export type EndHook = (
+   this: PluginContextBase,
    result: BundleResult
 ) => void;
-export type SetupBuildHook = (this: BuildHookContextBase) => void;
+export type SetupHook = (this: PluginContextBase) => void;
 
 // Context
-export interface BuildHookContextBase {
+export interface PluginContextBase {
    bundler: Toypack;
    /**
     * Convert a resource's source path to a useable source path.
@@ -109,7 +109,7 @@ export interface BuildHookContextBase {
    eachCache: (callback: (value: any, key: string) => void) => void;
 }
 
-export interface BuildHookContext extends BuildHookContextBase {
+export interface PluginContext extends PluginContextBase {
    /** Returns the modules that imported the current module. */
    getImporters: () => Importers;
    /** Returns the module that imported the current module. */
@@ -121,37 +121,37 @@ export interface BuildHookContext extends BuildHookContextBase {
 }
 
 // Object build hook
-interface BuildHookAsync<Handler extends (...args: any) => any> {
+interface AsyncHook<Handler extends (...args: any) => any> {
    async: true;
    handler: Asyncify<Handler>;
 }
 
-interface BuildHookSync<Handler extends (...args: any) => any> {
+interface SyncHook<Handler extends (...args: any) => any> {
    async?: false;
    handler: Handler;
 }
 
-export type BuildHookConfig<
+export type ConfigurableHook<
    Handler extends (...args: any) => any = (...args: any) => any
 > = {
    order?: "pre" | "post";
    chaining?: boolean;
-} & (BuildHookAsync<Handler> | BuildHookSync<Handler>);
+} & (AsyncHook<Handler> | SyncHook<Handler>);
 
-// Build hooks interface
-export interface BuildHooks {
+// Plugin hooks interface
+export interface PluginHooks {
    /** A hook called everytime a module needs to be loaded. */
-   load: LoadBuildHook | BuildHookConfig<LoadBuildHook>;
+   load: LoadHook | ConfigurableHook<LoadHook>;
    /** A hook called everytime a module needs to be resolved. */
-   resolve: ResolveBuildHook | BuildHookConfig<ResolveBuildHook>;
+   resolve: ResolveHook | ConfigurableHook<ResolveHook>;
    /** A hook called everytime a module needs to be transformed. */
-   transform: TransformBuildHook | BuildHookConfig<TransformBuildHook>;
+   transform: TransformHook | ConfigurableHook<TransformHook>;
    /** A hook called at the start of getting the dependency graph. */
-   buildStart: StartBuildHook | BuildHookConfig<StartBuildHook>;
+   buildStart: StartHook | ConfigurableHook<StartHook>;
    /** A hook called at the end of the bundling process. */
-   buildEnd: EndBuildHook | BuildHookConfig<EndBuildHook>;
+   buildEnd: EndHook | ConfigurableHook<EndHook>;
    /** A hook called everytime a module is parsed. */
-   parsed: ParsedBuildHook | BuildHookConfig<ParsedBuildHook>;
+   parsed: ParsedHook | ConfigurableHook<ParsedHook>;
    /** A hook called only once, useful to setup things in the bundler. */
-   setup: SetupBuildHook;
+   setup: SetupHook;
 }

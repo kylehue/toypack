@@ -6,7 +6,7 @@ import {
    ERRORS,
    shouldProduceSourceMap,
 } from "../utils";
-import { Asset, BuildHookContext, ResourceAsset, TextAsset } from "../types";
+import { Asset, PluginContext, ResourceAsset, TextAsset } from "../types";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { createAsset } from "../utils/create-asset.js";
 import path from "path-browserify";
@@ -15,7 +15,7 @@ export async function loadChunk(
    this: Toypack,
    rawSource: string,
    isEntry: boolean,
-   { graph, importers }: PartialContext<BuildHookContext>
+   { graph, importers }: PartialContext<PluginContext>
 ) {
    const isVirtual = rawSource.startsWith("virtual:");
    let type: InitialModuleType | null = isVirtual
