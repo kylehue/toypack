@@ -29,7 +29,9 @@ import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
+let _lastId = 0;
 export class Toypack extends Hooks {
+   public readonly id = `$${_lastId++}`;
    private _iframe: HTMLIFrameElement | null = null;
    private _extensions = {
       resource: [...EXTENSIONS.resource],
