@@ -1,27 +1,27 @@
 import { LoadResult, ModuleInfo } from "./graph/load-chunk.js";
 import {
-   BuildHookContext,
-   BuildHooks,
-   BuildHookConfig,
+   PluginContext,
+   PluginHooks,
+   ConfigurableHook,
 } from "./plugin/hook-types.js";
 
-export interface Plugin extends Partial<BuildHooks> {
+export interface Plugin extends Partial<PluginHooks> {
    name: string;
    loaders?: Loader[];
    extensions?: ["resource" | "script" | "style", string][];
 }
 
 type CompileHandler = (
-   this: BuildHookContext,
+   this: PluginContext,
    moduleInfo: ModuleInfo
 ) => LoadResult | string | void;
 export interface Loader {
    test: RegExp | ((source: string) => boolean);
    disableChaining?: boolean;
-   compile: CompileHandler | BuildHookConfig<CompileHandler>;
+   compile: CompileHandler | ConfigurableHook<CompileHandler>;
 }
 
-export type { BuildHookContext, BuildHooks } from "./plugin/hook-types.js";
+export type { PluginContext, PluginHooks } from "./plugin/hook-types.js";
 export type {
    Dependency,
    DependencyGraph,

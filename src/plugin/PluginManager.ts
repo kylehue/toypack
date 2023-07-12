@@ -16,25 +16,25 @@ import {
    shouldProduceSourceMap,
 } from "../utils";
 import {
-   BuildHookConfig,
-   BuildHookContext,
-   BuildHookContextBase,
-   BuildHooks,
+   ConfigurableHook,
+   PluginContext,
+   PluginContextBase,
+   PluginHooks,
 } from "./hook-types.js";
 import { loadChunk } from "../graph/load-chunk.js";
 
-type BuildHooksGroupMap = {
-   [key in keyof BuildHooks]?: {
+type PluginHooksGroupMap = {
+   [key in keyof PluginHooks]?: {
       plugin: Plugin;
-      hook: BuildHooks[key];
+      hook: PluginHooks[key];
    }[];
 };
 
 export type PartialContext<
-   T extends BuildHookContext | BuildHookContextBase = BuildHookContextBase
+   T extends PluginContext | PluginContextBase = PluginContextBase
 > = {
    bundler: Toypack;
-} & (T extends BuildHookContext
+} & (T extends PluginContext
    ? {
         graph: DependencyGraph;
         importers: Importers;
@@ -43,15 +43,15 @@ export type PartialContext<
    : {});
 
 type TriggerOptions<
-   HookName extends keyof BuildHooks,
-   Hook extends BuildHooks[HookName],
-   HookFunction extends Hook extends BuildHookConfig ? Hook["handler"] : Hook,
+   HookName extends keyof PluginHooks,
+   Hook extends PluginHooks[HookName],
+   HookFunction extends Hook extends ConfigurableHook ? Hook["handler"] : Hook,
    HookReturn extends Awaited<ReturnType<HookFunction>>,
    Callback = (result: Exclude<HookReturn, undefined | null | void>) => void
 > = {
    name: HookName;
    args: Parameters<HookFunction> | (() => Parameters<HookFunction>);
-} & (ThisParameterType<HookFunction> extends BuildHookContextBase
+} & (ThisParameterType<HookFunction> extends PluginContextBase
    ? { context: PartialContext<ThisParameterType<HookFunction>> }
    : { context?: never }) &
    (HookReturn extends void
@@ -63,7 +63,7 @@ type TriggerOptions<
         });
 
 export class PluginManager {
-   private _hooks: BuildHooksGroupMap = {};
+   private _hooks: PluginHooksGroupMap = {};
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
    private _cache = new Map<
       string,
@@ -99,10 +99,10 @@ export class PluginManager {
       return result;
    }
 
-   private _registerHook<HookName extends keyof BuildHooks>(
+   private _registerHook<HookName extends keyof PluginHooks>(
       plugin: Plugin,
       hookName: HookName,
-      hookFunction?: BuildHooks[HookName]
+      hookFunction?: PluginHooks[HookName]
    ) {
       if (!hookFunction) return;
       let hookGroup = this._hooks[hookName];
@@ -147,7 +147,7 @@ export class PluginManager {
       );
    }
 
-   private _createContext<T extends BuildHookContext | BuildHookContextBase>(
+   private _createContext<T extends PluginContext | PluginContextBase>(
       partialContext: PartialContext<T>,
       plugin: Plugin
    ): T {
@@ -161,7 +161,7 @@ export class PluginManager {
          return common;
       };
 
-      const baseContext: BuildHookContextBase = {
+      const baseContext: PluginContextBase = {
          bundler: partialContext.bundler,
          getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(this.bundler, source, baseDir);
@@ -237,13 +237,13 @@ export class PluginManager {
          },
       };
 
-      const ctx = partialContext as PartialContext<BuildHookContext>;
+      const ctx = partialContext as PartialContext<PluginContext>;
       if (ctx.source && ctx.importers && ctx.graph) {
          const shouldMap = shouldProduceSourceMap(
             ctx.source,
             this.bundler.getConfig().bundle.sourceMap
          );
-         const fullContext: BuildHookContext = {
+         const fullContext: PluginContext = {
             ...baseContext,
             getImporters: () => ctx.importers,
             // last importer is guaranteed to be defined
@@ -302,7 +302,7 @@ export class PluginManager {
             continue;
          }
 
-         const hookName = prop as keyof BuildHooks;
+         const hookName = prop as keyof PluginHooks;
          this._registerHook(plugin, hookName, plugin[hookName]);
       }
    }
@@ -316,7 +316,7 @@ export class PluginManager {
    ) {
       const loaders = this._getLoadersFor(source);
       for (const { loader, plugin } of loaders) {
-         const context = this._createContext<BuildHookContext>(
+         const context = this._createContext<PluginContext>(
             {
                bundler: this.bundler,
                graph,
@@ -338,9 +338,9 @@ export class PluginManager {
    }
 
    public async triggerHook<
-      T extends keyof BuildHooks,
-      H extends BuildHooks[T],
-      K extends H extends BuildHookConfig ? H["handler"] : H,
+      T extends keyof PluginHooks,
+      H extends PluginHooks[T],
+      K extends H extends ConfigurableHook ? H["handler"] : H,
       R extends Awaited<ReturnType<K>>
    >({ name, args: rawArgs, context, callback }: TriggerOptions<T, H, K, R>) {
       const hookGroup = this._hooks[name];
