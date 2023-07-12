@@ -184,9 +184,6 @@ export class PluginManager {
                return `module.exports = ${exportCode};`;
             }
          },
-         getConfigHash() {
-            return (this.bundler as any)._configHash;
-         },
          emitError: (message) => {
             // @ts-ignore
             this.bundler._trigger(

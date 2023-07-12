@@ -86,12 +86,6 @@ export interface BuildHookContextBase {
     * - e.g. `export default ... ;` or `module.exports = ... ;`
     */
    getDefaultExportCode: (exportCode: string) => string;
-   /**
-    * Returns the hash of the bundler's config.
-    * This is helpful when caching to avoid using cached modules
-    * that was compiled with different configurations.
-    */
-   getConfigHash: () => string;
    /** Emits an error message. */
    emitError: (message: string) => void;
    /** Emits a warning message. */
