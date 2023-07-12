@@ -65,6 +65,7 @@ type TriggerOptions<
 export class PluginManager {
    private _hooks: BuildHooksGroupMap = {};
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
+   private _cache = new Map<string, any>();
 
    constructor(private bundler: Toypack) {}
 
@@ -142,6 +143,16 @@ export class PluginManager {
       partialContext: PartialContext<T>,
       plugin: Plugin
    ): T {
+      const createCacheKey = (str: string, isConfigConstrained?: boolean) => {
+         const common = `${plugin.name}.${str}`;
+         if (isConfigConstrained) {
+            // @ts-ignore
+            return `${this.bundler._configHash}.${common}`;
+         }
+
+         return common;
+      };
+
       const baseContext: BuildHookContextBase = {
          bundler: partialContext.bundler,
          getUsableResourcePath(source: string, baseDir = ".") {
@@ -188,6 +199,18 @@ export class PluginManager {
                logLevel,
                console.info
             )?.(`[${plugin.name}]: ` + message);
+         },
+         getCache: (key, isConfigDependent) => {
+            key = createCacheKey(key, isConfigDependent);
+            return this._cache.get(key);
+         },
+         removeCache: (key, isConfigDependent) => {
+            key = createCacheKey(key, isConfigDependent);
+            this._cache.delete(key);
+         },
+         setCache: (key, value, isConfigDependent) => {
+            key = createCacheKey(key, isConfigDependent);
+            this._cache.set(key, value);
          },
       };
 

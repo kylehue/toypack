@@ -98,6 +98,15 @@ export interface BuildHookContextBase {
    warn: (message: string) => void;
    /** Emits an info message. */
    info: (message: string) => void;
+   /** Adds an item in the plugin's cache. */
+   setCache: (key: string, value: any, isConfigConstrained?: boolean) => void;
+   /** Retrieves an item in the plugin's cache. */
+   getCache: <T = any>(
+      key: string,
+      isConfigConstrained?: boolean
+   ) => T | undefined;
+   /** Removes an item in the plugin's cache. */
+   removeCache: (key: string, isConfigConstrained?: boolean) => void;
 }
 
 export interface BuildHookContext extends BuildHookContextBase {
