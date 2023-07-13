@@ -10,7 +10,6 @@ export function parseURL(url: string) {
 
    const [target, queryString] = url.split("?");
    result.target = target;
-   /* eslint-disable */
    const params = queryString?.split("&") || [];
 
    if (!params.length) {
