@@ -1,15 +1,11 @@
 import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
 import { compileStyle } from "./compile-style.js";
-import { mergeSourceMapToBundle } from "../utils";
 import { DependencyGraph } from "../types";
-import { GenMapping, toEncodedMap } from "@jridgewell/gen-mapping";
+import { BundleGenerator } from "../utils/BundleGenerator.js";
 
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
-   const config = this.getConfig();
-   const sourceMapConfig = config.bundle.sourceMap;
-   let bundle = "";
-   const smg = !!sourceMapConfig ? new GenMapping() : null;
+   const bundleGenerator = new BundleGenerator();
 
    for (const source in graph) {
       const chunk = graph[source];
@@ -17,22 +13,15 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
 
       const compiled = compileStyle.call(this, chunk, graph);
       if (!compiled.content) continue;
-
-      bundle += compiled.content + "\n";
-
-      if (smg && compiled.map && typeof chunk.asset.content == "string") {
-         mergeSourceMapToBundle(
-            smg,
-            compiled.map,
-            chunk.asset.source,
-            compiled.content,
-            bundle
-         );
-      }
+      bundleGenerator.add(compiled.content, {
+         map: compiled.map,
+      });
    }
 
+   const bundle = bundleGenerator.generate();
+
    return {
-      content: bundle,
-      map: smg ? MapConverter.fromObject(toEncodedMap(smg)) : null,
+      content: bundle.content,
+      map: bundle.map ? MapConverter.fromObject(bundle.map) : null,
    };
 }

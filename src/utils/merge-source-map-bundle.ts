@@ -1,7 +1,3 @@
-import { findCodePosition } from "./find-code-position.js";
-import path from "path-browserify";
-import { isLocal } from "./is-local.js";
-
 import {
    maybeAddMapping,
    GenMapping,
@@ -26,17 +22,16 @@ import {
 export function mergeSourceMapToBundle(
    targetMap: GenMapping,
    sourceMap: SourceMapInput,
-   source: string,
-   generatedContent: string,
-   bundleContent: string
+   position: {
+      line: number;
+      column: number;
+   }
 ) {
-   if (!targetMap) return;
-   const position = findCodePosition(bundleContent, generatedContent);
-
-   if (position.line == -1) {
-      console.warn(
-         `Warning: Source map discrepancy for '${source}'. The mappings may be inaccurate because the generated code's position could not be found in the bundle code.`
-      );
+   if (position.line <= 0) {
+      throw new RangeError([
+         "Invalid position line number.",
+         "It must be equal to or greater than 1.",
+      ].join(" "));
    }
 
    const trace = new TraceMap(sourceMap);

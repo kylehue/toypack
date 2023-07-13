@@ -52,14 +52,17 @@ function ${identifiers.require}(path) {
    return result;
 }
 
-export function moduleWrap(source: string, code: string) {
-   const varStr = `${identifiers.modules}["${source}"]`;
-   return `
+export function getModuleWrapper() {
+   const varStr = `${identifiers.modules}["\${source}"]`;
+   return {
+      head: `
 ${varStr} = function (module, exports, require) {
-${code}
+`.trim(),
+      foot: `
 return module.exports;
 }
-`.trim();
+`.trim(),
+   };
 }
 
 export function requireCall(source: string) {
