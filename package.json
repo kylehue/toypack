@@ -9,7 +9,6 @@
    "exports": {
       ".": "./build/Toypack.js",
       "./utils": "./build/utils/index.js",
-      "./plugins/*": "./build/build-plugins/*",
       "./types": "./build/types.js"
    },
    "repository": {
