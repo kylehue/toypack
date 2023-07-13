@@ -197,6 +197,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       // Scan dependency's dependencies recursively
       for (const depSource of parsed.dependencies) {
+         const parsed = parseURL(depSource);
          let resolved: string = depSource;
          // Resolve source with plugins
          await this._pluginManager.triggerHook({
@@ -232,13 +233,20 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             } else {
                resolved = nonVirtualResolution;
             }
+
+            this._trigger("onResolve", {
+               rawRequest: depSource,
+               request: parsed.target,
+               params: parsed.params,
+               resolved,
+               parent: chunk.source,
+            });
          }
 
          /**
           * In dependency graph, we have to put the queries in order
           * to avoid duplicates.
           */
-         const parsed = parseURL(depSource);
          const rawQuery = depSource.split("?")[1];
          chunk.dependencyMap[depSource] = resolved.split("?")[0] + parsed.query;
          await recurse(

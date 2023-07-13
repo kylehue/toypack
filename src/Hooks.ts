@@ -6,6 +6,7 @@ const eventMap = {
    onInstallPackage: (event: InstallPackageEvent) => undefined,
    onAddOrUpdateAsset: (event: AddOrUpdateAssetEvent) => undefined,
    onRemoveAsset: (event: RemoveAssetEvent) => undefined,
+   onResolve: (event: ResolveEvent) => undefined,
 } as const;
 
 export class Hooks implements IHooks {
@@ -85,6 +86,13 @@ export class Hooks implements IHooks {
    onRemoveAsset(callback: EventMap["onRemoveAsset"]): Function {
       return this._createListener("onRemoveAsset", callback);
    }
+
+   /**
+    * Emit a function everytime a module is resolved.
+    */
+   onResolve(callback: EventMap["onResolve"]): Function {
+      return this._createListener("onResolve", callback);
+   }
 }
 
 export type EventMap = typeof eventMap;
@@ -112,6 +120,14 @@ export interface InstallPackageEvent {
    subpath: string;
    assets: PackageAsset[];
    dtsAssets: PackageAsset[];
+}
+
+export interface ResolveEvent {
+   rawRequest: string;
+   request: string;
+   params: Record<string, string | boolean>;
+   resolved: string;
+   parent: string;
 }
 
 interface Listener {

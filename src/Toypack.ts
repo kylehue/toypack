@@ -279,7 +279,7 @@ export class Toypack extends Hooks {
          return acc;
       }, {} as Record<string, string>);
 
-      const result = resolve(assets, source, opts);
+      let result = resolve(assets, source, opts);
 
       if (!result) {
          const isNodeModule = !isLocal(source) && !isUrl(source);
@@ -298,10 +298,10 @@ export class Toypack extends Hooks {
             source = `${name}@${version}${subpath}`;
          }
 
-         return resolve(assets, source, opts);
-      } else {
-         return result;
+         result = resolve(assets, source, opts);
       }
+
+      return result;
    }
 
    /**
