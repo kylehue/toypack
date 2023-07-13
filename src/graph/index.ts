@@ -5,7 +5,13 @@ import path from "path-browserify";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
-import { DEBUG, ERRORS, escapeRegex, indexToPosition, parseURL } from "../utils";
+import {
+   DEBUG,
+   ERRORS,
+   escapeRegex,
+   indexToPosition,
+   parseURL,
+} from "../utils";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
@@ -107,7 +113,7 @@ async function loadAndParse(
             loaded,
          });
 
-         DEBUG.info(
+         DEBUG.debug(
             this.config.logLevel,
             console.info
          )?.(`Parsing ${source}...`);
