@@ -10,7 +10,7 @@ export function getResolveFallbackData(
    moduleId: string
 ) {
    for (const [id, fallback] of Object.entries(fallbacks)) {
-      if (moduleId.startsWith(id)) {
+      if (moduleId === id) {
          return {
             id,
             fallback,

@@ -124,6 +124,7 @@ it("should resolve fallback", () => {
             fallback: {
                "bad-module": "good-module",
                "another-bad-module": false,
+               path: false
             },
          },
       },
@@ -133,6 +134,8 @@ it("should resolve fallback", () => {
       "/node_modules/good-module/index.js"
    );
    expect(toypack.resolve("another-bad-module")).toBe("virtual:empty");
+   expect(toypack.resolve("path-browserify")).not.toBe("virtual:empty");
+   expect(toypack.resolve("path")).toBe("virtual:empty");
 });
 
 it("should resolve node_modules", () => {
