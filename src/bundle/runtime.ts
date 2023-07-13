@@ -24,27 +24,31 @@ var _modules_cache_ = {};
 
 /* Require function */
 function ${identifiers.require}(path) {
-   var init = ${identifiers.modules}[path];
-   if (!init) {
+   var _module_ = ${identifiers.modules}[path];
+   if (!_module_) {
       return {};
    }
 
+   var initialize = _module_[0];
+   var dependencyMap = _module_[1];
+
    var module = { exports: {} };
-   _modules_cache_[path] = module.exports;
+   _modules_cache_[dependencyMap[path]] = module.exports;
 
    function localRequire(path) {
-      if (!_modules_cache_[path]) {
-         _modules_cache_[path] = module.exports;
+      var resolvedPath = dependencyMap[path];
+      if (!_modules_cache_[resolvedPath]) {
+         _modules_cache_[resolvedPath] = module.exports;
          
-         var exports = ${identifiers.require}(path);
-         _modules_cache_[path] = exports;
+         var exports = ${identifiers.require}(resolvedPath);
+         _modules_cache_[resolvedPath] = exports;
          return exports;
       }
 
-      return _modules_cache_[path];
+      return _modules_cache_[resolvedPath];
    }
 
-   init(module, module.exports, localRequire);
+   initialize(module, module.exports, localRequire);
    return module.exports;
 }
 `.trim();
@@ -56,11 +60,11 @@ export function getModuleWrapper() {
    const varStr = `${identifiers.modules}["\${source}"]`;
    return {
       head: `
-${varStr} = function (module, exports, require) {
+${varStr} = [function (module, exports, require) {
 `.trim(),
       foot: `
 return module.exports;
-}
+}, \${dependencyMap}]
 `.trim(),
    };
 }

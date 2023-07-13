@@ -65,42 +65,6 @@ export async function compileScript(
       },
    });
 
-   // Rename imported sources from relative to absolute paths
-   if (moduleType == "esm") {
-      modifyTraverseOptions({
-         ImportDeclaration({ node }) {
-            node.source.value = chunk.dependencyMap[node.source.value];
-         },
-         ExportAllDeclaration({ node }) {
-            node.source.value = chunk.dependencyMap[node.source.value];
-         },
-         ExportNamedDeclaration({ node }) {
-            if (node.source?.type != "StringLiteral") return;
-            node.source.value = chunk.dependencyMap[node.source.value];
-         },
-         CallExpression({ node }) {
-            const argNode = node.arguments[0];
-            const callee = node.callee;
-            const isDynamicImport = callee.type == "Import";
-            if (isDynamicImport && argNode.type == "StringLiteral") {
-               argNode.value = chunk.dependencyMap[argNode.value];
-            }
-         },
-      });
-   } else {
-      modifyTraverseOptions({
-         CallExpression({ node }) {
-            const argNode = node.arguments[0];
-            const callee = node.callee;
-            const isRequire =
-               callee.type == "Identifier" && callee.name == "require";
-            if (isRequire && argNode.type == "StringLiteral") {
-               argNode.value = chunk.dependencyMap[argNode.value];
-            }
-         },
-      });
-   }
-
    const traverseOptions = createTraverseOptionsFromGroup(
       groupTraverseOptions(traverseOptionsArray)
    );

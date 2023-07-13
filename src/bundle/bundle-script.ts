@@ -50,7 +50,8 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          bundleGenerator.add(compiled.content, {
             map: compiled.map,
             moduleWrapperTemplates: {
-               source: chunk.source
+               source: chunk.source,
+               dependencyMap: JSON.stringify(chunk.dependencyMap)
             }
          });
          if (chunk.isEntry) returnCode = requireCall(chunk.source);
@@ -63,6 +64,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
             {
                moduleWrapperTemplates: {
                   source: chunk.source,
+                  dependencyMap: "{}" // resources doesn't have deps
                },
             }
          );
