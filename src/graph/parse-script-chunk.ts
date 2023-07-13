@@ -1,6 +1,6 @@
 import { parse as babelParse, ParserOptions, ParseError } from "@babel/parser";
 import traverseAST, { Node, NodePath, TraverseOptions } from "@babel/traverse";
-import * as t from "@babel/types";
+import type * as t from "@babel/types";
 import { Toypack } from "../Toypack.js";
 import { ERRORS } from "../utils";
 import { codeFrameColumns } from "@babel/code-frame";

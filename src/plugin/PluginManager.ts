@@ -251,6 +251,7 @@ export class PluginManager {
          );
          const fullContext: PluginContext = {
             ...baseContext,
+            graph: ctx.graph,
             getImporters: () => ctx.importers,
             // last importer is guaranteed to be defined
             getCurrentImporter: () => Object.values(ctx.importers).pop()!,

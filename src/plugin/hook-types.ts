@@ -1,5 +1,6 @@
 import { Asyncify } from "type-fest";
 import {
+   DependencyGraph,
    Importers,
    ScriptDependency,
    StyleDependency,
@@ -12,6 +13,7 @@ import { ParsedScriptResult } from "../graph/parse-script-chunk.js";
 import { ParsedStyleResult } from "../graph/parse-style-chunk.js";
 import { LoadResult, ModuleInfo } from "../graph/load-chunk.js";
 import { SpecifierOptions } from "../utils/get-import-code.js";
+import { BundleGenerator } from "../utils/BundleGenerator.js";
 
 // Interfaces
 export interface ScriptTransformDescriptor {
@@ -44,27 +46,25 @@ export type LoadHook = (
    moduleInfo: ModuleInfo
 ) => LoadResult | string | void;
 
-export type ResolveHook = (
-   this: PluginContext,
-   id: string
-) => string | void;
+export type ResolveHook = (this: PluginContext, id: string) => string | void;
 
 export type TransformHook = (
    this: PluginContext,
    context: ScriptTransformDescriptor | StyleTransformDescriptor
 ) => void;
 
-export type ParsedHook = (
-   this: PluginContext,
-   parseInfo: ParseInfo
-) => void;
+export type ParsedHook = (this: PluginContext, parseInfo: ParseInfo) => void;
 
 export type StartHook = (this: PluginContextBase) => void;
-export type EndHook = (
-   this: PluginContextBase,
-   result: BundleResult
-) => void;
+export type EndHook = (this: PluginContextBase, result: BundleResult) => void;
 export type SetupHook = (this: PluginContextBase) => void;
+export type GenerateBundleHook = (
+   this: PluginContextBase,
+   context: {
+      type: "script" | "style";
+      generator: BundleGenerator;
+   }
+) => void;
 
 // Context
 export interface PluginContextBase {
@@ -110,6 +110,7 @@ export interface PluginContextBase {
 }
 
 export interface PluginContext extends PluginContextBase {
+   graph: DependencyGraph;
    /** Returns the modules that imported the current module. */
    getImporters: () => Importers;
    /** Returns the module that imported the current module. */
@@ -152,6 +153,8 @@ export interface PluginHooks {
    buildEnd: EndHook | ConfigurableHook<EndHook>;
    /** A hook called everytime a module is parsed. */
    parsed: ParsedHook | ConfigurableHook<ParsedHook>;
+   /** A hook called everytime bundle generation has started. */
+   generateBundle: GenerateBundleHook | ConfigurableHook<GenerateBundleHook>;
    /** A hook called only once, useful to setup things in the bundler. */
    setup: SetupHook;
 }

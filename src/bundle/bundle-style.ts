@@ -7,6 +7,19 @@ import { BundleGenerator } from "../utils/BundleGenerator.js";
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    const bundleGenerator = new BundleGenerator();
 
+   this._pluginManager.triggerHook({
+      name: "generateBundle",
+      args: [
+         {
+            type: "style",
+            generator: bundleGenerator,
+         },
+      ],
+      context: {
+         bundler: this,
+      },
+   });
+
    for (const source in graph) {
       const chunk = graph[source];
       if (chunk.type != "style") continue;

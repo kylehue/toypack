@@ -28,6 +28,19 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       excludeWrap: true,
    });
 
+   this._pluginManager.triggerHook({
+      name: "generateBundle",
+      args: [
+         {
+            type: "script",
+            generator: bundleGenerator,
+         },
+      ],
+      context: {
+         bundler: this,
+      },
+   });
+
    let returnCode = "null";
 
    for (const source in graph) {
