@@ -1,11 +1,13 @@
-import { parse as babelParse, ParserOptions, ParseError } from "@babel/parser";
-import traverseAST, { Node, NodePath, TraverseOptions } from "@babel/traverse";
-import type * as t from "@babel/types";
+import { parse as babelParse, ParserOptions } from "@babel/parser";
+import traverseAST, { NodePath, TraverseOptions } from "@babel/traverse";
+import * as t from "@babel/types";
 import { Toypack } from "../Toypack.js";
-import { ERRORS } from "../utils";
+import {
+   ERRORS,
+   createTraverseOptionsFromGroup,
+   groupTraverseOptions,
+} from "../utils";
 import { codeFrameColumns } from "@babel/code-frame";
-
-const emptyAST: Node = babelParse("");
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -37,7 +39,7 @@ export async function parseScriptAsset(
    const result: ParsedScriptResult = {
       type: "script",
       dependencies: new Set(),
-      ast: emptyAST,
+      ast: {} as t.File,
    };
 
    const moduleType =
@@ -74,11 +76,14 @@ export async function parseScriptAsset(
       return result;
    }
 
-   let traverseOptions: TraverseOptions = {};
+   const traverseOptionsArray: TraverseOptions[] = [];
+   const traverse = (options: TraverseOptions) => {
+      traverseOptionsArray.push(options);
+   };
 
    // Extract dependencies
    if (moduleType == "esm") {
-      traverseOptions = {
+      traverse({
          ImportDeclaration(path) {
             result.dependencies.add(path.node.source.value);
             options?.inspectDependencies?.(path.node.source, path);
@@ -106,9 +111,9 @@ export async function parseScriptAsset(
             result.dependencies.add(path.node.argument.value);
             options?.inspectDependencies?.(path.node.argument, path);
          },
-      };
+      });
    } else {
-      traverseOptions = {
+      traverse({
          CallExpression(path) {
             const argNode = path.node.arguments[0];
             const callee = path.node.callee;
@@ -119,7 +124,7 @@ export async function parseScriptAsset(
                options?.inspectDependencies?.(argNode, path);
             }
          },
-      };
+      });
    }
 
    /**
@@ -149,7 +154,10 @@ export async function parseScriptAsset(
       }
    }
 
-   traverseAST(result.ast, traverseOptions);
+   traverseAST(
+      result.ast,
+      createTraverseOptionsFromGroup(groupTraverseOptions(traverseOptionsArray))
+   );
 
    return result;
 }
@@ -157,7 +165,7 @@ export async function parseScriptAsset(
 export interface ParsedScriptResult {
    type: "script";
    dependencies: Set<string>;
-   ast: Node;
+   ast: t.File;
 }
 
 export interface ParseScriptOptions {
