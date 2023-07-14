@@ -43,9 +43,9 @@ export async function compileScript(
       : config.bundle.moduleType;
    const mode = config.bundle.mode;
 
-   const traverseOptionsArray: ITraverseOptions[] = [];
-   const modifyTraverseOptions = (traverseOptions: ITraverseOptions) => {
-      traverseOptionsArray.push(traverseOptions);
+   const traverseOptionsArray: TraverseOptions[] = [];
+   const traverse = (options: TraverseOptions) => {
+      traverseOptionsArray.push(options);
    };
 
    this._pluginManager.triggerHook({
@@ -54,7 +54,7 @@ export async function compileScript(
          {
             type: "script",
             chunk: chunk,
-            traverse: modifyTraverseOptions,
+            traverse,
          },
       ],
       context: {
@@ -65,11 +65,11 @@ export async function compileScript(
       },
    });
 
-   const traverseOptions = createTraverseOptionsFromGroup(
-      groupTraverseOptions(traverseOptionsArray)
+   traverseAST(
+      chunk.ast,
+      // group the options so that we don't have to traverse multiple times
+      createTraverseOptionsFromGroup(groupTraverseOptions(traverseOptionsArray))
    );
-
-   traverseAST(chunk.ast, traverseOptions);
 
    const userBabelOptions = config.babel.transform;
    const importantBabelOptions = {
@@ -127,20 +127,13 @@ export async function compileScript(
    return result;
 }
 
-function groupTraverseOptions(array: ITraverseOptions[]) {
-   const groups: ITraverseOptionGroups = {};
-
+function groupTraverseOptions(array: TraverseOptions[]) {
+   const groups: TraverseGroupedOptions = {};
    for (const opts of array) {
-      let key: Node["type"];
+      let key: keyof TraverseOptions;
       for (key in opts) {
-         let group = groups[key] as ITraverseFunction<typeof key>[];
-
-         // Create group if it doesn't exist
-         if (!group) {
-            group = [] as ITraverseFunction<typeof key>[];
-            (groups as any)[key] = group;
-         }
-
+         let group = groups[key];
+         group ??= groups[key] = [];
          group.push((opts as any)[key]);
       }
    }
@@ -148,13 +141,16 @@ function groupTraverseOptions(array: ITraverseOptions[]) {
    return groups;
 }
 
-function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
-   const options: ITraverseOptions = {};
+function createTraverseOptionsFromGroup(groups: TraverseGroupedOptions) {
+   const options: TraverseOptions = {};
 
-   for (const [key, group] of Object.entries(groups)) {
-      options[key as Node["type"]] = (scope, node) => {
+   let key: keyof TraverseOptions;
+   for (key in groups) {
+      const group = groups[key];
+      if (!group) continue;
+      (options as any)[key] = (scope: any, node: any) => {
          for (const fn of group) {
-            (fn as ITraverseFunction<Node["type"]>)(scope, node);
+            (fn as TraverseFunction<Node["type"]>)(scope, node);
          }
       };
    }
@@ -162,17 +158,13 @@ function createTraverseOptionsFromGroup(groups: ITraverseOptionGroups) {
    return options as TraverseOptions;
 }
 
-export type ITraverseFunction<T> = (
+export type TraverseFunction<T> = (
    path: NodePath<Extract<Node, { type: T }>>,
    node: Node
 ) => void;
 
-export type ITraverseOptions = {
-   [Type in Node["type"]]?: ITraverseFunction<Type>;
-};
-
-export type ITraverseOptionGroups = {
-   [Type in Node["type"]]?: ITraverseFunction<Type>[];
+export type TraverseGroupedOptions = {
+   [Type in keyof TraverseOptions]?: TraverseFunction<Type>[];
 };
 
 export interface CompiledScriptResult {

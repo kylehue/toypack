@@ -6,7 +6,6 @@ import {
    StyleDependency,
 } from "../graph/index.js";
 import { Toypack } from "../Toypack.js";
-import { ITraverseOptions } from "../bundle/compile-script.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
 import { BundleResult } from "../types";
 import { ParsedScriptResult } from "../graph/parse-script-chunk.js";
@@ -14,18 +13,19 @@ import { ParsedStyleResult } from "../graph/parse-style-chunk.js";
 import { LoadResult, ModuleInfo } from "../graph/load-chunk.js";
 import { SpecifierOptions } from "../utils/get-import-code.js";
 import { BundleGenerator } from "../utils/BundleGenerator.js";
+import { TraverseOptions } from "@babel/traverse";
 
 // Interfaces
-export interface ScriptTransformDescriptor {
+export interface ScriptTransformContext {
    type: "script";
    chunk: ScriptDependency;
-   traverse: (traverseOptions: ITraverseOptions) => void;
+   traverse: (options: TraverseOptions) => void;
 }
 
-export interface StyleTransformDescriptor {
+export interface StyleTransformContext {
    type: "style";
    chunk: StyleDependency;
-   traverse: (traverseOptions: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
+   traverse: (options: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
 }
 
 export type ParseInfo =
@@ -50,7 +50,7 @@ export type ResolveHook = (this: PluginContext, id: string) => string | void;
 
 export type TransformHook = (
    this: PluginContext,
-   context: ScriptTransformDescriptor | StyleTransformDescriptor
+   context: ScriptTransformContext | StyleTransformContext
 ) => void;
 
 export type ParsedHook = (this: PluginContext, parseInfo: ParseInfo) => void;
