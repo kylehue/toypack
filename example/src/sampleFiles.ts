@@ -19,8 +19,8 @@ export const sampleFiles: Record<string, string | Blob> = {
    "styles/mixins.scss": (await import("@test/styles/mixins.scss?raw")).default,
    "styles/sample.sass": (await import("@test/styles/sample.sass?raw")).default,
    /* node_modules */
-   "node_modules/path-browserify/index.js": (
-      await import("@test/nm/path-browserify/index.js?raw")
+   "node_modules/pb/index.js": (
+      await import("@test/nm/pb/index.js?raw")
    ).default,
    "node_modules/testing/index.js": (
       await import("@test/nm/testing/index.js?raw")

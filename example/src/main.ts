@@ -23,7 +23,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "index.html",
+      entry: "src/main",
       moduleType: "esm",
       resolve: {
          alias: {
@@ -54,16 +54,17 @@ const toypack = new ToypackESM({
       //    console.log(dts);
       // },
    },
-   logLevel: "info"
+   logLevel: "info",
 });
 
 // await toypack.installPackage("react");
 // await toypack.installPackage("vue", "3.1.2");
 // await toypack.installPackage("matter-js");
-await toypack.installPackage("vue");
-await toypack.installPackage("react", "18");
-await toypack.installPackage("react-dom/client", "18");
-await toypack.installPackage("canvas-confetti");
+// await toypack.installPackage("vue");
+// await toypack.installPackage("react", "18");
+// await toypack.installPackage("react-dom/client", "18");
+// await toypack.installPackage("canvas-confetti");
+// await toypack.installPackage("path-browserify");
 
 (window as any).toypack = toypack;
 console.log(toypack, Babel.availablePlugins, Babel.availablePresets);
@@ -88,16 +89,14 @@ downloadButton.onclick = async () => {
 
 toypack.setIFrame(iframe);
 
-// const definePlugin = toypack.usePlugin(
-//    DefinePlugin({
-//       foo: "bar",
-//    })
-// );
-
-// definePlugin.add("bingbong", "beepboop");
-
 for (let [source, content] of Object.entries(sampleFiles)) {
    toypack.addOrUpdateAsset(source, content);
 }
 
 console.log(await toypack.run());
+
+// hot reload
+import.meta.hot?.accept();
+import.meta.hot?.on("vite:beforeUpdate", () => {
+   console.clear();
+});

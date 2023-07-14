@@ -6,3 +6,6 @@ import { createNum as cool } from "./createNum.js";
 export function adder(numA, numB) {
    return cool(numA) + cool(numB);
 }
+
+console.log(Object.fromEntries(new URL(import.meta.url).searchParams.entries()));
+// console.log(import.meta.resolve("/hello!!"));

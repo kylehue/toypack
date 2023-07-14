@@ -4,6 +4,7 @@ import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
 import importUrlPlugin from "./build-plugins/import-url-plugin.js";
+import importMetaPlugin from "./build-plugins/import-meta-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./graph/index.js";
@@ -61,7 +62,8 @@ export class Toypack extends Hooks {
          jsonPlugin(),
          htmlPlugin(),
          rawPlugin(),
-         importUrlPlugin()
+         importUrlPlugin(),
+         importMetaPlugin()
       );
 
       this.usePackageProvider({
