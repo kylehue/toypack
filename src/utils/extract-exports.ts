@@ -1,15 +1,7 @@
 import { NodePath, TraverseOptions } from "@babel/traverse";
 import * as t from "@babel/types";
-import generate from "@babel/generator";
 import { traverse } from "@babel/core";
 
-function astToString(ast: t.Node) {
-   return generate(ast, {
-      comments: false,
-   })?.code;
-}
-
-(window as any).astToString = astToString;
 
 export function getBindingDeclaration(path: NodePath, id: string) {
    const binding = path.scope.getBinding(id);
@@ -27,12 +19,70 @@ export function getBindingDeclaration(path: NodePath, id: string) {
    }
 }
 
+// function getVariableDeclarator() {
+// for (const declarator of declaration.declarations) {
+//    const { id } = declarator;
+//    if (id.type == "Identifier") {
+//       /**
+//        * For variable exports e.g.
+//        * export var foo = "foo", bar = "bar";
+//        */
+//       exports[id.name] = {
+//          type: "declared",
+//          name: id.name,
+//          path,
+//          declaration,
+//       };
+//    } else if (id.type == "ObjectPattern") {
+//       /**
+//        * For destructured object exports e.g.
+//        * export var { foo, bar } = object;
+//        */
+//       for (const prop of id.properties) {
+//          if (prop.type != "ObjectProperty") continue;
+//          if (prop.value.type != "Identifier") continue;
+//          let name = prop.value.name;
+//          exports[name] = {
+//             type: "declared",
+//             name,
+//             path,
+//             declaration,
+//          };
+//       }
+//    } else if (id.type == "ArrayPattern") {
+//       /**
+//        * For destructured array exports e.g.
+//        * export var [ foo, bar ] = array;
+//        */
+//       for (const el of id.elements) {
+//          if (el?.type != "Identifier") continue;
+//          exports[el.name] = {
+//             type: "declared",
+//             name: el.name,
+//             path,
+//             declaration,
+//          };
+//       }
+//    }
+// }
+// }
+
 export function extractExports(
    ast: t.Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const exports: Record<string, Export> = {};
+   let id = 0;
    const options: TraverseOptions = {
+      ExportAllDeclaration(path) {
+         const { node } = path;
+         const source = node.source?.value;
+         exports[id++] = {
+            type: "aggregatedAll",
+            path,
+            source,
+         };
+      },
       ExportNamedDeclaration(path) {
          const { node } = path;
          const { declaration } = node;
@@ -46,11 +96,9 @@ export function extractExports(
                    * For namespace exports e.g.
                    * export * as foo from "module.js";
                    */
-                  const { exported } = specifier;
-                  exports[exported.name] = {
+                  exports[specifier.exported.name] = {
                      type: "aggregatedNamespace",
-                     name: exported.name,
-                     imported: exported.name,
+                     specifier,
                      source,
                      path,
                   };
@@ -59,15 +107,14 @@ export function extractExports(
                    * For named exports e.g.
                    * export { foo, bar as greet } from "module.js";
                    */
-                  const { exported, local } = specifier;
+                  const { exported } = specifier;
                   const exportedName =
                      exported.type == "Identifier"
                         ? exported.name
                         : exported.value;
                   exports[exportedName] = {
                      type: "aggregatedName",
-                     name: exportedName,
-                     imported: local.name,
+                     specifier,
                      source,
                      path,
                   };
@@ -85,7 +132,7 @@ export function extractExports(
                       */
                      exports[id.name] = {
                         type: "declared",
-                        name: id.name,
+                        identifier: id,
                         path,
                         declaration,
                      };
@@ -97,12 +144,11 @@ export function extractExports(
                      for (const prop of id.properties) {
                         if (prop.type != "ObjectProperty") continue;
                         if (prop.value.type != "Identifier") continue;
-                        let name = prop.value.name;
-                        exports[name] = {
+                        exports[prop.value.name] = {
                            type: "declared",
-                           name,
                            path,
                            declaration,
+                           identifier: prop.value,
                         };
                      }
                   } else if (id.type == "ArrayPattern") {
@@ -114,9 +160,9 @@ export function extractExports(
                         if (el?.type != "Identifier") continue;
                         exports[el.name] = {
                            type: "declared",
-                           name: el.name,
                            path,
                            declaration,
+                           identifier: el,
                         };
                      }
                   }
@@ -131,18 +177,18 @@ export function extractExports(
                    * export function functionName() {}
                    */
                   // declaration.id should be guaranteed here
-                  const name = declaration.id!.name;
-                  exports[name] = {
+                  const identifier = declaration.id!;
+                  exports[identifier.name] = {
                      type: "declared",
-                     name,
                      path,
                      declaration,
+                     identifier
                   };
                } else {
                   for (const specifier of node.specifiers) {
                      if (specifier.type != "ExportSpecifier") continue;
                      /**
-                      * For hoisted exports e.g.
+                      * For exports declared above e.g.
                       * const PI = 3.14;
                       * class Book {}
                       * function getAuthor() {}
@@ -160,9 +206,9 @@ export function extractExports(
                      if (!declaration) continue;
                      exports[exportedName] = {
                         type: "declared",
-                        name: exportedName,
                         path,
                         declaration,
+                        identifier: local
                      };
                   }
                }
@@ -181,13 +227,12 @@ export function extractExports(
             if (t.isTSDeclareFunction(declaration)) return;
             exports["default"] = {
                type: "declaredDefault",
-               name: "default",
                path,
                declaration,
             };
          } else if (t.isIdentifier(node.declaration)) {
             /**
-             * For default hoisted exports e.g.
+             * For default exports declared above e.g.
              * const foo = "foo";
              * export default foo;
              */
@@ -196,7 +241,6 @@ export function extractExports(
             if (!declaration) return;
             exports["default"] = {
                type: "declaredDefault",
-               name: "default",
                path,
                declaration,
             };
@@ -210,14 +254,13 @@ export function extractExports(
             const { declaration } = node;
             exports["default"] = {
                type: "declaredDefaultExpression",
-               name: "default",
                path,
                declaration,
             };
          }
       },
    };
-   
+
    if (traverseFn) {
       traverseFn(options);
    } else {
@@ -227,20 +270,29 @@ export function extractExports(
    return exports;
 }
 
-interface ExportBase {
-   name: string;
-   path: NodePath;
-}
-
-interface AggregatedExport extends ExportBase {
-   type: "aggregatedName" | "aggregatedNamespace";
+export interface AggregatedNameExport {
+   type: "aggregatedName";
    source: string;
-   imported: string;
+   specifier: t.ExportSpecifier;
    path: NodePath<t.ExportNamedDeclaration>;
 }
 
-interface DeclaredExport extends ExportBase {
+export interface AggregatedNamespaceExport {
+   type: "aggregatedNamespace";
+   source: string;
+   specifier: t.ExportNamespaceSpecifier;
+   path: NodePath<t.ExportNamedDeclaration>;
+}
+
+export interface AggregatedAllExport {
+   type: "aggregatedAll";
+   source: string;
+   path: NodePath<t.ExportAllDeclaration>;
+}
+
+export interface DeclaredExport {
    type: "declared";
+   identifier: t.Identifier;
    path: NodePath<t.ExportNamedDeclaration>;
    declaration:
       | t.VariableDeclaration
@@ -248,7 +300,7 @@ interface DeclaredExport extends ExportBase {
       | t.FunctionDeclaration;
 }
 
-interface DeclaredDefaultExport extends ExportBase {
+export interface DeclaredDefaultExport {
    type: "declaredDefault";
    path: NodePath<t.ExportDefaultDeclaration>;
    declaration:
@@ -257,14 +309,16 @@ interface DeclaredDefaultExport extends ExportBase {
       | t.FunctionDeclaration;
 }
 
-interface DeclaredDefaultExpressionExport extends ExportBase {
+export interface DeclaredDefaultExpressionExport {
    type: "declaredDefaultExpression";
    path: NodePath<t.ExportDefaultDeclaration>;
    declaration: t.Expression;
 }
 
 export type Export =
-   | AggregatedExport
+   | AggregatedAllExport
+   | AggregatedNameExport
+   | AggregatedNamespaceExport
    | DeclaredExport
    | DeclaredDefaultExport
    | DeclaredDefaultExpressionExport;
