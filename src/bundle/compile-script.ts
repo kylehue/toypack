@@ -15,6 +15,8 @@ import {
    createTraverseOptionsFromGroup,
    groupTraverseOptions,
    extractExports,
+   extractImports,
+   Deconflict,
 } from "../utils";
 import { DependencyGraph, ScriptDependency } from "../types.js";
 
@@ -74,6 +76,9 @@ export async function compileScript(
    });
 
    const extractedExports = extractExports(chunk.ast, traverse);
+   const extractedImports = extractImports(chunk.ast, traverse);
+   Deconflict.initialize(chunk.source, chunk.ast, traverse);
+   // TODO: extract imports
 
    traverseAST(
       chunk.ast,
@@ -107,6 +112,7 @@ export async function compileScript(
 
    return {
       extractedExports,
+      extractedImports,
       compiled,
    };
 

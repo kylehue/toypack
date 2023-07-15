@@ -1,7 +1,9 @@
 export * as DEBUG from "./debug.js";
+export * as Deconflict from "./deconflict.js";
 export * as ERRORS from "./errors.js";
 export * as EXTENSIONS from "./extensions.js";
 export { extractExports } from "./extract-exports.js";
+export { extractImports } from "./extract-imports.js";
 export { escapeRegex } from "./escape-regex.js";
 export { findCodePosition, indexToPosition } from "./find-code-position.js";
 export { getHash } from "./get-hash.js";
