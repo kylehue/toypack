@@ -17,6 +17,8 @@ import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ParseInfo } from "../plugin/hook-types.js";
+import { Export } from "src/graph/extract-exports.js";
+import { Import } from "src/graph/extract-imports.js";
 
 function getImportPosition(
    content: string,
@@ -313,6 +315,8 @@ function createChunk<
          ...textCommon,
          type: "script",
          ast: parsed.ast,
+         exports: parsed.exports,
+         imports: parsed.imports,
       };
    } else {
       chunk = {
@@ -378,6 +382,8 @@ export interface ScriptDependency extends DependencyBase {
    asset: Asset;
    map?: EncodedSourceMap | null;
    isEntry: boolean;
+   exports: Record<string, Export>;
+   imports: Record<string, Import>;
 }
 
 export interface StyleDependency extends DependencyBase {

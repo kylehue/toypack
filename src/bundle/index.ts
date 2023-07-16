@@ -1,7 +1,7 @@
 import { Toypack } from "../Toypack.js";
 import { DependencyGraph } from "../types";
-import { bundleScript } from "./bundle-script.js";
-import { bundleStyle } from "./bundle-style.js";
+import { bundleScript } from "../bundle-script/index.js";
+import { bundleStyle } from "../bundle-style/bundle-style.js";
 import { getUsableResourcePath } from "../utils";
 import { html } from "./runtime.js";
 

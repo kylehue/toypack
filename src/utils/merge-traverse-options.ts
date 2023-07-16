@@ -1,6 +1,6 @@
 import { Node, NodePath, TraverseOptions } from "@babel/traverse";
 
-export function groupTraverseOptions(array: TraverseOptions[]) {
+function groupTraverseOptions(array: TraverseOptions[]) {
    const groups: TraverseGroupedOptions = {};
    for (const opts of array) {
       let key: keyof TraverseOptions;
@@ -14,7 +14,7 @@ export function groupTraverseOptions(array: TraverseOptions[]) {
    return groups;
 }
 
-export function createTraverseOptionsFromGroup(groups: TraverseGroupedOptions) {
+function createTraverseOptionsFromGroup(groups: TraverseGroupedOptions) {
    const options: TraverseOptions = {};
 
    let key: keyof TraverseOptions;
@@ -29,6 +29,10 @@ export function createTraverseOptionsFromGroup(groups: TraverseGroupedOptions) {
    }
 
    return options as TraverseOptions;
+}
+
+export function mergeTraverseOptions(options: TraverseOptions[]) {
+   return createTraverseOptionsFromGroup(groupTraverseOptions(options));
 }
 
 type TraverseFunction<T> = (

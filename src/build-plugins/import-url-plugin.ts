@@ -7,7 +7,7 @@ import { Plugin, Toypack } from "../types.js";
 import { isUrl, mergeSourceMaps } from "../utils";
 import { parseScriptAsset } from "../graph/parse-script-chunk";
 import { parseStyleAsset } from "../graph/parse-style-chunk";
-import { CSSTreeGeneratedResult } from "../bundle/compile-style";
+import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
 import { fetchSourceMapInContent } from "../package-manager/fetch-source-map";
 interface ExternalAssetBase {
    url: string;

@@ -24,7 +24,7 @@ import {
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
 import { parseStyleAsset } from "../graph/parse-style-chunk.js";
-import { CSSTreeGeneratedResult } from "../bundle/compile-style.js";
+import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
 
 function getDtsHeader(
    optionDtsHeader: PackageProvider["dtsHeader"],

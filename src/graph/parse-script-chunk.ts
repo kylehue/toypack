@@ -2,12 +2,10 @@ import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { NodePath, TraverseOptions } from "@babel/traverse";
 import * as t from "@babel/types";
 import { Toypack } from "../Toypack.js";
-import {
-   ERRORS,
-   createTraverseOptionsFromGroup,
-   groupTraverseOptions,
-} from "../utils";
+import { ERRORS, mergeTraverseOptions } from "../utils";
 import { codeFrameColumns } from "@babel/code-frame";
+import { Export, extractExports } from "./extract-exports.js";
+import { Import, extractImports } from "./extract-imports.js";
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -40,6 +38,8 @@ export async function parseScriptAsset(
       type: "script",
       dependencies: new Set(),
       ast: {} as t.File,
+      exports: {},
+      imports: {},
    };
 
    const moduleType =
@@ -127,6 +127,9 @@ export async function parseScriptAsset(
       });
    }
 
+   result.exports = extractExports(result.ast, traverse);
+   result.imports = extractImports(result.ast, traverse);
+
    /**
     * Scan `///<reference [path/types]="..." />` in dts files.
     */
@@ -154,10 +157,7 @@ export async function parseScriptAsset(
       }
    }
 
-   traverseAST(
-      result.ast,
-      createTraverseOptionsFromGroup(groupTraverseOptions(traverseOptionsArray))
-   );
+   traverseAST(result.ast, mergeTraverseOptions(traverseOptionsArray));
 
    return result;
 }
@@ -166,6 +166,8 @@ export interface ParsedScriptResult {
    type: "script";
    dependencies: Set<string>;
    ast: t.File;
+   exports: Record<string, Export>;
+   imports: Record<string, Import>;
 }
 
 export interface ParseScriptOptions {

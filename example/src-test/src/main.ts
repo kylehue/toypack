@@ -15,8 +15,10 @@
 // console.log(pkgjson);
 // const foo: string = "bar";
 // console.log(foo);
-// import { adder } from "@classes/adder?test";
-// console.log(adder(4, 6));
+import adder, {dog, bay} from "@classes/adder";
+console.log(adder, dog, bay);
+import { foo as o, bar, "hello there" as test } from "@classes/createNum";
+console.log(o, bar, test);
 // const bingbong = "beepboop";
 // console.log(bingbong);
 // import "../styles/sample.css";
@@ -27,58 +29,53 @@
 //    console.log(test);
 // })();
 
+// export default var a = 2;
+
 /* CJS */
 // require("../react");
 // const confetti = require("https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/+esm").default;
 // const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
 // meowButton.onclick = () => confetti();
 
-/* named exports */
-// export const candy = "🍬";
-// export function myFunction() {
-//    console.log(candy);
-// }
+/* Import test */
+// import ant from "./module.js";
+// import * as boat from "./module.js";
+// import { cat } from "./module.js";
+// import { dog as ear } from "./module.js";
+// import { default as fat } from "./module.js";
+// import { greet, Hunter } from "./module.js";
+// import { id, boat as jar, /* … */ } from "./module.js";
+// import { "string name" as keep } from "./module.js";
+// import lone, { PI, /* … */ } from "./module.js";
+// import Book, * as something from "./module.js";
+// import "./module.js";
 
-// /* default exports */
-// export default function () {
-//    console.log(candy);
-// }
-// export default class {
-//    constructor() {
-//       console.log(candy);
-//    }
-// }
-// const greet = "Good morning!";
-// export default greet;
-// Exporting declarations
+/* Export Test */
+// const o = {
+//    ant: "a",
+//    boat: "b",
+// };
+// const array = ["foo", "bar"];
+// export var cat, dog;
+// export var ear = 1, fat = 2;
+// export function greet() { /* … */ }
+// export class Hunter { /* … */ }
+// export function* id() { /* … */ }
+// export var { ant, "boat": jar } = o;
+// export var [keep, lone] = array;
 
-const o = {
-   ant: "a",
-   boat: "b",
-};
+// // Export list
+// const PI = 3.14;
+// class Book {}
+// function getAuthor() {}
+// export { PI, Book, getAuthor };
+// export { PI as foo, Book as bar, getAuthor as author };
+// export { PI as "string name" };
 
-const array = ["foo", "bar"];
-
-export var cat, dog;
-export var ear = 1, fat = 2;
-export function greet() { /* … */ }
-export class Hunter { /* … */ }
-export function* id() { /* … */ }
-export var { ant, "boat": jar } = o;
-export var [keep, lone] = array;
-
-// Export list
-const PI = 3.14;
-class Book {}
-function getAuthor() {}
-export { PI, Book, getAuthor };
-export { PI as foo, Book as bar, getAuthor as author };
-export { PI as "string name" };
-
-// Default exports
-export default {
-   type: "object"
-};
+// // Default exports
+// export default {
+//    type: "object"
+// };
 // export { PI as default };
 // export default function functionName2() { /* … */ }
 // export default class ClassName2 { /* … */ }

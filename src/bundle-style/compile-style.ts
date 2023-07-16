@@ -8,8 +8,8 @@ import {
    isUrl,
    mergeSourceMaps,
    shouldProduceSourceMap,
-} from "../utils";
-import { DependencyGraph, StyleDependency } from "../types";
+} from "../utils/index.js";
+import { DependencyGraph, StyleDependency } from "../types.js";
 import path from "path-browserify";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { SourceMapGenerator } from "source-map-js";

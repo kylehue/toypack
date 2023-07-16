@@ -1,7 +1,7 @@
 import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
 import { compileStyle } from "./compile-style.js";
-import { DependencyGraph } from "../types";
+import { DependencyGraph } from "../types.js";
 import { BundleGenerator } from "../utils/BundleGenerator.js";
 
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {

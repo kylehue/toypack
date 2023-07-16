@@ -43,8 +43,6 @@ export default function (): Plugin {
             },
          });
 
-         console.log(test);
-         
       },
    };
 }
