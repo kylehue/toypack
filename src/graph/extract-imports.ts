@@ -6,7 +6,7 @@ export function extractImports(
    ast: t.Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
-   const imports: Record<string, Import> = {};
+   const imports: Record<string, ImportInfo> = {};
    let sideEffectId = 0;
    const options: TraverseOptions = {
       ImportDeclaration(path) {
@@ -99,7 +99,7 @@ export interface ImportSideEffect {
    path: NodePath<t.ImportDeclaration>;
 }
 
-export type Import =
+export type ImportInfo =
    | ImportDefault
    | ImportNamespace
    | ImportSpecifier

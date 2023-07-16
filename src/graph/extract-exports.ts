@@ -71,7 +71,7 @@ export function extractExports(
    ast: t.Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
-   const exports: Record<string, Export> = {};
+   const exports: Record<string, ExportInfo> = {};
    let id = 0;
    const options: TraverseOptions = {
       ExportAllDeclaration(path) {
@@ -315,7 +315,7 @@ export interface DeclaredDefaultExpressionExport {
    declaration: t.Expression;
 }
 
-export type Export =
+export type ExportInfo =
    | AggregatedAllExport
    | AggregatedNameExport
    | AggregatedNamespaceExport

@@ -1,5 +1,5 @@
 import { DependencyGraph } from "src/graph";
-import { Export } from "src/graph/extract-exports";
+import { ExportInfo } from "src/graph/extract-exports";
 
 /**
  * Retrieves the exported declaration.
@@ -14,14 +14,14 @@ export function getExport(
    exportName: string,
    exportSource: string,
    importerSource: string
-): Export | null {
+): ExportInfo | null {
    const importer = graph[importerSource];
    if (importer.type != "script") return null;
    const resolvedImportSource = importer.dependencyMap[exportSource];
    const importedModule = graph[resolvedImportSource];
    if (importedModule.type != "script") return null;
    
-   let exported: Export | null = importedModule.exports[exportName];
+   let exported: ExportInfo | null = importedModule.exports[exportName];
    if (!exported) {
       /**
        * If export is not found, try if it's in any of the

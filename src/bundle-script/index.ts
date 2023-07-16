@@ -6,7 +6,7 @@ import { deconflict } from "./deconflict.js";
 import { addSourceCommentMarks } from "./add-source-comment-marks.js";
 import { program, Node } from "@babel/types";
 import generate from "@babel/generator";
-import { Export } from "src/graph/extract-exports.js";
+import { ExportInfo } from "src/graph/extract-exports.js";
 import { bindImports } from "./bind-imports.js";
 
 function getAst(ast: Node) {
@@ -29,8 +29,8 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    addSourceCommentMarks(traverseMap);
    deconflict(traverseMap);
-   bindImports(scriptModules);
    traverseMap.doTraverseAll();
+   bindImports(graph);
 
    const resultAst = program([]);
 
@@ -161,7 +161,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    // }
 
    // return result;
-
+   
    return {
       content: "",
       map: MapConverter.fromObject({}),
@@ -246,7 +246,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 //    }
 // }
 
-function removeExport(exported: Export) {
+function removeExport(exported: ExportInfo) {
    if (exported.path.removed) return;
    if (
       exported.type == "aggregatedAll" ||
