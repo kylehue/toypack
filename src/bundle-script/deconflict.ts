@@ -20,12 +20,12 @@ export function deconflict(traverseMap: TraverseMap) {
             return;
          }
 
-         const { node, scope, parent } = path;
+         const { node, scope } = path;
          let { name } = node;
 
-         // Skip globals and member expressions
+         // Skip globals
          const isGlobal = !scope.hasBinding(name);
-         if (t.isMemberExpression(parent) && isGlobal) {
+         if (t.isMemberExpression(path.node) || isGlobal) {
             return;
          }
 
@@ -36,17 +36,17 @@ export function deconflict(traverseMap: TraverseMap) {
             // Rename
             name = scope.generateUid(name);
             scope.rename(node.name, name);
-            /**
-             * We must let the other scopes know that this identifier
-             * name already exists to avoid id conflicts when generating
-             * uids in other scopes. We can achieve this by binding the
-             * identifier to that scope.
-             */
-            if (!dupe.path.scope.hasBinding(node.name)) {
-               const varDecl = path.find((a) => a.isVariableDeclaration());
-               const kind = getVarKind(varDecl);
-               dupe.path.scope.registerBinding(kind, path);
-            }
+         }
+
+         /**
+          * We must let the other scopes know that this identifier
+          * name already exists to avoid id conflicts when generating
+          * uids in other scopes. We can achieve this by binding the
+          * identifier to that scope.
+          */
+         for (const taken of takenVars) {
+            if (taken.path.scope.hasBinding(node.name)) continue;
+            taken.path.scope.registerDeclaration(path);
          }
 
          if (scope.hasBinding(name)) {
