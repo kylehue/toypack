@@ -2,12 +2,12 @@ import { NodePath, TraverseOptions } from "@babel/traverse";
 import * as t from "@babel/types";
 import { traverse } from "@babel/core";
 
+let uid = 0;
 export function extractImports(
    ast: t.Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const imports: Record<string, ImportInfo> = {};
-   let sideEffectId = 0;
    const options: TraverseOptions = {
       ImportDeclaration(path) {
          const { node } = path;
@@ -18,7 +18,8 @@ export function extractImports(
           * import "./module.js";
           */
          if (!node.specifiers.length) {
-            imports[sideEffectId++] = {
+            imports[uid++] = {
+               id: `$${uid}`,
                type: "sideEffect",
                path,
                source,
@@ -32,10 +33,11 @@ export function extractImports(
                 * import foo from "./module.js";
                 */
                imports[specifier.local.name] = {
+                  id: `$${uid++}`,
                   type: "default",
                   source,
                   path,
-                  specifier
+                  specifier,
                };
             } else if (specifier.type == "ImportNamespaceSpecifier") {
                /**
@@ -43,6 +45,7 @@ export function extractImports(
                 * import * as foo from "./module.js";
                 */
                imports[specifier.local.name] = {
+                  id: `$${uid++}`,
                   type: "namespace",
                   source,
                   path,
@@ -54,6 +57,7 @@ export function extractImports(
                 * import { foo, bar } from "./module.js";
                 */
                imports[specifier.local.name] = {
+                  id: `$${uid++}`,
                   type: "specifier",
                   source,
                   path,
@@ -74,6 +78,7 @@ export function extractImports(
 }
 
 interface ImportBase {
+   id: string;
    source: string;
    path: NodePath<t.ImportDeclaration>;
 }
@@ -94,6 +99,7 @@ export interface ImportNamespace extends ImportBase {
 }
 
 export interface ImportSideEffect {
+   id: string;
    type: "sideEffect";
    source: string;
    path: NodePath<t.ImportDeclaration>;

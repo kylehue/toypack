@@ -67,17 +67,18 @@ export function getBindingDeclaration(path: NodePath, id: string) {
 // }
 // }
 
+let uid = 0;
 export function extractExports(
    ast: t.Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const exports: Record<string, ExportInfo> = {};
-   let id = 0;
    const options: TraverseOptions = {
       ExportAllDeclaration(path) {
          const { node } = path;
          const source = node.source?.value;
-         exports[id++] = {
+         exports[uid++] = {
+            id: `$${uid}`,
             type: "aggregatedAll",
             path,
             source,
@@ -97,6 +98,7 @@ export function extractExports(
                    * export * as foo from "module.js";
                    */
                   exports[specifier.exported.name] = {
+                     id: `$${uid++}`,
                      type: "aggregatedNamespace",
                      specifier,
                      source,
@@ -113,6 +115,7 @@ export function extractExports(
                         ? exported.name
                         : exported.value;
                   exports[exportedName] = {
+                     id: `$${uid++}`,
                      type: "aggregatedName",
                      specifier,
                      source,
@@ -131,6 +134,7 @@ export function extractExports(
                       * export var foo = "foo", bar = "bar";
                       */
                      exports[id.name] = {
+                        id: `$${uid++}`,
                         type: "declared",
                         identifier: id,
                         path,
@@ -145,6 +149,7 @@ export function extractExports(
                         if (prop.type != "ObjectProperty") continue;
                         if (prop.value.type != "Identifier") continue;
                         exports[prop.value.name] = {
+                           id: `$${uid++}`,
                            type: "declared",
                            path,
                            declaration,
@@ -159,6 +164,7 @@ export function extractExports(
                      for (const el of id.elements) {
                         if (el?.type != "Identifier") continue;
                         exports[el.name] = {
+                           id: `$${uid++}`,
                            type: "declared",
                            path,
                            declaration,
@@ -179,10 +185,11 @@ export function extractExports(
                   // declaration.id should be guaranteed here
                   const identifier = declaration.id!;
                   exports[identifier.name] = {
+                     id: `$${uid++}`,
                      type: "declared",
                      path,
                      declaration,
-                     identifier
+                     identifier,
                   };
                } else {
                   for (const specifier of node.specifiers) {
@@ -205,10 +212,11 @@ export function extractExports(
                      );
                      if (!declaration) continue;
                      exports[exportedName] = {
+                        id: `$${uid++}`,
                         type: "declared",
                         path,
                         declaration,
-                        identifier: local
+                        identifier: local,
                      };
                   }
                }
@@ -226,9 +234,11 @@ export function extractExports(
             const { declaration } = node;
             if (t.isTSDeclareFunction(declaration)) return;
             exports["default"] = {
+               id: `$${uid++}`,
                type: "declaredDefault",
                path,
                declaration,
+               identifier: declaration.id || undefined,
             };
          } else if (t.isIdentifier(node.declaration)) {
             /**
@@ -240,9 +250,11 @@ export function extractExports(
             const declaration = getBindingDeclaration(path, name);
             if (!declaration) return;
             exports["default"] = {
+               id: `$${uid++}`,
                type: "declaredDefault",
                path,
                declaration,
+               identifier: node.declaration,
             };
          } else if (t.isExpression(node.declaration)) {
             /**
@@ -253,6 +265,7 @@ export function extractExports(
              */
             const { declaration } = node;
             exports["default"] = {
+               id: `$${uid++}`,
                type: "declaredDefaultExpression",
                path,
                declaration,
@@ -271,6 +284,7 @@ export function extractExports(
 }
 
 export interface AggregatedNameExport {
+   id: string;
    type: "aggregatedName";
    source: string;
    specifier: t.ExportSpecifier;
@@ -278,6 +292,7 @@ export interface AggregatedNameExport {
 }
 
 export interface AggregatedNamespaceExport {
+   id: string;
    type: "aggregatedNamespace";
    source: string;
    specifier: t.ExportNamespaceSpecifier;
@@ -285,12 +300,14 @@ export interface AggregatedNamespaceExport {
 }
 
 export interface AggregatedAllExport {
+   id: string;
    type: "aggregatedAll";
    source: string;
    path: NodePath<t.ExportAllDeclaration>;
 }
 
 export interface DeclaredExport {
+   id: string;
    type: "declared";
    identifier: t.Identifier;
    path: NodePath<t.ExportNamedDeclaration>;
@@ -301,8 +318,10 @@ export interface DeclaredExport {
 }
 
 export interface DeclaredDefaultExport {
+   id: string;
    type: "declaredDefault";
    path: NodePath<t.ExportDefaultDeclaration>;
+   identifier?: t.Identifier;
    declaration:
       | t.VariableDeclaration
       | t.ClassDeclaration
@@ -310,6 +329,7 @@ export interface DeclaredDefaultExport {
 }
 
 export interface DeclaredDefaultExpressionExport {
+   id: string;
    type: "declaredDefaultExpression";
    path: NodePath<t.ExportDefaultDeclaration>;
    declaration: t.Expression;
