@@ -26,10 +26,6 @@ function getImportedName(specifier: ImportSpecifier) {
    return imported.type == "Identifier" ? imported.name : imported.value;
 }
 
-function getSpecifierValue(node: Identifier | StringLiteral) {
-   return node.type == "Identifier" ? node.name : node.value;
-}
-
 /**
  * Gets all the modules that imported the provided import name.
  */
@@ -112,19 +108,6 @@ function setExportDefaultIdentifier(
    }
 }
 
-function reference(importInfo: ImportInfo, exportInfo: ExportInfo) {
-   const exportScope = exportInfo.path.scope;
-   const importScope = importInfo.path.scope;
-   if (exportInfo.type == "declared") {
-      const exported = exportScope.getBinding(exportInfo.identifier.name);
-      const imported = importScope.getBinding(exportInfo.identifier.name);
-      imported?.referencePaths.forEach((path) => {
-         exported?.reference(path);
-      });
-   } else if (exportInfo.type == "declaredDefault") {
-   }
-}
-
 /**
  * This method references the export to import.
  *
@@ -152,8 +135,9 @@ function referenceExportToImport(
       exportedBinding?.reference(path);
    });
 
+   // dereference the export declarations
    exportedBinding?.referencePaths.forEach((path, index) => {
-      if (path.findParent(x => x.isExportDeclaration())) {
+      if (path.findParent((x) => x.isExportDeclaration())) {
          exportedBinding?.dereference();
          exportedBinding?.referencePaths.splice(index, 1);
       }
@@ -162,7 +146,7 @@ function referenceExportToImport(
 
 const exportDeclarationUIDMap = new Map<string, string>();
 /** Gets the assigned UID of the exported declaration. */
-function getUid(exportInfo: ExportInfo, name?: string) {
+function getExportUid(exportInfo: ExportInfo, name?: string) {
    const previouslyUsedName = exportDeclarationUIDMap.get(exportInfo.id);
    let uid;
    if (previouslyUsedName) {
@@ -170,6 +154,20 @@ function getUid(exportInfo: ExportInfo, name?: string) {
    } else {
       uid = exportInfo.path.scope.generateUid(name);
       exportDeclarationUIDMap.set(exportInfo.id, uid);
+   }
+
+   return uid;
+}
+
+const assignedIds = new Map<string, string>();
+function getAssignedId(scope: Scope, name: string) {
+   const assigned = assignedIds.get(name);
+   let uid;
+   if (assigned) {
+      uid = assigned;
+   } else {
+      uid = scope.generateUid(name);
+      assignedIds.set(name, uid);
    }
 
    return uid;
@@ -196,16 +194,21 @@ function bindExported(
          : importLocalName;
 
    if (exportInfo.type == "declared") {
-      const exportName = exportInfo.identifier.name;
-      importScope.rename(importLocalName, exportName);
+      const uid = getExportUid(exportInfo, exportInfo.identifier.name);
+      exportScope.rename(exportInfo.identifier.name, uid);
+      importScope.rename(importLocalName, uid);
 
       if (exportInfo.declaration.type != "VariableDeclaration") {
          exportInfo.path.replaceWith(exportInfo.declaration);
       }
 
-      referenceExportToImport(importInfo, exportInfo, exportName);
+      referenceExportToImport(
+         importInfo,
+         exportInfo,
+         exportInfo.identifier.name
+      );
    } else if (exportInfo.type == "declaredDefault") {
-      const uid = getUid(exportInfo, suggestedId);
+      const uid = getExportUid(exportInfo, suggestedId);
       importScope.rename(importLocalName, uid);
 
       if (exportInfo.identifier) {
@@ -237,7 +240,7 @@ function bindExported(
 
       referenceExportToImport(importInfo, exportInfo, uid);
    } else if (exportInfo.type == "declaredDefaultExpression") {
-      const uid = getUid(exportInfo, suggestedId);
+      const uid = getExportUid(exportInfo, suggestedId);
       importScope.rename(importLocalName, uid);
 
       if (!isAlreadyDeclared) {
@@ -256,20 +259,81 @@ function bindExported(
       // throw error for safety
       throw new Error("No handler for aggregated modules.");
    } else if (exportInfo.type == "aggregatedNamespace") {
-      /**
-       * This will be handled below
-       */
+      const aggregatedModule = getAggregatedModule(
+         graph,
+         script,
+         importInfo,
+         exportInfo
+      );
+      if (!aggregatedModule) return;
+      const uid = getExportUid(exportInfo, suggestedId);
+      importScope.rename(importLocalName, uid);
+
+      if (!isAlreadyDeclared) {
+         const exports = create(aggregatedModule, uid);
+         aggregatedModule.ast.program.body.push(...exports);
+      }
    }
+}
+
+function getAggregatedModule(
+   graph: DependencyGraph,
+   importer: ScriptDependency,
+   importInfo: ImportInfo,
+   exportInfo: AggregatedNamespaceExport
+) {
+   const a = importer.dependencyMap[importInfo.source];
+   const b = graph[a];
+   if (b?.type != "script") return;
+   const c = b.dependencyMap[exportInfo.source];
+   const d = graph[c];
+   if (d?.type != "script") return;
+   return d;
+}
+
+function create(module: ScriptDependency, id: string) {
+   const exportEntries = Object.entries(module.exports);
+   const formattedExports = exportEntries
+      .map(([exportId, value], index) => {
+         const computedExportId =
+            (value.type == "declared" || value.type == "declaredDefault") &&
+            value.identifier
+               ? value.identifier.name
+               : exportDeclarationUIDMap.get(value.id);
+         if (!computedExportId) {
+            throw new Error(
+               `Can't find '${exportId}' export in ${module.source}.`
+            );
+         }
+         let line = `${exportId}: ${computedExportId}`;
+         if (index == 0) line = "{\n" + line;
+         if (index == exportEntries.length - 1) line += "\n}";
+         return line;
+      })
+      .join(",\n");
+
+   const buildTemplate = template(`
+      const ID = ${formattedExports}
+   `);
+
+   const result = buildTemplate({
+      ID: id,
+   });
+
+   return Array.isArray(result) ? result : [result];
 }
 
 function bindImport(
    graph: DependencyGraph,
    script: ScriptDependency,
-   importInfo: ImportInfo
+   importInfo: ImportInfo,
+   namespace = "test"
 ) {
-   if (importInfo.type == "sideEffect") {
-   } else if (importInfo.type == "specifier") {
-      const importedName = getImportedName(importInfo.specifier);
+   if (importInfo.type == "specifier" || importInfo.type == "default") {
+      const importedName =
+         importInfo.type == "specifier"
+            ? getImportedName(importInfo.specifier)
+            : "default";
       const aliasName = importInfo.specifier.local.name;
       const exportInfo = getExport(
          graph,
@@ -277,6 +341,7 @@ function bindImport(
          importInfo.source,
          script.source
       );
+
       if (!exportInfo) {
          throw new Error(
             `No '${importedName}' export found in ${importInfo.source}`
@@ -290,29 +355,6 @@ function bindImport(
          importedName,
          aliasName
       );
-   } else if (importInfo.type == "default") {
-      const importedName = "default";
-      const aliasName = importInfo.specifier.local.name;
-      const exportInfo = getExport(
-         graph,
-         importedName,
-         importInfo.source,
-         script.source
-      );
-      if (!exportInfo) {
-         throw new Error(
-            `No '${importedName}' export found in ${importInfo.source}`
-         );
-      }
-      bindExported(
-         graph,
-         script,
-         importInfo,
-         exportInfo,
-         importedName,
-         aliasName
-      );
-   } else if (importInfo.type == "namespace") {
    }
 }
 
@@ -342,13 +384,13 @@ function createNamespaceExport(
       .join(",")}}`;
 
    const code = `
-var %%id%% = {};
-%%exportId%%(%%id%%, ${formattedExportsMap});
+var ID = {};
+EXPORT_ID(ID, ${formattedExportsMap});
 `;
 
    const result = template.smart(code)({
-      id: namespace,
-      exportId,
+      ID: namespace,
+      EXPORT_ID: exportId,
    });
 
    return Array.isArray(result) ? result : [result];
