@@ -1,25 +1,47 @@
 import { NodePath, TraverseOptions } from "@babel/traverse";
-import * as t from "@babel/types";
+import {
+   Node,
+   Identifier,
+   ArrayPattern,
+   ObjectPattern,
+   VariableDeclaration,
+   ExportAllDeclaration,
+   Expression,
+   FunctionDeclaration,
+   ClassDeclaration,
+   isExpression,
+   ExportSpecifier,
+   ExportNamedDeclaration,
+   ExportNamespaceSpecifier,
+   ExportDefaultDeclaration,
+   isVariableDeclarator,
+   isVariableDeclaration,
+   isClassDeclaration,
+   isFunctionDeclaration,
+   isDeclaration,
+   isTSDeclareFunction,
+   isIdentifier,
+} from "@babel/types";
 import { traverse } from "@babel/core";
 
 export function getBindingDeclaration(path: NodePath, id: string) {
    const binding = path.scope.getBinding(id);
    if (!binding) return;
    if (
-      t.isVariableDeclarator(binding.path.node) &&
-      t.isVariableDeclaration(binding.path.parent)
+      isVariableDeclarator(binding.path.node) &&
+      isVariableDeclaration(binding.path.parent)
    ) {
       return binding.path.parent;
    } else if (
-      t.isClassDeclaration(binding.path.node) ||
-      t.isFunctionDeclaration(binding.path.node)
+      isClassDeclaration(binding.path.node) ||
+      isFunctionDeclaration(binding.path.node)
    ) {
       return binding.path.node;
    }
 }
 
-function getArrayPatternIds(id: t.ArrayPattern) {
-   const result: t.Identifier[] = [];
+function getArrayPatternIds(id: ArrayPattern) {
+   const result: Identifier[] = [];
    for (const el of id.elements) {
       if (!el) continue;
       if (el.type == "ArrayPattern") {
@@ -34,8 +56,8 @@ function getArrayPatternIds(id: t.ArrayPattern) {
    return result;
 }
 
-function getObjectPatternIds(id: t.ObjectPattern) {
-   const result: t.Identifier[] = [];
+function getObjectPatternIds(id: ObjectPattern) {
+   const result: Identifier[] = [];
    for (const prop of id.properties) {
       if (prop.type != "ObjectProperty") continue;
       if (prop.value.type == "ArrayPattern") {
@@ -49,57 +71,10 @@ function getObjectPatternIds(id: t.ObjectPattern) {
 
    return result;
 }
-// function getVariableDeclarator() {
-// for (const declarator of declaration.declarations) {
-//    const { id } = declarator;
-//    if (id.type == "Identifier") {
-//       /**
-//        * For variable exports e.g.
-//        * export var foo = "foo", bar = "bar";
-//        */
-//       exports[id.name] = {
-//          type: "declared",
-//          name: id.name,
-//          path,
-//          declaration,
-//       };
-//    } else if (id.type == "ObjectPattern") {
-//       /**
-//        * For destructured object exports e.g.
-//        * export var { foo, bar } = object;
-//        */
-//       for (const prop of id.properties) {
-//          if (prop.type != "ObjectProperty") continue;
-//          if (prop.value.type != "Identifier") continue;
-//          let name = prop.value.name;
-//          exports[name] = {
-//             type: "declared",
-//             name,
-//             path,
-//             declaration,
-//          };
-//       }
-//    } else if (id.type == "ArrayPattern") {
-//       /**
-//        * For destructured array exports e.g.
-//        * export var [ foo, bar ] = array;
-//        */
-//       for (const el of id.elements) {
-//          if (el?.type != "Identifier") continue;
-//          exports[el.name] = {
-//             type: "declared",
-//             name: el.name,
-//             path,
-//             declaration,
-//          };
-//       }
-//    }
-// }
-// }
 
 let uid = 0;
 export function extractExports(
-   ast: t.Node,
+   ast: Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const exports: Record<string, ExportInfo> = {};
@@ -155,7 +130,7 @@ export function extractExports(
             }
          } else {
             // Declared exports
-            if (t.isVariableDeclaration(declaration)) {
+            if (isVariableDeclaration(declaration)) {
                for (const declarator of declaration.declarations) {
                   const { id } = declarator;
                   if (id.type == "Identifier") {
@@ -189,7 +164,7 @@ export function extractExports(
                       * For destructured array exports e.g.
                       * export var [ foo, bar ] = array;
                       */
-                     getArrayPatternIds(id).forEach(id => {
+                     getArrayPatternIds(id).forEach((id) => {
                         exports[id.name] = {
                            id: `$${uid++}`,
                            type: "declared",
@@ -202,8 +177,8 @@ export function extractExports(
                }
             } else {
                if (
-                  t.isFunctionDeclaration(declaration) ||
-                  t.isClassDeclaration(declaration)
+                  isFunctionDeclaration(declaration) ||
+                  isClassDeclaration(declaration)
                ) {
                   /**
                    * For declared class/function exports e.g.
@@ -252,14 +227,14 @@ export function extractExports(
       },
       ExportDefaultDeclaration(path) {
          const { node } = path;
-         if (t.isDeclaration(node.declaration)) {
+         if (isDeclaration(node.declaration)) {
             /**
              * For default-declared exports e.g.
              * export default function() {}
              * export default class {}
              */
             const { declaration } = node;
-            if (t.isTSDeclareFunction(declaration)) return;
+            if (isTSDeclareFunction(declaration)) return;
             exports["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
@@ -267,7 +242,7 @@ export function extractExports(
                declaration,
                identifier: declaration.id || undefined,
             };
-         } else if (t.isIdentifier(node.declaration)) {
+         } else if (isIdentifier(node.declaration)) {
             /**
              * For default exports declared above e.g.
              * const foo = "foo";
@@ -283,7 +258,7 @@ export function extractExports(
                declaration,
                identifier: node.declaration,
             };
-         } else if (t.isExpression(node.declaration)) {
+         } else if (isExpression(node.declaration)) {
             /**
              * For default expression exports e.g.
              * export default {};
@@ -314,52 +289,46 @@ export interface AggregatedNameExport {
    id: string;
    type: "aggregatedName";
    source: string;
-   specifier: t.ExportSpecifier;
-   path: NodePath<t.ExportNamedDeclaration>;
+   specifier: ExportSpecifier;
+   path: NodePath<ExportNamedDeclaration>;
 }
 
 export interface AggregatedNamespaceExport {
    id: string;
    type: "aggregatedNamespace";
    source: string;
-   specifier: t.ExportNamespaceSpecifier;
-   path: NodePath<t.ExportNamedDeclaration>;
+   specifier: ExportNamespaceSpecifier;
+   path: NodePath<ExportNamedDeclaration>;
 }
 
 export interface AggregatedAllExport {
    id: string;
    type: "aggregatedAll";
    source: string;
-   path: NodePath<t.ExportAllDeclaration>;
+   path: NodePath<ExportAllDeclaration>;
 }
 
 export interface DeclaredExport {
    id: string;
    type: "declared";
-   identifier: t.Identifier;
-   path: NodePath<t.ExportNamedDeclaration>;
-   declaration:
-      | t.VariableDeclaration
-      | t.ClassDeclaration
-      | t.FunctionDeclaration;
+   identifier: Identifier;
+   path: NodePath<ExportNamedDeclaration>;
+   declaration: VariableDeclaration | ClassDeclaration | FunctionDeclaration;
 }
 
 export interface DeclaredDefaultExport {
    id: string;
    type: "declaredDefault";
-   path: NodePath<t.ExportDefaultDeclaration>;
-   identifier?: t.Identifier;
-   declaration:
-      | t.VariableDeclaration
-      | t.ClassDeclaration
-      | t.FunctionDeclaration;
+   path: NodePath<ExportDefaultDeclaration>;
+   identifier?: Identifier;
+   declaration: VariableDeclaration | ClassDeclaration | FunctionDeclaration;
 }
 
 export interface DeclaredDefaultExpressionExport {
    id: string;
    type: "declaredDefaultExpression";
-   path: NodePath<t.ExportDefaultDeclaration>;
-   declaration: t.Expression;
+   path: NodePath<ExportDefaultDeclaration>;
+   declaration: Expression;
 }
 
 export type ExportInfo =

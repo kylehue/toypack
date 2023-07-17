@@ -1,6 +1,14 @@
 import { parse as babelParse, ParserOptions } from "@babel/parser";
 import traverseAST, { NodePath, TraverseOptions } from "@babel/traverse";
-import * as t from "@babel/types";
+import {
+   File,
+   StringLiteral,
+   ImportDeclaration,
+   ExportAllDeclaration,
+   ExportNamedDeclaration,
+   CallExpression,
+   TSImportType,
+} from "@babel/types";
 import { Toypack } from "../Toypack.js";
 import { ERRORS, mergeTraverseOptions } from "../utils";
 import { codeFrameColumns } from "@babel/code-frame";
@@ -37,7 +45,7 @@ export async function parseScriptAsset(
    const result: ParsedScriptResult = {
       type: "script",
       dependencies: new Set(),
-      ast: {} as t.File,
+      ast: {} as File,
       exports: {},
       imports: {},
    };
@@ -165,7 +173,7 @@ export async function parseScriptAsset(
 export interface ParsedScriptResult {
    type: "script";
    dependencies: Set<string>;
-   ast: t.File;
+   ast: File;
    exports: Record<string, ExportInfo>;
    imports: Record<string, ImportInfo>;
 }
@@ -174,15 +182,15 @@ export interface ParseScriptOptions {
    parserOptions?: ParserOptions;
    /** Function to mutate the node or path of a dependency. */
    inspectDependencies?: (
-      node: t.StringLiteral | { value: string },
+      node: StringLiteral | { value: string },
       path:
          | NodePath<
-              | t.ImportDeclaration
-              | t.ExportAllDeclaration
-              | t.ExportNamedDeclaration
-              | t.CallExpression
-              | t.TSImportType
+              | ImportDeclaration
+              | ExportAllDeclaration
+              | ExportNamedDeclaration
+              | CallExpression
+              | TSImportType
            >
-         | t.File
+         | File
    ) => void;
 }

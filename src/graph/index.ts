@@ -1,5 +1,4 @@
-import { Node } from "@babel/traverse";
-import * as t from "@babel/types";
+import { File } from "@babel/types";
 import { codeFrameColumns } from "@babel/code-frame";
 import { CssNode, Url } from "css-tree";
 import path from "path-browserify";
@@ -376,7 +375,7 @@ export type Importers = Record<string, ScriptDependency | StyleDependency>;
 
 export interface ScriptDependency extends DependencyBase {
    type: "script";
-   ast: t.File;
+   ast: File;
    content: string;
    dependencyMap: Record<string, string>;
    asset: Asset;

@@ -1,10 +1,16 @@
 import { NodePath, TraverseOptions } from "@babel/traverse";
-import * as t from "@babel/types";
+import {
+   Node,
+   ImportDeclaration,
+   ImportDefaultSpecifier,
+   ImportSpecifier,
+   ImportNamespaceSpecifier,
+} from "@babel/types";
 import { traverse } from "@babel/core";
 
 let uid = 0;
 export function extractImports(
-   ast: t.Node,
+   ast: Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const imports: Record<string, ImportInfo> = {};
@@ -77,36 +83,36 @@ export function extractImports(
    return imports;
 }
 
-interface ImportBase {
+interface BaseImport {
    id: string;
    source: string;
-   path: NodePath<t.ImportDeclaration>;
+   path: NodePath<ImportDeclaration>;
 }
 
-export interface ImportDefault extends ImportBase {
+export interface DefaultImport extends BaseImport {
    type: "default";
-   specifier: t.ImportDefaultSpecifier;
+   specifier: ImportDefaultSpecifier;
 }
 
-export interface ImportSpecifier extends ImportBase {
+export interface SpecifierImport extends BaseImport {
    type: "specifier";
-   specifier: t.ImportSpecifier;
+   specifier: ImportSpecifier;
 }
 
-export interface ImportNamespace extends ImportBase {
+export interface NamespaceImport extends BaseImport {
    type: "namespace";
-   specifier: t.ImportNamespaceSpecifier;
+   specifier: ImportNamespaceSpecifier;
 }
 
-export interface ImportSideEffect {
+export interface SideEffectImport {
    id: string;
    type: "sideEffect";
    source: string;
-   path: NodePath<t.ImportDeclaration>;
+   path: NodePath<ImportDeclaration>;
 }
 
 export type ImportInfo =
-   | ImportDefault
-   | ImportNamespace
-   | ImportSpecifier
-   | ImportSideEffect;
+   | DefaultImport
+   | NamespaceImport
+   | SpecifierImport
+   | SideEffectImport;
