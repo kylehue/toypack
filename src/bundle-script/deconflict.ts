@@ -1,7 +1,6 @@
 import { NodePath } from "@babel/traverse";
-import * as t from "@babel/types";
+import { isMemberExpression } from "@babel/types";
 import { TraverseMap } from "./TraverseMap";
-import { getVarKind } from "./get-var-kind";
 
 /**
  * Deconflicts all of the script modules in the dependency graph.
@@ -16,7 +15,7 @@ export function deconflict(traverseMap: TraverseMap) {
    traverseMap.setTraverseAll((scopeId) => ({
       Identifier(path) {
          // Only deconflict top-level vars
-         if (path.find((a) => a.isFunctionDeclaration())) {
+         if (path.findParent((a) => a.isFunctionDeclaration())) {
             return;
          }
 
@@ -25,14 +24,15 @@ export function deconflict(traverseMap: TraverseMap) {
 
          // Skip globals
          const isGlobal = !scope.hasBinding(name);
-         if (t.isMemberExpression(path.node) || isGlobal) {
-            return;
-         }
+         if (isGlobal) return;
 
-         const dupe = takenVars.find(
+         // Skip member expressions
+         if (isMemberExpression(path.node)) return;
+
+         const duplicate = takenVars.find(
             (f) => f.value === name && f.scopeId !== scopeId
          );
-         if (dupe) {
+         if (duplicate) {
             // Rename
             name = scope.generateUid(name);
             scope.rename(node.name, name);
@@ -46,16 +46,15 @@ export function deconflict(traverseMap: TraverseMap) {
           */
          for (const taken of takenVars) {
             if (taken.path.scope.hasBinding(node.name)) continue;
+            if (taken.scopeId == scopeId) continue;
             taken.path.scope.registerDeclaration(path);
          }
-
-         if (scope.hasBinding(name)) {
-            takenVars.push({
-               scopeId,
-               value: name,
-               path: path,
-            });
-         }
+         
+         takenVars.push({
+            scopeId,
+            value: name,
+            path: path,
+         });
       },
    }));
 }
