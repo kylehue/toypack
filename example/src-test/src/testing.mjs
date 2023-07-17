@@ -1,10 +1,7 @@
-import cool, * as path from "path-browserify";
-import { resolve as res2 } from "path-browserify";
-import { join as wow } from "testing";
-export const test = 44;
-export const script = "script";
-console.log(path, cool, test, res2, script, wow);
-window.test = test;
-export default function () {
-   console.log(123);
-}
+const numbers =  [1, 2, 3, 4, 5];
+export * as Adder from "../classes/adder";
+import hiii, { dog as god, bay as yab, greet } from "../classes/adder";
+import defaultStrFromCreateNum from "../classes/createNum";
+console.log(hiii, god, yab, defaultStrFromCreateNum, greet);
+
+export default numbers;

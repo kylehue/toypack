@@ -6,7 +6,6 @@
 
 // export * from "./createNum2.js";
 
-
 const o = {
    foo: 1,
    bar: 2,
@@ -18,3 +17,4 @@ console.log(adder + _adder);
 
 export const { foo, bar } = o;
 export { o as "hello there"};
+export default "DEFAULT_EXPORT_EXPRESSION";

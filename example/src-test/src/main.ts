@@ -15,10 +15,15 @@
 // console.log(pkgjson);
 // const foo: string = "bar";
 // console.log(foo);
-import adder, {dog, bay} from "@classes/adder";
+import adder, {dog, bay} from "../classes/adder";
 console.log(adder, dog, bay);
-import { foo as o, bar, "hello there" as test } from "@classes/createNum";
+import { foo as o, bar, "hello there" as test } from "../classes/createNum";
 console.log(o, bar, test);
+import counter, { Adder } from "./testing.mjs";
+import * as namespace from "../classes/adder";
+console.log(counter, Adder, namespace);
+// export var foos = "foo", bars = "bar";
+// export const [[hello, hi], hey] = [[1, 2], 3];
 // const bingbong = "beepboop";
 // console.log(bingbong);
 // import "../styles/sample.css";

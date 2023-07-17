@@ -15,13 +15,14 @@
 
 // console.log(Object.fromEntries(new URL(import.meta.url).searchParams.entries()));
 // // console.log(import.meta.resolve("/hello!!"));
-
+import str from "./createNum";
+console.log(str);
 const foo = 123;
 const sum_default = 123;
 const o = 123;
 const adder = 123;
 const _adder = 123;
-export default function (a, b) {
+export default function adad(a, b) {
    return a + b + foo + sum_default + o + adder + _adder;
 }
 export function greet() {

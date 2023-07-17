@@ -3,11 +3,13 @@ import { DependencyGraph, ScriptDependency } from "../graph/index.js";
 import { Toypack } from "../Toypack.js";
 import { TraverseMap } from "./TraverseMap.js";
 import { deconflict } from "./deconflict.js";
-import { addSourceCommentMarks } from "./add-source-comment-marks.js";
-import { program, Node } from "@babel/types";
+import { file, program, Node } from "@babel/types";
 import generate from "@babel/generator";
 import { ExportInfo } from "src/graph/extract-exports.js";
 import { bindImports } from "./bind-imports.js";
+import { getSortedScripts } from "./get-sorted-scripts.js";
+import { finalizeModules } from "./finalize-modules.js";
+import traverse from "@babel/traverse";
 
 function getAst(ast: Node) {
    return generate(ast, {
@@ -17,38 +19,24 @@ function getAst(ast: Node) {
 
 (window as any).getAst = getAst;
 
+
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const traverseMap = new TraverseMap();
-   const scriptModules = Object.values(graph).filter(
-      (g): g is ScriptDependency => g.type == "script"
-   );
+   const scriptModules = getSortedScripts(graph);
 
    for (const script of scriptModules) {
       traverseMap.setAst(script.source, script.ast);
    }
 
-   addSourceCommentMarks(traverseMap);
    deconflict(traverseMap);
    traverseMap.doTraverseAll();
    bindImports(graph);
+   finalizeModules(scriptModules);
 
-   const resultAst = program([]);
+   const resultAst = file(program([]));
 
    for (const script of scriptModules) {
-      // Object.values(imports).forEach((i) =>
-      //    !i.path.removed ? i.path.remove() : {}
-      // );
-      // Object.values(exports).forEach((x) => removeExport(x));
-
-      // t.addComment(
-      //    chunk.ast.program.body[0],
-      //    "leading",
-      //    ` ${chunk.source.replace(/^\//, "")}`,
-      //    true
-      // );
-      resultAst.body.unshift(...script.ast.program.body);
-      // test += `\n\n// ${chunk.source.replace(/^\//, "")}\n`;
-      // test += generate(chunk.ast, { comments: false }).code;
+      resultAst.program.body.unshift(...script.ast.program.body);
    }
 
    const generated = generate(resultAst);
@@ -161,7 +149,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    // }
 
    // return result;
-   
+
    return {
       content: "",
       map: MapConverter.fromObject({}),
