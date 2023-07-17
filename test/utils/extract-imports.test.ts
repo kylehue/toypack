@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { extractImports } from "../../src/utils";
+import { extractImports } from "../../src/graph/extract-imports";
 import { parseSync, TransformOptions } from "@babel/core";
 
 const opts: TransformOptions = {

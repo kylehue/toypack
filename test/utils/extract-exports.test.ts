@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { extractExports } from "../../src/utils";
+import { extractExports } from "../../src/graph/extract-exports";
 import { parseSync, TransformOptions } from "@babel/core";
 
 const opts: TransformOptions = {
@@ -26,6 +26,14 @@ export class Hunter { /* … */ }
 export function* id() { /* … */ }
 export var { ant, "boat": jar } = o;
 export var [keep, lone] = array;
+const o2 = {
+   foo: [["🐶", "🎈"], "🌉"],
+   bar: {tick: [{tock: "eleven!"}]}
+}
+export const {
+   foo: [[puppy, balloon], bay],
+   bar: {tick: [{tock: eleven}]}
+} = o2;
 `,
    opts
 )!;
@@ -42,6 +50,10 @@ const declaredAstExpectedExports = [
    "jar",
    "keep",
    "lone",
+   "puppy",
+   "bay",
+   "balloon",
+   "eleven",
 ];
 
 const referencedAst = parseSync(
