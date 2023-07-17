@@ -2,7 +2,6 @@ import { NodePath, TraverseOptions } from "@babel/traverse";
 import * as t from "@babel/types";
 import { traverse } from "@babel/core";
 
-
 export function getBindingDeclaration(path: NodePath, id: string) {
    const binding = path.scope.getBinding(id);
    if (!binding) return;
@@ -19,6 +18,37 @@ export function getBindingDeclaration(path: NodePath, id: string) {
    }
 }
 
+function getArrayPatternIds(id: t.ArrayPattern) {
+   const result: t.Identifier[] = [];
+   for (const el of id.elements) {
+      if (!el) continue;
+      if (el.type == "ArrayPattern") {
+         result.push(...getArrayPatternIds(el));
+      } else if (el.type == "ObjectPattern") {
+         result.push(...getObjectPatternIds(el));
+      } else if (el.type == "Identifier") {
+         result.push(el);
+      }
+   }
+
+   return result;
+}
+
+function getObjectPatternIds(id: t.ObjectPattern) {
+   const result: t.Identifier[] = [];
+   for (const prop of id.properties) {
+      if (prop.type != "ObjectProperty") continue;
+      if (prop.value.type == "ArrayPattern") {
+         result.push(...getArrayPatternIds(prop.value));
+      } else if (prop.value.type == "ObjectPattern") {
+         result.push(...getObjectPatternIds(prop.value));
+      } else if (prop.value.type == "Identifier") {
+         result.push(prop.value);
+      }
+   }
+
+   return result;
+}
 // function getVariableDeclarator() {
 // for (const declarator of declaration.declarations) {
 //    const { id } = declarator;
@@ -145,32 +175,29 @@ export function extractExports(
                       * For destructured object exports e.g.
                       * export var { foo, bar } = object;
                       */
-                     for (const prop of id.properties) {
-                        if (prop.type != "ObjectProperty") continue;
-                        if (prop.value.type != "Identifier") continue;
-                        exports[prop.value.name] = {
+                     getObjectPatternIds(id).forEach((id) => {
+                        exports[id.name] = {
                            id: `$${uid++}`,
                            type: "declared",
                            path,
                            declaration,
-                           identifier: prop.value,
+                           identifier: id,
                         };
-                     }
+                     });
                   } else if (id.type == "ArrayPattern") {
                      /**
                       * For destructured array exports e.g.
                       * export var [ foo, bar ] = array;
                       */
-                     for (const el of id.elements) {
-                        if (el?.type != "Identifier") continue;
-                        exports[el.name] = {
+                     getArrayPatternIds(id).forEach(id => {
+                        exports[id.name] = {
                            id: `$${uid++}`,
                            type: "declared",
                            path,
                            declaration,
-                           identifier: el,
+                           identifier: id,
                         };
-                     }
+                     });
                   }
                }
             } else {
