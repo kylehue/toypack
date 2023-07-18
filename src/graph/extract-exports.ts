@@ -2,8 +2,6 @@ import { NodePath, TraverseOptions } from "@babel/traverse";
 import {
    Node,
    Identifier,
-   ArrayPattern,
-   ObjectPattern,
    VariableDeclaration,
    ExportAllDeclaration,
    Expression,
@@ -23,6 +21,7 @@ import {
    isIdentifier,
 } from "@babel/types";
 import { traverse } from "@babel/core";
+import { getPatternIds } from "../utils";
 
 export function getBindingDeclaration(path: NodePath, id: string) {
    const binding = path.scope.getBinding(id);
@@ -38,38 +37,6 @@ export function getBindingDeclaration(path: NodePath, id: string) {
    ) {
       return binding.path.node;
    }
-}
-
-function getArrayPatternIds(id: ArrayPattern) {
-   const result: Identifier[] = [];
-   for (const el of id.elements) {
-      if (!el) continue;
-      if (el.type == "ArrayPattern") {
-         result.push(...getArrayPatternIds(el));
-      } else if (el.type == "ObjectPattern") {
-         result.push(...getObjectPatternIds(el));
-      } else if (el.type == "Identifier") {
-         result.push(el);
-      }
-   }
-
-   return result;
-}
-
-function getObjectPatternIds(id: ObjectPattern) {
-   const result: Identifier[] = [];
-   for (const prop of id.properties) {
-      if (prop.type != "ObjectProperty") continue;
-      if (prop.value.type == "ArrayPattern") {
-         result.push(...getArrayPatternIds(prop.value));
-      } else if (prop.value.type == "ObjectPattern") {
-         result.push(...getObjectPatternIds(prop.value));
-      } else if (prop.value.type == "Identifier") {
-         result.push(prop.value);
-      }
-   }
-
-   return result;
 }
 
 let uid = 0;
@@ -133,47 +100,22 @@ export function extractExports(
             if (isVariableDeclaration(declaration)) {
                for (const declarator of declaration.declarations) {
                   const { id } = declarator;
-                  if (id.type == "Identifier") {
-                     /**
-                      * For variable exports e.g.
-                      * export var foo = "foo", bar = "bar";
-                      */
+                  if (
+                     id.type != "ArrayPattern" &&
+                     id.type != "ObjectPattern" &&
+                     id.type != "Identifier"
+                  ) {
+                     continue;
+                  }
+                  getPatternIds(id).forEach((id) => {
                      exports[id.name] = {
                         id: `$${uid++}`,
                         type: "declared",
-                        identifier: id,
                         path,
                         declaration,
+                        identifier: id,
                      };
-                  } else if (id.type == "ObjectPattern") {
-                     /**
-                      * For destructured object exports e.g.
-                      * export var { foo, bar } = object;
-                      */
-                     getObjectPatternIds(id).forEach((id) => {
-                        exports[id.name] = {
-                           id: `$${uid++}`,
-                           type: "declared",
-                           path,
-                           declaration,
-                           identifier: id,
-                        };
-                     });
-                  } else if (id.type == "ArrayPattern") {
-                     /**
-                      * For destructured array exports e.g.
-                      * export var [ foo, bar ] = array;
-                      */
-                     getArrayPatternIds(id).forEach((id) => {
-                        exports[id.name] = {
-                           id: `$${uid++}`,
-                           type: "declared",
-                           path,
-                           declaration,
-                           identifier: id,
-                        };
-                     });
-                  }
+                  });
                }
             } else {
                if (
