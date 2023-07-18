@@ -19,6 +19,10 @@ import {
    isDeclaration,
    isTSDeclareFunction,
    isIdentifier,
+   variableDeclaration,
+   variableDeclarator,
+   identifier,
+   exportDefaultDeclaration,
 } from "@babel/types";
 import { traverse } from "@babel/core";
 import { getPatternIds } from "../utils";
@@ -177,12 +181,16 @@ export function extractExports(
              */
             const { declaration } = node;
             if (isTSDeclareFunction(declaration)) return;
+            if (!declaration.id) {
+               declaration.id = identifier(path.scope.generateUid("default"));
+            }
+
             exports["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
                declaration,
-               identifier: declaration.id || undefined,
+               identifier: declaration.id,
             };
          } else if (isIdentifier(node.declaration)) {
             /**
@@ -207,12 +215,33 @@ export function extractExports(
              * export default 200;
              * export default "Hello";
              */
-            const { declaration } = node;
+
+            /**
+             * Transform it so that it can have an identifier e.g.
+             *
+             * input:
+             * export default {};
+             *
+             * output:
+             * const id = {};
+             * export default id;
+             */
+            const newIdentifier = identifier(path.scope.generateUid("default"));
+            const [newDeclaration] = path.insertBefore(
+               variableDeclaration("const", [
+                  variableDeclarator(newIdentifier, node.declaration),
+               ])
+            );
+
+            path.replaceWith(exportDefaultDeclaration(newIdentifier));
+            path.scope.registerDeclaration(newDeclaration);
+
             exports["default"] = {
                id: `$${uid++}`,
-               type: "declaredDefaultExpression",
+               type: "declaredDefault",
                path,
-               declaration,
+               declaration: newDeclaration.node,
+               identifier: newIdentifier,
             };
          }
       },
@@ -262,15 +291,8 @@ export interface DeclaredDefaultExport {
    id: string;
    type: "declaredDefault";
    path: NodePath<ExportDefaultDeclaration>;
-   identifier?: Identifier;
+   identifier: Identifier;
    declaration: VariableDeclaration | ClassDeclaration | FunctionDeclaration;
-}
-
-export interface DeclaredDefaultExpressionExport {
-   id: string;
-   type: "declaredDefaultExpression";
-   path: NodePath<ExportDefaultDeclaration>;
-   declaration: Expression;
 }
 
 export type ExportInfo =
@@ -278,5 +300,4 @@ export type ExportInfo =
    | AggregatedNameExport
    | AggregatedNamespaceExport
    | DeclaredExport
-   | DeclaredDefaultExport
-   | DeclaredDefaultExpressionExport;
+   | DeclaredDefaultExport;
