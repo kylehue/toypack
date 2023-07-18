@@ -1,12 +1,17 @@
 import { Node, NodePath, TraverseOptions } from "@babel/traverse";
 
+function noopStops(path: NodePath) {
+   path.skip = () => {};
+   path.stop = () => {};
+}
+
 function groupTraverseOptions(array: TraverseOptions[]) {
    const groups: TraverseGroupedOptions = {};
    for (const opts of array) {
       let key: keyof TraverseOptions;
       for (key in opts) {
          let group = groups[key];
-         group ??= groups[key] = [];
+         group ??= (groups as any)[key] = [];
          group.push((opts as any)[key]);
       }
    }
@@ -21,10 +26,27 @@ function createTraverseOptionsFromGroup(groups: TraverseGroupedOptions) {
    for (key in groups) {
       const group = groups[key];
       if (!group) continue;
-      (options as any)[key] = (scope: any, node: any) => {
-         for (const fn of group) {
-            (fn as TraverseFunction<Node["type"]>)(scope, node);
-         }
+      (options as any)[key] = {
+         enter(path: any, state: any) {
+            noopStops(path);
+            for (const fn of group) {
+               if (typeof fn == "function") {
+                  fn.call(this, path, state);
+               } else {
+                  fn.enter?.call(this, path, state);
+               }
+            }
+         },
+         exit(path: any, state: any) {
+            noopStops(path);
+            for (const fn of group) {
+               if (typeof fn == "function") {
+                  fn.call(this, path, state);
+               } else {
+                  fn.exit?.call(this, path, state);
+               }
+            }
+         },
       };
    }
 
@@ -40,6 +62,13 @@ type TraverseFunction<T> = (
    node: Node
 ) => void;
 
+type TraverseConfig<T> = {
+   enter: TraverseFunction<T>;
+   exit: TraverseFunction<T>;
+};
+
 type TraverseGroupedOptions = {
-   [Type in keyof TraverseOptions]?: TraverseFunction<Type>[];
+   [Type in keyof TraverseOptions]?:
+      | TraverseFunction<Type>[]
+      | TraverseConfig<Type>[];
 };
