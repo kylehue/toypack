@@ -1,6 +1,6 @@
 import traverse, { TraverseOptions } from "@babel/traverse";
 import { Node } from "@babel/types";
-import { mergeTraverseOptions } from "../utils";
+import { mergeTraverseOptions } from "../../utils";
 
 export class TraverseMap {
    private _asts: Map<

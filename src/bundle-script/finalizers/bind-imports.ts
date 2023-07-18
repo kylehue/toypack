@@ -4,7 +4,7 @@ import {
    AggregatedNamespaceExport,
    ExportInfo,
 } from "src/graph/extract-exports";
-import { getExport } from "./get-export";
+import { getExport } from "../utils/get-export";
 import {
    ImportSpecifier,
    ClassDeclaration,
@@ -18,7 +18,7 @@ import {
 } from "@babel/types";
 import { NodePath, Scope } from "@babel/traverse";
 import { template } from "@babel/core";
-import { getSortedScripts } from "./get-sorted-scripts";
+import { getSortedScripts } from "../utils/get-sorted-scripts";
 import path from "path-browserify";
 
 function getImportedName(specifier: ImportSpecifier) {
@@ -244,7 +244,7 @@ function bindExported(
       importScope.rename(importLocalName, uid);
 
       if (!isAlreadyDeclared) {
-         const decl = variableDeclaration("const", [
+         const decl = variableDeclaration("var", [
             variableDeclarator(identifier(uid), exportInfo.declaration),
          ]);
          exportInfo.path.replaceWith(decl);
@@ -313,7 +313,7 @@ function create(module: ScriptDependency, id: string) {
       .join(",\n");
 
    const buildTemplate = template(`
-      const ID = ${formattedExports}
+      var ID = ${formattedExports}
    `);
 
    const result = buildTemplate({

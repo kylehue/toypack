@@ -1,15 +1,16 @@
-import MapConverter from "convert-source-map";
-import { DependencyGraph, ScriptDependency } from "../graph/index.js";
-import { Toypack } from "../Toypack.js";
-import { TraverseMap } from "./TraverseMap.js";
-import { deconflict } from "./deconflict.js";
 import { file, program, Node } from "@babel/types";
 import generate from "@babel/generator";
-import { ExportInfo } from "src/graph/extract-exports.js";
-import { bindImports } from "./bind-imports.js";
-import { getSortedScripts } from "./get-sorted-scripts.js";
-import { finalizeModules } from "./finalize-modules.js";
-import traverse from "@babel/traverse";
+import MapConverter from "convert-source-map";
+import { Toypack } from "../Toypack.js";
+import { ExportInfo } from "../graph/extract-exports.js";
+import { DependencyGraph } from "../graph/index.js";
+import {
+   bindImports,
+   cleanComments,
+   removeImportExportDeclarations,
+} from "./finalizers";
+import { deconflict, transformToVars } from "./transformers";
+import { TraverseMap, getSortedScripts } from "./utils";
 
 function getAst(ast: Node) {
    return generate(ast, {
@@ -19,7 +20,6 @@ function getAst(ast: Node) {
 
 (window as any).getAst = getAst;
 
-
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const traverseMap = new TraverseMap();
    const scriptModules = getSortedScripts(graph);
@@ -28,10 +28,15 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       traverseMap.setAst(script.source, script.ast);
    }
 
+   // transform
+   transformToVars(traverseMap);
    deconflict(traverseMap);
    traverseMap.doTraverseAll();
+
+   // finalize
    bindImports(graph);
-   finalizeModules(scriptModules);
+   removeImportExportDeclarations(scriptModules);
+   cleanComments(scriptModules);
 
    const resultAst = file(program([]));
 

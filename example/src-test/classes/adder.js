@@ -15,17 +15,43 @@
 
 // console.log(Object.fromEntries(new URL(import.meta.url).searchParams.entries()));
 // // console.log(import.meta.resolve("/hello!!"));
+
+
 import str from "./createNum";
 console.log(str);
 const foo = 123;
 const sum_default = 123;
-const o = 123;
+const _o = 123;
 const adder = 123;
-const _adder = 123;
-export default function adad(a, b) {
-   return a + b + foo + sum_default + o + adder + _adder;
+var _adder = 123;
+
+if (true) {
+   const [_adder] = [2];
+   console.log(_adder);
 }
+for (let i = 0; i != 0; i++) {}
 export function greet() {
-   return 45;
+   const _adder = 45;
+   return _adder;
 }
-export const [dog, bay] = ["🐶", "🌉"];
+// export default function adad(a, b) {
+//    return a + b + foo + sum_default + _o + adder + _adder;
+// }
+
+export default {
+   foo,
+   sum_default,
+   _o,
+   adder,
+   _adder,
+};
+
+const o = {
+   foo: [["🐶", "🎈"], "🌉"],
+   bar: {tick: [{tock: "eleven!"}]}
+}
+
+export const {
+   foo: [[dog, balloon], bay],
+   bar: {tick: [{tock: eleven}]}
+} = o;

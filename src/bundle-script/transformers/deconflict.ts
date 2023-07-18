@@ -1,6 +1,6 @@
 import { NodePath } from "@babel/traverse";
-import { isMemberExpression } from "@babel/types";
-import { TraverseMap } from "./TraverseMap";
+import { isBlockScoped, isMemberExpression } from "@babel/types";
+import { TraverseMap } from "../utils/TraverseMap";
 
 /**
  * Deconflicts all of the script modules in the dependency graph.
@@ -14,19 +14,18 @@ export function deconflict(traverseMap: TraverseMap) {
 
    traverseMap.setTraverseAll((scopeId) => ({
       Identifier(path) {
-         // Only deconflict top-level vars
-         if (path.findParent((a) => a.isFunctionDeclaration())) {
+         const { node, scope } = path;
+         
+         // Only target top-level vars
+         if (isBlockScoped(scope.block)) {
             return;
          }
 
-         const { node, scope } = path;
          let { name } = node;
 
-         // Skip globals
          const isGlobal = !scope.hasBinding(name);
          if (isGlobal) return;
 
-         // Skip member expressions
          if (isMemberExpression(path.node)) return;
 
          const duplicate = takenVars.find(
