@@ -11,6 +11,12 @@ export class TraverseMap {
       }
    > = new Map();
 
+   eachAst(callback: (ast: Node, source: string) => void) {
+      this._asts.forEach(({ ast }, source) => {
+         callback(ast, source);
+      });
+   }
+
    setAst(source: string, ast: Node) {
       this._asts.set(source, {
          ast,

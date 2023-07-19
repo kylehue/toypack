@@ -15,11 +15,16 @@ import {
    identifier,
    variableDeclaration,
    variableDeclarator,
+   file,
+   program,
 } from "@babel/types";
-import { NodePath, Scope } from "@babel/traverse";
+import traverse, { NodePath, Scope } from "@babel/traverse";
 import { template } from "@babel/core";
 import { getSortedScripts } from "../utils/get-sorted-scripts";
 import path from "path-browserify";
+import runtime from "../runtime";
+import { TransformContext } from "../utils/transform-context";
+import { generateUid } from "../utils";
 
 function getImportedName(specifier: ImportSpecifier) {
    const { imported } = specifier;
@@ -147,135 +152,32 @@ function referenceExportToImport(
 const exportDeclarationUIDMap = new Map<string, string>();
 /** Gets the assigned UID of the exported declaration. */
 function getExportUid(exportInfo: ExportInfo, name?: string) {
-   const previouslyUsedName = exportDeclarationUIDMap.get(exportInfo.id);
-   let uid;
-   if (previouslyUsedName) {
-      uid = previouslyUsedName;
-   } else {
-      uid = exportInfo.path.scope.generateUid(name);
+   let uid = exportDeclarationUIDMap.get(exportInfo.id);
+   if (!uid) {
+      uid = generateUid(name);
       exportDeclarationUIDMap.set(exportInfo.id, uid);
    }
 
    return uid;
 }
 
-const assignedIds = new Map<string, string>();
-function getAssignedId(scope: Scope, name: string) {
-   const assigned = assignedIds.get(name);
-   let uid;
-   if (assigned) {
-      uid = assigned;
-   } else {
-      uid = scope.generateUid(name);
-      assignedIds.set(name, uid);
-   }
-
-   return uid;
-}
-
 /**
- * Binds the imported module references to the exported declaration.
+ * This function gets the module that was aggregated by the imported
+ * module e.g.
+ *
+ * ```js
+ * // main.js --> The `importer`
+ * import { Aggregated } from "./some-module.js";
+ * // This import is the `importInfo`
+ *
+ * // some-module.js --> The imported module
+ * export * as Aggregated from "./aggregated.js";
+ * // This export is the `exportInfo`
+ *
+ * // aggregated.js --> Function's result
+ * export const foo = "bar";
+ * ```
  */
-function bindExported(
-   graph: DependencyGraph,
-   script: ScriptDependency,
-   importInfo: ImportInfo,
-   exportInfo: ExportInfo,
-   importName: string,
-   importLocalName: string
-) {
-   const exportScope = exportInfo.path.scope;
-   const importScope = importInfo.path.scope;
-   const isAlreadyDeclared = !!exportDeclarationUIDMap.get(exportInfo.id);
-
-   const suggestedId =
-      importName == "default"
-         ? `${path.basename(importInfo.source)}_default`
-         : importLocalName;
-
-   if (exportInfo.type == "declared") {
-      const uid = getExportUid(exportInfo, exportInfo.identifier.name);
-      exportScope.rename(exportInfo.identifier.name, uid);
-      importScope.rename(importLocalName, uid);
-
-      if (exportInfo.declaration.type != "VariableDeclaration") {
-         exportInfo.path.replaceWith(exportInfo.declaration);
-      }
-
-      referenceExportToImport(
-         importInfo,
-         exportInfo,
-         exportInfo.identifier.name
-      );
-   } else if (exportInfo.type == "declaredDefault") {
-      const uid = getExportUid(exportInfo, suggestedId);
-      importScope.rename(importLocalName, uid);
-
-      if (exportInfo.identifier) {
-         exportScope.rename(exportInfo.identifier.name, uid);
-      } else if (exportInfo.declaration.type != "VariableDeclaration") {
-         /**
-          * Declared default functions are allowed to not have
-          * identifiers, so here, we're gonna id them
-          */
-         setExportDefaultIdentifier(exportInfo.declaration, uid);
-         /**
-          * Since it didn't have a name before, then it isn't in its
-          * scope's bindings. With that being said, we have to manually
-          * register it in its scope's bindings.
-          */
-         const bindingKind =
-            exportInfo.declaration.type == "ClassDeclaration"
-               ? "let"
-               : "hoisted";
-         exportScope.registerBinding(bindingKind, exportInfo.path);
-      }
-
-      if (
-         !isAlreadyDeclared &&
-         exportInfo.declaration.type != "VariableDeclaration"
-      ) {
-         exportInfo.path.replaceWith(exportInfo.declaration);
-      }
-
-      referenceExportToImport(importInfo, exportInfo, uid);
-   } else if (exportInfo.type == "declaredDefaultExpression") {
-      const uid = getExportUid(exportInfo, suggestedId);
-      importScope.rename(importLocalName, uid);
-
-      if (!isAlreadyDeclared) {
-         const decl = variableDeclaration("var", [
-            variableDeclarator(identifier(uid), exportInfo.declaration),
-         ]);
-         exportInfo.path.replaceWith(decl);
-      }
-
-      referenceExportToImport(importInfo, exportInfo, uid);
-   } else if (
-      exportInfo.type == "aggregatedAll" ||
-      exportInfo.type == "aggregatedName"
-   ) {
-      // There can't possibly an export with this type if `getExport` was used.
-      // throw error for safety
-      throw new Error("No handler for aggregated modules.");
-   } else if (exportInfo.type == "aggregatedNamespace") {
-      const aggregatedModule = getAggregatedModule(
-         graph,
-         script,
-         importInfo,
-         exportInfo
-      );
-      if (!aggregatedModule) return;
-      const uid = getExportUid(exportInfo, suggestedId);
-      importScope.rename(importLocalName, uid);
-
-      if (!isAlreadyDeclared) {
-         const exports = create(aggregatedModule, uid);
-         aggregatedModule.ast.program.body.push(...exports);
-      }
-   }
-}
-
 function getAggregatedModule(
    graph: DependencyGraph,
    importer: ScriptDependency,
@@ -291,43 +193,140 @@ function getAggregatedModule(
    return d;
 }
 
-function create(module: ScriptDependency, id: string) {
+const namespaceExportsMap = new Map<string, string>();
+
+/**
+ * This function declares an object that contains all of the exports
+ * of the provided module e.g.
+ *
+ * In:
+ * ```js
+ * // main.js
+ * export const foo = "bar";
+ * export const bar = "foo";
+ * ```
+ * Out:
+ * ```js
+ * var namespace = {};
+ * __export(namespace, {
+ *    foo: () => foo,
+ *    bar: () => bar
+ * });
+ *
+ * ...
+ * ```
+ *
+ * @returns The namespace id.
+ */
+function getOrCreateNamespace(
+   context: TransformContext,
+   module: ScriptDependency,
+   path: NodePath,
+   namespace: string
+) {
+   const declared = namespaceExportsMap.get(module.source);
+   if (declared) {
+      return declared;
+   }
+
    const exportEntries = Object.entries(module.exports);
+   const computedIdsMap = new Map<string, Identifier>();
    const formattedExports = exportEntries
-      .map(([exportId, value], index) => {
-         const computedExportId =
-            (value.type == "declared" || value.type == "declaredDefault") &&
-            value.identifier
-               ? value.identifier.name
-               : exportDeclarationUIDMap.get(value.id);
-         if (!computedExportId) {
-            throw new Error(
-               `Can't find '${exportId}' export in ${module.source}.`
-            );
+      .map(([exportName, exportInfo], index, arr) => {
+         if (
+            exportInfo.type !== "declared" &&
+            exportInfo.type !== "declaredDefault"
+         ) {
+            return;
          }
-         let line = `${exportId}: ${computedExportId}`;
-         if (index == 0) line = "{\n" + line;
-         if (index == exportEntries.length - 1) line += "\n}";
+
+         const computedIdKey = `COMP_${index}`;
+         computedIdsMap.set(computedIdKey, exportInfo.identifier);
+         let line = `${exportName}: () => ${computedIdKey}`;
          return line;
       })
       .join(",\n");
 
    const buildTemplate = template(`
-      var ID = ${formattedExports}
+      var ID = {};
+      __export(ID, {\n${formattedExports}\n});
    `);
 
-   const result = buildTemplate({
-      ID: id,
-   });
+   const replacements: any = { ID: namespace };
+   for (const [key, val] of computedIdsMap) {
+      replacements[key] = val;
+   }
 
-   return Array.isArray(result) ? result : [result];
+   const builtTemplate = buildTemplate(replacements);
+   context.addRuntime("__export");
+   context.unshiftAst(builtTemplate, module.source);
+
+   namespaceExportsMap.set(module.source, namespace);
+   return namespace;
 }
 
-function bindImport(
+/**
+ * Binds the imported module to the exported declarations.
+ */
+function bindExported(
+   context: TransformContext,
    graph: DependencyGraph,
    script: ScriptDependency,
    importInfo: ImportInfo,
-   namespace = "test"
+   exportInfo: ExportInfo,
+   importName: string,
+   importLocalName: string,
+   isImportedAsNamespace = false
+) {
+   const exportScope = exportInfo.path.scope;
+   const importScope = importInfo.path.scope;
+   const isAlreadyDeclared = !!exportDeclarationUIDMap.get(exportInfo.id);
+   if (exportInfo.type == "declared" || exportInfo.type == "declaredDefault") {
+      const uid = getExportUid(exportInfo, importLocalName);
+      exportScope.rename(exportInfo.identifier.name, uid);
+      importScope.rename(importLocalName, uid);
+
+      if (exportInfo.declaration.type != "VariableDeclaration") {
+         exportInfo.path.replaceWith(exportInfo.declaration);
+      }
+
+      referenceExportToImport(
+         importInfo,
+         exportInfo,
+         exportInfo.identifier.name
+      );
+   } else if (
+      exportInfo.type == "aggregatedAll" ||
+      exportInfo.type == "aggregatedName"
+   ) {
+      // There can't possibly an export with this type if `getExport` was used.
+      // throw error for safety
+      throw new Error("No handler for aggregated modules.");
+   } else if (exportInfo.type == "aggregatedNamespace") {
+      const aggregatedModule = getAggregatedModule(
+         graph,
+         script,
+         importInfo,
+         exportInfo
+      );
+      if (!aggregatedModule) return;
+      const uid = getExportUid(exportInfo, importLocalName);
+      const namespace = getOrCreateNamespace(
+         context,
+         aggregatedModule,
+         exportInfo.path,
+         uid
+      );
+      importScope.rename(importLocalName, namespace);
+      referenceExportToImport(importInfo, exportInfo, namespace);
+   }
+}
+
+function bindImport(
+   context: TransformContext,
+   graph: DependencyGraph,
+   script: ScriptDependency,
+   importInfo: ImportInfo
 ) {
    if (importInfo.type == "specifier" || importInfo.type == "default") {
       const importedName =
@@ -347,7 +346,9 @@ function bindImport(
             `No '${importedName}' export found in ${importInfo.source}`
          );
       }
+
       bindExported(
+         context,
          graph,
          script,
          importInfo,
@@ -355,104 +356,88 @@ function bindImport(
          importedName,
          aliasName
       );
-   }
-}
-
-function createExportHelper(scope: Scope) {
-   const code = `
-const %%exportId%% = (target, all) => {
-   for (const name in all)
-   Object.defineProperty(target, name, { get: all[name], enumerable: true });
-};
-`;
-
-   return template(code)({
-      exportId: scope.generateUid("_export"),
-   });
-}
-
-function createNamespaceExport(
-   exportId: string,
-   namespace: string,
-   exportsMap: Record<string, string>
-) {
-   const formattedExportsMap = `{${Object.entries(exportsMap)
-      .map(([key, value], i) => {
-         let line = `${key}: () => ${value}`;
-         return line;
-      })
-      .join(",")}}`;
-
-   const code = `
-var ID = {};
-EXPORT_ID(ID, ${formattedExportsMap});
-`;
-
-   const result = template.smart(code)({
-      ID: namespace,
-      EXPORT_ID: exportId,
-   });
-
-   return Array.isArray(result) ? result : [result];
-}
-
-/**
- * 1. Check if the module has been exported aggregately by other modules.
- * 2. If it has, then check if it's a namespaced export.
- * 3. If it's a namespace export:
- *    - Remove that exportInfo from the module.
- *    - Get the module that imported that aggregated namespace and get
- *    the identifier used by it so we can change it later.
- *    - Create an object containing all the import of the current module.
- *    - Let the identifier of the created object and the importer be the same.
- */
-function bindAggr(graph: DependencyGraph, script: ScriptDependency) {
-   const aggs = getAggregateNamespaceExports(graph, script.source);
-   // TODO: clean this (every thing here is temporary)
-   let name = "";
-   for (const agg of aggs) {
-      const namespace = agg.exportInfo.specifier.exported.name;
-      const importers = getImportersOfName(graph, script.source, namespace);
-      console.log(importers);
-
-      for (const { importInfo } of importers) {
-         if (importInfo.type == "sideEffect") continue;
-         name ||= agg.exportInfo.path.scope.generateUid(
-            importInfo.specifier.local.name
+   } else if (importInfo.type == "namespace") {
+      const localName = importInfo.specifier.local.name;
+      const request = importInfo.source;
+      const resolvedRequest = script.dependencyMap[request];
+      const resolvedModule = graph[resolvedRequest];
+      if (resolvedModule.type != "script") return;
+      const namespace = getOrCreateNamespace(
+         context,
+         resolvedModule,
+         importInfo.path,
+         localName
+      );
+      importInfo.path.scope.rename(localName, namespace);
+      for (const exportName in resolvedModule.exports) {
+         const exportInfo = resolvedModule.exports[exportName];
+         bindExported(
+            context,
+            graph,
+            script,
+            importInfo,
+            resolvedModule.exports[exportName],
+            exportName,
+            localName,
          );
-         importInfo.path.scope.rename(importInfo.specifier.local.name, name);
+         referenceExportToImport(importInfo, exportInfo, namespace);
       }
-      // const x = createExports("_export", "ADDsERR", [
-      //    "hey",
-      //    "dog",
-      //    "car",
-      // ]);
-      // console.log(x);
-
-      // agg.exportInfo.path.replaceWithMultiple(x);
    }
-   // if (aggs.length) {
-   //    const x = createNamespaceExport("_export", name, {
-   //       test: "test",
-   //       default: "hey",
-   //       fesa: "ge",
-   //    });
-   //    script.ast.program.body.push(...x);
-   // }
 }
 
 /**
  * This method connects the imports of each module to the exported
  * declarations of other modules
  */
-export function bindImports(graph: DependencyGraph) {
+export function bindImports(context: TransformContext, graph: DependencyGraph) {
    const scriptModules = getSortedScripts(graph);
    exportDeclarationUIDMap.clear();
+   namespaceExportsMap.clear();
    for (const script of scriptModules) {
       for (const importInfo of Object.values(script.imports)) {
-         bindImport(graph, script, importInfo);
-         importInfo.path.replaceWithMultiple;
+         bindImport(context, graph, script, importInfo);
       }
-      //bindAggr(graph, script);
    }
+
+   // Remove left out imports/exports after binding
+   for (const script of scriptModules) {
+      const ast = script.ast;
+      ast.program.body = ast.program.body.filter(
+         (node) =>
+            node.type !== "ExportDefaultDeclaration" &&
+            node.type !== "ExportAllDeclaration" &&
+            node.type !== "ExportNamedDeclaration" &&
+            node.type !== "ImportDeclaration"
+      );
+
+      traverse(ast, {
+         Program(path) {
+            const bindings = path.scope.getAllBindings();
+            Object.values(bindings).forEach(binding => {
+               if (!binding.referencePaths.length) {
+                  binding.path.remove();
+                  console.log("treeshaken: ", getAst(binding.path.parent));
+                  
+               }
+            });
+
+
+            path.stop();
+         }
+      })
+   }
+
+   // for (const script of scriptModules) {
+   //    const importInfo = Object.values(script.imports)[0];
+   //    if (!importInfo) continue;
+   //    console.log("-".repeat(60));
+   //    console.log(script.source);
+   //    Object.values(importInfo.path.scope.getAllBindings()).forEach(
+   //       (binding) => {
+   //          binding.referencePaths.forEach((ref) => {
+   //             console.log(`${binding.identifier.name}: ${getAst(ref.parent)}`);
+   //          });
+   //       }
+   //    );
+   // }
 }

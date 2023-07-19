@@ -15,15 +15,22 @@
 // console.log(pkgjson);
 // const foo: string = "bar";
 // console.log(foo);
+/* test */
 import adder, { dog, balloon, bay, eleven } from "../classes/adder";
-console.log(adder, dog, balloon, bay, eleven);
+console.log(adder, /* dog, */ balloon, bay, eleven);
 import { foo as o, bar, "hello there" as test } from "../classes/createNum";
 console.log(o, bar, test);
 import counter, { Adder } from "./testing.mjs";
+console.log(/* counter, */ /* Adder */);
 import * as namespace from "../classes/adder";
-console.log(counter, Adder, namespace);
-i;
-let i;
+console.log(/* namespace.default */);
+const __export = "this var name shouldn't be used"
+
+
+import * as NS from "../classes/createNum2";
+console.log(NS);
+
+
 // export var foos = "foo", bars = "bar";
 // export const [[hello, hi], hey] = [[1, 2], 3];
 // const bingbong = "beepboop";

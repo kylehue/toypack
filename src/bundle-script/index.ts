@@ -1,16 +1,16 @@
-import { file, program, Node } from "@babel/types";
+import { file, program, Node, Statement } from "@babel/types";
 import generate from "@babel/generator";
 import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
 import { ExportInfo } from "../graph/extract-exports.js";
 import { DependencyGraph } from "../graph/index.js";
-import {
-   bindImports,
-   cleanComments,
-   removeImportExportDeclarations,
-} from "./finalizers";
+import { bindImports, cleanComments } from "./finalizers";
 import { deconflict, transformToVars } from "./transformers";
-import { TraverseMap, getSortedScripts } from "./utils";
+import { TraverseMap, getSortedScripts, createTransformContext } from "./utils";
+import { template } from "@babel/core";
+import runtime from "./runtime.js";
+import traverse, { Hub, NodePath } from "@babel/traverse";
+import { codeFrameColumns } from "@babel/code-frame";
 
 function getAst(ast: Node) {
    return generate(ast, {
@@ -18,7 +18,25 @@ function getAst(ast: Node) {
    })?.code;
 }
 
+function getCode(code: string) {
+   return codeFrameColumns(
+      code,
+      {
+         start: {
+            line: 0,
+         },
+      },
+      {
+         forceColor: true,
+         highlightCode: true,
+         linesAbove: 0,
+         linesBelow: 999,
+      }
+   );
+}
+
 (window as any).getAst = getAst;
+(window as any).getCode = getCode;
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const traverseMap = new TraverseMap();
@@ -34,18 +52,41 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    traverseMap.doTraverseAll();
 
    // finalize
-   bindImports(graph);
-   removeImportExportDeclarations(scriptModules);
-   cleanComments(scriptModules);
+   const { context, runtimesUsed, otherAsts } = createTransformContext();
+   bindImports(context, graph);
+   cleanComments([...scriptModules, ...otherAsts]);
 
+   // bundle
    const resultAst = file(program([]));
 
    for (const script of scriptModules) {
       resultAst.program.body.unshift(...script.ast.program.body);
    }
 
-   const generated = generate(resultAst);
-   console.log(generated.code);
+   for (const { ast } of otherAsts) {
+      resultAst.program.body.unshift(...ast.program.body);
+   }
+
+   for (const name of runtimesUsed) {
+      const statements = template(runtime[name])();
+      const arr = Array.isArray(statements) ? statements : [statements];
+      resultAst.program.body.unshift(...arr);
+   }
+
+   const generated = generate(resultAst, {
+      // sourceMaps: true
+   });
+
+   // for (let i = 0; i < (generated?.map?.sources.length || 0); i++) {
+   //    const source = generated?.map?.sources[i]!;
+   //    generated.map!.sourcesContent ??= [];
+   //    generated.map!.sourcesContent[i] = graph[source].asset.content as string;
+   // }
+
+   console.log("%c-------------- RESULT --------------", "color:red;");
+   console.log(getCode(generated.code));
+   console.log(generated);
+   
 
    // Deconflict.reset();
    // const config = this.getConfig();
@@ -238,23 +279,6 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 //       }
 //    }
 // }
-
-function removeExport(exported: ExportInfo) {
-   if (exported.path.removed) return;
-   if (
-      exported.type == "aggregatedAll" ||
-      exported.type == "aggregatedName" ||
-      exported.type == "declared" ||
-      exported.type == "aggregatedNamespace"
-   ) {
-      exported.path.remove();
-   } else if (
-      exported.type == "declaredDefault" ||
-      exported.type == "declaredDefaultExpression"
-   ) {
-      exported.path.replaceWith(exported.declaration);
-   }
-}
 
 /**
  * This function is for connecting each imported/exported identifiers
