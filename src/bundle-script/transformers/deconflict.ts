@@ -1,59 +1,62 @@
-import { NodePath } from "@babel/traverse";
-import { isBlockScoped, isMemberExpression } from "@babel/types";
+import { Binding, Scope } from "@babel/traverse";
+import { isBlockScoped } from "@babel/types";
 import { TraverseMap } from "../utils/TraverseMap";
 
+function getAllTopLevelBindings(scope: Scope) {
+   const bindings = scope.getAllBindings();
+   const filtered: Record<string, Binding> = {};
+   for (const [name, binding] of Object.entries(bindings)) {
+      if (isBlockScoped(binding.scope.block)) continue;
+      filtered[name] = binding;
+   }
+
+   return filtered;
+}
+
 /**
- * Deconflicts all of the script modules in the dependency graph.
+ * Deconflicts all of the top-level variables in script modules.
  */
 export function deconflict(traverseMap: TraverseMap) {
-   let takenVars: {
-      scopeId: string;
-      value: string;
-      path: NodePath;
-   }[] = [];
+   const prevScopes = new Set<Scope>();
+   const takenVars = new Set<string>();
 
-   traverseMap.setTraverseAll((scopeId) => ({
-      Identifier(path) {
-         const { node, scope } = path;
-         
-         // Only target top-level vars
-         if (isBlockScoped(scope.block)) {
-            return;
+   traverseMap.setTraverseAll((source) => ({
+      Program(path) {
+         const currentScope = path.scope;
+
+         for (const binding of Object.values(
+            getAllTopLevelBindings(currentScope)
+         )) {
+            const identifier = binding.identifier;
+
+            if (takenVars.has(identifier.name)) {
+               currentScope.rename(identifier.name);
+            }
+            takenVars.add(identifier.name);
          }
 
-         let { name } = node;
+         // no idea what this does but it fixes the missing bindings
+         currentScope.crawl();
 
-         const isGlobal = !scope.hasBinding(name);
-         if (isGlobal) return;
+         for (const prevScope of prevScopes) {
+            // Append the current bindings to previous modules
+            for (const binding of Object.values(
+               getAllTopLevelBindings(currentScope)
+            )) {
+               if (prevScope.hasBinding(binding.identifier.name)) continue;
+               prevScope.registerDeclaration(binding.path);
+            }
 
-         if (isMemberExpression(path.node)) return;
-
-         const duplicate = takenVars.find(
-            (f) => f.value === name && f.scopeId !== scopeId
-         );
-         if (duplicate) {
-            // Rename
-            name = scope.generateUid(name);
-            scope.rename(node.name, name);
+            // Append the previous bindings to the current module
+            for (const binding of Object.values(
+               getAllTopLevelBindings(prevScope)
+            )) {
+               if (currentScope.hasBinding(binding.identifier.name)) continue;
+               currentScope.registerDeclaration(binding.path);
+            }
          }
 
-         /**
-          * We must let the other scopes know that this identifier
-          * name already exists to avoid id conflicts when generating
-          * uids in other scopes. We can achieve this by binding the
-          * identifier to that scope.
-          */
-         for (const taken of takenVars) {
-            if (taken.path.scope.hasBinding(node.name)) continue;
-            if (taken.scopeId == scopeId) continue;
-            taken.path.scope.registerDeclaration(path);
-         }
-         
-         takenVars.push({
-            scopeId,
-            value: name,
-            path: path,
-         });
+         prevScopes.add(currentScope);
       },
    }));
 }
