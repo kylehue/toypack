@@ -25,7 +25,6 @@ import {
    exportDefaultDeclaration,
 } from "@babel/types";
 import { traverse } from "@babel/core";
-import { getPatternIds } from "../utils";
 
 export function getBindingDeclaration(path: NodePath, id: string) {
    const binding = path.scope.getBinding(id);
@@ -102,25 +101,16 @@ export function extractExports(
          } else {
             // Declared exports
             if (isVariableDeclaration(declaration)) {
-               for (const declarator of declaration.declarations) {
-                  const { id } = declarator;
-                  if (
-                     id.type != "ArrayPattern" &&
-                     id.type != "ObjectPattern" &&
-                     id.type != "Identifier"
-                  ) {
-                     continue;
-                  }
-                  getPatternIds(id).forEach((id) => {
-                     exports[id.name] = {
-                        id: `$${uid++}`,
-                        type: "declared",
-                        path,
-                        declaration,
-                        identifier: id,
-                     };
-                  });
-               }
+               const ids = Object.values(path.getBindingIdentifiers());
+               ids.forEach(id => {
+                  exports[id.name] = {
+                     id: `$${uid++}`,
+                     type: "declared",
+                     path,
+                     declaration,
+                     identifier: id,
+                  };
+               });
             } else {
                if (
                   isFunctionDeclaration(declaration) ||

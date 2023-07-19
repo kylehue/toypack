@@ -5,7 +5,6 @@ export { escapeRegex } from "./escape-regex.js";
 export { findCodePosition, indexToPosition } from "./find-code-position.js";
 export { getHash } from "./get-hash.js";
 export { getImportCode } from "./get-import-code.js";
-export { getPatternIds } from "./get-pattern-ids.js";
 export { getSourceMapUrl, removeSourceMapUrl } from "./get-source-map-url.js";
 export { getUsableResourcePath } from "./get-usable-resource-path.js";
 export { isLocal } from "./is-local.js";

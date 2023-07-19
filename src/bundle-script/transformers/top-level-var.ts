@@ -1,5 +1,5 @@
+import { generateUid } from "../utils";
 import { TraverseMap } from "../utils/TraverseMap";
-import { getPatternIds } from "../../utils";
 import { isBlockScoped } from "@babel/types";
 
 /**
@@ -18,22 +18,13 @@ export function transformToVars(traverseMap: TraverseMap) {
                return;
             }
 
-            for (const declarator of node.declarations) {
-               const { id } = declarator;
-               if (
-                  id.type != "ArrayPattern" &&
-                  id.type != "ObjectPattern" &&
-                  id.type != "Identifier"
-               ) {
-                  continue;
+            const parentScope = scope.parent;
+            const ids = Object.values(path.getBindingIdentifiers());
+            ids.forEach((id) => {
+               if (parentScope?.hasBinding(id.name)) {
+                  scope.rename(id.name, generateUid(id.name));
                }
-               const parentScope = scope.parent;
-               getPatternIds(id).forEach((id) => {
-                  if (parentScope?.hasBinding(id.name)) {
-                     scope.rename(id.name);
-                  }
-               });
-            }
+            });
 
             if (node.kind != "var") {
                node.kind = "var";
