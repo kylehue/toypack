@@ -29,12 +29,24 @@ export function deconflict(traverseMap: TraverseMap) {
          )) {
             const identifier = binding.identifier;
             const { name } = identifier;
+
+            // TODO: should we really skip bindings that are in import declarations?
+            if (
+               currentScope
+                  .getBinding(name)
+                  ?.path.find((x) => x.isImportDeclaration())
+            ) {
+               continue;
+            }
+
             if (takenVars.has(name) || name in runtime) {
                currentScope.rename(name, generateUid(name));
             }
 
             takenVars.add(identifier.name);
          }
+
+         currentScope.crawl();
       },
    }));
 }

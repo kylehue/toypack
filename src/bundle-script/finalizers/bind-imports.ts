@@ -17,6 +17,8 @@ import {
    variableDeclarator,
    file,
    program,
+   isFunctionDeclaration,
+   isClassDeclaration,
 } from "@babel/types";
 import traverse, { NodePath, Scope } from "@babel/traverse";
 import { template } from "@babel/core";
@@ -136,17 +138,20 @@ function referenceExportToImport(
    const importScope = importInfo.path.scope;
    const exportedBinding = exportScope.getBinding(nameToReference);
    const importedBinding = importScope.getBinding(nameToReference);
-   importedBinding?.referencePaths.forEach((path) => {
-      exportedBinding?.reference(path);
+   exportedBinding?.referencePaths.forEach((path) => {
+      importedBinding?.reference(path);
    });
 
    // dereference the export declarations
-   exportedBinding?.referencePaths.forEach((path, index) => {
-      if (path.findParent((x) => x.isExportDeclaration())) {
-         exportedBinding?.dereference();
-         exportedBinding?.referencePaths.splice(index, 1);
-      }
-   });
+   // exportedBinding?.referencePaths.forEach((path, index) => {
+   //    if (path.findParent((x) => x.isExportDeclaration())) {
+   //       exportedBinding?.dereference();
+   //       exportedBinding?.referencePaths.splice(index, 1);
+   //    }
+   // });
+
+   // exportInfo.path.scope.crawl();
+   // importInfo.path.scope.crawl();
 }
 
 const exportDeclarationUIDMap = new Map<string, string>();
@@ -233,10 +238,7 @@ function getOrCreateNamespace(
    const computedIdsMap = new Map<string, Identifier>();
    const formattedExports = exportEntries
       .map(([exportName, exportInfo], index, arr) => {
-         if (
-            exportInfo.type !== "declared" &&
-            exportInfo.type !== "declaredDefault"
-         ) {
+         if (exportInfo.type !== "declared") {
             return;
          }
 
@@ -265,6 +267,79 @@ function getOrCreateNamespace(
    return namespace;
 }
 
+const declaredModules: string[] = [];
+
+/**
+ * In the code below, the binding of `foo` will remove its reference
+ * in `export { foo };` because it's in an export declaration.
+ *
+ * ```js
+ * const foo = "bar";
+ * export { foo };
+ * ```
+ */
+function removeExportDeclRefs(exportInfo: ExportInfo, name: string) {
+   const exportScope = exportInfo.path.scope;
+   const exportBinding = exportScope.getBinding(name);
+   exportBinding?.referencePaths.forEach((path, index) => {
+      if (path.find((x) => x.isExportDeclaration())) {
+         exportBinding.referencePaths.splice(index, 1);
+         exportBinding.dereference();
+      }
+   });
+}
+
+/**
+ * In the code below, the binding `const foo = "bar"` in "module.js"
+ * will have a reference to the `foo` in "main.js"
+ *
+ * ```js
+ * // main.js
+ * import { foo } from "module.js";
+ * console.log(foo);
+ *
+ * // module.js
+ * export const foo = "bar";
+ * ```
+ */
+function addImportRefsToExportBinding(
+   importInfo: ImportInfo,
+   importName: string,
+   exportInfo: ExportInfo,
+   exportName: string
+) {
+   const exportScope = exportInfo.path.scope;
+   const importScope = importInfo.path.scope;
+   const importBinding = importScope.getBinding(importName);
+   const exportBinding = exportScope.getBinding(exportName);
+   importBinding?.referencePaths.forEach((path) => {
+      exportBinding?.reference(path);
+   });
+}
+
+function fixReferences(
+   importInfo: ImportInfo,
+   importName: string,
+   exportInfo: ExportInfo,
+   exportName: string
+) {
+   removeExportDeclRefs(exportInfo, exportName);
+   addImportRefsToExportBinding(importInfo, importName, exportInfo, exportName);
+}
+
+function matchImportAndExportName(
+   importInfo: ImportInfo,
+   importName: string,
+   exportInfo: ExportInfo,
+   exportName: string
+) {
+   const exportScope = exportInfo.path.scope;
+   const importScope = importInfo.path.scope;
+   const uid = getExportUid(exportInfo, importName);
+   importScope.rename(importName, uid);
+   exportScope.rename(exportName, uid);
+}
+
 /**
  * Binds the imported module to the exported declarations.
  */
@@ -281,44 +356,104 @@ function bindExported(
    const exportScope = exportInfo.path.scope;
    const importScope = importInfo.path.scope;
    const isAlreadyDeclared = !!exportDeclarationUIDMap.get(exportInfo.id);
-   if (exportInfo.type == "declared" || exportInfo.type == "declaredDefault") {
-      const uid = getExportUid(exportInfo, importLocalName);
-      exportScope.rename(exportInfo.identifier.name, uid);
-      importScope.rename(importLocalName, uid);
-
-      if (exportInfo.declaration.type != "VariableDeclaration") {
-         exportInfo.path.replaceWith(exportInfo.declaration);
-      }
-
-      referenceExportToImport(
+   if (exportInfo.type == "declared") {
+      fixReferences(
          importInfo,
+         importLocalName,
          exportInfo,
          exportInfo.identifier.name
       );
-   } else if (
-      exportInfo.type == "aggregatedAll" ||
-      exportInfo.type == "aggregatedName"
-   ) {
-      // There can't possibly an export with this type if `getExport` was used.
-      // throw error for safety
-      throw new Error("No handler for aggregated modules.");
-   } else if (exportInfo.type == "aggregatedNamespace") {
-      const aggregatedModule = getAggregatedModule(
-         graph,
-         script,
+      matchImportAndExportName(
          importInfo,
-         exportInfo
+         importLocalName,
+         exportInfo,
+         exportInfo.identifier.name
       );
-      if (!aggregatedModule) return;
-      const uid = getExportUid(exportInfo, importLocalName);
-      const namespace = getOrCreateNamespace(
-         context,
-         aggregatedModule,
-         exportInfo.path,
-         uid
+
+      dumpReference(exportScope, exportInfo.identifier.name, script.source, 2);
+   } else if (exportInfo.type == "declaredDefault") {
+      const decl = exportInfo.declaration;
+
+      if (
+         decl.node.type == "FunctionDeclaration" ||
+         decl.node.type == "ClassDeclaration"
+      ) {
+         /**
+          * Function/Class declarations are allowed to not have
+          * ids when exported as default. So in here, we must make
+          * sure that they get id'd
+          */
+         if (!decl.node.id) {
+            decl.node.id = identifier(generateUid("default"));
+            exportScope.registerDeclaration(decl);
+         }
+
+         const id = decl.node.id;
+         fixReferences(importInfo, importLocalName, exportInfo, id.name);
+
+         // Remove the `export` declaration
+         const exportDecl = exportInfo.path.node.declaration;
+         if (
+            isFunctionDeclaration(exportDecl) ||
+            isClassDeclaration(exportDecl)
+         ) {
+            exportInfo.path.replaceWith(decl);
+         } else {
+            exportInfo.path.remove();
+         }
+
+         matchImportAndExportName(
+            importInfo,
+            importLocalName,
+            exportInfo,
+            id.name
+         );
+
+         // dumpReference(exportScope, id.name, script.source, 2);
+      } else {
+      }
+   } else if (exportInfo.type == "declaredDefaultExpression") {
+      /**
+       * Create a variable declaration for the expression and
+       * replace the `export` declaration with it e.g.
+       */
+      const id = identifier(generateUid("default"));
+      const varDecl = variableDeclaration("const", [
+         variableDeclarator(id, exportInfo.declaration.node),
+      ]);
+      const [varDeclPath] = exportInfo.path.replaceWith(varDecl);
+      exportScope.registerDeclaration(varDeclPath);
+
+      fixReferences(importInfo, importLocalName, exportInfo, id.name);
+      matchImportAndExportName(
+         importInfo,
+         importLocalName,
+         exportInfo,
+         id.name
       );
-      importScope.rename(importLocalName, namespace);
-      referenceExportToImport(importInfo, exportInfo, namespace);
+
+      // dumpReference(exportScope, id.name, script.source, 2);
+   } else if (exportInfo.type == "aggregatedNamespace") {
+      // const aggregatedModule = getAggregatedModule(
+      //    graph,
+      //    script,
+      //    importInfo,
+      //    exportInfo
+      // );
+      // if (!aggregatedModule) return;
+      // const uid = getExportUid(exportInfo, importLocalName);
+      // const namespace = getOrCreateNamespace(
+      //    context,
+      //    aggregatedModule,
+      //    exportInfo.path,
+      //    uid
+      // );
+      // importScope.rename(importLocalName, namespace);
+      // referenceExportToImport(importInfo, exportInfo, namespace);
+   }
+
+   if (!importInfo.path.node.specifiers.length) {
+      importInfo.path.remove();
    }
 }
 
@@ -333,7 +468,7 @@ function bindImport(
          importInfo.type == "specifier"
             ? getImportedName(importInfo.specifier)
             : "default";
-      const aliasName = importInfo.specifier.local.name;
+      const localName = importInfo.specifier.local.name;
       const exportInfo = getExport(
          graph,
          importedName,
@@ -354,34 +489,35 @@ function bindImport(
          importInfo,
          exportInfo,
          importedName,
-         aliasName
-      );
-   } else if (importInfo.type == "namespace") {
-      const localName = importInfo.specifier.local.name;
-      const request = importInfo.source;
-      const resolvedRequest = script.dependencyMap[request];
-      const resolvedModule = graph[resolvedRequest];
-      if (resolvedModule.type != "script") return;
-      const namespace = getOrCreateNamespace(
-         context,
-         resolvedModule,
-         importInfo.path,
          localName
       );
-      importInfo.path.scope.rename(localName, namespace);
-      for (const exportName in resolvedModule.exports) {
-         const exportInfo = resolvedModule.exports[exportName];
-         bindExported(
-            context,
-            graph,
-            script,
-            importInfo,
-            resolvedModule.exports[exportName],
-            exportName,
-            localName,
-         );
-         referenceExportToImport(importInfo, exportInfo, namespace);
-      }
+      // importInfo.path.scope.moveBindingTo(localName, exportInfo.path.scope);
+   } else if (importInfo.type == "namespace") {
+      // const localName = importInfo.specifier.local.name;
+      // const request = importInfo.source;
+      // const resolvedRequest = script.dependencyMap[request];
+      // const resolvedModule = graph[resolvedRequest];
+      // if (resolvedModule.type != "script") return;
+      // const namespace = getOrCreateNamespace(
+      //    context,
+      //    resolvedModule,
+      //    importInfo.path,
+      //    localName
+      // );
+      // importInfo.path.scope.rename(localName, namespace);
+      // for (const exportName in resolvedModule.exports) {
+      //    const exportInfo = resolvedModule.exports[exportName];
+      //    bindExported(
+      //       context,
+      //       graph,
+      //       script,
+      //       importInfo,
+      //       resolvedModule.exports[exportName],
+      //       exportName,
+      //       localName,
+      //    );
+      //    referenceExportToImport(importInfo, exportInfo, namespace);
+      // }
    }
 }
 
@@ -393,6 +529,7 @@ export function bindImports(context: TransformContext, graph: DependencyGraph) {
    const scriptModules = getSortedScripts(graph);
    exportDeclarationUIDMap.clear();
    namespaceExportsMap.clear();
+
    for (const script of scriptModules) {
       for (const importInfo of Object.values(script.imports)) {
          bindImport(context, graph, script, importInfo);
@@ -402,29 +539,28 @@ export function bindImports(context: TransformContext, graph: DependencyGraph) {
    // Remove left out imports/exports after binding
    for (const script of scriptModules) {
       const ast = script.ast;
-      ast.program.body = ast.program.body.filter(
-         (node) =>
-            node.type !== "ExportDefaultDeclaration" &&
-            node.type !== "ExportAllDeclaration" &&
-            node.type !== "ExportNamedDeclaration" &&
-            node.type !== "ImportDeclaration"
-      );
+      // ast.program.body = ast.program.body.filter(
+      //    (node) =>
+      //       node.type !== "ExportDefaultDeclaration" &&
+      //       node.type !== "ExportAllDeclaration" &&
+      //       node.type !== "ExportNamedDeclaration" &&
+      //       node.type !== "ImportDeclaration"
+      // );
 
-      traverse(ast, {
-         Program(path) {
-            const bindings = path.scope.getAllBindings();
-            Object.values(bindings).forEach(binding => {
-               if (!binding.referencePaths.length) {
-                  binding.path.remove();
-                  console.log("treeshaken: ", getAst(binding.path.parent));
-                  
-               }
-            });
+      // traverse(ast, {
+      //    Program(path) {
+      //       const bindings = path.scope.getAllBindings();
+      //       Object.values(bindings).forEach(binding => {
+      //          if (!binding.referencePaths.length) {
+      //             binding.path.remove();
+      //             console.log("treeshaken: ", getAst(binding.path.parent));
 
+      //          }
+      //       });
 
-            path.stop();
-         }
-      })
+      //       path.stop();
+      //    }
+      // })
    }
 
    // for (const script of scriptModules) {

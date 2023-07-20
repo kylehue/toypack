@@ -1,8 +1,9 @@
-import { NodePath, TraverseOptions } from "@babel/traverse";
+import { NodePath, Scope, TraverseOptions } from "@babel/traverse";
 import {
    Node,
    Identifier,
    VariableDeclaration,
+   VariableDeclarator,
    ExportAllDeclaration,
    Expression,
    FunctionDeclaration,
@@ -26,19 +27,19 @@ import {
 } from "@babel/types";
 import { traverse } from "@babel/core";
 
-export function getBindingDeclaration(path: NodePath, id: string) {
-   const binding = path.scope.getBinding(id);
+export function getBindingDeclaration(scope: Scope, name: string) {
+   const binding = scope.getBinding(name);
    if (!binding) return;
+   const path = binding.path;
    if (
-      isVariableDeclarator(binding.path.node) &&
-      isVariableDeclaration(binding.path.parent)
+      path.type == "FunctionDeclaration" ||
+      path.type == "ClassDeclaration" ||
+      path.type == "VariableDeclarator"
    ) {
-      return binding.path.parent;
-   } else if (
-      isClassDeclaration(binding.path.node) ||
-      isFunctionDeclaration(binding.path.node)
-   ) {
-      return binding.path.node;
+      return binding.path as
+         | NodePath<ClassDeclaration>
+         | NodePath<FunctionDeclaration>
+         | NodePath<VariableDeclarator>;
    }
 }
 
@@ -102,12 +103,18 @@ export function extractExports(
             // Declared exports
             if (isVariableDeclaration(declaration)) {
                const ids = Object.values(path.getBindingIdentifiers());
-               ids.forEach(id => {
+               ids.forEach((id) => {
+                  const declPath = getBindingDeclaration(path.scope, id.name);
+
+                  if (!declPath) {
+                     throw new Error(`No declaration found for "${id.name}"`);
+                  }
+
                   exports[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
-                     declaration,
+                     declaration: declPath,
                      identifier: id,
                   };
                });
@@ -122,11 +129,22 @@ export function extractExports(
                    */
                   // declaration.id should be guaranteed here
                   const identifier = declaration.id!;
+                  const declPath = getBindingDeclaration(
+                     path.scope,
+                     identifier.name
+                  );
+
+                  if (!declPath) {
+                     throw new Error(
+                        `No declaration found for "${identifier.name}"`
+                     );
+                  }
+
                   exports[identifier.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
-                     declaration,
+                     declaration: declPath,
                      identifier,
                   };
                } else {
@@ -144,16 +162,22 @@ export function extractExports(
                         exported.type == "Identifier"
                            ? exported.name
                            : exported.value;
-                     const declaration = getBindingDeclaration(
-                        path,
+                     const declPath = getBindingDeclaration(
+                        path.scope,
                         local.name
                      );
-                     if (!declaration) continue;
+
+                     if (!declPath) {
+                        throw new Error(
+                           `No declaration found for "${local.name}"`
+                        );
+                     }
+
                      exports[exportedName] = {
                         id: `$${uid++}`,
                         type: "declared",
                         path,
-                        declaration,
+                        declaration: declPath,
                         identifier: local,
                      };
                   }
@@ -163,24 +187,33 @@ export function extractExports(
       },
       ExportDefaultDeclaration(path) {
          const { node } = path;
-         if (isDeclaration(node.declaration)) {
+         const { declaration } = node;
+         if (
+            isFunctionDeclaration(declaration) ||
+            isClassDeclaration(declaration)
+         ) {
             /**
              * For default-declared exports e.g.
              * export default function() {}
              * export default class {}
              */
-            const { declaration } = node;
-            if (isTSDeclareFunction(declaration)) return;
-            if (!declaration.id) {
-               declaration.id = identifier(path.scope.generateUid("default"));
+
+            const declPath = path.get("declaration");
+
+            if (
+               !isFunctionDeclaration(declPath.node) &&
+               !isClassDeclaration(declPath.node)
+            ) {
+               throw new TypeError("Invalid declaration.");
             }
 
             exports["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
-               declaration,
-               identifier: declaration.id,
+               declaration: declPath as
+                  | NodePath<ClassDeclaration>
+                  | NodePath<FunctionDeclaration>,
             };
          } else if (isIdentifier(node.declaration)) {
             /**
@@ -189,13 +222,17 @@ export function extractExports(
              * export default foo;
              */
             const name = node.declaration.name;
-            const declaration = getBindingDeclaration(path, name);
-            if (!declaration) return;
+            const declPath = getBindingDeclaration(path.scope, name);
+
+            if (!declPath) {
+               throw new Error(`No declaration found for "${name}"`);
+            }
+
             exports["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
-               declaration,
+               declaration: declPath,
                identifier: node.declaration,
             };
          } else if (isExpression(node.declaration)) {
@@ -206,32 +243,16 @@ export function extractExports(
              * export default "Hello";
              */
 
-            /**
-             * Transform it so that it can have an identifier e.g.
-             *
-             * input:
-             * export default {};
-             *
-             * output:
-             * const id = {};
-             * export default id;
-             */
-            const newIdentifier = identifier(path.scope.generateUid("default"));
-            const [newDeclaration] = path.insertBefore(
-               variableDeclaration("const", [
-                  variableDeclarator(newIdentifier, node.declaration),
-               ])
-            );
-
-            path.replaceWith(exportDefaultDeclaration(newIdentifier));
-            path.scope.registerDeclaration(newDeclaration);
+            const declPath = path.get("declaration");
+            if (!isExpression(declPath.node)) {
+               throw new TypeError("Invalid declaration.");
+            }
 
             exports["default"] = {
                id: `$${uid++}`,
-               type: "declaredDefault",
+               type: "declaredDefaultExpression",
                path,
-               declaration: newDeclaration.node,
-               identifier: newIdentifier,
+               declaration: declPath as NodePath<Expression>,
             };
          }
       },
@@ -274,15 +295,28 @@ export interface DeclaredExport {
    type: "declared";
    identifier: Identifier;
    path: NodePath<ExportNamedDeclaration>;
-   declaration: VariableDeclaration | ClassDeclaration | FunctionDeclaration;
+   declaration:
+      | NodePath<ClassDeclaration>
+      | NodePath<FunctionDeclaration>
+      | NodePath<VariableDeclarator>;
 }
 
 export interface DeclaredDefaultExport {
    id: string;
    type: "declaredDefault";
    path: NodePath<ExportDefaultDeclaration>;
-   identifier: Identifier;
-   declaration: VariableDeclaration | ClassDeclaration | FunctionDeclaration;
+   identifier?: Identifier;
+   declaration:
+      | NodePath<ClassDeclaration>
+      | NodePath<FunctionDeclaration>
+      | NodePath<VariableDeclarator>;
+}
+
+export interface DeclaredDefaultExpressionExport {
+   id: string;
+   type: "declaredDefaultExpression";
+   path: NodePath<ExportDefaultDeclaration>;
+   declaration: NodePath<Expression>;
 }
 
 export type ExportInfo =
@@ -290,4 +324,5 @@ export type ExportInfo =
    | AggregatedNameExport
    | AggregatedNamespaceExport
    | DeclaredExport
-   | DeclaredDefaultExport;
+   | DeclaredDefaultExport
+   | DeclaredDefaultExpressionExport;
