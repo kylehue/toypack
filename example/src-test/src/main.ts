@@ -16,19 +16,27 @@
 // const foo: string = "bar";
 // console.log(foo);
 /* test */
-import adder, { dog, balloon, bay, eleven } from "../classes/adder";
-console.log(adder, /* dog, */ balloon, bay, eleven);
-import { foo as o, bar, "hello there" as test } from "../classes/createNum";
-console.log(o, bar, test);
-import counter, { Adder } from "./testing.mjs";
-console.log(/* counter, */ /* Adder */);
-import * as namespace from "../classes/adder";
-console.log(/* namespace.default */);
-const __export = "this var name shouldn't be used"
+// import adder, { dog, balloon, bay, eleven } from "../classes/adder";
+// console.log(adder, dog, balloon, bay, eleven);
+// import { foo as o, bar, "hello there" as test } from "../classes/createNum";
+// console.log(o, bar, test);
+// import counter, { Adder } from "./testing.mjs";
+// console.log(counter, Adder);
 
+import * as cool from "./testing.mjs";
+console.log(cool);
+// import * as namespace from "../classes/adder";
+// console.log(namespace.default);
+// const __export = "this var name shouldn't be used"
 
-import * as NS from "../classes/createNum2";
-console.log(NS);
+// import * as NS from "../classes/createNum2";
+// console.log(NS);
+
+// import def, { add, createNum } from "../classes/createNum2";
+// const def_0 = 45;
+// const def_1 = 45;
+// var cook = 45;
+// console.log(def, add, createNum);
 
 
 // export var foos = "foo", bars = "bar";

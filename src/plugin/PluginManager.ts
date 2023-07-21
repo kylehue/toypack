@@ -1,5 +1,5 @@
 import { SpecifierOptions } from "src/utils/get-import-code.js";
-import { Importers } from "../graph/index.js";
+import { Importers } from "../parse/index.js";
 import Toypack from "../Toypack.js";
 import {
    DependencyGraph,
@@ -21,7 +21,7 @@ import {
    PluginContextBase,
    PluginHooks,
 } from "./hook-types.js";
-import { loadChunk } from "../graph/load-chunk.js";
+import { loadChunk } from "../parse/load-chunk.js";
 
 type PluginHooksGroupMap = {
    [key in keyof PluginHooks]?: {

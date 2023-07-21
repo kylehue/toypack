@@ -8,9 +8,12 @@ import {
    ExportNamedDeclaration,
    CallExpression,
    TSImportType,
+   file,
+   program,
+   Program,
 } from "@babel/types";
 import { Toypack } from "../Toypack.js";
-import { ERRORS, mergeTraverseOptions } from "../utils";
+import { ERRORS, mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
 import { ExportInfo, extractExports } from "./extract-exports.js";
 import { ImportInfo, extractImports } from "./extract-imports.js";
@@ -45,9 +48,10 @@ export async function parseScriptAsset(
    const result: ParsedScriptResult = {
       type: "script",
       dependencies: new Set(),
-      ast: {} as File,
+      ast: file(program([])),
       exports: {},
       imports: {},
+      programPath: {} as NodePath<Program>,
    };
 
    const moduleType =
@@ -88,6 +92,12 @@ export async function parseScriptAsset(
    const traverse = (options: TraverseOptions) => {
       traverseOptionsArray.push(options);
    };
+
+   traverse({
+      Program(path) {
+         result.programPath = path;
+      },
+   });
 
    // Extract dependencies
    if (moduleType == "esm") {
@@ -176,6 +186,7 @@ export interface ParsedScriptResult {
    ast: File;
    exports: Record<string, ExportInfo>;
    imports: Record<string, ImportInfo>;
+   programPath: NodePath<Program>;
 }
 
 export interface ParseScriptOptions {

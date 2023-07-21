@@ -5,8 +5,8 @@ import {
    isSupported,
    ERRORS,
    shouldProduceSourceMap,
-} from "../utils";
-import { Asset, PluginContext, ResourceAsset, TextAsset } from "../types";
+} from "../utils/index.js";
+import { Asset, PluginContext, ResourceAsset, TextAsset } from "../types.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { createAsset } from "../utils/create-asset.js";
 import path from "path-browserify";

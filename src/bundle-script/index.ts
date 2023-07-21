@@ -1,26 +1,30 @@
-import { file, program, Node, Statement } from "@babel/types";
+import { file, program, Node } from "@babel/types";
 import generate from "@babel/generator";
 import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
-import { ExportInfo } from "../graph/extract-exports.js";
-import { DependencyGraph } from "../graph/index.js";
-import { bindImports, cleanComments } from "./finalizers";
-import { deconflict, transformToVars } from "./transformers";
-import { TraverseMap, getSortedScripts, createTransformContext } from "./utils";
+import { ExportInfo } from "../parse/extract-exports.js";
+import { DependencyGraph, ScriptDependency } from "../parse/index.js";
+import { bindImports, deconflict, transformToVars } from "./link/index.js";
+import {
+   TraverseMap,
+   cleanComments,
+   createTransformContext,
+   getSortedScripts,
+   resetUidCache,
+} from "./utils";
 import { template } from "@babel/core";
 import runtime from "./runtime.js";
-import traverse, { Hub, NodePath } from "@babel/traverse";
+import traverse, { Hub, NodePath, Scope } from "@babel/traverse";
 import { codeFrameColumns } from "@babel/code-frame";
 
-function getAst(ast: Node) {
-   return generate(ast, {
-      comments: false,
-   })?.code;
-}
-
-function getCode(code: string) {
+// TODO: remove
+(window as any).getCode = function (ast: Node | string) {
    return codeFrameColumns(
-      code,
+      typeof ast == "string"
+         ? ast
+         : generate(ast, {
+              comments: false,
+           })?.code,
       {
          start: {
             line: 0,
@@ -33,12 +37,72 @@ function getCode(code: string) {
          linesBelow: 999,
       }
    );
-}
+};
 
-(window as any).getAst = getAst;
-(window as any).getCode = getCode;
+// TODO: remove
+(window as any).dumpReference = function (
+   scope: Scope,
+   name: string,
+   source = "unknown",
+   deepness: 1 | 2 | 3 = 1
+) {
+   console.log("%c" + "-".repeat(80), "color: red;");
+   const binding = scope.getBinding(name);
+   if (!binding) {
+      console.log(
+         `%cNo "${name}" binding found in "${source}".`,
+         "color: grey"
+      );
+      console.log(scope);
+      return;
+   }
+
+   if (!binding.referencePaths.length) {
+      console.log(`%c"${name}" has no references in ${source}.`, "color: grey");
+      console.log(scope);
+      return;
+   }
+
+   console.log(
+      `%cReference found:`,
+      "color: orange",
+      source,
+      `(${binding.references})`
+   );
+   console.log(`Binding: "${name}"`);
+   binding.referencePaths.forEach((path) => {
+      const nodeToPrint =
+         deepness == 1
+            ? path.node
+            : deepness == 2
+            ? path.parent
+            : deepness == 3
+            ? path.parentPath?.node || path.parent
+            : path.node;
+      console.log(getCode(nodeToPrint));
+   });
+};
+
+// function mergeAsts(scriptModules: ScriptDependency[]) {
+//    const mergedAst = file(program([]));
+
+//    for (const script of scriptModules) {
+//       mergedAst.program.body.unshift(...script.ast.program.body);
+//    }
+
+//    let resultPath: NodePath<Program>;
+//    traverse(mergedAst, {
+//       Program(path) {
+//          resultPath = path;
+//          path.stop();
+//       }
+//    });
+
+//    return resultPath!;
+// }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
+   resetUidCache();
    const traverseMap = new TraverseMap();
    const scriptModules = getSortedScripts(graph);
 
@@ -46,15 +110,15 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       traverseMap.setAst(script.source, script.ast);
    }
 
-   // transform
-   transformToVars(traverseMap);
-   deconflict(traverseMap);
-   traverseMap.doTraverseAll();
-
-   // finalize
    const { context, runtimesUsed, otherAsts } = createTransformContext();
-   bindImports(context, graph);
-   cleanComments([...scriptModules, ...otherAsts]);
+
+   // order matters here
+   transformToVars(scriptModules);
+   deconflict(scriptModules);
+   bindImports(context, graph, scriptModules);
+   cleanComments(scriptModules);
+
+   // bindImports(context, graph);
 
    // bundle
    const resultAst = file(program([]));
@@ -86,7 +150,6 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    console.log("%c-------------- RESULT --------------", "color:red;");
    console.log(getCode(generated.code));
    console.log(generated);
-   
 
    // Deconflict.reset();
    // const config = this.getConfig();

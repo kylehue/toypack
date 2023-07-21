@@ -4,13 +4,13 @@ import {
    Importers,
    ScriptDependency,
    StyleDependency,
-} from "../graph/index.js";
+} from "../parse/index.js";
 import { Toypack } from "../Toypack.js";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
 import { BundleResult } from "../types";
-import { ParsedScriptResult } from "../graph/parse-script-chunk.js";
-import { ParsedStyleResult } from "../graph/parse-style-chunk.js";
-import { LoadResult, ModuleInfo } from "../graph/load-chunk.js";
+import { ParsedScriptResult } from "../parse/parse-script-chunk.js";
+import { ParsedStyleResult } from "../parse/parse-style-chunk.js";
+import { LoadResult, ModuleInfo } from "../parse/load-chunk.js";
 import { SpecifierOptions } from "../utils/get-import-code.js";
 import { BundleGenerator } from "../utils/BundleGenerator.js";
 import { TraverseOptions } from "@babel/traverse";

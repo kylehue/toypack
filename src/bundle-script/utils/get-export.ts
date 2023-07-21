@@ -1,5 +1,5 @@
-import { DependencyGraph } from "src/graph";
-import { ExportInfo } from "src/graph/extract-exports";
+import { DependencyGraph } from "src/parse";
+import { ExportInfo } from "src/parse/extract-exports";
 
 /**
  * Retrieves the exported declaration.

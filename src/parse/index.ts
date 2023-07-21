@@ -1,4 +1,4 @@
-import { File } from "@babel/types";
+import { File, Program } from "@babel/types";
 import { codeFrameColumns } from "@babel/code-frame";
 import { CssNode, Url } from "css-tree";
 import path from "path-browserify";
@@ -11,13 +11,14 @@ import {
    escapeRegex,
    indexToPosition,
    parseURL,
-} from "../utils";
+} from "../utils/index.js";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ParseInfo } from "../plugin/hook-types.js";
-import { ExportInfo } from "src/graph/extract-exports.js";
-import { ImportInfo } from "src/graph/extract-imports.js";
+import { ExportInfo } from "src/parse/extract-exports.js";
+import { ImportInfo } from "src/parse/extract-imports.js";
+import { NodePath } from "@babel/traverse";
 
 function getImportPosition(
    content: string,
@@ -316,6 +317,7 @@ function createChunk<
          ast: parsed.ast,
          exports: parsed.exports,
          imports: parsed.imports,
+         programPath: parsed.programPath,
       };
    } else {
       chunk = {
@@ -383,6 +385,7 @@ export interface ScriptDependency extends DependencyBase {
    isEntry: boolean;
    exports: Record<string, ExportInfo>;
    imports: Record<string, ImportInfo>;
+   programPath: NodePath<Program>;
 }
 
 export interface StyleDependency extends DependencyBase {

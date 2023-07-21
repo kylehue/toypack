@@ -15,3 +15,15 @@ declare module "babel-minify" {
       overrides?: Overrides
    ): { code: string; map: EncodedSourceMap };
 }
+
+// TODO: remove
+declare function dumpReference(
+   scope: Scope,
+   name: string,
+   source?: string,
+   deepness?: number
+): void;
+
+declare function getCode(
+   ast: any
+): string;

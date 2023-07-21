@@ -19,8 +19,8 @@
 
 
 
-import str from "./createNum";
-console.log(str);
+// import str from "./createNum";
+// console.log(str);
 const foo = 123;
 const sum_default = 123;
 const _o = 123;
@@ -28,10 +28,10 @@ const adder = 123;
 var _adder = 123;
 
 if (true) {
-   const [_adder] = [2];
+   const _adder = [2];
    console.log(_adder);
 }
-for (let i = 0; i != 0; i++) {}
+for (var i = 0; i != 0; i++) {}
 export function greet() {
    const _adder = 45;
    return _adder;
@@ -57,3 +57,6 @@ export const {
    foo: [[dog, balloon], bay],
    bar: {tick: [{tock: eleven}]}
 } = o;
+
+
+export * as woah from "./createNum2";

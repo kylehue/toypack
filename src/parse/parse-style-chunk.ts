@@ -1,7 +1,7 @@
 import * as cssTree from "css-tree";
 import path from "path-browserify";
 import { Toypack } from "../Toypack.js";
-import { getUsableResourcePath, ERRORS, isNodeModule, isLocal, isUrl } from "../utils";
+import { getUsableResourcePath, ERRORS, isNodeModule, isLocal, isUrl } from "../utils/index.js";
 
 /**
  * Parses and extracts the dependencies of a CSS asset.

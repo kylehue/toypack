@@ -5,8 +5,8 @@ import { generate as generateStyle } from "css-tree";
 import { resolve, getType } from "../package-manager/utils";
 import { Plugin, Toypack } from "../types.js";
 import { isUrl, mergeSourceMaps } from "../utils";
-import { parseScriptAsset } from "../graph/parse-script-chunk";
-import { parseStyleAsset } from "../graph/parse-style-chunk";
+import { parseScriptAsset } from "../parse/parse-script-chunk.js";
+import { parseStyleAsset } from "../parse/parse-style-chunk.js";
 import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
 import { fetchSourceMapInContent } from "../package-manager/fetch-source-map";
 interface ExternalAssetBase {

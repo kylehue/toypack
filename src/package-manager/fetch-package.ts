@@ -3,7 +3,7 @@ import { generate as generateStyle } from "css-tree";
 import type { ParserOptions } from "@babel/parser";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MapConverter from "convert-source-map";
-import { parseScriptAsset } from "../graph/parse-script-chunk.js";
+import { parseScriptAsset } from "../parse/parse-script-chunk.js";
 import type { Toypack } from "../types.js";
 import {
    mergeSourceMaps,
@@ -23,7 +23,7 @@ import {
 } from "./utils.js";
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
-import { parseStyleAsset } from "../graph/parse-style-chunk.js";
+import { parseStyleAsset } from "../parse/parse-style-chunk.js";
 import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
 
 function getDtsHeader(

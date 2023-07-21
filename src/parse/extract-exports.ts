@@ -24,6 +24,12 @@ import {
    variableDeclarator,
    identifier,
    exportDefaultDeclaration,
+   importDeclaration,
+   importNamespaceSpecifier,
+   exportNamedDeclaration,
+   exportSpecifier,
+   stringLiteral,
+   cloneNode,
 } from "@babel/types";
 import { traverse } from "@babel/core";
 
@@ -32,14 +38,11 @@ export function getBindingDeclaration(scope: Scope, name: string) {
    if (!binding) return;
    const path = binding.path;
    if (
-      path.type == "FunctionDeclaration" ||
-      path.type == "ClassDeclaration" ||
-      path.type == "VariableDeclarator"
+      path.isFunctionDeclaration() ||
+      path.isClassDeclaration() ||
+      path.isVariableDeclarator()
    ) {
-      return binding.path as
-         | NodePath<ClassDeclaration>
-         | NodePath<FunctionDeclaration>
-         | NodePath<VariableDeclarator>;
+      return path;
    }
 }
 
@@ -63,9 +66,9 @@ export function extractExports(
       ExportNamedDeclaration(path) {
          const { node } = path;
          const { declaration } = node;
-         const source = node.source?.value;
 
-         if (source) {
+         if (node.source) {
+            const source = node.source.value;
             // Aggregated exports
             for (const specifier of node.specifiers) {
                if (specifier.type == "ExportNamespaceSpecifier") {
@@ -73,13 +76,27 @@ export function extractExports(
                    * For namespace exports e.g.
                    * export * as foo from "module.js";
                    */
-                  exports[specifier.exported.name] = {
-                     id: `$${uid++}`,
-                     type: "aggregatedNamespace",
-                     specifier,
-                     source,
-                     path,
-                  };
+                  // exports[specifier.exported.name] = {
+                  //    id: `$${uid++}`,
+                  //    type: "aggregatedNamespace",
+                  //    specifier,
+                  //    source,
+                  //    path,
+                  // };
+
+                  const uid = path.scope.generateUidIdentifier(
+                     specifier.exported.name
+                  );
+                  const [newPath] = path.replaceWithMultiple([
+                     importDeclaration(
+                        [importNamespaceSpecifier(uid)],
+                        cloneNode(node.source)
+                     ),
+                     exportNamedDeclaration(null, [
+                        exportSpecifier(cloneNode(uid), specifier.exported),
+                     ]),
+                  ]);
+                  path.scope.registerDeclaration(newPath);
                } else if (specifier.type == "ExportSpecifier") {
                   /**
                    * For named exports e.g.
@@ -201,8 +218,8 @@ export function extractExports(
             const declPath = path.get("declaration");
 
             if (
-               !isFunctionDeclaration(declPath.node) &&
-               !isClassDeclaration(declPath.node)
+               !declPath.isFunctionDeclaration() &&
+               !declPath.isClassDeclaration()
             ) {
                throw new TypeError("Invalid declaration.");
             }
@@ -211,9 +228,7 @@ export function extractExports(
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
-               declaration: declPath as
-                  | NodePath<ClassDeclaration>
-                  | NodePath<FunctionDeclaration>,
+               declaration: declPath,
             };
          } else if (isIdentifier(node.declaration)) {
             /**
@@ -224,7 +239,7 @@ export function extractExports(
             const name = node.declaration.name;
             const declPath = getBindingDeclaration(path.scope, name);
 
-            if (!declPath) {
+            if (!declPath?.isVariableDeclarator()) {
                throw new Error(`No declaration found for "${name}"`);
             }
 

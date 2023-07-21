@@ -7,7 +7,7 @@ import importUrlPlugin from "./build-plugins/import-url-plugin.js";
 import importMetaPlugin from "./build-plugins/import-meta-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
-import { Importers, getDependencyGraph } from "./graph/index.js";
+import { Importers, getDependencyGraph } from "./parse/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
 import { Asset, ResolveOptions, Plugin, TextAsset } from "./types.js";
@@ -24,9 +24,9 @@ import {
 } from "./utils";
 import { createAsset } from "./utils/create-asset.js";
 import { resolve } from "./utils/resolve.js";
-import { LoadChunkResult } from "./graph/load-chunk.js";
-import { ParsedScriptResult } from "./graph/parse-script-chunk.js";
-import { ParsedStyleResult } from "./graph/parse-style-chunk.js";
+import { LoadChunkResult } from "./parse/load-chunk.js";
+import { ParsedScriptResult } from "./parse/parse-script-chunk.js";
+import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
