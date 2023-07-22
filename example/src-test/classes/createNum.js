@@ -13,7 +13,7 @@ const o = {
 const adder = 123;
 const _adder = 123;
 import { Adder } from "../src/testing.mjs";
-console.log(adder + _adder/* , Adder */);
+console.log(adder + _adder, Adder);
 
 export const { foo, bar } = o;
 export { o as "hello there"};

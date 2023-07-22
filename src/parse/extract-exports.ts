@@ -76,43 +76,32 @@ export function extractExports(
                    * For namespace exports e.g.
                    * export * as foo from "module.js";
                    */
-                  // exports[specifier.exported.name] = {
-                  //    id: `$${uid++}`,
-                  //    type: "aggregatedNamespace",
-                  //    specifier,
-                  //    source,
-                  //    path,
-                  // };
-
-                  const uid = path.scope.generateUidIdentifier(
-                     specifier.exported.name
-                  );
-                  const [newPath] = path.replaceWithMultiple([
-                     importDeclaration(
-                        [importNamespaceSpecifier(uid)],
-                        cloneNode(node.source)
-                     ),
-                     exportNamedDeclaration(null, [
-                        exportSpecifier(cloneNode(uid), specifier.exported),
-                     ]),
-                  ]);
-                  path.scope.registerDeclaration(newPath);
+                  const name = specifier.exported.name;
+                  exports[name] = {
+                     id: `$${uid++}`,
+                     type: "aggregatedNamespace",
+                     specifier,
+                     source,
+                     path,
+                     name,
+                  };
                } else if (specifier.type == "ExportSpecifier") {
                   /**
                    * For named exports e.g.
                    * export { foo, bar as greet } from "module.js";
                    */
                   const { exported } = specifier;
-                  const exportedName =
+                  const name =
                      exported.type == "Identifier"
                         ? exported.name
                         : exported.value;
-                  exports[exportedName] = {
+                  exports[name] = {
                      id: `$${uid++}`,
                      type: "aggregatedName",
                      specifier,
                      source,
                      path,
+                     name,
                   };
                }
             }
@@ -127,12 +116,14 @@ export function extractExports(
                      throw new Error(`No declaration found for "${id.name}"`);
                   }
 
+                  const name = id.name;
                   exports[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
                      declaration: declPath,
                      identifier: id,
+                     name,
                   };
                });
             } else {
@@ -145,24 +136,21 @@ export function extractExports(
                    * export function functionName() {}
                    */
                   // declaration.id should be guaranteed here
-                  const identifier = declaration.id!;
-                  const declPath = getBindingDeclaration(
-                     path.scope,
-                     identifier.name
-                  );
+                  const id = declaration.id!;
+                  const declPath = getBindingDeclaration(path.scope, id.name);
 
                   if (!declPath) {
-                     throw new Error(
-                        `No declaration found for "${identifier.name}"`
-                     );
+                     throw new Error(`No declaration found for "${id.name}"`);
                   }
 
-                  exports[identifier.name] = {
+                  const name = id.name;
+                  exports[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
                      declaration: declPath,
-                     identifier,
+                     identifier: id,
+                     name,
                   };
                } else {
                   for (const specifier of node.specifiers) {
@@ -175,7 +163,7 @@ export function extractExports(
                       * export { PI as foo, Book as bar, getAuthor as author };
                       */
                      const { exported, local } = specifier;
-                     const exportedName =
+                     const name =
                         exported.type == "Identifier"
                            ? exported.name
                            : exported.value;
@@ -190,12 +178,13 @@ export function extractExports(
                         );
                      }
 
-                     exports[exportedName] = {
+                     exports[name] = {
                         id: `$${uid++}`,
                         type: "declared",
                         path,
                         declaration: declPath,
                         identifier: local,
+                        name,
                      };
                   }
                }
@@ -229,6 +218,7 @@ export function extractExports(
                type: "declaredDefault",
                path,
                declaration: declPath,
+               name: "default",
             };
          } else if (isIdentifier(node.declaration)) {
             /**
@@ -249,6 +239,7 @@ export function extractExports(
                path,
                declaration: declPath,
                identifier: node.declaration,
+               name: "default",
             };
          } else if (isExpression(node.declaration)) {
             /**
@@ -268,6 +259,7 @@ export function extractExports(
                type: "declaredDefaultExpression",
                path,
                declaration: declPath as NodePath<Expression>,
+               name: "default",
             };
          }
       },
@@ -282,16 +274,19 @@ export function extractExports(
    return exports;
 }
 
-export interface AggregatedNameExport {
+interface ExportBase {
    id: string;
+   name: string;
+}
+
+export interface AggregatedNameExport extends ExportBase {
    type: "aggregatedName";
    source: string;
    specifier: ExportSpecifier;
    path: NodePath<ExportNamedDeclaration>;
 }
 
-export interface AggregatedNamespaceExport {
-   id: string;
+export interface AggregatedNamespaceExport extends ExportBase {
    type: "aggregatedNamespace";
    source: string;
    specifier: ExportNamespaceSpecifier;
@@ -305,8 +300,7 @@ export interface AggregatedAllExport {
    path: NodePath<ExportAllDeclaration>;
 }
 
-export interface DeclaredExport {
-   id: string;
+export interface DeclaredExport extends ExportBase {
    type: "declared";
    identifier: Identifier;
    path: NodePath<ExportNamedDeclaration>;
@@ -316,8 +310,7 @@ export interface DeclaredExport {
       | NodePath<VariableDeclarator>;
 }
 
-export interface DeclaredDefaultExport {
-   id: string;
+export interface DeclaredDefaultExport extends ExportBase {
    type: "declaredDefault";
    path: NodePath<ExportDefaultDeclaration>;
    identifier?: Identifier;
@@ -327,8 +320,7 @@ export interface DeclaredDefaultExport {
       | NodePath<VariableDeclarator>;
 }
 
-export interface DeclaredDefaultExpressionExport {
-   id: string;
+export interface DeclaredDefaultExpressionExport extends ExportBase {
    type: "declaredDefaultExpression";
    path: NodePath<ExportDefaultDeclaration>;
    declaration: NodePath<Expression>;

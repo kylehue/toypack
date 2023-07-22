@@ -16,15 +16,13 @@
 // const foo: string = "bar";
 // console.log(foo);
 /* test */
-// import adder, { dog, balloon, bay, eleven } from "../classes/adder";
-// console.log(adder, dog, balloon, bay, eleven);
-// import { foo as o, bar, "hello there" as test } from "../classes/createNum";
-// console.log(o, bar, test);
-// import counter, { Adder } from "./testing.mjs";
-// console.log(counter, Adder);
+import adder, { dog, balloon, bay, eleven } from "../classes/adder";
+console.log(adder, dog, balloon, bay, eleven);
+import { foo as o, bar, "hello there" as test } from "../classes/createNum";
+console.log(o, bar, test);
+import counter, { Adder } from "./testing.mjs";
+console.log(counter, Adder);
 
-import * as cool from "./testing.mjs";
-console.log(cool);
 // import * as namespace from "../classes/adder";
 // console.log(namespace.default);
 // const __export = "this var name shouldn't be used"

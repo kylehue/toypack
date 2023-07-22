@@ -9,6 +9,8 @@ export function generateUid(name = "temp") {
       generated = name + "_" + _idCountMap[name]++;
    }
 
+   _reservedVars.add(generated);
+
    return generated;
 }
 
