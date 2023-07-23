@@ -30,6 +30,9 @@ import {
    exportSpecifier,
    stringLiteral,
    cloneNode,
+   ImportSpecifier,
+   ImportDefaultSpecifier,
+   ImportNamespaceSpecifier,
 } from "@babel/types";
 import { traverse } from "@babel/core";
 
@@ -40,7 +43,10 @@ export function getBindingDeclaration(scope: Scope, name: string) {
    if (
       path.isFunctionDeclaration() ||
       path.isClassDeclaration() ||
-      path.isVariableDeclarator()
+      path.isVariableDeclarator() ||
+      path.isImportSpecifier() ||
+      path.isImportDefaultSpecifier() ||
+      path.isImportNamespaceSpecifier()
    ) {
       return path;
    }
@@ -51,17 +57,20 @@ export function extractExports(
    ast: Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
-   const exports: Record<string, ExportInfo> = {};
+   const exports: Exports = {
+      aggregatedAll: [],
+      others: {},
+   };
    const options: TraverseOptions = {
       ExportAllDeclaration(path) {
          const { node } = path;
          const source = node.source?.value;
-         exports[uid++] = {
-            id: `$${uid}`,
+         exports.aggregatedAll.push({
+            id: `$${uid++}`,
             type: "aggregatedAll",
             path,
             source,
-         };
+         });
       },
       ExportNamedDeclaration(path) {
          const { node } = path;
@@ -77,7 +86,7 @@ export function extractExports(
                    * export * as foo from "module.js";
                    */
                   const name = specifier.exported.name;
-                  exports[name] = {
+                  exports.others[name] = {
                      id: `$${uid++}`,
                      type: "aggregatedNamespace",
                      specifier,
@@ -95,7 +104,7 @@ export function extractExports(
                      exported.type == "Identifier"
                         ? exported.name
                         : exported.value;
-                  exports[name] = {
+                  exports.others[name] = {
                      id: `$${uid++}`,
                      type: "aggregatedName",
                      specifier,
@@ -117,7 +126,7 @@ export function extractExports(
                   }
 
                   const name = id.name;
-                  exports[id.name] = {
+                  exports.others[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
@@ -144,7 +153,7 @@ export function extractExports(
                   }
 
                   const name = id.name;
-                  exports[id.name] = {
+                  exports.others[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
@@ -178,7 +187,7 @@ export function extractExports(
                         );
                      }
 
-                     exports[name] = {
+                     exports.others[name] = {
                         id: `$${uid++}`,
                         type: "declared",
                         path,
@@ -213,7 +222,7 @@ export function extractExports(
                throw new TypeError("Invalid declaration.");
             }
 
-            exports["default"] = {
+            exports.others["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
@@ -233,7 +242,7 @@ export function extractExports(
                throw new Error(`No declaration found for "${name}"`);
             }
 
-            exports["default"] = {
+            exports.others["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
@@ -254,7 +263,7 @@ export function extractExports(
                throw new TypeError("Invalid declaration.");
             }
 
-            exports["default"] = {
+            exports.others["default"] = {
                id: `$${uid++}`,
                type: "declaredDefaultExpression",
                path,
@@ -307,7 +316,10 @@ export interface DeclaredExport extends ExportBase {
    declaration:
       | NodePath<ClassDeclaration>
       | NodePath<FunctionDeclaration>
-      | NodePath<VariableDeclarator>;
+      | NodePath<VariableDeclarator>
+      | NodePath<ImportSpecifier>
+      | NodePath<ImportDefaultSpecifier>
+      | NodePath<ImportNamespaceSpecifier>;
 }
 
 export interface DeclaredDefaultExport extends ExportBase {
@@ -317,13 +329,28 @@ export interface DeclaredDefaultExport extends ExportBase {
    declaration:
       | NodePath<ClassDeclaration>
       | NodePath<FunctionDeclaration>
-      | NodePath<VariableDeclarator>;
+      | NodePath<VariableDeclarator>
+      | NodePath<ImportSpecifier>
+      | NodePath<ImportDefaultSpecifier>
+      | NodePath<ImportNamespaceSpecifier>;
 }
 
 export interface DeclaredDefaultExpressionExport extends ExportBase {
    type: "declaredDefaultExpression";
    path: NodePath<ExportDefaultDeclaration>;
    declaration: NodePath<Expression>;
+}
+
+export interface Exports {
+   aggregatedAll: AggregatedAllExport[];
+   others: Record<
+      string,
+      | AggregatedNameExport
+      | AggregatedNamespaceExport
+      | DeclaredExport
+      | DeclaredDefaultExport
+      | DeclaredDefaultExpressionExport
+   >;
 }
 
 export type ExportInfo =

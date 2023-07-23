@@ -13,7 +13,11 @@ export function extractImports(
    ast: Node,
    traverseFn?: (options: TraverseOptions) => void
 ) {
-   const imports: Record<string, ImportInfo> = {};
+   const imports: Imports = {
+      sideEffect: [],
+      others: {},
+   };
+
    const options: TraverseOptions = {
       ImportDeclaration(path) {
          const { node } = path;
@@ -24,12 +28,12 @@ export function extractImports(
           * import "./module.js";
           */
          if (!node.specifiers.length) {
-            imports[uid++] = {
-               id: `$${uid}`,
+            imports.sideEffect.push({
+               id: `$${uid++}`,
                type: "sideEffect",
                path,
                source,
-            };
+            });
          }
 
          for (const specifier of node.specifiers) {
@@ -38,7 +42,7 @@ export function extractImports(
                 * For default imports e.g.
                 * import foo from "./module.js";
                 */
-               imports[specifier.local.name] = {
+               imports.others[specifier.local.name] = {
                   id: `$${uid++}`,
                   type: "default",
                   source,
@@ -50,19 +54,19 @@ export function extractImports(
                 * For namespace imports e.g.
                 * import * as foo from "./module.js";
                 */
-               imports[specifier.local.name] = {
+               imports.others[specifier.local.name] = {
                   id: `$${uid++}`,
                   type: "namespace",
                   source,
                   path,
                   specifier,
                };
-            } else {
+            } else if (specifier.type == "ImportSpecifier") {
                /**
                 * For specified imports e.g.
                 * import { foo, bar } from "./module.js";
                 */
-               imports[specifier.local.name] = {
+               imports.others[specifier.local.name] = {
                   id: `$${uid++}`,
                   type: "specifier",
                   source,
@@ -109,6 +113,11 @@ export interface SideEffectImport {
    type: "sideEffect";
    source: string;
    path: NodePath<ImportDeclaration>;
+}
+
+export interface Imports {
+   sideEffect: SideEffectImport[];
+   others: Record<string, NamespaceImport | SpecifierImport | DefaultImport>;
 }
 
 export type ImportInfo =

@@ -7,7 +7,7 @@ import { ExportInfo } from "src/parse/extract-exports";
  * @param exportName The name of the export to retrieve.
  * @param exportSource The source of the module that has the export.
  * @param importerSource The source of the module that needs the export.
- * @returns 
+ * @returns
  */
 export function getExport(
    graph: DependencyGraph,
@@ -16,20 +16,19 @@ export function getExport(
    importerSource: string
 ): ExportInfo | null {
    const importer = graph[importerSource];
-   if (importer.type != "script") return null;
+   if (importer?.type != "script") return null;
    const resolvedImportSource = importer.dependencyMap[exportSource];
    const importedModule = graph[resolvedImportSource];
-   if (importedModule.type != "script") return null;
-   
-   let exported: ExportInfo | null = importedModule.exports[exportName];
+   if (importedModule?.type != "script") return null;
+
+   let exported: ExportInfo | null = importedModule.exports.others[exportName];
    if (!exported) {
       /**
        * If export is not found, try if it's in any of the
        * aggregated star exports e.g.
        * export * from "./module.js";
        */
-      for (const exportInfo of Object.values(importedModule.exports)) {
-         if (exportInfo.type != "aggregatedAll") continue;
+      for (const exportInfo of importedModule.exports.aggregatedAll) {
          exported = getExport(
             graph,
             exportName,

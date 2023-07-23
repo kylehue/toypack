@@ -15,8 +15,8 @@ import {
 import { Toypack } from "../Toypack.js";
 import { ERRORS, mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
-import { ExportInfo, extractExports } from "./extract-exports.js";
-import { ImportInfo, extractImports } from "./extract-imports.js";
+import { ExportInfo, Exports, extractExports } from "./extract-exports.js";
+import { ImportInfo, Imports, extractImports } from "./extract-imports.js";
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -49,8 +49,8 @@ export async function parseScriptAsset(
       type: "script",
       dependencies: new Set(),
       ast: file(program([])),
-      exports: {},
-      imports: {},
+      exports: {} as Exports,
+      imports: {} as Imports,
       programPath: {} as NodePath<Program>,
    };
 
@@ -184,8 +184,8 @@ export interface ParsedScriptResult {
    type: "script";
    dependencies: Set<string>;
    ast: File;
-   exports: Record<string, ExportInfo>;
-   imports: Record<string, ImportInfo>;
+   exports: Exports;
+   imports: Imports;
    programPath: NodePath<Program>;
 }
 

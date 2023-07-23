@@ -23,6 +23,7 @@ console.log(o, bar, test);
 import counter, { Adder } from "./testing.mjs";
 console.log(counter, Adder);
 
+
 // import * as namespace from "../classes/adder";
 // console.log(namespace.default);
 // const __export = "this var name shouldn't be used"
@@ -35,7 +36,6 @@ console.log(counter, Adder);
 // const def_1 = 45;
 // var cook = 45;
 // console.log(def, add, createNum);
-
 
 // export var foos = "foo", bars = "bar";
 // export const [[hello, hi], hey] = [[1, 2], 3];

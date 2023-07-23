@@ -16,8 +16,8 @@ import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ParseInfo } from "../plugin/hook-types.js";
-import { ExportInfo } from "src/parse/extract-exports.js";
-import { ImportInfo } from "src/parse/extract-imports.js";
+import { ExportInfo, Exports } from "src/parse/extract-exports.js";
+import { ImportInfo, Imports } from "src/parse/extract-imports.js";
 import { NodePath } from "@babel/traverse";
 
 function getImportPosition(
@@ -383,8 +383,8 @@ export interface ScriptDependency extends DependencyBase {
    asset: Asset;
    map?: EncodedSourceMap | null;
    isEntry: boolean;
-   exports: Record<string, ExportInfo>;
-   imports: Record<string, ImportInfo>;
+   exports: Exports;
+   imports: Imports;
    programPath: NodePath<Program>;
 }
 

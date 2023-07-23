@@ -138,7 +138,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    }
 
    const generated = generate(resultAst, {
-      sourceMaps: true,
+      // sourceMaps: true,
    });
 
    console.log("%c-------------- RESULT --------------", "color:red;");
@@ -146,15 +146,15 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    console.log(getCode(generated.code));
    console.log(generated);
 
-   for (let i = 0; i < (generated?.map?.sources.length || 0); i++) {
-      const source = generated?.map?.sources[i]!;
-      generated.map!.sourcesContent ??= [];
-      generated.map!.sourcesContent[i] = graph[source].asset.content as string;
-   }
+   // for (let i = 0; i < (generated?.map?.sources.length || 0); i++) {
+   //    const source = generated?.map?.sources[i]!;
+   //    generated.map!.sourcesContent ??= [];
+   //    generated.map!.sourcesContent[i] = graph[source].asset.content as string;
+   // }
 
-   console.log(
-      generated.code + "\n" + MapConverter.fromObject(generated.map).toComment()
-   );
+   // console.log(
+   //    generated.code + "\n" + MapConverter.fromObject(generated.map).toComment()
+   // );
 
    return {
       content: "",

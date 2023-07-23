@@ -78,6 +78,10 @@ export class Toypack extends Hooks {
          },
          prepath: "npm",
       });
+
+      this.onError(er => {
+         console.error(er.reason);
+      });
    }
 
    protected _getCache<
