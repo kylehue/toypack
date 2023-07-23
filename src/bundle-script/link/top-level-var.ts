@@ -1,7 +1,5 @@
 import { ScriptDependency } from "src/parse";
 import { addReservedVars, generateUid } from "../utils";
-import { TraverseMap } from "../utils/TraverseMap";
-import { isBlockScoped, isVariableDeclaration } from "@babel/types";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.

@@ -102,17 +102,12 @@ import { codeFrameColumns } from "@babel/code-frame";
 // }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
-   resetUidCache();
-   const traverseMap = new TraverseMap();
+   const config = this.getConfig();
    const scriptModules = getSortedScripts(graph);
-
-   for (const script of scriptModules) {
-      traverseMap.setAst(script.source, script.ast);
-   }
-
    const { context, runtimesUsed, otherAsts } = createTransformContext();
 
    // order matters here
+   resetUidCache();
    transformToVars(scriptModules);
    deconflict(scriptModules);
    bindImports(context, graph, scriptModules);
@@ -138,7 +133,9 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    }
 
    const generated = generate(resultAst, {
-      // sourceMaps: true,
+      sourceMaps: !!config.bundle.sourceMap,
+      minified: config.bundle.mode == "production",
+      comments: config.bundle.mode == "development",
    });
 
    console.log("%c-------------- RESULT --------------", "color:red;");

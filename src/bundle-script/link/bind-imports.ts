@@ -133,8 +133,9 @@ function bindExported(
    importLocalName: string
 ) {
    const exportScope = exportInfo.path.scope;
-   const importScope = importInfo.path.scope;
    const exportSource = importer.dependencyMap[importInfo.source];
+   if (importInfo.path.removed) return;
+   if (exportInfo.path.removed) return;
 
    if (exportInfo.type == "declared") {
       matchImportAndExportName(
@@ -144,8 +145,6 @@ function bindExported(
          exportInfo.name,
          exportSource
       );
-
-      importScope.getBinding(exportInfo.identifier.name)?.path.remove();
    } else if (exportInfo.type == "declaredDefault") {
       const declPath = exportInfo.declaration;
       if (declPath.isFunctionDeclaration() || declPath.isClassDeclaration()) {
@@ -160,16 +159,13 @@ function bindExported(
             );
             exportScope.registerDeclaration(declPath);
          }
-         const id = declPath.node.id;
-         // Remove the `export` declaration
+         // Seperate from its `export` declaration
          const exportDecl = exportInfo.path.node.declaration;
          if (
             isFunctionDeclaration(exportDecl) ||
             isClassDeclaration(exportDecl)
          ) {
-            exportInfo.path.replaceWith(declPath);
-         } else {
-            exportInfo.path.remove();
+            exportInfo.path.insertBefore(declPath.node);
          }
          matchImportAndExportName(
             importInfo,
@@ -178,10 +174,7 @@ function bindExported(
             exportInfo.name,
             exportSource
          );
-         importScope.getBinding(id.name)?.path.remove();
       } else {
-         // id should be guaranteed when vars are exported as default
-         const id = exportInfo.identifier!;
          matchImportAndExportName(
             importInfo,
             importLocalName,
@@ -189,11 +182,6 @@ function bindExported(
             exportInfo.name,
             exportSource
          );
-         importScope.getBinding(id.name)?.path.remove();
-
-         if (!exportInfo.path.removed) {
-            exportInfo.path.remove();
-         }
       }
    } else if (exportInfo.type == "declaredDefaultExpression") {
       /**
@@ -204,8 +192,7 @@ function bindExported(
       const varDecl = variableDeclaration("var", [
          variableDeclarator(id, exportInfo.declaration.node),
       ]);
-      const [varDeclPath] = exportInfo.path.replaceWith(varDecl);
-      exportScope.registerDeclaration(varDeclPath);
+      exportInfo.path.insertBefore(varDecl);
       matchImportAndExportName(
          importInfo,
          importLocalName,
@@ -213,7 +200,6 @@ function bindExported(
          exportInfo.name,
          exportSource
       );
-      importScope.getBinding(id.name)?.path.remove();
    } else if (exportInfo.type == "aggregatedNamespace") {
       /**
        * This export type is basically just an import anyway, so
@@ -237,10 +223,6 @@ function bindExported(
          exportSource
       );
       bindImport(context, graph, parentModule, facadeImportInfo);
-   }
-
-   if (!importInfo.path.removed && !importInfo.path.node.specifiers.length) {
-      importInfo.path.remove();
    }
 }
 
@@ -293,6 +275,33 @@ function bindImport(
    }
 }
 
+function removeExport(exportInfo: ExportInfo) {
+   if (exportInfo.path.removed) return;
+   if (
+      exportInfo.type == "aggregatedAll" ||
+      exportInfo.type == "aggregatedNamespace" ||
+      exportInfo.type == "aggregatedName"
+   ) {
+      exportInfo.path.remove();
+   } else if (
+      exportInfo.type == "declared" ||
+      exportInfo.type == "declaredDefault" ||
+      exportInfo.type == "declaredDefaultExpression"
+   ) {
+      const declPath = exportInfo.declaration;
+
+      if (declPath.isFunctionDeclaration() || declPath.isClassDeclaration()) {
+         const exportDecl = exportInfo.path.node.declaration;
+         if (
+            isFunctionDeclaration(exportDecl) ||
+            isClassDeclaration(exportDecl)
+         ) {
+            exportInfo.path.insertBefore(declPath.node);
+         }
+      }
+   }
+}
+
 /**
  * This method connects the imports of each module to the exported
  * declarations of other modules
@@ -314,15 +323,32 @@ export function bindImports(
    }
 
    // Build namespace templates
-   for (const [source, namespace] of namespaceMap) {
+   for (const [_, namespace] of namespaceMap) {
       namespace.build();
    }
 
    // Remove left out imports/exports after binding
    for (const module of scriptModules) {
-      const path = module.programPath;
-      const { scope } = path;
+      for (const exportInfo of Object.values(module.exports.others)) {
+         removeExport(exportInfo);
+      }
 
+      for (const importInfo of Object.values(module.imports.others)) {
+         if (importInfo.path.removed) continue;
+         importInfo.path.remove();
+      }
+
+      /**
+       * We still gotta do this because some of the exportInfo references
+       * gets lost when its declaration node is renamed e.g.
+       *
+       * export const foo = "bar";
+       * // Renaming "foo" above, will cause it to transform to:
+       * const renamedFoo = "bar";
+       * export { renamedFoo as foo };
+       * // Now, the real export path is gone and replaced by the export above
+       * // which is the one we gotta remove.
+       */
       const ast = module.ast;
       ast.program.body = ast.program.body.filter(
          (node) =>

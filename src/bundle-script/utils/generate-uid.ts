@@ -5,7 +5,7 @@ let _reservedVars = new Set<string>();
 export function generateUid(name = "temp") {
    name = toCamelCase(name);
    _idCountMap[name] ??= 0;
-   let generated = name + "_" + _idCountMap[name]++;
+   let generated = name;
    while (_reservedVars.has(generated) || generated in runtime) {
       generated = name + "_" + _idCountMap[name]++;
    }

@@ -12,7 +12,7 @@ export const add = 123;
 //    console.log("default function!");
 // }
 
-// export default "Default expression!";
+export default "Default expression!";
 
 const test = 4;
 export { test };
@@ -23,4 +23,4 @@ if (true) {
    var cook = 23;
 }
 
-export default defs;
+// export default defs;

@@ -70,7 +70,7 @@ export class ExportUidTracker {
          });
       }
 
-      // Fix import aggregates (ones that are bound to an import declaration)
+      // Fix implicit aggregates (ones that are bound to an import declaration)
       for (const module of scriptModules) {
          const idMap = (this._map[module.source] ??= {});
          Object.values(module.exports.others).forEach((exportInfo) => {
@@ -114,7 +114,7 @@ export class ExportUidTracker {
          });
       }
 
-      // Lastly, the aggregated all exports
+      // Lastly, the aggregated star exports
       for (const module of scriptModules) {
          const idMap = (this._map[module.source] ??= {});
          module.exports.aggregatedAll.forEach((exportInfo) => {
