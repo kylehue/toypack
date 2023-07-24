@@ -35,6 +35,8 @@ export function getExport(
             exportInfo.source,
             importedModule.source
          );
+
+         if (exported) break;
       }
    }
 

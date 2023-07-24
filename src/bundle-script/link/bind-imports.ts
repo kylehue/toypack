@@ -14,6 +14,60 @@ import { getExport } from "../utils/get-export";
 import { TransformContext } from "../utils/transform-context";
 import { ExportUidTracker } from "./ExportUidTracker";
 
+function removeImportsAndExports(scriptModules: ScriptDependency[]) {
+   for (const module of scriptModules) {
+      /**
+       * Before removing, we must assure that the exports that has the
+       * declarations in its path get seperated. e.g.
+       *
+       * In:
+       * export function fn() {}
+       *
+       * Out:
+       * function fn() {}
+       */
+      for (const exportInfo of Object.values(module.exports.others)) {
+         if (exportInfo.path.removed) {
+            continue;
+         }
+
+         if (
+            exportInfo.type == "declared" ||
+            exportInfo.type == "declaredDefault" ||
+            exportInfo.type == "declaredDefaultExpression"
+         ) {
+            const declPath = exportInfo.declaration;
+
+            if (
+               declPath.isFunctionDeclaration() ||
+               declPath.isClassDeclaration()
+            ) {
+               const exportDecl = exportInfo.path.node.declaration;
+               if (
+                  isFunctionDeclaration(exportDecl) ||
+                  isClassDeclaration(exportDecl)
+               ) {
+                  exportInfo.path.replaceWith(declPath.node);
+               }
+            }
+         }
+      }
+
+      /**
+       * Remove from ast without using .remove() because we still need to
+       * use them on the next runs.
+       */
+      const ast = module.ast;
+      ast.program.body = ast.program.body.filter(
+         (node) =>
+            node.type !== "ExportDefaultDeclaration" &&
+            node.type !== "ExportAllDeclaration" &&
+            node.type !== "ExportNamedDeclaration" &&
+            node.type !== "ImportDeclaration"
+      );
+   }
+}
+
 const namespaceMap = new Map<
    string,
    {
@@ -22,29 +76,6 @@ const namespaceMap = new Map<
    }
 >();
 
-/**
- * This function declares an object that contains all of the exports
- * of the provided module e.g.
- *
- * In:
- * ```js
- * // main.js
- * export const foo = "bar";
- * export const bar = "foo";
- * ```
- * Out:
- * ```js
- * var namespace = {};
- * __export(namespace, {
- *    foo: () => foo,
- *    bar: () => bar
- * });
- *
- * ...
- * ```
- *
- * @returns The namespace id.
- */
 function createNamespaceExport(
    context: TransformContext,
    module: ScriptDependency
@@ -66,17 +97,7 @@ function createNamespaceExport(
          const exportEntries = Object.entries(module.exports.others);
          const formattedExports = exportEntries
             .map(([exportName, exportInfo]) => {
-               if (
-                  exportInfo.type !== "declared" &&
-                  exportInfo.type !== "declaredDefault" &&
-                  exportInfo.type !== "declaredDefaultExpression" &&
-                  exportInfo.type !== "aggregatedNamespace"
-               ) {
-                  throw new Error("Namespaced exports has to be declared.");
-               }
-
                const uid = getAssignedId(module.source, exportName);
-
                let line = `${exportName}: () => ${uid}`;
                return line;
             })
@@ -107,20 +128,6 @@ function getAssignedId(source: string, name: string) {
    return uid;
 }
 
-function matchImportAndExportName(
-   importInfo: ImportInfo,
-   importName: string,
-   exportInfo: ExportInfo,
-   exportName: string,
-   exportSource: string
-) {
-   const exportScope = exportInfo.path.scope;
-   const importScope = importInfo.path.scope;
-   const uid = getAssignedId(exportSource, exportName);
-   importScope.rename(importName, uid);
-   exportScope.rename(exportName, uid);
-}
-
 /**
  * Binds the imported module to the exported declarations.
  */
@@ -132,19 +139,24 @@ function bindExported(
    exportInfo: ExportInfo,
    importLocalName: string
 ) {
+   const importScope = importInfo.path.scope;
    const exportScope = exportInfo.path.scope;
    const exportSource = importer.dependencyMap[importInfo.source];
    if (importInfo.path.removed) return;
    if (exportInfo.path.removed) return;
 
    if (exportInfo.type == "declared") {
-      matchImportAndExportName(
-         importInfo,
-         importLocalName,
-         exportInfo,
-         exportInfo.name,
-         exportSource
-      );
+      const id = getAssignedId(exportSource, exportInfo.name);
+      importScope.rename(importLocalName, id);
+      exportScope.rename(exportInfo.identifier.name, id);
+
+      /**
+       * For some weird reason, the `identifier.name` sometimes doesn't
+       * change to `id` on the next run, which causes the renaming to fail
+       * and cause errors. One way to solve this is to assign the `id`
+       * to `identifier.name` manually.
+       */
+      exportInfo.identifier.name = id;
    } else if (exportInfo.type == "declaredDefault") {
       const declPath = exportInfo.declaration;
       if (declPath.isFunctionDeclaration() || declPath.isClassDeclaration()) {
@@ -159,70 +171,50 @@ function bindExported(
             );
             exportScope.registerDeclaration(declPath);
          }
-         // Seperate from its `export` declaration
+         // Remove from its `export` declaration
          const exportDecl = exportInfo.path.node.declaration;
          if (
             isFunctionDeclaration(exportDecl) ||
             isClassDeclaration(exportDecl)
          ) {
-            exportInfo.path.insertBefore(declPath.node);
+            exportInfo.path.replaceWith(declPath.node);
+            exportInfo.identifier = declPath.node.id;
          }
-         matchImportAndExportName(
-            importInfo,
-            importLocalName,
-            exportInfo,
-            exportInfo.name,
-            exportSource
-         );
-      } else {
-         matchImportAndExportName(
-            importInfo,
-            importLocalName,
-            exportInfo,
-            exportInfo.name,
-            exportSource
-         );
+      }
+
+      const id = getAssignedId(exportSource, exportInfo.name);
+      importScope.rename(importLocalName, id);
+      if (exportInfo.identifier) {
+         exportScope.rename(exportInfo.identifier.name, id);
+         exportInfo.identifier.name = id;
       }
    } else if (exportInfo.type == "declaredDefaultExpression") {
-      /**
-       * Create a variable declaration for the expression and
-       * replace the `export` declaration with it e.g.
-       */
+      // Create a variable declaration for the expression
       const id = identifier(getAssignedId(exportSource, "default"));
       const varDecl = variableDeclaration("var", [
          variableDeclarator(id, exportInfo.declaration.node),
       ]);
-      exportInfo.path.insertBefore(varDecl);
-      matchImportAndExportName(
-         importInfo,
-         importLocalName,
-         exportInfo,
-         exportInfo.name,
-         exportSource
-      );
+      exportInfo.path.replaceWith(varDecl);
+      importScope.rename(importLocalName, id.name);
    } else if (exportInfo.type == "aggregatedNamespace") {
+      const parentSource = importer.dependencyMap[importInfo.source];
+      const parentModule = graph[parentSource] as ScriptDependency;
       /**
        * This export type is basically just an import anyway, so
        * we can let the `bindImport` function handle the namespacing.
        */
-      const parentSource = importer.dependencyMap[importInfo.source];
-      const parentModule = graph[parentSource] as ScriptDependency;
-      const id = exportInfo.specifier.exported;
       const facadeImportInfo: ImportInfo = {
          id: importInfo.id,
          type: "namespace",
          path: importInfo.path,
          source: exportInfo.source,
-         specifier: importNamespaceSpecifier(id),
+         specifier: importNamespaceSpecifier(exportInfo.specifier.exported),
       };
-      matchImportAndExportName(
-         importInfo,
-         importLocalName,
-         exportInfo,
-         exportInfo.name,
-         exportSource
-      );
       bindImport(context, graph, parentModule, facadeImportInfo);
+
+      const aggrSource = parentModule.dependencyMap[exportInfo.source];
+      const id = exportUidTracker.getNamespaceFor(aggrSource);
+      importScope.rename(importLocalName, id);
    }
 }
 
@@ -258,47 +250,27 @@ function bindImport(
       const localName = importInfo.specifier.local.name;
       const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
       if (namespacedModule?.type != "script") return;
-      const namespace = createNamespaceExport(context, namespacedModule);
-      Object.entries(namespacedModule.exports.others).forEach(
-         ([name, exportInfo]) => {
-            bindExported(
-               context,
-               graph,
-               importer,
-               importInfo,
-               exportInfo,
-               name
-            );
-         }
-      );
-      importInfo.path.scope.rename(localName, namespace);
-   }
-}
-
-function removeExport(exportInfo: ExportInfo) {
-   if (exportInfo.path.removed) return;
-   if (
-      exportInfo.type == "aggregatedAll" ||
-      exportInfo.type == "aggregatedNamespace" ||
-      exportInfo.type == "aggregatedName"
-   ) {
-      exportInfo.path.remove();
-   } else if (
-      exportInfo.type == "declared" ||
-      exportInfo.type == "declaredDefault" ||
-      exportInfo.type == "declaredDefaultExpression"
-   ) {
-      const declPath = exportInfo.declaration;
-
-      if (declPath.isFunctionDeclaration() || declPath.isClassDeclaration()) {
-         const exportDecl = exportInfo.path.node.declaration;
-         if (
-            isFunctionDeclaration(exportDecl) ||
-            isClassDeclaration(exportDecl)
-         ) {
-            exportInfo.path.insertBefore(declPath.node);
-         }
+      const declared = namespaceMap.get(namespacedModule.source);
+      let namespace;
+      if (!declared) {
+         namespace = createNamespaceExport(context, namespacedModule);
+         Object.entries(namespacedModule.exports.others).forEach(
+            ([name, exportInfo]) => {
+               bindExported(
+                  context,
+                  graph,
+                  importer,
+                  importInfo,
+                  exportInfo,
+                  name
+               );
+            }
+         );
+      } else {
+         namespace = declared.namespace;
       }
+
+      importInfo.path.scope.rename(localName, namespace);
    }
 }
 
@@ -314,6 +286,7 @@ export function bindImports(
    exportUidTracker.clear();
    namespaceMap.clear();
    exportUidTracker.assignWithModules(scriptModules);
+   console.log(exportUidTracker);
 
    // Bind
    for (const module of scriptModules) {
@@ -328,34 +301,5 @@ export function bindImports(
    }
 
    // Remove left out imports/exports after binding
-   for (const module of scriptModules) {
-      for (const exportInfo of Object.values(module.exports.others)) {
-         removeExport(exportInfo);
-      }
-
-      for (const importInfo of Object.values(module.imports.others)) {
-         if (importInfo.path.removed) continue;
-         importInfo.path.remove();
-      }
-
-      /**
-       * We still gotta do this because some of the exportInfo references
-       * gets lost when its declaration node is renamed e.g.
-       *
-       * export const foo = "bar";
-       * // Renaming "foo" above, will cause it to transform to:
-       * const renamedFoo = "bar";
-       * export { renamedFoo as foo };
-       * // Now, the real export path is gone and replaced by the export above
-       * // which is the one we gotta remove.
-       */
-      const ast = module.ast;
-      ast.program.body = ast.program.body.filter(
-         (node) =>
-            node.type !== "ExportDefaultDeclaration" &&
-            node.type !== "ExportAllDeclaration" &&
-            node.type !== "ExportNamedDeclaration" &&
-            node.type !== "ImportDeclaration"
-      );
-   }
+   removeImportsAndExports(scriptModules);
 }

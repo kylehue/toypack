@@ -339,6 +339,7 @@ export interface DeclaredDefaultExpressionExport extends ExportBase {
    type: "declaredDefaultExpression";
    path: NodePath<ExportDefaultDeclaration>;
    declaration: NodePath<Expression>;
+   identifier?: Identifier;
 }
 
 export interface Exports {

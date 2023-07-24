@@ -16,15 +16,14 @@
 // const foo: string = "bar";
 // console.log(foo);
 /* test */
-// import adder, { dog, balloon, bay, eleven } from "../classes/adder";
-// console.log(adder, dog, balloon, bay, eleven);
-// import { foo as o, bar, "hello there" as test } from "../classes/createNum";
-// console.log(o, bar, test);
-// import counter, { Adder } from "./testing.mjs";
-// console.log(counter, Adder);
-
-import a, {add} from "../classes/createNum2";
-console.log(a, add);
+import adder, { dog, balloon, bay, eleven } from "../classes/adder";
+console.log(adder, dog, balloon, bay, eleven);
+import { foo as o, bar, "hello there" as test } from "../classes/createNum";
+console.log(o, bar, test);
+import counter, { Adder, dog as goodBoy } from "./testing.mjs";
+console.log(counter, Adder, goodBoy);
+// import a, {add} from "../classes/createNum2";
+// console.log(a, add);
 
 // import def, { add, createNum } from "../classes/createNum2";
 // const def_0 = 45;

@@ -53,10 +53,10 @@ export class ExportUidTracker {
             let name, id;
             if (type == "declared") {
                name = exportInfo.name;
-               id = exportInfo.identifier.name;
+               id = generateUid(exportInfo.name);
             } else if (type == "declaredDefault") {
                name = "default";
-               id = exportInfo.identifier?.name || generateUid(exportInfo.name);
+               id = generateUid(createDefaultName(module.source));
             } else if (type == "declaredDefaultExpression") {
                name = "default";
                id = generateUid(createDefaultName(module.source));

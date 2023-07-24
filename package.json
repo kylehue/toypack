@@ -45,6 +45,7 @@
       "@types/babel__traverse": "^7.20.0",
       "@types/convert-source-map": "^2.0.0",
       "@types/css-tree": "^2.3.1",
+      "@types/lodash-es": "^4.17.8",
       "@types/path-browserify": "^1.0.0",
       "@types/semver": "^7.5.0",
       "@vitest/coverage-v8": "^0.32.4",
@@ -89,6 +90,7 @@
       "babel-minify": "^0.5.2",
       "convert-source-map": "^2.0.0",
       "css-tree": "^2.3.1",
+      "lodash-es": "^4.17.21",
       "node-html-parser": "^6.1.5",
       "path-browserify": "^1.0.1",
       "semver": "^7.5.3"

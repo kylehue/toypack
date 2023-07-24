@@ -5,5 +5,5 @@ export * as Adder from "../classes/adder";
 // console.log(hiii, /* god, */ yab, defaultStrFromCreateNum, greet);
 
 export default numbers;
-
+export const dog = 45;
 export * as NM from "../classes/createNum2";

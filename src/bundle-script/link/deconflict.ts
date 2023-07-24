@@ -15,6 +15,20 @@ function getAllTopLevelBindings(scope: Scope) {
    return filtered;
 }
 
+function isFromImport(binding: Binding, otherBinding?: Binding) {
+   const isImported = !!otherBinding?.path.find((x) => x.isImportDeclaration());
+   const isExported =
+      !!binding.path.find((x) => x.isExportDeclaration()) ||
+      !!binding.referencePaths.find(
+         (x) => !!x.find((x) => x.isExportDeclaration())
+      ) ||
+      !!binding.referencePaths.find(
+         (x) => !!x.find((x) => x.isExportSpecifier())
+      );
+
+   return isImported && isExported;
+}
+
 /**
  * Deconflicts all of the top-level variables in script modules.
  */
@@ -34,25 +48,23 @@ export function deconflict(scriptModules: ScriptDependency[]) {
          const identifier = binding.identifier;
          let { name } = identifier;
 
-         const hasConflict = typeof conflicts[name] == "object";
-         // TODO: should we really skip bindings that are imported?
-         const isImported =
-            conflicts[name]?.binding.path.find((x) =>
-               x.isImportDeclaration()
-            ) && binding.path.find((x) => x.isExportDeclaration());
-
+         const conflict = conflicts[name];
+         const hasConflict = typeof conflict == "object";
+         /**
+          * We must make sure that we don't deconflict bindings that are
+          * bound to an import declaration because their names will be
+          * handled when we bind the imports (in bind-imports.ts).
+          */
+         const isImported = isFromImport(binding, conflict?.binding);
          if (!isImported && (hasConflict || name in runtime)) {
             const newName = generateUid(name);
             scope.rename(name, newName);
-            name = newName;
          }
 
-         conflicts[name] ??= { scope, binding };
+         conflicts[identifier.name] ??= { scope, binding };
       }
 
-      const reservedVars = Object.keys(scope.getAllBindings()).concat(
-         Object.keys(conflicts)
-      );
+      const reservedVars = Object.keys(scope.getAllBindings());
       addReservedVars(reservedVars);
    });
 }

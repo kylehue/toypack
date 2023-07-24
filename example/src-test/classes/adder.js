@@ -28,12 +28,18 @@ const adder = 123;
 var _adder = 123;
 
 if (true) {
-   const _adder = [2];
-   console.log(_adder);
+   const adder = [2];
+   console.log(adder);
 }
-for (var i = 0; i != 0; i++) {}
+for (var i = 0; i != 0; i++) { }
+
+export function sayHello() {
+   console.log("Hello!");
+}
+
 export function greet() {
-   const _adder = 45;
+   var _adder = 45;
+   sayHello();
    return _adder;
 }
 // export default function adad(a, b) {
@@ -57,6 +63,9 @@ export const {
    foo: [[dog, balloon], bay],
    bar: {tick: [{tock: eleven}]}
 } = o;
+
+import defExp from "./createNum2";
+console.log(defExp);
 
 
 export * as woah from "./createNum2";

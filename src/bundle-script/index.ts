@@ -104,16 +104,14 @@ import { codeFrameColumns } from "@babel/code-frame";
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const scriptModules = getSortedScripts(graph);
-   const { context, runtimesUsed, otherAsts } = createTransformContext();
+   const transform = createTransformContext();
 
    // order matters here
    resetUidCache();
    transformToVars(scriptModules);
    deconflict(scriptModules);
-   bindImports(context, graph, scriptModules);
+   bindImports(transform.context, graph, scriptModules);
    cleanComments(scriptModules);
-
-   // bindImports(context, graph);
 
    // bundle
    const resultAst = file(program([]));
@@ -122,11 +120,11 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       resultAst.program.body.unshift(...script.ast.program.body);
    }
 
-   for (const { ast } of otherAsts) {
+   for (const { ast } of transform.otherAsts) {
       resultAst.program.body.unshift(...ast.program.body);
    }
 
-   for (const name of runtimesUsed) {
+   for (const name of transform.runtimesUsed) {
       const statements = template(runtime[name])();
       const arr = Array.isArray(statements) ? statements : [statements];
       resultAst.program.body.unshift(...arr);

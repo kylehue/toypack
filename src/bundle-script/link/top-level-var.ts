@@ -21,16 +21,12 @@ export function transformToVars(scriptModules: ScriptDependency[]) {
             // only rename if the conflicted var is not in the same scope
             if (hasConflict && !isSameScope) {
                scope.rename(id.name, generateUid(id.name));
-               addReservedVars(id.name);
             }
          });
 
          if (node.kind != "var") {
             node.kind = "var";
          }
-
-         const reservedVars = Object.keys(scope.getAllBindings());
-         addReservedVars(reservedVars);
       });
    });
 }
