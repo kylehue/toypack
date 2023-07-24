@@ -1,5 +1,5 @@
 import { ScriptDependency } from "src/parse";
-import { addReservedVars, generateUid } from "../utils";
+import { UidGenerator } from "../utils";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.
@@ -20,7 +20,7 @@ export function transformToVars(scriptModules: ScriptDependency[]) {
             const isSameScope = otherBinding?.scope === scope.parent;
             // only rename if the conflicted var is not in the same scope
             if (hasConflict && !isSameScope) {
-               scope.rename(id.name, generateUid(id.name));
+               scope.rename(id.name, UidGenerator.generate(id.name));
             }
          });
 

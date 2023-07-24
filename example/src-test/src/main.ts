@@ -25,6 +25,11 @@ console.log(counter, Adder, goodBoy);
 // import a, {add} from "../classes/createNum2";
 // console.log(a, add);
 
+export default 123;
+export { counter, Adder };
+export { dog } from "./testing.mjs";
+export * as NM from "../classes/createNum2";
+export * from "../classes/createNum2";
 // import def, { add, createNum } from "../classes/createNum2";
 // const def_0 = 45;
 // const def_1 = 45;

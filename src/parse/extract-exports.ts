@@ -238,7 +238,7 @@ export function extractExports(
             const name = node.declaration.name;
             const declPath = getBindingDeclaration(path.scope, name);
 
-            if (!declPath?.isVariableDeclarator()) {
+            if (!declPath) {
                throw new Error(`No declaration found for "${name}"`);
             }
 

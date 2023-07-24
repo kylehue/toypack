@@ -6,6 +6,11 @@
 
 // export * from "./createNum2.js";
 
+
+import cpath, { resolve as cresolve } from "path-browserify";
+import * as crpath from "path-browserify";
+console.log(cpath, cresolve, crpath);
+
 const o = {
    foo: 1,
    bar: 2,

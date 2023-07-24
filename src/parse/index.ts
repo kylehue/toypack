@@ -10,6 +10,7 @@ import {
    ERRORS,
    escapeRegex,
    indexToPosition,
+   isLocal,
    parseURL,
 } from "../utils/index.js";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
@@ -200,6 +201,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       // Scan dependency's dependencies recursively
       for (const depSource of parsed.dependencies) {
+         if (!isLocal(depSource)) continue;
          const parsed = parseURL(depSource);
          let resolved: string = depSource;
          // Resolve source with plugins

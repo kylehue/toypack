@@ -2,7 +2,7 @@ import { Binding, Scope } from "@babel/traverse";
 import { isBlockScoped } from "@babel/types";
 import runtime from "../runtime";
 import { ScriptDependency } from "src/parse";
-import { addReservedVars, generateUid } from "../utils";
+import { UidGenerator } from "../utils";
 
 function getAllTopLevelBindings(scope: Scope) {
    const bindings = scope.getAllBindings();
@@ -57,7 +57,7 @@ export function deconflict(scriptModules: ScriptDependency[]) {
           */
          const isImported = isFromImport(binding, conflict?.binding);
          if (!isImported && (hasConflict || name in runtime)) {
-            const newName = generateUid(name);
+            const newName = UidGenerator.generate(name);
             scope.rename(name, newName);
          }
 
@@ -65,6 +65,6 @@ export function deconflict(scriptModules: ScriptDependency[]) {
       }
 
       const reservedVars = Object.keys(scope.getAllBindings());
-      addReservedVars(reservedVars);
+      UidGenerator.addReservedVars(reservedVars);
    });
 }

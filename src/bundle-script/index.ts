@@ -10,12 +10,13 @@ import {
    cleanComments,
    createTransformContext,
    getSortedScripts,
-   resetUidCache,
+   UidGenerator,
 } from "./utils";
 import { template } from "@babel/core";
 import runtime from "./runtime.js";
 import traverse, { Hub, NodePath, Scope } from "@babel/traverse";
 import { codeFrameColumns } from "@babel/code-frame";
+import { Format } from "./formats/index.js";
 
 // TODO: remove
 (window as any).getCode = function (ast: Node | string) {
@@ -107,7 +108,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const transform = createTransformContext();
 
    // order matters here
-   resetUidCache();
+   UidGenerator.reset();
    transformToVars(scriptModules);
    deconflict(scriptModules);
    bindImports(transform.context, graph, scriptModules);
@@ -129,6 +130,9 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       const arr = Array.isArray(statements) ? statements : [statements];
       resultAst.program.body.unshift(...arr);
    }
+
+   // format
+   Format.esm(resultAst, scriptModules);
 
    const generated = generate(resultAst, {
       sourceMaps: !!config.bundle.sourceMap,

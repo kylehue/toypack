@@ -6,6 +6,8 @@ import {
    isFunctionDeclaration,
    isClassDeclaration,
    importNamespaceSpecifier,
+   StringLiteral,
+   Identifier,
 } from "@babel/types";
 import { DependencyGraph, ScriptDependency } from "../../parse";
 import { ImportInfo } from "../../parse/extract-imports";
@@ -13,6 +15,7 @@ import { ExportInfo } from "../../parse/extract-exports";
 import { getExport } from "../utils/get-export";
 import { TransformContext } from "../utils/transform-context";
 import { ExportUidTracker } from "./ExportUidTracker";
+import { isLocal } from "../../utils";
 
 function removeImportsAndExports(scriptModules: ScriptDependency[]) {
    for (const module of scriptModules) {
@@ -85,7 +88,7 @@ function createNamespaceExport(
       return declared.namespace;
    }
 
-   const name = exportUidTracker.getNamespaceFor(module.source);
+   const name = ExportUidTracker.getNamespaceFor(module.source);
 
    if (!name) {
       throw new Error(`No assigned namespace for ${module.source}.`);
@@ -117,9 +120,8 @@ function createNamespaceExport(
    return name;
 }
 
-const exportUidTracker = new ExportUidTracker();
 function getAssignedId(source: string, name: string) {
-   const uid = exportUidTracker.get(source, name);
+   const uid = ExportUidTracker.get(source, name);
 
    if (!uid) {
       throw new Error(`Failed to get the assigned id for ${name} in ${source}`);
@@ -213,9 +215,13 @@ function bindExported(
       bindImport(context, graph, parentModule, facadeImportInfo);
 
       const aggrSource = parentModule.dependencyMap[exportInfo.source];
-      const id = exportUidTracker.getNamespaceFor(aggrSource);
+      const id = ExportUidTracker.getNamespaceFor(aggrSource);
       importScope.rename(importLocalName, id);
    }
+}
+
+function getStringOrIdValue(node: StringLiteral | Identifier) {
+   return node.type == "Identifier" ? node.name : node.value;
 }
 
 function bindImport(
@@ -224,12 +230,11 @@ function bindImport(
    importer: ScriptDependency,
    importInfo: ImportInfo
 ) {
+   if (!isLocal(importInfo.source)) return;
    if (importInfo.type == "specifier" || importInfo.type == "default") {
       const importedName =
          importInfo.type == "specifier"
-            ? importInfo.specifier.imported.type == "Identifier"
-               ? importInfo.specifier.imported.name
-               : importInfo.specifier.imported.value
+            ? getStringOrIdValue(importInfo.specifier.imported)
             : "default";
       const localName = importInfo.specifier.local.name;
       const exportInfo = getExport(
@@ -283,10 +288,9 @@ export function bindImports(
    graph: DependencyGraph,
    scriptModules: ScriptDependency[]
 ) {
-   exportUidTracker.clear();
    namespaceMap.clear();
-   exportUidTracker.assignWithModules(scriptModules);
-   console.log(exportUidTracker);
+   ExportUidTracker.clear();
+   ExportUidTracker.assignWithModules(scriptModules);
 
    // Bind
    for (const module of scriptModules) {
