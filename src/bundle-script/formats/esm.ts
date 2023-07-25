@@ -61,11 +61,15 @@ export function initialize(ast: File, scriptModules: ScriptDependency[]) {
                specifier.imported
             );
          } else if (type == "default") {
-            const id = (idMap["default"] ??= UidGenerator.generate(source));
+            const id = (idMap["default"] ??= UidGenerator.generate(
+               source.split("/")[0] + "_default"
+            ));
             scope.rename(local, id);
             specifiers[id] = importDefaultSpecifier(identifier(id));
          } else if (type == "namespace") {
-            const id = (namespaceMap[source] ??= UidGenerator.generate(source));
+            const id = (namespaceMap[source] ??= UidGenerator.generate(
+               source.split("/")[0]
+            ));
             scope.rename(local, id);
             importDecls[source].namespace ??= importDeclaration(
                [importNamespaceSpecifier(identifier(id))],
@@ -115,7 +119,7 @@ export function initialize(ast: File, scriptModules: ScriptDependency[]) {
       }
    });
 
-   entry.exports.aggregatedAll.forEach(exportInfo => {
+   entry.exports.aggregatedAll.forEach((exportInfo) => {
       const { source } = exportInfo;
       const resolved = entry.dependencyMap[source];
       const aggrExports = ExportUidTracker.getModuleExports(resolved);
@@ -128,5 +132,8 @@ export function initialize(ast: File, scriptModules: ScriptDependency[]) {
       }
    });
 
-   body.push(exportNamedDeclaration(null, Object.values(exportSpecifiers)));
+   const exportSpecifiersArr = Object.values(exportSpecifiers);
+   if (exportSpecifiersArr.length) {
+      body.push(exportNamedDeclaration(null, exportSpecifiersArr));
+   }
 }
