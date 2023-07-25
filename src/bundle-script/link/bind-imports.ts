@@ -5,71 +5,15 @@ import {
    variableDeclarator,
    isFunctionDeclaration,
    isClassDeclaration,
-   importNamespaceSpecifier,
    StringLiteral,
    Identifier,
 } from "@babel/types";
 import { DependencyGraph, ScriptDependency } from "../../parse";
 import { ImportInfo } from "../../parse/extract-imports";
 import { ExportInfo } from "../../parse/extract-exports";
-import { getExport } from "../utils/get-export";
 import { TransformContext } from "../utils/transform-context";
-import { ExportUidTracker } from "./ExportUidTracker";
+import { UidTracker } from "./UidTracker";
 import { isLocal } from "../../utils";
-
-function removeImportsAndExports(scriptModules: ScriptDependency[]) {
-   for (const module of scriptModules) {
-      /**
-       * Before removing, we must assure that the exports that has the
-       * declarations in its path get seperated. e.g.
-       *
-       * In:
-       * export function fn() {}
-       *
-       * Out:
-       * function fn() {}
-       */
-      for (const exportInfo of Object.values(module.exports.others)) {
-         if (exportInfo.path.removed) {
-            continue;
-         }
-
-         if (
-            exportInfo.type == "declared" ||
-            exportInfo.type == "declaredDefault" ||
-            exportInfo.type == "declaredDefaultExpression"
-         ) {
-            const declPath = exportInfo.declaration;
-
-            if (
-               declPath.isFunctionDeclaration() ||
-               declPath.isClassDeclaration()
-            ) {
-               const exportDecl = exportInfo.path.node.declaration;
-               if (
-                  isFunctionDeclaration(exportDecl) ||
-                  isClassDeclaration(exportDecl)
-               ) {
-                  exportInfo.path.replaceWith(declPath.node);
-               }
-            }
-         }
-      }
-
-      /**
-       * Remove from ast without using .remove() because we still need to
-       * use them on the next runs.
-       */
-      const ast = module.ast;
-      ast.program.body = ast.program.body.filter(
-         (node) =>
-            node.type !== "ExportDefaultDeclaration" &&
-            node.type !== "ExportAllDeclaration" &&
-            node.type !== "ExportNamedDeclaration" &&
-            node.type !== "ImportDeclaration"
-      );
-   }
-}
 
 const namespaceMap = new Map<
    string,
@@ -88,7 +32,7 @@ function createNamespaceExport(
       return declared.namespace;
    }
 
-   const name = ExportUidTracker.getNamespaceFor(module.source);
+   const name = UidTracker.getNamespaceFor(module.source);
 
    if (!name) {
       throw new Error(`No assigned namespace for ${module.source}.`);
@@ -103,6 +47,15 @@ function createNamespaceExport(
             exportedNames
                .map((exportName) => {
                   const uid = getAssignedId(module.source, exportName);
+
+                  // Add quotes if not a valid export name
+                  const isValidName =
+                     /^[a-z0-9$_]+$/i.test(exportName) &&
+                     !/^[0-9]+/.test(exportName);
+                  if (!isValidName) {
+                     exportName = `"${exportName}"`;
+                  }
+
                   let line = `${exportName}: () => ${uid}`;
                   return line;
                })
@@ -123,7 +76,7 @@ function createNamespaceExport(
 }
 
 function getAssignedId(source: string, name: string) {
-   const uid = ExportUidTracker.get(source, name);
+   const uid = UidTracker.get(source, name);
 
    if (!uid) {
       throw new Error(
@@ -137,17 +90,14 @@ function getAssignedId(source: string, name: string) {
 /**
  * Binds the imported module to the exported declarations.
  */
-function bindExported(
+function bindExport(
    context: TransformContext,
    graph: DependencyGraph,
-   importer: ScriptDependency,
-   importInfo: ImportInfo,
-   exportInfo: ExportInfo
+   exportInfo: ExportInfo,
+   exportInfosModule: ScriptDependency
 ) {
    const exportScope = exportInfo.path.scope;
-   const exportSource = importer.dependencyMap[importInfo.source];
-   if (importInfo.path.removed) return;
-   if (exportInfo.path.removed) return;
+   const exportSource = exportInfosModule.source;
 
    if (exportInfo.type == "declared") {
       const id = getAssignedId(exportSource, exportInfo.name);
@@ -198,20 +148,9 @@ function bindExported(
       ]);
       exportInfo.path.replaceWith(varDecl);
    } else if (exportInfo.type == "aggregatedNamespace") {
-      const parentSource = importer.dependencyMap[importInfo.source];
+      const parentSource = exportInfosModule.dependencyMap[exportInfo.source];
       const parentModule = graph[parentSource] as ScriptDependency;
-      /**
-       * This export type is basically just an import anyway, so
-       * we can let the `bindImport` function handle the namespacing.
-       */
-      const facadeImportInfo: ImportInfo = {
-         id: importInfo.id,
-         type: "namespace",
-         path: importInfo.path,
-         source: exportInfo.source,
-         specifier: importNamespaceSpecifier(exportInfo.specifier.exported),
-      };
-      bindImport(context, graph, parentModule, facadeImportInfo);
+      createNamespaceExport(context, parentModule);
    }
 }
 
@@ -228,44 +167,22 @@ function bindImport(
    if (!isLocal(importInfo.source)) return;
    const importScope = importInfo.path.scope;
    const importSource = importer.dependencyMap[importInfo.source];
+   const importedModule = graph[importSource];
+   if (importedModule?.type != "script") return;
+
    if (importInfo.type == "specifier" || importInfo.type == "default") {
       const importedName =
          importInfo.type == "specifier"
             ? getStringOrIdValue(importInfo.specifier.imported)
             : "default";
       const localName = importInfo.specifier.local.name;
-      const exportInfo = getExport(
-         graph,
-         importedName,
-         importInfo.source,
-         importer.source
-      );
-
-      if (!exportInfo) {
-         throw new Error(
-            `No '${importedName}' export found in ${importInfo.source}`
-         );
-      }
-
       importScope.rename(localName, getAssignedId(importSource, importedName));
-      bindExported(context, graph, importer, importInfo, exportInfo);
    } else if (importInfo.type == "namespace") {
       const localName = importInfo.specifier.local.name;
       const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
       if (namespacedModule?.type != "script") return;
-      if (!namespaceMap.has(namespacedModule.source)) {
-         createNamespaceExport(context, namespacedModule);
-         Object.values(namespacedModule.exports.others).forEach(
-            (exportInfo) => {
-               bindExported(context, graph, importer, importInfo, exportInfo);
-            }
-         );
-      }
-
-      importScope.rename(
-         localName,
-         ExportUidTracker.getNamespaceFor(importSource)
-      );
+      const namespace = createNamespaceExport(context, namespacedModule);
+      importScope.rename(localName, namespace);
    }
 }
 
@@ -273,19 +190,23 @@ function bindImport(
  * This method connects the imports of each module to the exported
  * declarations of other modules
  */
-export function bindImports(
+export function bindModules(
    context: TransformContext,
    graph: DependencyGraph,
    scriptModules: ScriptDependency[]
 ) {
    namespaceMap.clear();
-   ExportUidTracker.clear();
-   ExportUidTracker.assignWithModules(scriptModules);
+   UidTracker.clear();
+   UidTracker.assignWithModules(scriptModules);
 
-   // Bind
+   // Bind ids
    for (const module of scriptModules) {
       for (const importInfo of Object.values(module.imports.others)) {
          bindImport(context, graph, module, importInfo);
+      }
+
+      for (const exportInfo of Object.values(module.exports.others)) {
+         bindExport(context, graph, exportInfo, module);
       }
    }
 
@@ -295,5 +216,18 @@ export function bindImports(
    }
 
    // Remove left out imports/exports after binding
-   removeImportsAndExports(scriptModules);
+   for (const module of scriptModules) {
+      /**
+       * Remove from ast without using path.remove() because we still need to
+       * use them on the next runs.
+       */
+      const ast = module.ast;
+      ast.program.body = ast.program.body.filter(
+         (node) =>
+            node.type !== "ExportDefaultDeclaration" &&
+            node.type !== "ExportAllDeclaration" &&
+            node.type !== "ExportNamedDeclaration" &&
+            node.type !== "ImportDeclaration"
+      );
+   }
 }

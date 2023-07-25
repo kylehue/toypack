@@ -4,7 +4,7 @@ import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
 import { ExportInfo } from "../parse/extract-exports.js";
 import { DependencyGraph, ScriptDependency } from "../parse/index.js";
-import { bindImports, deconflict, transformToVars } from "./link/index.js";
+import { bindModules, deconflict, transformToVars } from "./link/index.js";
 import {
    TraverseMap,
    cleanComments,
@@ -111,7 +111,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    UidGenerator.reset();
    transformToVars(scriptModules);
    deconflict(scriptModules);
-   bindImports(transform.context, graph, scriptModules);
+   bindModules(transform.context, graph, scriptModules);
    cleanComments(scriptModules);
 
    // bundle

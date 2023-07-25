@@ -19,7 +19,7 @@ import {
 } from "@babel/types";
 import { ScriptDependency } from "src/parse";
 import { UidGenerator, getLibImports } from "../utils";
-import { ExportUidTracker } from "../link/ExportUidTracker";
+import { UidTracker } from "../link/UidTracker";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -98,7 +98,7 @@ export function initialize(ast: File, scriptModules: ScriptDependency[]) {
    const exportSpecifiers: Record<string, ExportSpecifier> = {};
    Object.values(entry.exports.others).forEach((exportInfo) => {
       const { type, path } = exportInfo;
-      const id = ExportUidTracker.get(entry.source, exportInfo.name);
+      const id = UidTracker.get(entry.source, exportInfo.name);
       if (!id) return;
       if (
          type == "declared" ||
@@ -115,14 +115,17 @@ export function initialize(ast: File, scriptModules: ScriptDependency[]) {
             identifier("default")
          );
       } else if (type == "declaredDefaultExpression") {
-         body.push(exportDefaultDeclaration(exportInfo.declaration.node));
+         exportSpecifiers["default"] = exportSpecifier(
+            identifier(id),
+            identifier("default")
+         );
       }
    });
 
    entry.exports.aggregatedAll.forEach((exportInfo) => {
       const { source } = exportInfo;
       const resolved = entry.dependencyMap[source];
-      const aggrExports = ExportUidTracker.getModuleExports(resolved);
+      const aggrExports = UidTracker.getModuleExports(resolved);
       for (const [name, id] of Object.entries(aggrExports)) {
          if (name == "default") continue;
          exportSpecifiers[id] = exportSpecifier(

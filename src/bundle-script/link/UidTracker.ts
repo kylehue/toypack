@@ -11,7 +11,7 @@ function createDefaultName(source: string) {
    return path.basename(source) + "_default";
 }
 
-export namespace ExportUidTracker {
+export namespace UidTracker {
    let _map: Record<string, Record<string, string>> = {};
    let _namespaceMap: Record<string, string> = {};
    export function set(source: string, exported: string, id: string) {
