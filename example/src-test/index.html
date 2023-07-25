@@ -19,6 +19,16 @@
             height: 40px;
          }
       </style>
+      <script type="importmap">
+         {
+            "imports": {
+               "path-browserify": "https://esm.sh/path-browserify",
+               "path-browserify/": "https://esm.sh/path-browserify/",
+               "vue": "https://esm.sh/vue",
+               "vue/": "https://esm.sh/vue/"
+            }
+         }
+      </script>
       <script src="./src/main.ts"></script>
    </head>
    <body class="cool">
@@ -30,7 +40,7 @@
       </div>
       <div id="reactApp"></div>
       <div id="vueApp"></div>
-      <img src="images/kitty-cat-sandwich.gif" alt="cat" height="200">
+      <img src="images/kitty-cat-sandwich.gif" alt="cat" height="200" />
       <video src="videos/cat-milk.mp4" height="200" controls></video>
    </body>
 </html>

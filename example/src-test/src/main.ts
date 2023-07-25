@@ -3,7 +3,7 @@
 // import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 // import "../react";
-// import "../vue";
+import "../vue";
 // import confetti from "canvas-confetti";
 // const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
 // meowButton.onclick = () => confetti();
@@ -24,7 +24,6 @@ import counter, { Adder, dog as goodBoy } from "./testing.mjs";
 console.log(counter, Adder, goodBoy);
 // import a, {add} from "../classes/createNum2";
 // console.log(a, add);
-
 export default 123;
 export { counter, Adder };
 export { dog } from "./testing.mjs";

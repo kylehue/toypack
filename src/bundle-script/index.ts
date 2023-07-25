@@ -2,21 +2,24 @@ import { file, program, Node } from "@babel/types";
 import generate from "@babel/generator";
 import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
-import { ExportInfo } from "../parse/extract-exports.js";
-import { DependencyGraph, ScriptDependency } from "../parse/index.js";
-import { bindModules, deconflict, transformToVars } from "./link/index.js";
+import { DependencyGraph } from "../parse/index.js";
 import {
-   TraverseMap,
+   bindModules,
+   deconflict,
+   transformToVars,
+   UidGenerator,
+} from "./link/index.js";
+import {
    cleanComments,
    createTransformContext,
    getSortedScripts,
-   UidGenerator,
 } from "./utils";
 import { template } from "@babel/core";
 import runtime from "./runtime.js";
-import traverse, { Hub, NodePath, Scope } from "@babel/traverse";
+import { Scope } from "@babel/traverse";
 import { codeFrameColumns } from "@babel/code-frame";
 import { Format } from "./formats/index.js";
+import { resyncSourceMap } from "./utils/resync-source-map.js";
 
 // TODO: remove
 (window as any).getCode = function (ast: Node | string) {
@@ -84,24 +87,6 @@ import { Format } from "./formats/index.js";
    });
 };
 
-// function mergeAsts(scriptModules: ScriptDependency[]) {
-//    const mergedAst = file(program([]));
-
-//    for (const script of scriptModules) {
-//       mergedAst.program.body.unshift(...script.ast.program.body);
-//    }
-
-//    let resultPath: NodePath<Program>;
-//    traverse(mergedAst, {
-//       Program(path) {
-//          resultPath = path;
-//          path.stop();
-//       }
-//    });
-
-//    return resultPath!;
-// }
-
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const scriptModules = getSortedScripts(graph);
@@ -140,23 +125,21 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       comments: config.bundle.mode == "development",
    });
 
-   console.log("%c-------------- RESULT --------------", "color:red;");
+   if (generated.map) {
+      // @ts-expect-error mute readonly error
+      generated.map = resyncSourceMap(generated.map, scriptModules);
+   }
 
-   console.log(getCode(generated.code));
-   console.log(generated);
-
-   // for (let i = 0; i < (generated?.map?.sources.length || 0); i++) {
-   //    const source = generated?.map?.sources[i]!;
-   //    generated.map!.sourcesContent ??= [];
-   //    generated.map!.sourcesContent[i] = graph[source].asset.content as string;
-   // }
+   // console.log("%c-------------- RESULT --------------", "color:red;");
+   // console.log(getCode(generated.code));
+   // console.log(generated);
 
    // console.log(
    //    generated.code + "\n" + MapConverter.fromObject(generated.map).toComment()
    // );
 
    return {
-      content: "",
-      map: MapConverter.fromObject({}),
+      content: generated.code,
+      map: MapConverter.fromObject(generated.map),
    };
 }

@@ -18,8 +18,8 @@ import {
    stringLiteral,
 } from "@babel/types";
 import { ScriptDependency } from "src/parse";
-import { UidGenerator, getLibImports } from "../utils";
-import { UidTracker } from "../link/UidTracker";
+import { getLibImports } from "../utils";
+import { UidGenerator, UidTracker } from "../link";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;

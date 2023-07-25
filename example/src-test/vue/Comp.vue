@@ -1,9 +1,9 @@
-<script setup lang="ts">
+<script setup>
 // @ts-nocheck
 import { ref } from "vue";
-const props = defineProps<{
-   msg: string;
-}>();
+const props = defineProps({
+   msg: String
+});
 
 const msg = ref(props.msg);
 

@@ -9,7 +9,7 @@ export function html(scriptSrc = "", linkHref = "") {
 <html lang="en">
    <head>
       <link rel="stylesheet" href="${linkHref}"></link>
-      <script defer type="application/javascript" src="${scriptSrc}"></script>
+      <script defer type="module" src="${scriptSrc}"></script>
    </head>
    <body>
    </body>

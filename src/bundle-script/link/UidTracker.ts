@@ -1,5 +1,5 @@
 import { ScriptDependency } from "src/types";
-import { UidGenerator } from "../utils";
+import { UidGenerator } from "../link";
 import { Identifier, StringLiteral } from "@babel/types";
 import path from "path-browserify";
 

@@ -74,22 +74,6 @@ function compile(
          dependencies.add(depSource);
       }
 
-      // Import maps aren't supported
-      if (node.tagName == "SCRIPT" && node.attributes.type == "importmap") {
-         const pos = indexToPosition(content, node.range[0]);
-         let message = [
-            "ESM import maps are not supported,",
-            "please install packages instead.",
-         ].join(" ");
-         let importMapError =
-            message +
-            "\n" +
-            codeFrameColumns(content, {
-               start: pos,
-            });
-         this.emitError(importMapError);
-      }
-
       /**
        * Save the styles so that the bundler can process it.
        * This is necessary because the urls inside it needs to
@@ -158,7 +142,7 @@ function injectAstToHtml(content: string, astToInject: HTMLElement) {
    // Inject head in head
    const headToInject = astToInject.querySelector("head");
    headToInject?.childNodes.forEach((node) => {
-      headAst.appendChild(node.clone());
+      headAst.childNodes.unshift(node.clone());
    });
 
    return htmlAst.toString();
