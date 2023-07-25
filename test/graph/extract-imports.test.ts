@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { extractImports } from "../../src/graph/extract-imports";
+import { extractImports } from "../../src/parse/extract-imports";
 import { parseSync, TransformOptions } from "@babel/core";
 
 const opts: TransformOptions = {
@@ -45,6 +45,12 @@ const importsAstExpectedExports = [
    "something",
 ];
 
+it("should extract imports", () => {
+   expect(Object.keys(extractImports(importsAst).others).sort()).toEqual(
+      importsAstExpectedExports.sort()
+   );
+});
+
 const sideEffectImportsAst = parseSync(
    `
 import "./module0.js";
@@ -56,23 +62,10 @@ import "./module4.js";
    opts
 )!;
 
-const sideEffectImportsAstExpectedExports = [
-   "0",
-   "1",
-   "2",
-   "3",
-   "4",
-];
-
-
-it("should extract imports", () => {
-   expect(Object.keys(extractImports(importsAst)).sort()).toEqual(
-      importsAstExpectedExports.sort()
-   );
-});
+const sideEffectImportsAstExpectedExports = ["0", "1", "2", "3", "4"];
 
 it("should extract side-effect imports", () => {
-   expect(Object.keys(extractImports(sideEffectImportsAst)).sort()).toEqual(
-      sideEffectImportsAstExpectedExports.sort()
-   );
+   expect(
+      Object.keys(extractImports(sideEffectImportsAst).sideEffect).sort()
+   ).toEqual(sideEffectImportsAstExpectedExports.sort());
 });

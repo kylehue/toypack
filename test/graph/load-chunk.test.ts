@@ -4,7 +4,7 @@
 
 import { expect, it, beforeEach } from "vitest";
 import { Toypack } from "../..";
-import { loadChunk } from "../../src/graph/load-chunk.js";
+import { loadChunk } from "../../src/parse/load-chunk.js";
 import { Loader, Plugin } from "../../build/types.js";
 
 const unknownPath = "unknown.js";

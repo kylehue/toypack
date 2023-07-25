@@ -3,7 +3,7 @@
  */
 
 import { expect, it } from "vitest";
-import { extractExports } from "../../src/graph/extract-exports";
+import { extractExports } from "../../src/parse/extract-exports";
 import { parseSync, TransformOptions } from "@babel/core";
 
 const opts: TransformOptions = {
@@ -31,7 +31,7 @@ const o2 = {
    bar: {tick: [{tock: "eleven!"}]}
 }
 export const {
-   foo: [[puppy, balloon], bay],
+   foo: [[puppy, balloon], bridge],
    bar: {tick: [{tock: eleven}]}
 } = o2;
 `,
@@ -51,10 +51,16 @@ const declaredAstExpectedExports = [
    "keep",
    "lone",
    "puppy",
-   "bay",
+   "bridge",
    "balloon",
    "eleven",
 ];
+
+it("should extract declared", () => {
+   expect(Object.keys(extractExports(declaredAst).others).sort()).toEqual(
+      declaredAstExpectedExports.sort()
+   );
+});
 
 const referencedAst = parseSync(
    `
@@ -77,6 +83,12 @@ const referencedAstExpectedExports = [
    "default",
 ];
 
+it("should extract referenced", () => {
+   expect(Object.keys(extractExports(referencedAst).others).sort()).toEqual(
+      referencedAstExpectedExports.sort()
+   );
+});
+
 const defaultsAst = parseSync(
    `
 export default 23;
@@ -93,6 +105,12 @@ export default candy;
 )!;
 
 const defaultsAstExpectedExports = ["default"];
+
+it("should extract default", () => {
+   expect(Object.keys(extractExports(defaultsAst).others).sort()).toEqual(
+      defaultsAstExpectedExports.sort()
+   );
+});
 
 const aggregatedAst = parseSync(
    `
@@ -116,26 +134,8 @@ const aggregatedAstExpectedExports = [
    "tavern",
 ];
 
-it("should extract declared", () => {
-   expect(Object.keys(extractExports(declaredAst)).sort()).toEqual(
-      declaredAstExpectedExports.sort()
-   );
-});
-
-it("should extract referenced", () => {
-   expect(Object.keys(extractExports(referencedAst)).sort()).toEqual(
-      referencedAstExpectedExports.sort()
-   );
-});
-
-it("should extract default", () => {
-   expect(Object.keys(extractExports(defaultsAst)).sort()).toEqual(
-      defaultsAstExpectedExports.sort()
-   );
-});
-
 it("should extract aggregated", () => {
-   expect(Object.keys(extractExports(aggregatedAst)).sort()).toEqual(
+   expect(Object.keys(extractExports(aggregatedAst).others).sort()).toEqual(
       aggregatedAstExpectedExports.sort()
    );
 });
