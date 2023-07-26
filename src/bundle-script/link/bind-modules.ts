@@ -7,6 +7,8 @@ import {
    isClassDeclaration,
    StringLiteral,
    Identifier,
+   arrowFunctionExpression,
+   callExpression,
 } from "@babel/types";
 import { DependencyGraph, ScriptDependency } from "../../parse";
 import { ImportInfo } from "../../parse/extract-imports";
@@ -14,8 +16,6 @@ import { ExportInfo } from "../../parse/extract-exports";
 import { TransformContext } from "../utils/transform-context";
 import { UidTracker } from "./UidTracker";
 import { isLocal } from "../../utils";
-// import { RefTracker } from ".";
-// import { getExport } from "../utils";
 
 const namespaceMap = new Map<
    string,
@@ -167,6 +167,7 @@ function bindImport(
    importInfo: ImportInfo
 ) {
    if (!isLocal(importInfo.source)) return;
+   
    const importScope = importInfo.path.scope;
    const importSource = importer.dependencyMap[importInfo.source];
    const importedModule = graph[importSource];
@@ -178,22 +179,6 @@ function bindImport(
             ? getStringOrIdValue(importInfo.specifier.imported)
             : "default";
       const localName = importInfo.specifier.local.name;
-
-      // const exportInfo = getExport(
-      //    graph,
-      //    importedName,
-      //    importSource,
-      //    importer.source
-      // )!;
-
-      // if (
-      //    exportInfo.type == "declared" ||
-      //    exportInfo.type == "declaredDefault" ||
-      //    exportInfo.type == "declaredDefaultExpression"
-      // ) {
-      //    RefTracker.ref(exportInfo.declaration.node);
-      // }
-
       importScope.rename(localName, getAssignedId(importSource, importedName));
    } else if (importInfo.type == "namespace") {
       const localName = importInfo.specifier.local.name;
@@ -201,6 +186,16 @@ function bindImport(
       if (namespacedModule?.type != "script") return;
       const namespace = createNamespaceExport(context, namespacedModule);
       importScope.rename(localName, namespace);
+   } else if (importInfo.type == "dynamic") {
+      const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
+      if (namespacedModule?.type != "script") return;
+      const namespace = createNamespaceExport(context, namespacedModule);
+      importInfo.path.replaceWith(
+         callExpression(
+            arrowFunctionExpression([], identifier(namespace), true),
+            []
+         )
+      );
    }
 }
 
@@ -219,7 +214,10 @@ export function bindModules(
 
    // Bind ids
    for (const module of scriptModules) {
-      for (const importInfo of Object.values(module.imports.others)) {
+      for (const importInfo of [
+         ...Object.values(module.imports.others),
+         ...module.imports.dynamic,
+      ]) {
          bindImport(context, graph, module, importInfo);
       }
 

@@ -24,7 +24,6 @@ const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
       entry: "src/main",
-      moduleType: "esm",
       resolve: {
          alias: {
             "@classes": "/classes/",

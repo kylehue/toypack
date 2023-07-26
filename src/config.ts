@@ -13,10 +13,10 @@ export const defaultConfig = {
        */
       entry: "",
       /**
-       * The module type of the program.
+       * The format of the bundle.
        * @default "esm"
        */
-      moduleType: "esm" as ModuleTypeConfig,
+      format: "esm" as FormatConfig,
       /**
        * The mode of the bundle. Development mode is optimized for fast
        * workflow during the development process. Production mode is
@@ -95,7 +95,7 @@ export const defaultConfig = {
 };
 
 export type ToypackConfig = typeof defaultConfig;
-export type ModuleTypeConfig = "esm" | "cjs";
+export type FormatConfig = "esm";
 export type ModeConfig = "production" | "development";
 export type LogLevelConfig = "error" | "warn" | "info" | "debug" | "none";
 export type SourceMapConfig = {

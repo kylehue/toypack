@@ -2,6 +2,7 @@ import { DependencyGraph } from "src/parse";
 import { ExportInfo } from "src/parse/extract-exports";
 
 /**
+ * TODO: remove (this is unused)
  * Retrieves the exported declaration.
  * @param graph The dependency graph.
  * @param exportName The name of the export to retrieve.

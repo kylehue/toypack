@@ -5,6 +5,7 @@ import {
    ImportDefaultSpecifier,
    ImportSpecifier,
    ImportNamespaceSpecifier,
+   CallExpression,
 } from "@babel/types";
 import { traverse } from "@babel/core";
 
@@ -15,6 +16,7 @@ export function extractImports(
 ) {
    const imports: Imports = {
       sideEffect: [],
+      dynamic: [],
       others: {},
    };
 
@@ -76,6 +78,20 @@ export function extractImports(
             }
          }
       },
+      CallExpression(path) {
+         const argNode = path.node.arguments[0];
+         const callee = path.node.callee;
+         const isDynamicImport = callee.type == "Import";
+         if (isDynamicImport && argNode.type == "StringLiteral") {
+            const source = argNode.value;
+            imports.dynamic.push({
+               id: `$${uid++}`,
+               type: "dynamic",
+               path,
+               source,
+            });
+         }
+      },
    };
 
    if (traverseFn) {
@@ -90,22 +106,29 @@ export function extractImports(
 interface BaseImport {
    id: string;
    source: string;
-   path: NodePath<ImportDeclaration>;
 }
 
 export interface DefaultImport extends BaseImport {
    type: "default";
    specifier: ImportDefaultSpecifier;
+   path: NodePath<ImportDeclaration>;
 }
 
 export interface SpecifierImport extends BaseImport {
    type: "specifier";
    specifier: ImportSpecifier;
+   path: NodePath<ImportDeclaration>;
 }
 
 export interface NamespaceImport extends BaseImport {
    type: "namespace";
    specifier: ImportNamespaceSpecifier;
+   path: NodePath<ImportDeclaration>;
+}
+
+export interface DynamicImport extends BaseImport {
+   type: "dynamic";
+   path: NodePath<CallExpression>;
 }
 
 export interface SideEffectImport {
@@ -117,11 +140,13 @@ export interface SideEffectImport {
 
 export interface Imports {
    sideEffect: SideEffectImport[];
+   dynamic: DynamicImport[];
    others: Record<string, NamespaceImport | SpecifierImport | DefaultImport>;
 }
 
 export type ImportInfo =
    | DefaultImport
+   | DynamicImport
    | NamespaceImport
    | SpecifierImport
    | SideEffectImport;

@@ -54,14 +54,9 @@ export async function parseScriptAsset(
       programPath: {} as NodePath<Program>,
    };
 
-   const moduleType =
-      source.startsWith("virtual:") || source.startsWith("/node_modules/")
-         ? "esm"
-         : config.bundle.moduleType;
-
    const userBabelOptions = config.babel.parse;
    const importantBabelOptions: ParserOptions = {
-      sourceType: moduleType == "esm" ? "module" : "script",
+      sourceType: "module",
       sourceFilename: source,
    };
    const parserOptions: ParserOptions = {
@@ -93,57 +88,39 @@ export async function parseScriptAsset(
       traverseOptionsArray.push(options);
    };
 
+   // Extract dependencies
    traverse({
       Program(path) {
          result.programPath = path;
       },
+      ImportDeclaration(path) {
+         result.dependencies.add(path.node.source.value);
+         options?.inspectDependencies?.(path.node.source, path);
+      },
+      ExportAllDeclaration(path) {
+         result.dependencies.add(path.node.source.value);
+         options?.inspectDependencies?.(path.node.source, path);
+      },
+      ExportNamedDeclaration(path) {
+         if (path.node.source) {
+            result.dependencies.add(path.node.source.value);
+            options?.inspectDependencies?.(path.node.source, path);
+         }
+      },
+      CallExpression(path) {
+         const argNode = path.node.arguments[0];
+         const callee = path.node.callee;
+         const isDynamicImport = callee.type == "Import";
+         if (isDynamicImport && argNode.type == "StringLiteral") {
+            result.dependencies.add(argNode.value);
+            options?.inspectDependencies?.(argNode, path);
+         }
+      },
+      TSImportType(path) {
+         result.dependencies.add(path.node.argument.value);
+         options?.inspectDependencies?.(path.node.argument, path);
+      },
    });
-
-   // Extract dependencies
-   if (moduleType == "esm") {
-      traverse({
-         ImportDeclaration(path) {
-            result.dependencies.add(path.node.source.value);
-            options?.inspectDependencies?.(path.node.source, path);
-         },
-         ExportAllDeclaration(path) {
-            result.dependencies.add(path.node.source.value);
-            options?.inspectDependencies?.(path.node.source, path);
-         },
-         ExportNamedDeclaration(path) {
-            if (path.node.source) {
-               result.dependencies.add(path.node.source.value);
-               options?.inspectDependencies?.(path.node.source, path);
-            }
-         },
-         CallExpression(path) {
-            const argNode = path.node.arguments[0];
-            const callee = path.node.callee;
-            const isDynamicImport = callee.type == "Import";
-            if (isDynamicImport && argNode.type == "StringLiteral") {
-               result.dependencies.add(argNode.value);
-               options?.inspectDependencies?.(argNode, path);
-            }
-         },
-         TSImportType(path) {
-            result.dependencies.add(path.node.argument.value);
-            options?.inspectDependencies?.(path.node.argument, path);
-         },
-      });
-   } else {
-      traverse({
-         CallExpression(path) {
-            const argNode = path.node.arguments[0];
-            const callee = path.node.callee;
-            const isRequire =
-               callee.type == "Identifier" && callee.name == "require";
-            if (isRequire && argNode.type == "StringLiteral") {
-               result.dependencies.add(argNode.value);
-               options?.inspectDependencies?.(argNode, path);
-            }
-         },
-      });
-   }
 
    result.exports = extractExports(result.ast, traverse);
    result.imports = extractImports(result.ast, traverse);

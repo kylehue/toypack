@@ -13,7 +13,6 @@ export default function (): Plugin {
       name: "import-meta-plugin",
       transform(context) {
          if (context.type != "script") return;
-         if (this.bundler.config.bundle.moduleType != "esm") return;
          let test;
          context.traverse({
             MemberExpression(path) {

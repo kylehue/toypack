@@ -25,49 +25,27 @@ function constructSpecifiers(
 }
 
 export function getImportCode(
-   moduleType: "esm" | "cjs",
    request: string,
    specifiers?: (string | SpecifierOptions)[]
 ) {
    let code = "";
-   if (moduleType == "esm") {
-      if (specifiers?.length) {
-         const spec = constructSpecifiers(specifiers, "as");
-         if (spec.length) {
-            code = `import { ${spec} } from "${request}";`;
-         }
+   if (specifiers?.length) {
+      const spec = constructSpecifiers(specifiers, "as");
+      if (spec.length) {
+         code = `import { ${spec} } from "${request}";`;
+      }
 
-         for (const spec of specifiers) {
-            if (typeof spec == "string") continue;
-            if (spec.isDefault) {
-               code += `\nimport ${spec.name} from "${request}";`;
-            }
-            if (spec.isNamespace) {
-               code += `\nimport * as ${spec.name} from "${request}";`;
-            }
+      for (const spec of specifiers) {
+         if (typeof spec == "string") continue;
+         if (spec.isDefault) {
+            code += `\nimport ${spec.name} from "${request}";`;
          }
-      } else {
-         code = `import "${request}";`;
+         if (spec.isNamespace) {
+            code += `\nimport * as ${spec.name} from "${request}";`;
+         }
       }
    } else {
-      if (specifiers?.length) {
-         const spec = constructSpecifiers(specifiers, ":");
-         if (spec.length) {
-            code = `const { ${spec} } = require("${request}");`;
-         }
-         
-         for (const spec of specifiers) {
-            if (typeof spec == "string") continue;
-            if (spec.isDefault) {
-               code += `\nconst ${spec.name} = require("${request}").default;`;
-            }
-            if (spec.isNamespace) {
-               code += `\nconst ${spec.name} = require("${request}");`;
-            }
-         }
-      } else {
-         code = `require("${request}");`;
-      }
+      code = `import "${request}";`;
    }
 
    return code;

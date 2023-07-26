@@ -70,7 +70,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    // format
    formatEsm(resultAst, scriptModules);
 
-   const generated = generate(resultAst, {
+   let generated = generate(resultAst, {
       sourceMaps: !!config.bundle.sourceMap,
       minified: config.bundle.mode == "production",
       comments: config.bundle.mode == "development",
@@ -84,7 +84,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    console.log(getCode(generated.code));
 
    return {
-      content: /* generated.code */ "",
+      content: generated.code,
       map: MapConverter.fromObject(generated.map),
    };
 }

@@ -7,15 +7,18 @@ export function getLibImports(scriptModules: ScriptDependency[]) {
    for (const module of scriptModules) {
       const moduleImports = module.imports.others;
       const sideEffectImports = module.imports.sideEffect;
+      const dynamicImports = module.imports.dynamic;
 
-      [...Object.values(moduleImports), ...sideEffectImports].forEach(
-         (importInfo) => {
-            const source = importInfo.source;
-            if (isLocal(source)) return;
-            imports[source] ??= [];
-            imports[source].push(importInfo);
-         }
-      );
+      [
+         ...Object.values(moduleImports),
+         ...sideEffectImports,
+         ...dynamicImports,
+      ].forEach((importInfo) => {
+         const source = importInfo.source;
+         if (isLocal(source)) return;
+         imports[source] ??= [];
+         imports[source].push(importInfo);
+      });
    }
 
    return imports;

@@ -4,7 +4,7 @@ import { CssNode, Url } from "css-tree";
 import path from "path-browserify";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import Toypack from "../Toypack.js";
-import { TextAsset, Asset, ResourceAsset, ModuleTypeConfig } from "../types.js";
+import { TextAsset, Asset, ResourceAsset } from "../types.js";
 import {
    DEBUG,
    ERRORS,
@@ -24,22 +24,13 @@ import { NodePath } from "@babel/traverse";
 function getImportPosition(
    content: string,
    importSource: string,
-   moduleType: ModuleTypeConfig
 ) {
    let index: number | null = null;
-   if (moduleType == "esm") {
-      const esmImportRegex = new RegExp(
-         `(?:import|export).*(?:from)?.*(["']${escapeRegex(importSource)}["'])`,
-         "dg"
-      );
-      index = esmImportRegex.exec(content)?.indices?.[1][0] || null;
-   } else {
-      const cjsRequireRegex = new RegExp(
-         `require\\s*\\(\\s*(["']${escapeRegex(importSource)}["'])\\s*\\)`,
-         "dg"
-      );
-      index = cjsRequireRegex.exec(content)?.indices?.[1][0] || null;
-   }
+   const esmImportRegex = new RegExp(
+      `(?:import|export).*(?:from)?.*(["']${escapeRegex(importSource)}["'])`,
+      "dg"
+   );
+   index = esmImportRegex.exec(content)?.indices?.[1][0] || null;
 
    if (!index) return null;
    return indexToPosition(content, index);
@@ -56,7 +47,6 @@ function getImportCodeFrame(
       const pos = getImportPosition(
          asset.content,
          importSource,
-         this.getConfig().bundle.moduleType
       );
       codeFrame = !pos
          ? ""

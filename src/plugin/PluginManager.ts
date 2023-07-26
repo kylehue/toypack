@@ -171,18 +171,12 @@ export class PluginManager {
             specifiers?: (SpecifierOptions | string)[]
          ) {
             return getImportCode(
-               this.bundler.config.bundle.moduleType,
                request,
                specifiers
             );
          },
          getDefaultExportCode(exportCode: string) {
-            const config = this.bundler.getConfig();
-            if (config.bundle.moduleType == "esm") {
-               return `export default ${exportCode};`;
-            } else {
-               return `module.exports = ${exportCode};`;
-            }
+            return `export default ${exportCode};`;
          },
          emitError: (message) => {
             const logLevel = partialContext.bundler.getConfig().logLevel;

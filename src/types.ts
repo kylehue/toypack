@@ -37,7 +37,7 @@ export type {
    BabelTransformConfig,
    LogLevelConfig,
    ModeConfig,
-   ModuleTypeConfig,
+   FormatConfig as TargetConfig,
 } from "./config.js";
 export type {
    PackageManagerConfig,

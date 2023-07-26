@@ -47,8 +47,14 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
       importDecls[source] ??= {};
       const sourceStringNode = stringLiteral(source);
       for (const importInfo of importInfos) {
-         if (importInfo.type == "sideEffect") continue;
-
+         if (
+            importInfo.type != "default" &&
+            importInfo.type != "specifier" &&
+            importInfo.type != "namespace"
+         ) {
+            continue;
+         }
+         
          const { type, path, specifier } = importInfo;
          const scope = path.scope;
          const local = specifier.local.name;

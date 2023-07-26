@@ -30,11 +30,21 @@
 // export * as NM from "../classes/createNum2";
 // export * from "../classes/createNum2";
 
+// import def, { add, createNum } from "../classes/createNum2";
+// console.log(add);
 
+const button = document.createElement("button");
+button.textContent = "Load module!";
+document.body.append(button);
 
+button.onclick = async () => {
+   import("../classes/createNum2").then((module) => {
+      console.log(module.Book);
+   });
 
-import def, { add, createNum } from "../classes/createNum2";
-console.log(add);
+   const module = await import("../classes/createNum2");
+   console.log(module.Book);
+}
 
 // const def_0 = 45;
 // const def_1 = 45;
