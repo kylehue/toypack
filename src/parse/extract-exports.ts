@@ -34,7 +34,7 @@ import {
    ImportDefaultSpecifier,
    ImportNamespaceSpecifier,
 } from "@babel/types";
-import { traverse } from "@babel/core";
+import traverse from "@babel/traverse";
 
 export function getBindingDeclaration(scope: Scope, name: string) {
    const binding = scope.getBinding(name);

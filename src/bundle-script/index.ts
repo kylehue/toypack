@@ -4,19 +4,15 @@ import { file, program } from "@babel/types";
 import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
 import { DependencyGraph } from "../parse/index.js";
-import {
-   deconflict,
-   transformToVars,
-   UidGenerator,
-} from "./link/index.js";
+import { deconflict } from "./link/deconflict.js";
+import { transformToVars } from "./link/top-level-var.js";
+import { UidGenerator } from "./link/UidGenerator.js";
 import { bindModules } from "./link/bind-modules.js";
-import {
-   cleanComments,
-   createTransformContext,
-   getSortedScripts,
-} from "./utils";
-import { Format } from "./formats/index.js";
+import { cleanComments } from "./utils/clean-comments.js";
+import { createTransformContext } from "./utils/transform-context.js";
+import { getSortedScripts } from "./utils/get-sorted-scripts.js";
 import { resyncSourceMap } from "./utils/resync-source-map.js";
+import { formatEsm } from "./formats/esm.js";
 import runtime from "./runtime.js";
 
 // TODO: remove
@@ -72,14 +68,14 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    }
 
    // format
-   Format.esm(resultAst, scriptModules);
+   formatEsm(resultAst, scriptModules);
 
    const generated = generate(resultAst, {
       sourceMaps: !!config.bundle.sourceMap,
       minified: config.bundle.mode == "production",
       comments: config.bundle.mode == "development",
    });
-   
+
    if (generated.map) {
       // @ts-ignore mute readonly error
       generated.map = resyncSourceMap(generated.map, scriptModules);
@@ -88,7 +84,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    console.log(getCode(generated.code));
 
    return {
-      content: /* generated.code */"",
+      content: /* generated.code */ "",
       map: MapConverter.fromObject(generated.map),
    };
 }

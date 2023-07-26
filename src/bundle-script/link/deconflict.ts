@@ -2,7 +2,7 @@ import { Binding, Scope } from "@babel/traverse";
 import { isBlockScoped } from "@babel/types";
 import runtime from "../runtime";
 import { ScriptDependency } from "src/parse";
-import { UidGenerator } from "../link";
+import { UidGenerator } from "./UidGenerator";
 
 function getAllTopLevelBindings(scope: Scope) {
    const bindings = scope.getAllBindings();

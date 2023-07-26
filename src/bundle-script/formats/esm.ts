@@ -17,14 +17,15 @@ import {
    stringLiteral,
 } from "@babel/types";
 import { ScriptDependency } from "src/parse";
-import { getLibImports } from "../utils";
-import { UidGenerator, UidTracker } from "../link";
+import { getLibImports } from "../utils/get-lib-imports";
+import { UidGenerator } from "../link/UidGenerator";
+import { UidTracker } from "../link/UidTracker";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
 }
 
-export function initialize(ast: File, scriptModules: ScriptDependency[]) {
+export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
    const body = ast.program.body;
    const libImports = getLibImports(scriptModules);
    const importDecls: Record<

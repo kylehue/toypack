@@ -1,5 +1,5 @@
 import { ScriptDependency } from "src/parse";
-import { UidGenerator } from "../link";
+import { UidGenerator } from "./UidGenerator";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.

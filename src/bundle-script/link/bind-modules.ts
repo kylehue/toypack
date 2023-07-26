@@ -1,4 +1,4 @@
-import { template } from "@babel/core";
+import template from "@babel/template";
 import {
    identifier,
    variableDeclaration,
