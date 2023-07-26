@@ -14,6 +14,8 @@ import { ExportInfo } from "../../parse/extract-exports";
 import { TransformContext } from "../utils/transform-context";
 import { UidTracker } from "./UidTracker";
 import { isLocal } from "../../utils";
+// import { RefTracker } from ".";
+// import { getExport } from "../utils";
 
 const namespaceMap = new Map<
    string,
@@ -176,6 +178,22 @@ function bindImport(
             ? getStringOrIdValue(importInfo.specifier.imported)
             : "default";
       const localName = importInfo.specifier.local.name;
+
+      // const exportInfo = getExport(
+      //    graph,
+      //    importedName,
+      //    importSource,
+      //    importer.source
+      // )!;
+
+      // if (
+      //    exportInfo.type == "declared" ||
+      //    exportInfo.type == "declaredDefault" ||
+      //    exportInfo.type == "declaredDefaultExpression"
+      // ) {
+      //    RefTracker.ref(exportInfo.declaration.node);
+      // }
+
       importScope.rename(localName, getAssignedId(importSource, importedName));
    } else if (importInfo.type == "namespace") {
       const localName = importInfo.specifier.local.name;

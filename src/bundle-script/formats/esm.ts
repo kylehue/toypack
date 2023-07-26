@@ -7,7 +7,6 @@ import {
    ImportNamespaceSpecifier,
    ImportSpecifier,
    StringLiteral,
-   exportDefaultDeclaration,
    exportNamedDeclaration,
    exportSpecifier,
    identifier,

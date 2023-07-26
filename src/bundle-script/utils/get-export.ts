@@ -17,8 +17,7 @@ export function getExport(
 ): ExportInfo | null {
    const importer = graph[importerSource];
    if (importer?.type != "script") return null;
-   const resolvedImportSource = importer.dependencyMap[exportSource];
-   const importedModule = graph[resolvedImportSource];
+   const importedModule = graph[exportSource];
    if (importedModule?.type != "script") return null;
 
    let exported: ExportInfo | null = importedModule.exports.others[exportName];

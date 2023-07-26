@@ -505,7 +505,6 @@ export class Toypack extends Hooks {
 }
 
 export default Toypack;
-export * as Babel from "@babel/standalone";
 
 interface Cache {
    parsed: Map<

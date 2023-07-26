@@ -3,7 +3,7 @@
 // import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 // import "../react";
-import "../vue";
+// import "../vue";
 // import confetti from "canvas-confetti";
 // const meowButton = document.getElementById<HTMLButtonElement>("meow")!;
 // meowButton.onclick = () => confetti();
@@ -16,20 +16,26 @@ import "../vue";
 // const foo: string = "bar";
 // console.log(foo);
 /* test */
-import adder, { dog, balloon, bay, eleven } from "../classes/adder";
-console.log(adder, dog, balloon, bay, eleven);
-import { foo as o, bar, "hello there" as test } from "../classes/createNum";
-console.log(o, bar, test);
-import counter, { Adder, dog as goodBoy } from "./testing.mjs";
-console.log(counter, Adder, goodBoy);
-// import a, {add} from "../classes/createNum2";
-// console.log(a, add);
-export default 123;
-export { counter, Adder };
-export { dog } from "./testing.mjs";
-export * as NM from "../classes/createNum2";
-export * from "../classes/createNum2";
-// import def, { add, createNum } from "../classes/createNum2";
+// import adder, { dog, balloon, bay, eleven } from "../classes/adder";
+// console.log(adder, dog, balloon, bay, eleven);
+// import { foo as o, bar, "hello there" as test } from "../classes/createNum";
+// console.log(o, bar, test);
+// import counter, { Adder, dog as goodBoy } from "./testing.mjs";
+// console.log(counter, Adder, goodBoy);
+// // import a, {add} from "../classes/createNum2";
+// // console.log(a, add);
+// export default 123;
+// export { counter, Adder };
+// export { dog } from "./testing.mjs";
+// export * as NM from "../classes/createNum2";
+// export * from "../classes/createNum2";
+
+
+
+
+import def, { add, createNum } from "../classes/createNum2";
+console.log(add);
+
 // const def_0 = 45;
 // const def_1 = 45;
 // var cook = 45;

@@ -1,6 +1,6 @@
 import "./style.css";
 import { sampleFiles } from "./sampleFiles.js";
-import { Toypack as ToypackESM, Babel } from "toypack";
+import { Toypack as ToypackESM } from "toypack";
 import vuePlugin from "toypack-vue";
 import sassPlugin from "toypack-sass";
 
@@ -23,7 +23,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "index.html",
+      entry: "src/main",
       moduleType: "esm",
       resolve: {
          alias: {
@@ -67,7 +67,7 @@ const toypack = new ToypackESM({
 // await toypack.installPackage("path-browserify");
 
 (window as any).toypack = toypack;
-console.log(toypack, Babel.availablePlugins, Babel.availablePresets);
+console.log(toypack);
 
 runButton.onclick = async () => {
    console.log(await toypack.run());
