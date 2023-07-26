@@ -36,7 +36,6 @@
 const button = document.createElement("button");
 button.textContent = "Load module!";
 document.body.append(button);
-
 button.onclick = async () => {
    import("../classes/createNum2").then((module) => {
       console.log(module.Book);

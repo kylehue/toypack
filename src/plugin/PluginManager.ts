@@ -30,17 +30,11 @@ type PluginHooksGroupMap = {
    }[];
 };
 
-export type PartialContext<
-   T extends PluginContext | PluginContextBase = PluginContextBase
-> = {
-   bundler: Toypack;
-} & (T extends PluginContext
-   ? {
-        graph: DependencyGraph;
-        importers: Importers;
-        source: string;
-     }
-   : {});
+interface FullContext {
+   graph: DependencyGraph;
+   importers: Importers;
+   source: string;
+}
 
 type TriggerOptions<
    HookName extends keyof PluginHooks,
@@ -51,8 +45,8 @@ type TriggerOptions<
 > = {
    name: HookName;
    args: Parameters<HookFunction> | (() => Parameters<HookFunction>);
-} & (ThisParameterType<HookFunction> extends PluginContextBase
-   ? { context: PartialContext<ThisParameterType<HookFunction>> }
+} & (ThisParameterType<HookFunction> extends PluginContext
+   ? { context: FullContext }
    : { context?: never }) &
    (HookReturn extends void
       ? {
@@ -147,10 +141,10 @@ export class PluginManager {
       );
    }
 
-   private _createContext<T extends PluginContext | PluginContextBase>(
-      partialContext: PartialContext<T>,
-      plugin: Plugin
-   ): T {
+   private _createContext<T extends FullContext>(
+      plugin: Plugin,
+      fullContext?: T
+   ): T extends FullContext ? PluginContext : PluginContextBase {
       const createCacheKey = (str: string, isConfigConstrained?: boolean) => {
          const common = `${plugin.name}.${str}`;
          if (isConfigConstrained) {
@@ -162,7 +156,7 @@ export class PluginManager {
       };
 
       const baseContext: PluginContextBase = {
-         bundler: partialContext.bundler,
+         bundler: this.bundler,
          getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(this.bundler, source, baseDir);
          },
@@ -170,36 +164,27 @@ export class PluginManager {
             request: string,
             specifiers?: (SpecifierOptions | string)[]
          ) {
-            return getImportCode(
-               request,
-               specifiers
-            );
+            return getImportCode(request, specifiers);
          },
          getDefaultExportCode(exportCode: string) {
             return `export default ${exportCode};`;
          },
          emitError: (message) => {
-            const logLevel = partialContext.bundler.getConfig().logLevel;
+            const logLevel = this.bundler.getConfig().logLevel;
             DEBUG.error(
                logLevel,
                console.error
-            )?.(`[${plugin.name}] Warning: ` + message);
-            
-            // @ts-ignore
-            this.bundler._trigger(
-               "onError",
-               ERRORS.plugin(plugin.name, message)
-            );
+            )?.(`[${plugin.name}] Error: ` + message);
          },
          emitWarning: (message) => {
-            const logLevel = partialContext.bundler.getConfig().logLevel;
+            const logLevel = this.bundler.getConfig().logLevel;
             DEBUG.warn(
                logLevel,
                console.warn
             )?.(`[${plugin.name}] Warning: ` + message);
          },
          emitInfo: (message) => {
-            const logLevel = partialContext.bundler.getConfig().logLevel;
+            const logLevel = this.bundler.getConfig().logLevel;
             DEBUG.warn(
                logLevel,
                console.info
@@ -225,7 +210,7 @@ export class PluginManager {
                originalKey: key,
                formattedKey,
                value,
-               plugin
+               plugin,
             });
             return value;
          },
@@ -237,18 +222,19 @@ export class PluginManager {
          },
       };
 
-      const ctx = partialContext as PartialContext<PluginContext>;
-      if (ctx.source && ctx.importers && ctx.graph) {
+      if (fullContext?.source && fullContext?.importers && fullContext?.graph) {
          const shouldMap = shouldProduceSourceMap(
-            ctx.source,
+            fullContext.source,
             this.bundler.getConfig().bundle.sourceMap
          );
-         const fullContext: PluginContext = {
+         const _fullContext: PluginContext = {
             ...baseContext,
-            graph: ctx.graph,
-            getImporters: () => ctx.importers,
-            // last importer is guaranteed to be defined
-            getCurrentImporter: () => Object.values(ctx.importers).pop()!,
+            graph: fullContext.graph,
+            getImporters: () => fullContext.importers,
+            getCurrentImporter: () => {
+               const importersArr = Object.values(fullContext.importers);
+               return importersArr[importersArr.length - 1];
+            },
             shouldMap: () => {
                return shouldMap;
             },
@@ -257,12 +243,13 @@ export class PluginManager {
                const cached = this.bundler._getCache("parsed", source);
                const result = cached?.loaded
                   ? cached.loaded
-                  : await loadChunk.call(this.bundler, source, false, {
-                       bundler: this.bundler,
-                       graph: ctx.graph,
-                       importers: ctx.importers,
+                  : await loadChunk.call(
+                       this.bundler,
                        source,
-                    });
+                       false,
+                       fullContext.graph,
+                       fullContext.importers
+                    );
 
                // @ts-ignore
                this.bundler._setCache("parsed", source, {
@@ -273,10 +260,10 @@ export class PluginManager {
             },
          };
 
-         return fullContext as T;
+         return _fullContext;
       }
 
-      return baseContext as T;
+      return baseContext as PluginContext;
    }
 
    public registerPlugin<T extends Plugin>(plugin: T) {
@@ -284,14 +271,7 @@ export class PluginManager {
          this._loaders.push({ loader, plugin });
       }
 
-      plugin.setup?.call(
-         this._createContext(
-            {
-               bundler: this.bundler,
-            },
-            plugin
-         )
-      );
+      plugin.setup?.call(this._createContext(plugin));
 
       for (const prop in plugin) {
          if (
@@ -317,22 +297,24 @@ export class PluginManager {
    ) {
       const loaders = this._getLoadersFor(source);
       for (const { loader, plugin } of loaders) {
-         const context = this._createContext<PluginContext>(
-            {
-               bundler: this.bundler,
-               graph,
-               importers,
-               source,
-            },
-            plugin
-         );
+         const context = this._createContext(plugin, {
+            graph,
+            importers,
+            source,
+         });
 
-         const loaderResult =
-            typeof loader.compile == "function"
-               ? loader.compile.call(context, moduleInfo)
-               : loader.compile.async === true
-               ? await loader.compile.handler.call(context, moduleInfo)
-               : loader.compile.handler.call(context, moduleInfo);
+         let loaderResult;
+         const compile = loader.compile;
+         if (typeof compile == "function") {
+            loaderResult = compile.call(context, moduleInfo);
+         } else {
+            if (compile.async) {
+               loaderResult = await compile.handler.call(context, moduleInfo);
+            } else {
+               loaderResult = compile.handler.call(context, moduleInfo);
+            }
+         }
+
          if (!loaderResult) continue;
          callback(loaderResult);
       }
@@ -347,7 +329,7 @@ export class PluginManager {
       const hookGroup = this._hooks[name];
       if (!hookGroup) return;
       for (const { hook, plugin } of hookGroup) {
-         const ctx = context ? this._createContext(context, plugin) : null;
+         const ctx = this._createContext(plugin, context);
          const args = typeof rawArgs == "function" ? rawArgs() : rawArgs;
          let result: R;
          if (typeof hook == "function") {
@@ -361,7 +343,7 @@ export class PluginManager {
          }
          if (typeof callback == "function" && result) {
             (callback as any)(result);
-            if (typeof hook != "function" && hook.chaining === false) {
+            if (typeof hook == "object" && hook.chaining === false) {
                break;
             }
          }

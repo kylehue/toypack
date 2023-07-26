@@ -75,12 +75,7 @@ async function loadAndParse(
 
    if (!loaded) {
       try {
-         loaded = await loadChunk.call(this, source, isEntry, {
-            bundler: this,
-            graph,
-            importers,
-            source,
-         });
+         loaded = await loadChunk.call(this, source, isEntry, graph, importers);
          this._setCache("parsed", source, {
             importers,
             loaded,
@@ -175,7 +170,6 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       this._pluginManager.triggerHook({
          name: "parsed",
          context: {
-            bundler: this,
             graph,
             importers,
             source: rawSource,
@@ -199,7 +193,6 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             name: "resolve",
             args: () => [resolved],
             context: {
-               bundler: this,
                graph,
                importers: { [chunk.source]: chunk },
                source: resolved,
@@ -332,9 +325,6 @@ export async function getDependencyGraph(this: Toypack) {
    await this._pluginManager.triggerHook({
       name: "buildStart",
       args: [],
-      context: {
-         bundler: this,
-      },
    });
 
    const config = this.getConfig();

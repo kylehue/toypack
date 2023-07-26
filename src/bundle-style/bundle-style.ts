@@ -15,9 +15,6 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
             generator: bundleGenerator,
          },
       ],
-      context: {
-         bundler: this,
-      },
    });
 
    for (const source in graph) {

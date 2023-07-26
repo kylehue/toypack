@@ -37,25 +37,6 @@ export function compileStyle(
       };
    }
 
-   this._pluginManager.triggerHook({
-      name: "transform",
-      args: [
-         {
-            chunk,
-            type: "style",
-            traverse: (opts) => {
-               CSSTree.walk(chunk.ast, opts);
-            },
-         },
-      ],
-      context: {
-         bundler: this,
-         graph: graph,
-         importers: chunk.importers,
-         source: chunk.source,
-      },
-   });
-
    for (const node of chunk.urlNodes) {
       /**
        * We have to convert the path to relative path if

@@ -18,14 +18,16 @@ import { TraverseOptions } from "@babel/traverse";
 // Interfaces
 export interface ScriptTransformContext {
    type: "script";
-   chunk: ScriptDependency;
    traverse: (options: TraverseOptions) => void;
+   source: string;
+   content: string;
 }
 
 export interface StyleTransformContext {
    type: "style";
-   chunk: StyleDependency;
    traverse: (options: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
+   source: string;
+   content: string;
 }
 
 export type ParseInfo =
@@ -49,7 +51,7 @@ export type LoadHook = (
 export type ResolveHook = (this: PluginContext, id: string) => string | void;
 
 export type TransformHook = (
-   this: PluginContext,
+   this: PluginContextBase,
    context: ScriptTransformContext | StyleTransformContext
 ) => void;
 
@@ -141,20 +143,20 @@ export type ConfigurableHook<
 
 // Plugin hooks interface
 export interface PluginHooks {
-   /** A hook called everytime a module needs to be loaded. */
+   /** Hook called everytime a module needs to be loaded. */
    load: LoadHook | ConfigurableHook<LoadHook>;
-   /** A hook called everytime a module needs to be resolved. */
+   /** Hook called everytime a module needs to be resolved. */
    resolve: ResolveHook | ConfigurableHook<ResolveHook>;
-   /** A hook called everytime a module needs to be transformed. */
+   /** Hook called everytime a module needs to be transformed. */
    transform: TransformHook | ConfigurableHook<TransformHook>;
-   /** A hook called at the start of getting the dependency graph. */
+   /** Hook called at the start of getting the dependency graph. */
    buildStart: StartHook | ConfigurableHook<StartHook>;
-   /** A hook called at the end of the bundling process. */
+   /** Hook called at the end of the bundling process. */
    buildEnd: EndHook | ConfigurableHook<EndHook>;
-   /** A hook called everytime a module is parsed. */
+   /** Hook called everytime a module is parsed. */
    parsed: ParsedHook | ConfigurableHook<ParsedHook>;
-   /** A hook called everytime bundle generation has started. */
+   /** Hook called everytime bundle generation has started. */
    generateBundle: GenerateBundleHook | ConfigurableHook<GenerateBundleHook>;
-   /** A hook called only once, useful to setup things in the bundler. */
+   /** Hook called only once, useful for setting up things. */
    setup: SetupHook;
 }

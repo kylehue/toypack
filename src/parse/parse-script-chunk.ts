@@ -11,12 +11,14 @@ import {
    file,
    program,
    Program,
+   stringLiteral,
 } from "@babel/types";
 import { Toypack } from "../Toypack.js";
 import { ERRORS, mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
 import { ExportInfo, Exports, extractExports } from "./extract-exports.js";
 import { ImportInfo, Imports, extractImports } from "./extract-imports.js";
+import { dirname } from "path-browserify";
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -87,6 +89,18 @@ export async function parseScriptAsset(
    const traverse = (options: TraverseOptions) => {
       traverseOptionsArray.push(options);
    };
+
+   await this._pluginManager.triggerHook({
+      name: "transform",
+      args: [
+         {
+            type: "script",
+            traverse,
+            source,
+            content,
+         },
+      ],
+   });
 
    // Extract dependencies
    traverse({

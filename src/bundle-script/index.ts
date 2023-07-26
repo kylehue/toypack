@@ -17,6 +17,7 @@ import runtime from "./runtime.js";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
+import { TraverseMap } from "./utils/TraverseMap.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -42,6 +43,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const scriptModules = getSortedScripts(graph);
    const transform = createTransformContext();
+   const traverseMap = new TraverseMap();
 
    // order matters here
    UidGenerator.reset();

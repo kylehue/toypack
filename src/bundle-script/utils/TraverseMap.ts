@@ -45,8 +45,10 @@ export class TraverseMap {
          throw new Error(`The ast of '${source}' doesn't exist.`);
       }
 
-      const traverseOptions = mergeTraverseOptions(group.traversals);
+      if (!group.traversals.length) return;
 
+      const traverseOptions = mergeTraverseOptions(group.traversals);
+      
       traverse(group.ast, traverseOptions);
    }
 

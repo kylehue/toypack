@@ -43,6 +43,20 @@ export async function parseStyleAsset(
    });
 
    result.ast = AST;
+   
+   await this._pluginManager.triggerHook({
+      name: "transform",
+      args: [
+         {
+            type: "style",
+            traverse: (opts) => {
+               cssTree.walk(result.ast, opts);
+            },
+            source,
+            content,
+         },
+      ],
+   });
 
    // Extract dependencies
    cssTree.walk(AST, (node, item, list) => {

@@ -1,4 +1,3 @@
-import { PartialContext } from "../plugin/PluginManager.js";
 import { Toypack } from "../Toypack.js";
 import {
    mergeSourceMaps,
@@ -6,16 +5,23 @@ import {
    ERRORS,
    shouldProduceSourceMap,
 } from "../utils/index.js";
-import { Asset, PluginContext, ResourceAsset, TextAsset } from "../types.js";
+import {
+   Asset,
+   DependencyGraph,
+   ResourceAsset,
+   TextAsset,
+} from "../types.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { createAsset } from "../utils/create-asset.js";
 import path from "path-browserify";
+import { Importers } from "./index.js";
 
 export async function loadChunk(
    this: Toypack,
    rawSource: string,
    isEntry: boolean,
-   { graph, importers }: PartialContext<PluginContext>
+   graph: DependencyGraph,
+   importers: Importers
 ) {
    const isVirtual = rawSource.startsWith("virtual:");
    let type: InitialModuleType | null = isVirtual
@@ -107,7 +113,6 @@ export async function loadChunk(
          },
       ],
       context: {
-         bundler: this,
          graph,
          importers,
          source: rawSource,
