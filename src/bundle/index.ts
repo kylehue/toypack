@@ -3,10 +3,23 @@ import { DependencyGraph } from "../types";
 import { bundleScript } from "../bundle-script/index.js";
 import { bundleStyle } from "../bundle-style/bundle-style.js";
 import { getUsableResourcePath } from "../utils";
-import { html } from "./runtime.js";
 
 let previousScriptUrl: string | undefined = undefined;
 let previousLinkUrl: string | undefined = undefined;
+
+function getHtml(scriptSrc = "", linkHref = "") {
+   return `
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <link rel="stylesheet" href="${linkHref}"></link>
+      <script defer type="module" src="${scriptSrc}"></script>
+   </head>
+   <body>
+   </body>
+</html>
+`.trim();
+}
 
 export async function bundle(this: Toypack, graph: DependencyGraph) {
    const outputFilename = "index";
@@ -66,7 +79,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
          })
       );
 
-      result.html.content = html(previousScriptUrl, previousLinkUrl);
+      result.html.content = getHtml(previousScriptUrl, previousLinkUrl);
    } else {
       // Extract resources from graph
       for (const source in graph) {
@@ -100,7 +113,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
          });
       }
 
-      result.html.content = html(
+      result.html.content = getHtml(
          "./" + result.js.source,
          "./" + result.css.source
       );
