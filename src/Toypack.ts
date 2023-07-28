@@ -510,15 +510,16 @@ export class Toypack extends Hooks {
 
       // Log debug data
       const logLevel = this._config.logLevel;
-      if (
-         logLevel == "error" ||
-         logLevel == "warn" ||
-         logLevel == "info" ||
-         logLevel == "verbose"
-      ) {
-         const error = this._debugger.error[0];
-         if (error) {
-            this._trigger("onError", error);
+
+      const error = this._debugger.error[0];
+      if (error) {
+         this._trigger("onError", error);
+         if (
+            logLevel == "error" ||
+            logLevel == "warn" ||
+            logLevel == "info" ||
+            logLevel == "verbose"
+         ) {
             console.error(error.reason);
          }
       }
