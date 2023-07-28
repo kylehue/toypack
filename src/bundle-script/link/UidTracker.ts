@@ -57,7 +57,9 @@ export namespace UidTracker {
             let name, id;
             if (type == "declared") {
                name = exportInfo.name;
-               id = UidGenerator.generate(exportInfo.name);
+               id = UidGenerator.generate(
+                  name == "default" ? createDefaultName(module.source) : name
+               );
             } else if (type == "declaredDefault") {
                name = "default";
                id = UidGenerator.generate(createDefaultName(module.source));
@@ -133,6 +135,5 @@ export namespace UidTracker {
       }
 
       console.log(_map);
-      
    }
 }
