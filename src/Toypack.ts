@@ -230,9 +230,19 @@ export class Toypack extends Hooks {
          for (const ext of plugin.extensions || []) {
             if (!this._hasExtension(ext[0], ext[1])) {
                this._extensions[ext[0]].push(ext[1]);
+               
             }
          }
       }
+   }
+
+   /**
+    * Removes a plugin.
+    * 
+    * Note: This won't remove the extensions that was added by the plugin.
+    */
+   public removePlugin(plugin: string | Plugin) {
+      this._pluginManager.removePlugin(plugin);
    }
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
@@ -506,7 +516,7 @@ export class Toypack extends Hooks {
          `⏲ Graph  - ${totalGraphTime} ms\n` +
          `⏲ Bundle - ${totalBundleTime} ms\n` +
          `⏲ Total  - ${totalGraphTime + totalBundleTime} ms`;
-      this._pushToDebugger("verbose", message);
+      this._pushToDebugger("info", message);
 
       // Log debug data
       const logLevel = this._config.logLevel;

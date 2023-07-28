@@ -287,6 +287,37 @@ export class PluginManager {
       }
    }
 
+   public removePlugin(plugin: string | Plugin) {
+      const isMatch = (_plugin: Plugin) =>
+         typeof plugin == "string"
+            ? _plugin.name === plugin
+            : _plugin === plugin;
+      const removeFromHook = (hookName: keyof typeof this._hooks) => {
+         for (let i = 0; i < (this._hooks[hookName]?.length || 0); i++) {
+            const hook = this._hooks[hookName]![i];
+            if (isMatch(hook.plugin)) {
+               this._hooks[hookName]?.splice;
+               break;
+            }
+         }
+      }
+
+      for (const hookName in this._hooks) {
+         removeFromHook(hookName as keyof typeof this._hooks);
+      }
+
+      for (let i = 0; i < this._loaders.length; i++) {
+         const loader = this._loaders[i];
+         if (!isMatch(loader.plugin)) continue;
+         this._loaders.splice(i, 1);
+      }
+
+      for (const [key, cache] of this._cache) {
+         if (!isMatch(cache.plugin)) continue;
+         this._cache.delete(key);
+      }
+   }
+
    public async useLoaders(
       source: string,
       graph: DependencyGraph,
