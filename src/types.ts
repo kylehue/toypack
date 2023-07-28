@@ -21,6 +21,8 @@ export interface Loader {
    compile: CompileHandler | ConfigurableHook<CompileHandler>;
 }
 
+export type Error = { code: number; reason: string };
+
 export type { PluginContext, PluginHooks } from "./plugin/hook-types.js";
 export type {
    Dependency,
@@ -37,7 +39,7 @@ export type {
    BabelTransformConfig,
    LogLevelConfig,
    ModeConfig,
-   FormatConfig as TargetConfig,
+   FormatConfig,
 } from "./config.js";
 export type {
    PackageManagerConfig,

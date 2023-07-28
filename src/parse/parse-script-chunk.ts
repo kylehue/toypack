@@ -11,14 +11,12 @@ import {
    file,
    program,
    Program,
-   stringLiteral,
 } from "@babel/types";
 import { Toypack } from "../Toypack.js";
 import { ERRORS, mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
-import { ExportInfo, Exports, extractExports } from "./extract-exports.js";
-import { ImportInfo, Imports, extractImports } from "./extract-imports.js";
-import { dirname } from "path-browserify";
+import { Exports, extractExports } from "./extract-exports.js";
+import { Imports, extractImports } from "./extract-imports.js";
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -81,7 +79,7 @@ export async function parseScriptAsset(
          message = error;
       }
 
-      this._trigger("onError", ERRORS.parse(message));
+      this._pushToDebugger("error", ERRORS.parse(message));
       return result;
    }
 

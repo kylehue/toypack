@@ -97,7 +97,7 @@ export const defaultConfig = {
 export type ToypackConfig = typeof defaultConfig;
 export type FormatConfig = "esm";
 export type ModeConfig = "production" | "development";
-export type LogLevelConfig = "error" | "warn" | "info" | "debug" | "none";
+export type LogLevelConfig = "error" | "warn" | "info" | "verbose" | "none";
 export type SourceMapConfig = {
    /** Whether to include the source contents or not. */
    includeContent?: boolean;

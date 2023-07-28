@@ -13,11 +13,11 @@ import { createTransformContext } from "./utils/transform-context.js";
 import { getSortedScripts } from "./utils/get-sorted-scripts.js";
 import { resyncSourceMap } from "./utils/resync-source-map.js";
 import { formatEsm } from "./formats/esm.js";
+import { ERRORS } from "../utils/index.js";
 import runtime from "./runtime.js";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
-import { TraverseMap } from "./utils/TraverseMap.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -43,34 +43,39 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const scriptModules = getSortedScripts(graph);
    const transform = createTransformContext();
-   const traverseMap = new TraverseMap();
 
-   // order matters here
-   UidGenerator.reset();
-   transformToVars(scriptModules);
-   deconflict(scriptModules);
-   bindModules(transform.context, graph, scriptModules);
-   cleanComments(scriptModules);
-
-   // bundle
    const resultAst = file(program([]));
+   try {
+      // order matters here
+      UidGenerator.reset();
+      transformToVars(scriptModules);
+      deconflict(scriptModules);
+      bindModules(transform.context, graph, scriptModules);
+      cleanComments(scriptModules);
 
-   for (const script of scriptModules) {
-      resultAst.program.body.unshift(...script.ast.program.body);
+      // Bundle
+      for (const script of scriptModules) {
+         resultAst.program.body.unshift(...script.ast.program.body);
+      }
+
+      for (const { ast } of transform.otherAsts) {
+         resultAst.program.body.unshift(...ast.program.body);
+      }
+
+      for (const name of transform.runtimesUsed) {
+         const statements = template.ast(runtime[name]);
+         const arr = Array.isArray(statements) ? statements : [statements];
+         resultAst.program.body.unshift(...arr);
+      }
+
+      // Format
+      formatEsm(resultAst, scriptModules);
+   } catch (error: any) {
+      this._pushToDebugger(
+         "error",
+         ERRORS.bundle(error.message || error.stack || error)
+      );
    }
-
-   for (const { ast } of transform.otherAsts) {
-      resultAst.program.body.unshift(...ast.program.body);
-   }
-
-   for (const name of transform.runtimesUsed) {
-      const statements = template.ast(runtime[name]);
-      const arr = Array.isArray(statements) ? statements : [statements];
-      resultAst.program.body.unshift(...arr);
-   }
-
-   // format
-   formatEsm(resultAst, scriptModules);
 
    let generated = generate(resultAst, {
       sourceMaps: !!config.bundle.sourceMap,

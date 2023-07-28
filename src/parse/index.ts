@@ -6,7 +6,6 @@ import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import Toypack from "../Toypack.js";
 import { TextAsset, Asset, ResourceAsset } from "../types.js";
 import {
-   DEBUG,
    ERRORS,
    escapeRegex,
    indexToPosition,
@@ -81,12 +80,9 @@ async function loadAndParse(
             loaded,
          });
 
-         DEBUG.debug(
-            this.config.logLevel,
-            console.info
-         )?.(`Loading ${source}...`);
+         this._pushToDebugger("verbose", `Loading "${source}"...`);
       } catch (error: any) {
-         this._trigger("onError", ERRORS.parse(error));
+         this._pushToDebugger("error", ERRORS.parse(error.message || error));
       }
    }
 
@@ -102,12 +98,9 @@ async function loadAndParse(
             loaded,
          });
 
-         DEBUG.debug(
-            this.config.logLevel,
-            console.info
-         )?.(`Parsing ${source}...`);
+         this._pushToDebugger("verbose", `Parsing "${source}"...`);
       } catch (error: any) {
-         this._trigger("onError", ERRORS.parse(error));
+         this._pushToDebugger("error", ERRORS.parse(error.message || error));
       }
    }
 
@@ -167,7 +160,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       }
 
       // Trigger parsed hook
-      this._pluginManager.triggerHook({
+      await this._pluginManager.triggerHook({
          name: "parsed",
          context: {
             graph,
@@ -210,8 +203,8 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
             if (!nonVirtualResolution) {
                const errorSource = loaded.asset.source || rawSource;
-               this._trigger(
-                  "onError",
+               this._pushToDebugger(
+                  "error",
                   ERRORS.resolveFailure(
                      depSource,
                      errorSource,
@@ -335,12 +328,12 @@ export async function getDependencyGraph(this: Toypack) {
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;
 
    if (!entryAsset) {
-      this._trigger("onError", ERRORS.entryNotFound());
+      this._pushToDebugger("error", ERRORS.entryNotFound());
       return graph;
    }
 
    if (entryAsset.type != "text") {
-      this._trigger("onError", ERRORS.invalidEntry(entryAsset.source));
+      this._pushToDebugger("error", ERRORS.invalidEntry(entryAsset.source));
       return graph;
    }
 

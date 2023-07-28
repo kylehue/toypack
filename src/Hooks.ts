@@ -1,12 +1,12 @@
-import { PackageAsset } from "./package-manager/fetch-package";
-import { Asset } from "./types";
+import type { PackageAsset } from "./package-manager/fetch-package";
+import type { Asset, Error } from "./types";
 
 const eventMap = {
-   onError: (event: ErrorEvent) => undefined,
-   onInstallPackage: (event: InstallPackageEvent) => undefined,
-   onAddOrUpdateAsset: (event: AddOrUpdateAssetEvent) => undefined,
-   onRemoveAsset: (event: RemoveAssetEvent) => undefined,
-   onResolve: (event: ResolveEvent) => undefined,
+   onError: (error: Error) => undefined,
+   onInstallPackage: (packageInfo: PackageInfo) => undefined,
+   onAddOrUpdateAsset: (asset: Asset) => undefined,
+   onRemoveAsset: (asset: Asset) => undefined,
+   onResolve: (resolveInfo: ResolveInfo) => undefined,
 } as const;
 
 export class Hooks implements IHooks {
@@ -101,20 +101,7 @@ export type IHooks = {
    [K in keyof EventMap]: (callback: EventMap[K], async: boolean) => Function;
 };
 
-export interface ErrorEvent {
-   code: number;
-   reason: string;
-}
-
-export interface AddOrUpdateAssetEvent {
-   asset: Asset;
-}
-
-export interface RemoveAssetEvent {
-   asset: Asset;
-}
-
-export interface InstallPackageEvent {
+export interface PackageInfo {
    name: string;
    version: string;
    subpath: string;
@@ -122,7 +109,7 @@ export interface InstallPackageEvent {
    dtsAssets: PackageAsset[];
 }
 
-export interface ResolveEvent {
+export interface ResolveInfo {
    rawRequest: string;
    request: string;
    params: Record<string, string | boolean>;

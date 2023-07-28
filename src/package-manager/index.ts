@@ -1,5 +1,5 @@
 import type { Toypack } from "../types";
-import { DEBUG, ERRORS } from "../utils";
+import { ERRORS } from "../utils";
 import { PackageAsset, fetchPackage } from "./fetch-package.js";
 
 /**
@@ -22,10 +22,9 @@ export async function getPackage(
    };
 
    const providers = this._getPackageProviders();
-   const config = this.getConfig();
    if (!providers.length) {
-      this._trigger(
-         "onError",
+      this._pushToDebugger(
+         "error",
          ERRORS.any("[package-manager] Error: No providers were found.")
       );
 
@@ -46,16 +45,17 @@ export async function getPackage(
       result.dtsAssets = Object.values(pkg.dtsAssets);
 
       const assetCount = result.assets.length + result.dtsAssets.length;
-      DEBUG.info(
-         config.logLevel,
-         console.info
-      )?.(
+      this._pushToDebugger(
+         "info",
          `[package-manager]: Successfully fetched ${assetCount} assets in ${packagePath}.`
       );
    } catch (error: any) {
-      this._trigger(
-         "onError",
-         ERRORS.packageInstallFailure(packagePath, error)
+      this._pushToDebugger(
+         "error",
+         ERRORS.packageInstallFailure(
+            packagePath,
+            error.message || error
+         )
       );
    }
 

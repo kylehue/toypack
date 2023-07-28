@@ -140,8 +140,8 @@ export async function loadChunk(
    const isNotLoaded = !isSupported(formattedSource) && !isLoaded;
    const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
    if (isNotLoaded || isStillVirtual) {
-      this._trigger(
-         "onError",
+      this._pushToDebugger(
+         "error",
          ERRORS.loadFailure(
             rawSource,
             moduleInfo.type != "resource" ? moduleInfo.lang : undefined

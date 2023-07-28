@@ -10,9 +10,8 @@ import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./parse/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
-import { Asset, ResolveOptions, Plugin, TextAsset } from "./types.js";
+import type { Asset, ResolveOptions, Plugin, TextAsset, Error } from "./types";
 import {
-   DEBUG,
    ERRORS,
    EXTENSIONS,
    getHash,
@@ -48,8 +47,15 @@ export class Toypack extends Hooks {
       parsed: new Map(),
       compiled: new Map(),
    };
+   private _debugger = {
+      error: [] as Error[],
+      warning: [] as string[],
+      info: [] as string[],
+      verbose: [] as string[],
+   };
    protected _virtualAssets = new Map<string, Asset>();
    protected _pluginManager = new PluginManager(this);
+
    constructor(config?: PartialDeep<ToypackConfig>) {
       super();
       if (config) this.setConfig(config);
@@ -78,10 +84,13 @@ export class Toypack extends Hooks {
          },
          prepath: "npm",
       });
+   }
 
-      this.onError(er => {
-         console.error(er.reason);
-      });
+   protected _pushToDebugger<T extends keyof typeof this._debugger>(
+      type: T,
+      data: T extends "error" ? Error : string
+   ) {
+      this._debugger[type].push(data as any);
    }
 
    protected _getCache<
@@ -337,7 +346,7 @@ export class Toypack extends Hooks {
       content: string | Blob = ""
    ): T {
       if (!isValidAssetSource(source)) {
-         this._trigger("onError", ERRORS.invalidAssetSource(source));
+         this._pushToDebugger("error", ERRORS.invalidAssetSource(source));
          return {} as T;
       }
 
@@ -363,7 +372,7 @@ export class Toypack extends Hooks {
          }
       }
 
-      this._trigger("onAddOrUpdateAsset", { asset });
+      this._trigger("onAddOrUpdateAsset", asset);
       return asset as T;
    }
 
@@ -462,7 +471,7 @@ export class Toypack extends Hooks {
          });
       });
 
-      this._trigger("onRemoveAsset", { asset });
+      this._trigger("onRemoveAsset", asset);
    }
 
    /**
@@ -470,6 +479,12 @@ export class Toypack extends Hooks {
     * @returns An object containing the bundle result.
     */
    public async run() {
+      // Clear debug data
+      this._debugger.error = [];
+      this._debugger.info = [];
+      this._debugger.warning = [];
+      this._debugger.verbose = [];
+
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
       const timeAfterGraph = performance.now();
@@ -491,7 +506,41 @@ export class Toypack extends Hooks {
          `⏲ Graph  - ${totalGraphTime} ms\n` +
          `⏲ Bundle - ${totalBundleTime} ms\n` +
          `⏲ Total  - ${totalGraphTime + totalBundleTime} ms`;
-      DEBUG.info(this._config.logLevel, console.info)?.(message);
+      this._pushToDebugger("verbose", message);
+
+      // Log debug data
+      const logLevel = this._config.logLevel;
+      if (
+         logLevel == "error" ||
+         logLevel == "warn" ||
+         logLevel == "info" ||
+         logLevel == "verbose"
+      ) {
+         const error = this._debugger.error[0];
+         if (error) {
+            this._trigger("onError", error);
+            console.error(error.reason);
+         }
+      }
+
+      if (logLevel == "warn" || logLevel == "info" || logLevel == "verbose") {
+         for (const warning of this._debugger.warning) {
+            console.warn(warning);
+         }
+      }
+
+      if (logLevel == "info" || logLevel == "verbose") {
+         for (const info of this._debugger.info) {
+            console.info(info);
+         }
+      }
+
+      if (logLevel == "verbose") {
+         for (const verbose of this._debugger.verbose) {
+            console.info(verbose);
+         }
+      }
+
       return result;
    }
 

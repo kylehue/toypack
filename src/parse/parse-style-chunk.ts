@@ -38,7 +38,7 @@ export async function parseStyleAsset(
 
          message += `\n\nSource file: ${source}`;
 
-         this._trigger("onError", ERRORS.parse(message));
+         this._pushToDebugger("error", ERRORS.parse(message));
       },
    });
 
@@ -69,8 +69,8 @@ export async function parseStyleAsset(
          if (isValidDep && node.value.startsWith("data:")) isValidDep = false;
          // url()'s source path can't be .js or .css.
          if (isValidDep && !this._hasExtension("resource", node.value)) {
-            this._trigger(
-               "onError",
+            this._pushToDebugger(
+               "error",
                ERRORS.parse(
                   `'url()' tokens can't be used to reference ${path.extname(
                      node.value

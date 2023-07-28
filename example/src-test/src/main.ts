@@ -32,7 +32,6 @@
 
 // import def, { add, createNum } from "../classes/createNum2";
 // console.log(add);
-
 const button = document.createElement("button");
 button.textContent = "Load module!";
 document.body.append(button);

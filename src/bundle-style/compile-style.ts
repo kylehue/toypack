@@ -2,7 +2,6 @@ import MapConverter from "convert-source-map";
 import * as CSSTree from "css-tree";
 import { Toypack } from "../Toypack.js";
 import {
-   DEBUG,
    getUsableResourcePath,
    isLocal,
    isUrl,
@@ -96,10 +95,7 @@ export function compileStyle(
          importers: chunk.importers,
       });
 
-      DEBUG.debug(
-         config.logLevel,
-         console.info
-      )?.(`Compiling ${chunk.source}...`);
+      this._pushToDebugger("verbose", `Compiling ${chunk.source}...`);
    }
 
    return result;

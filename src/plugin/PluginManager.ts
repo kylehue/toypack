@@ -11,7 +11,6 @@ import {
 import {
    getImportCode,
    getUsableResourcePath,
-   DEBUG,
    ERRORS,
    shouldProduceSourceMap,
 } from "../utils";
@@ -170,25 +169,25 @@ export class PluginManager {
             return `export default ${exportCode};`;
          },
          emitError: (message) => {
-            const logLevel = this.bundler.getConfig().logLevel;
-            DEBUG.error(
-               logLevel,
-               console.error
-            )?.(`[${plugin.name}] Error: ` + message);
+            // @ts-ignore
+            this.bundler._pushToDebugger(
+               "error",
+               ERRORS.plugin(plugin.name, message)
+            );
          },
          emitWarning: (message) => {
-            const logLevel = this.bundler.getConfig().logLevel;
-            DEBUG.warn(
-               logLevel,
-               console.warn
-            )?.(`[${plugin.name}] Warning: ` + message);
+            // @ts-ignore
+            this.bundler._pushToDebugger(
+               "warning",
+               `[${plugin.name}] Warning: ` + message
+            );
          },
          emitInfo: (message) => {
-            const logLevel = this.bundler.getConfig().logLevel;
-            DEBUG.warn(
-               logLevel,
-               console.info
-            )?.(`[${plugin.name}]: ` + message);
+            // @ts-ignore
+            this.bundler._pushToDebugger(
+               "info",
+               `[${plugin.name}]: ` + message
+            );
          },
          getCache: (key, isConfigDependent) => {
             key = createCacheKey(key, isConfigDependent);
