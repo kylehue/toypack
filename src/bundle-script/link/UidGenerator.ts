@@ -1,3 +1,4 @@
+import { Binding } from "@babel/traverse";
 import runtime from "../runtime";
 import { camelCase } from "lodash-es";
 
@@ -15,6 +16,15 @@ export namespace UidGenerator {
       _reservedVars.add(generated);
 
       return generated;
+   }
+
+   export function generateBasedOnBinding(binding: Binding, name?: string) {
+      let generated = generate(name);
+      while (binding.path.scope.hasBinding(generated)) {
+         generated = generate(name);
+      }
+
+      return generate(name);
    }
 
    export function addReservedVars(reservedVars: string | string[]) {

@@ -44,7 +44,7 @@ export function deconflict(scriptModules: ScriptDependency[]) {
    scriptModules.forEach((module) => {
       const { scope } = module.programPath;
 
-      for (const binding of Object.values(getAllTopLevelBindings(scope))) {
+      for (const binding of Object.values(scope.getAllBindings())) {
          const identifier = binding.identifier;
          let { name } = identifier;
 
@@ -57,7 +57,7 @@ export function deconflict(scriptModules: ScriptDependency[]) {
           */
          const isImported = isFromImport(binding, conflict?.binding);
          if (!isImported && (hasConflict || name in runtime)) {
-            const newName = UidGenerator.generate(name);
+            const newName = UidGenerator.generateBasedOnBinding(binding, name);
             scope.rename(name, newName);
          }
 

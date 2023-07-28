@@ -131,5 +131,8 @@ export namespace UidTracker {
             }
          });
       }
+
+      console.log(_map);
+      
    }
 }
