@@ -2,7 +2,6 @@ import { ScriptDependency } from "../../parse/index.js";
 import {
    EncodedSourceMap,
    GenMapping,
-   addMapping,
    maybeAddMapping,
    toEncodedMap,
 } from "@jridgewell/gen-mapping";
@@ -21,28 +20,29 @@ export function resyncSourceMap(
    const mergedMapGenerator = new GenMapping();
    const generatedMap = new TraceMap(map);
    const unmappedScripts: Record<string, string> = {};
-   for (const script of scriptModules) {
-      if (!script.map) {
-         unmappedScripts[script.source] = script.content;
+   for (const module of scriptModules) {
+      const sourceMap =
+         (module.asset.type == "text" ? module.asset.map : null) || module.map;
+      if (!sourceMap) {
+         unmappedScripts[module.source] = module.content;
          continue;
       }
-
-      const scriptMap = new TraceMap(script.map as EncodedSourceMap);
+      
+      const traceMap = new TraceMap(sourceMap);
       let lastCol = 0;
-      eachMapping(scriptMap, (map) => {
-         if (map.originalLine == null) return;
+      eachMapping(traceMap, (map) => {
+         if (!map.source) return;
          const genPos = generatedPositionFor(generatedMap, {
             line: map.generatedLine,
             column: map.generatedColumn,
-            source: script.source,
+            source: module.source,
          });
-         
+
          // No need to map every column
          if (lastCol == genPos.column) return;
 
          if (genPos.line == null) return;
-         if (genPos.column == null) return;
-
+         
          maybeAddMapping(mergedMapGenerator, {
             generated: {
                line: genPos.line,
@@ -52,10 +52,10 @@ export function resyncSourceMap(
                line: map.originalLine,
                column: map.originalColumn,
             },
-            source: script.source,
+            source: map.source,
             // @ts-ignore
             name: map.name || undefined,
-            content: sourceContentFor(scriptMap, script.source),
+            content: sourceContentFor(traceMap, map.source),
          });
 
          lastCol = genPos.column;

@@ -4,6 +4,7 @@ import {
    toEncodedMap,
    setSourceContent,
    maybeAddMapping,
+   addMapping,
 } from "@jridgewell/gen-mapping";
 import {
    eachMapping,
@@ -17,21 +18,21 @@ export function mergeSourceMaps(
    oldMap: SourceMapInput,
    newMap: SourceMapInput
 ) {
-   const oldMapConsumer = new TraceMap(oldMap);
-   const newMapConsumer = new TraceMap(newMap);
+   const oldMapConsumer = new TraceMap(Object.assign({}, oldMap));
+   const newMapConsumer = new TraceMap(Object.assign({}, newMap));
    const mergedMapGenerator = new GenMapping();
 
-   eachMapping(newMapConsumer, function (map) {
+   eachMapping(oldMapConsumer, function (map) {
       if (map.originalLine == null) return;
 
-      const origPosInOldMap = originalPositionFor(oldMapConsumer, {
+      const origPosInOldMap = originalPositionFor(newMapConsumer, {
          line: map.originalLine,
          column: map.originalColumn,
       });
 
+      if (origPosInOldMap.line == null) return;
       if (origPosInOldMap.source == null) return;
-
-      maybeAddMapping(mergedMapGenerator, {
+      addMapping(mergedMapGenerator, {
          original: {
             line: origPosInOldMap.line,
             column: origPosInOldMap.column,
@@ -41,19 +42,8 @@ export function mergeSourceMaps(
             column: map.generatedColumn,
          },
          source: origPosInOldMap.source,
-         name: map.name || "",
-      });
-   });
-
-   // Add sources
-   [newMapConsumer, oldMapConsumer].forEach(function (mapConsumer) {
-      mapConsumer.sources.forEach(function (source, index) {
-         if (!source) return;
-         setSourceContent(
-            mergedMapGenerator,
-            source,
-            sourceContentFor(mapConsumer, source)
-         );
+         name: origPosInOldMap.name || "",
+         content: sourceContentFor(newMapConsumer, origPosInOldMap.source),
       });
    });
 

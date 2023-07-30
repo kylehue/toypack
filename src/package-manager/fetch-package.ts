@@ -8,6 +8,7 @@ import type { Toypack } from "../types.js";
 import {
    mergeSourceMaps,
    parsePackageName,
+   removeSourceMapUrl,
    shouldProduceSourceMap,
 } from "../utils";
 import { PackageProvider } from "./index.js";
@@ -25,6 +26,7 @@ import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
 import { parseStyleAsset } from "../parse/parse-style-chunk.js";
 import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
+import path from "path-browserify";
 
 function getDtsHeader(
    optionDtsHeader: PackageProvider["dtsHeader"],
@@ -238,12 +240,16 @@ export async function fetchPackage(
             dependencies = dependencies.filter((d) => d.endsWith(".d.ts"));
          }
 
-         const generated = generateScript(parsedScript.ast, {
-            sourceFileName: source,
-            filename: source,
-            sourceMaps: shouldMap,
-            comments: false,
-         });
+         const generated = generateScript(
+            parsedScript.ast,
+            {
+               sourceFileName: source,
+               filename: source,
+               sourceMaps: shouldMap,
+               comments: false,
+            },
+            rawContent
+         );
 
          content = generated.code;
          map = generated.map as any;
@@ -281,15 +287,9 @@ export async function fetchPackage(
 
       // Get source map
       if (shouldMap && !isDts) {
-         let sourceMap =
-            cached && cached.type != "resource"
-               ? cached.map
-               : await fetchSourceMapInContent(rawContent, url);
-
+         let sourceMap = await fetchSourceMapInContent(rawContent, url);
          if (sourceMap && map) {
-            map = mergeSourceMaps(sourceMap, map);
-         } else {
-            map = sourceMap || map;
+            map = mergeSourceMaps(map, sourceMap);
          }
       }
 
@@ -345,7 +345,6 @@ export async function fetchPackage(
             rawContent: rawContent,
             response,
             asset,
-            map: asset.map,
          });
       }
 
