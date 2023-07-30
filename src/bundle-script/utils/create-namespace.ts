@@ -4,27 +4,21 @@ import template from "@babel/template";
 
 export function createNamespace(module: ScriptDependency) {
    const name = UidTracker.getNamespaceFor(module.source);
-   const exportedNames = Object.keys(module.exports.others);
+   const exports = Object.entries(UidTracker.getModuleExports(module.source));
+
    const exportObject =
       "{\n" +
-      exportedNames
-         .map((exportName) => {
-            const uid = UidTracker.get(module.source, exportName);
-
-            if (!uid) {
-               throw new Error(
-                  `Failed to get the assigned id for "${name}" in ${module.source}.`
-               );
-            }
-
-            // Add quotes if not a valid export name
+      exports
+         .map(([name, id]) => {
+            // Add quotes if not a valid export name e.g. string exports
             const isValidName =
-               /^[a-z0-9$_]+$/i.test(exportName) && !/^[0-9]+/.test(exportName);
+               /^[a-z0-9$_]+$/i.test(name) && !/^[0-9]+/.test(name);
             if (!isValidName) {
-               exportName = `"${exportName}"`;
+               name = `"${name}"`;
             }
 
-            let line = `${exportName}: () => ${uid}`;
+            let line = `${name}: () => ${id}`;
+
             return line;
          })
          .join(",\n") +
