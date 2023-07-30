@@ -93,7 +93,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    } catch (error: any) {
       this._pushToDebugger(
          "error",
-         ERRORS.bundle(error.message || error)
+         ERRORS.bundle(error)
       );
    }
 

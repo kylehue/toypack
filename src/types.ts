@@ -36,7 +36,6 @@ export type {
    ToypackConfig,
    SourceMapConfig,
    BabelParseConfig,
-   BabelTransformConfig,
    LogLevelConfig,
    ModeConfig,
    FormatConfig,

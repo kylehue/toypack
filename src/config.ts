@@ -4,7 +4,7 @@ import { Plugin } from "./types";
 
 export const defaultConfig = {
    /**
-    * Configuration for the bundler.
+    * Bundling configurations.
     */
    bundle: {
       /**
@@ -68,24 +68,15 @@ export const defaultConfig = {
        * will speed up the bundles in development mode.
        * @default "auto"
        */
-      includeDeps: "auto"
+      includeDeps: "auto",
    },
    /**
-    * Configuration for Babel.
+    * Configuration for the parser.
+    * @see https://babeljs.io/docs/babel-parser#options
     */
-   babel: {
-      transform: {
-         presets: [],
-         plugins: [],
-      } as BabelTransformConfig,
-      parse: {
-         plugins: [],
-      } as BabelParseConfig,
-      /**
-       * @see https://babeljs.io/docs/babel-preset-minify#options
-       */
-      minify: {} as Record<string, any>,
-   },
+   parser: {
+      plugins: [],
+   } as BabelParseConfig,
    /**
     * Log level.
     * @default "warn"
@@ -113,15 +104,6 @@ export type SourceMapConfig = {
    /** Paths to exclude from source maps. */
    exclude?: string[] | RegExp | ((source: string) => boolean | void);
 };
-export type BabelTransformConfig = Pick<
-   TransformOptions,
-   | "plugins"
-   | "presets"
-   | "targets"
-   | "assumptions"
-   | "highlightCode"
-   | "shouldPrintComment"
->;
 
 export type BabelParseConfig = Omit<
    ParserOptions,

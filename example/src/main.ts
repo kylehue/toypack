@@ -36,13 +36,8 @@ const toypack = new ToypackESM({
       sourceMap: true,
       globalName: "MyLib",
    },
-   babel: {
-      transform: {
-         presets: ["typescript", "react"],
-      },
-      parse: {
-         plugins: ["typescript", "jsx"],
-      },
+   parser: {
+      plugins: ["typescript", "jsx"],
    },
    plugins: [vuePlugin(), sassPlugin()],
    packageManager: {

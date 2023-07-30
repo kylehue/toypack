@@ -13,7 +13,7 @@ import {
    Program,
 } from "@babel/types";
 import { Toypack } from "../Toypack.js";
-import { ERRORS, mergeTraverseOptions } from "../utils/index.js";
+import { mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
 import { Exports, extractExports } from "./extract-exports.js";
 import { Imports, extractImports } from "./extract-imports.js";
@@ -54,7 +54,7 @@ export async function parseScriptAsset(
       programPath: {} as NodePath<Program>,
    };
 
-   const userBabelOptions = config.babel.parse;
+   const userBabelOptions = config.parser;
    const importantBabelOptions: ParserOptions = {
       sourceType: "module",
       sourceFilename: source,
@@ -76,11 +76,10 @@ export async function parseScriptAsset(
          });
          message = `${error.name}: ${error.message} in "${source}"\n${result}`;
       } else {
-         message = error;
+         message = error.message || error;
       }
 
-      this._pushToDebugger("error", ERRORS.parse(message));
-      return result;
+      throw new Error(message);
    }
 
    const traverseOptionsArray: TraverseOptions[] = [];

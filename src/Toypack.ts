@@ -540,10 +540,6 @@ export class Toypack extends Hooks {
          ) {
             console.error(error.reason);
          }
-
-         for (const err of this._debugger.error) {
-            console.error(err.reason);
-         }
       }
 
       if (logLevel == "warn" || logLevel == "info" || logLevel == "verbose") {
