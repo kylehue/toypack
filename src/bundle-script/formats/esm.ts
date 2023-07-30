@@ -54,28 +54,34 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
          ) {
             continue;
          }
-         
+
          const { type, path, specifier } = importInfo;
          const scope = path.scope;
          const local = specifier.local.name;
          if (type == "specifier") {
             const imported = getStringOrIdValue(specifier.imported);
-            const id = (idMap[imported] ??= UidGenerator.generate(imported));
+            const id = (idMap[imported] ??= UidGenerator.generateBasedOnScope(
+               importInfo.path.scope,
+               imported
+            ));
             scope.rename(local, id);
             specifiers[id] = importSpecifier(
                identifier(id),
                specifier.imported
             );
          } else if (type == "default") {
-            const id = (idMap["default"] ??= UidGenerator.generate(
+            const id = (idMap["default"] ??= UidGenerator.generateBasedOnScope(
+               importInfo.path.scope,
                source.split("/")[0] + "_default"
             ));
             scope.rename(local, id);
             specifiers[id] = importDefaultSpecifier(identifier(id));
          } else if (type == "namespace") {
-            const id = (namespaceMap[source] ??= UidGenerator.generate(
-               source.split("/")[0]
-            ));
+            const id = (namespaceMap[source] ??=
+               UidGenerator.generateBasedOnScope(
+                  importInfo.path.scope,
+                  source.split("/")[0]
+               ));
             scope.rename(local, id);
             importDecls[source].namespace ??= importDeclaration(
                [importNamespaceSpecifier(identifier(id))],

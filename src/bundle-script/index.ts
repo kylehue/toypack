@@ -2,17 +2,17 @@ import generate from "@babel/generator";
 import template from "@babel/template";
 import { file, program } from "@babel/types";
 import MapConverter from "convert-source-map";
-import { Toypack } from "../Toypack.js";
 import { DependencyGraph } from "../parse/index.js";
+import { UidTracker } from "./link/UidTracker.js";
 import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
-import { UidGenerator } from "./link/UidGenerator.js";
 import { bindModules } from "./link/bind-modules.js";
 import { cleanComments } from "./utils/clean-comments.js";
-import { createTransformContext } from "./utils/transform-context.js";
-import { getSortedScripts } from "./utils/get-sorted-scripts.js";
+import { getSortedScripts } from "./utils/get-sorted-modules.js";
 import { resyncSourceMap } from "./utils/resync-source-map.js";
+import { createNamespace } from "./utils/create-namespace.js";
 import { formatEsm } from "./formats/esm.js";
+import { Toypack } from "../Toypack.js";
 import { ERRORS } from "../utils/index.js";
 import runtime from "./runtime.js";
 
@@ -42,27 +42,47 @@ import { codeFrameColumns } from "@babel/code-frame";
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const scriptModules = getSortedScripts(graph);
-   const transform = createTransformContext();
+   const runtimesUsed = new Set<keyof typeof runtime>();
 
    const resultAst = file(program([]));
    try {
-      // order matters here
-      UidGenerator.reset();
-      transformToVars(scriptModules);
-      deconflict(scriptModules);
-      bindModules(transform.context, graph, scriptModules);
-      cleanComments(scriptModules);
+      UidTracker.assignWithModules(scriptModules);
+      for (const module of scriptModules) {
+         if (
+            !this._getCache("compiled", module.source) ||
+            module.asset.modified
+         ) {
+            this._pushToDebugger("verbose", `Compiling "${module.source}"...`);
+
+            // order matters here
+            transformToVars(module);
+            deconflict(module);
+            bindModules.call(this, graph, module);
+            cleanComments(module);
+
+            this._setCache("compiled", module.source, {
+               module,
+            });
+         }
+      }
 
       // Bundle
-      for (const script of scriptModules) {
-         resultAst.program.body.unshift(...script.ast.program.body);
+      for (const module of scriptModules) {
+         resultAst.program.body.unshift(...module.ast.program.body);
       }
 
-      for (const { ast } of transform.otherAsts) {
-         resultAst.program.body.unshift(...ast.program.body);
+      for (const module of scriptModules) {
+         if (!this._getCache("compiled", module.source)?.needsNamespace) {
+            continue;
+         }
+
+         const statements = createNamespace(module);
+         const arr = Array.isArray(statements) ? statements : [statements];
+         resultAst.program.body.unshift(...arr);
+         runtimesUsed.add("__export");
       }
 
-      for (const name of transform.runtimesUsed) {
+      for (const name of runtimesUsed) {
          const statements = template.ast(runtime[name]);
          const arr = Array.isArray(statements) ? statements : [statements];
          resultAst.program.body.unshift(...arr);
@@ -73,11 +93,11 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    } catch (error: any) {
       this._pushToDebugger(
          "error",
-         ERRORS.bundle(error.message || error.stack || error)
+         ERRORS.bundle(error.message || error)
       );
    }
 
-   let generated = generate(resultAst, {
+   const generated = generate(resultAst, {
       sourceMaps: !!config.bundle.sourceMap,
       minified: config.bundle.mode == "production",
       comments: config.bundle.mode == "development",
@@ -88,10 +108,10 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       generated.map = resyncSourceMap(generated.map, scriptModules);
    }
 
-   console.log(getCode(generated.code));
+   // console.log(getCode(generated.code));
 
    return {
       content: generated.code,
-      map: MapConverter.fromObject(generated.map),
+      map: generated.map ? MapConverter.fromObject(generated.map) : null,
    };
 }

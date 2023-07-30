@@ -1,4 +1,4 @@
-import { Binding } from "@babel/traverse";
+import { Scope } from "@babel/traverse";
 import runtime from "../runtime";
 import { camelCase } from "lodash-es";
 
@@ -18,9 +18,9 @@ export namespace UidGenerator {
       return generated;
    }
 
-   export function generateBasedOnBinding(binding: Binding, name?: string) {
+   export function generateBasedOnScope(scope: Scope, name?: string) {
       let generated = generate(name);
-      while (binding.path.scope.hasBinding(generated)) {
+      while (scope.hasBinding(generated)) {
          generated = generate(name);
       }
 

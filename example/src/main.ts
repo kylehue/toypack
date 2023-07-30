@@ -23,7 +23,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "src/main",
+      entry: "index.html",
       resolve: {
          alias: {
             "@classes": "/classes/",
@@ -33,9 +33,7 @@ const toypack = new ToypackESM({
          },
       },
       mode: "development",
-      sourceMap: {
-         exclude: ["/node_modules/"],
-      },
+      sourceMap: true,
       globalName: "MyLib",
    },
    babel: {
@@ -63,7 +61,7 @@ const toypack = new ToypackESM({
 // await toypack.installPackage("react", "18");
 // await toypack.installPackage("react-dom/client", "18");
 // await toypack.installPackage("canvas-confetti");
-// await toypack.installPackage("path-browserify");
+await toypack.installPackage("path-browserify");
 
 (window as any).toypack = toypack;
 console.log(toypack);

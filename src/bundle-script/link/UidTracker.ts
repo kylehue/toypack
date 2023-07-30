@@ -2,6 +2,7 @@ import { ScriptDependency } from "src/types";
 import { UidGenerator } from "./UidGenerator";
 import { Identifier, StringLiteral } from "@babel/types";
 import path from "path-browserify";
+import { getModulesMap } from "../utils/get-module-map";
 
 function getStringOrIdValue(exported: StringLiteral | Identifier) {
    return exported.type == "Identifier" ? exported.name : exported.value;
@@ -21,7 +22,16 @@ export namespace UidTracker {
    }
 
    export function getNamespaceFor(source: string) {
-      return _namespaceMap[source] || undefined;
+      const namespace = _namespaceMap[source];
+      if (!namespace) {
+         throw new Error(`Namespace not found for ${source}`);
+      }
+
+      return _namespaceMap[source];
+   }
+
+   export function getAllNamespaces() {
+      return Object.values(_namespaceMap);
    }
 
    export function get(source: string, exported: string) {
@@ -40,32 +50,61 @@ export namespace UidTracker {
       return _map[source];
    }
 
+   export function resyncModules(scriptModules: ScriptDependency[]) {
+      const modulesMap = getModulesMap(scriptModules);
+
+      for (const source in _namespaceMap) {
+         if (!(source in modulesMap)) {
+            delete _namespaceMap[source];
+         }
+      }
+
+      for (const source in _map) {
+         if (!(source in modulesMap)) {
+            delete _map[source];
+         }
+      }
+   }
+
    export function assignWithModules(scriptModules: ScriptDependency[]) {
+      resyncModules(scriptModules);
+
       // Set the module's id as a namespace
       for (const module of scriptModules) {
-         _namespaceMap[module.source] = UidGenerator.generate(
+         if (_namespaceMap[module.source]) continue;
+         _namespaceMap[module.source] = UidGenerator.generateBasedOnScope(
+            module.programPath.scope,
             path.basename(module.source)
          );
       }
 
       // Initial add
       for (const module of scriptModules) {
+         if (_map[module.source]) continue;
          const idMap = (_map[module.source] ??= {});
+         const scope = module.programPath.scope;
          Object.values(module.exports.others).forEach((exportInfo) => {
             const { type } = exportInfo;
             if (type == "aggregatedName") return;
             let name, id;
             if (type == "declared") {
                name = exportInfo.name;
-               id = UidGenerator.generate(
+               id = UidGenerator.generateBasedOnScope(
+                  scope,
                   name == "default" ? createDefaultName(module.source) : name
                );
             } else if (type == "declaredDefault") {
                name = "default";
-               id = UidGenerator.generate(createDefaultName(module.source));
+               id = UidGenerator.generateBasedOnScope(
+                  scope,
+                  createDefaultName(module.source)
+               );
             } else if (type == "declaredDefaultExpression") {
                name = "default";
-               id = UidGenerator.generate(createDefaultName(module.source));
+               id = UidGenerator.generateBasedOnScope(
+                  scope,
+                  createDefaultName(module.source)
+               );
             } else {
                const { source } = exportInfo;
                const resolved = module.dependencyMap[source];
@@ -133,7 +172,5 @@ export namespace UidTracker {
             }
          });
       }
-
-      console.log(_map);
    }
 }

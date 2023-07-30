@@ -5,12 +5,13 @@ import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
 import importUrlPlugin from "./build-plugins/import-url-plugin.js";
 import importMetaPlugin from "./build-plugins/import-meta-plugin.js";
+import bundleDepsPlugin from "./build-plugins/bundle-deps-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./parse/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
-import type { Asset, ResolveOptions, Plugin, TextAsset, Error } from "./types";
+import type { Asset, ResolveOptions, Plugin, TextAsset, Error, ScriptDependency } from "./types";
 import {
    ERRORS,
    EXTENSIONS,
@@ -69,12 +70,16 @@ export class Toypack extends Hooks {
          htmlPlugin(),
          rawPlugin(),
          importUrlPlugin(),
-         importMetaPlugin()
+         importMetaPlugin(),
+         bundleDepsPlugin()
       );
 
       this.usePackageProvider({
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
+         queryParams: {
+            // dev: true
+         },
       });
 
       this.usePackageProvider({
@@ -111,7 +116,10 @@ export class Toypack extends Hooks {
       const cacheData = { source, ...value };
       const cached = this._getCache(loc, source);
       if (cached) {
-         Object.assign(cached, cacheData);
+         this._cachedDeps[loc].set(
+            hashedSource,
+            Object.assign(cached, cacheData)
+         );
       } else {
          this._cachedDeps[loc].set(hashedSource, cacheData);
       }
@@ -532,6 +540,10 @@ export class Toypack extends Hooks {
          ) {
             console.error(error.reason);
          }
+
+         for (const err of this._debugger.error) {
+            console.error(err.reason);
+         }
       }
 
       if (logLevel == "warn" || logLevel == "info" || logLevel == "verbose") {
@@ -583,6 +595,8 @@ interface Cache {
          importers?: Importers;
          content?: string;
          map?: EncodedSourceMap | null;
+         needsNamespace?: boolean;
+         module?: ScriptDependency;
       }
    >;
 }

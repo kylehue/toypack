@@ -74,13 +74,12 @@ async function loadAndParse(
 
    if (!loaded) {
       try {
+         this._pushToDebugger("verbose", `Loading "${source}"...`);
          loaded = await loadChunk.call(this, source, isEntry, graph, importers);
          this._setCache("parsed", source, {
             importers,
             loaded,
          });
-
-         this._pushToDebugger("verbose", `Loading "${source}"...`);
       } catch (error: any) {
          this._pushToDebugger("error", ERRORS.parse(error.message || error));
       }
@@ -88,6 +87,7 @@ async function loadAndParse(
 
    if (!parsed && loaded && loaded.type != "resource") {
       try {
+         this._pushToDebugger("verbose", `Parsing "${source}"...`);
          parsed =
             loaded.type == "script"
                ? await parseScriptAsset.call(this, source, loaded.content)
@@ -97,8 +97,6 @@ async function loadAndParse(
             parsed,
             loaded,
          });
-
-         this._pushToDebugger("verbose", `Parsing "${source}"...`);
       } catch (error: any) {
          this._pushToDebugger("error", ERRORS.parse(error.message || error));
       }
@@ -178,7 +176,6 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       // Scan dependency's dependencies recursively
       for (const depSource of parsed.dependencies) {
-         if (!isLocal(depSource)) continue;
          const parsed = parseURL(depSource);
          let resolved: string = depSource;
          // Resolve source with plugins
@@ -194,6 +191,9 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                if (result) resolved = result;
             },
          });
+
+         // skip externals
+         if (!isLocal(resolved)) continue;
 
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {

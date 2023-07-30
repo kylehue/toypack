@@ -1,4 +1,3 @@
-import template from "@babel/template";
 import {
    identifier,
    variableDeclaration,
@@ -13,69 +12,9 @@ import {
 import { DependencyGraph, ScriptDependency } from "../../parse";
 import { ImportInfo } from "../../parse/extract-imports";
 import { ExportInfo } from "../../parse/extract-exports";
-import { TransformContext } from "../utils/transform-context";
 import { UidTracker } from "./UidTracker";
 import { isLocal } from "../../utils";
-
-const namespaceMap = new Map<
-   string,
-   {
-      namespace: string;
-      build: () => void;
-   }
->();
-
-function createNamespaceExport(
-   context: TransformContext,
-   module: ScriptDependency
-) {
-   const declared = namespaceMap.get(module.source);
-   if (declared) {
-      return declared.namespace;
-   }
-
-   const name = UidTracker.getNamespaceFor(module.source);
-
-   if (!name) {
-      throw new Error(`No assigned namespace for ${module.source}.`);
-   }
-
-   namespaceMap.set(module.source, {
-      namespace: name,
-      build() {
-         const exportedNames = Object.keys(module.exports.others);
-         const exportObject =
-            "{\n" +
-            exportedNames
-               .map((exportName) => {
-                  const uid = getAssignedId(module.source, exportName);
-
-                  // Add quotes if not a valid export name
-                  const isValidName =
-                     /^[a-z0-9$_]+$/i.test(exportName) &&
-                     !/^[0-9]+/.test(exportName);
-                  if (!isValidName) {
-                     exportName = `"${exportName}"`;
-                  }
-
-                  let line = `${exportName}: () => ${uid}`;
-                  return line;
-               })
-               .join(",\n") +
-            "\n}";
-
-         const builtTemplate = template.ast(`
-            var ${name} = {};
-            __export(${name}, ${exportObject});
-         `);
-
-         context.addRuntime("__export");
-         context.unshiftAst(builtTemplate, module.source);
-      },
-   });
-
-   return name;
-}
+import Toypack from "src/Toypack";
 
 function getAssignedId(source: string, name: string) {
    const uid = UidTracker.get(source, name);
@@ -93,7 +32,7 @@ function getAssignedId(source: string, name: string) {
  * Binds the imported module to the exported declarations.
  */
 function bindExport(
-   context: TransformContext,
+   this: Toypack,
    graph: DependencyGraph,
    exportInfo: ExportInfo,
    exportInfosModule: ScriptDependency
@@ -151,8 +90,10 @@ function bindExport(
       exportInfo.path.replaceWith(varDecl);
    } else if (exportInfo.type == "aggregatedNamespace") {
       const parentSource = exportInfosModule.dependencyMap[exportInfo.source];
-      const parentModule = graph[parentSource] as ScriptDependency;
-      createNamespaceExport(context, parentModule);
+      const namespacedModule = graph[parentSource] as ScriptDependency;
+      this._setCache("compiled", namespacedModule.source, {
+         needsNamespace: true,
+      });
    }
 }
 
@@ -161,13 +102,13 @@ function getStringOrIdValue(node: StringLiteral | Identifier) {
 }
 
 function bindImport(
-   context: TransformContext,
+   this: Toypack,
    graph: DependencyGraph,
    importer: ScriptDependency,
    importInfo: ImportInfo
 ) {
    if (!isLocal(importInfo.source)) return;
-   
+
    const importScope = importInfo.path.scope;
    const importSource = importer.dependencyMap[importInfo.source];
    const importedModule = graph[importSource];
@@ -181,15 +122,23 @@ function bindImport(
       const localName = importInfo.specifier.local.name;
       importScope.rename(localName, getAssignedId(importSource, importedName));
    } else if (importInfo.type == "namespace") {
-      const localName = importInfo.specifier.local.name;
       const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
       if (namespacedModule?.type != "script") return;
-      const namespace = createNamespaceExport(context, namespacedModule);
+      this._setCache("compiled", namespacedModule.source, {
+         needsNamespace: true,
+      });
+      const namespace = UidTracker.getNamespaceFor(namespacedModule.source);
+      const localName = importInfo.specifier.local.name;
       importScope.rename(localName, namespace);
    } else if (importInfo.type == "dynamic") {
       const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
       if (namespacedModule?.type != "script") return;
-      const namespace = createNamespaceExport(context, namespacedModule);
+      this._setCache("compiled", namespacedModule.source, {
+         needsNamespace: true
+      });
+      const namespace = UidTracker.getNamespaceFor(namespacedModule.source);
+
+      // transform dynamic imports
       importInfo.path.replaceWith(
          callExpression(
             arrowFunctionExpression([], identifier(namespace), true),
@@ -204,46 +153,32 @@ function bindImport(
  * declarations of other modules
  */
 export function bindModules(
-   context: TransformContext,
+   this: Toypack,
    graph: DependencyGraph,
-   scriptModules: ScriptDependency[]
+   module: ScriptDependency,
 ) {
-   namespaceMap.clear();
-   UidTracker.clear();
-   UidTracker.assignWithModules(scriptModules);
-
    // Bind ids
-   for (const module of scriptModules) {
-      for (const importInfo of [
-         ...Object.values(module.imports.others),
-         ...module.imports.dynamic,
-      ]) {
-         bindImport(context, graph, module, importInfo);
-      }
-
-      for (const exportInfo of Object.values(module.exports.others)) {
-         bindExport(context, graph, exportInfo, module);
-      }
+   for (const importInfo of [
+      ...Object.values(module.imports.others),
+      ...module.imports.dynamic,
+   ]) {
+      bindImport.call(this, graph, module, importInfo);
    }
 
-   // Build namespace templates
-   for (const [_, namespace] of namespaceMap) {
-      namespace.build();
+   for (const exportInfo of Object.values(module.exports.others)) {
+      bindExport.call(this, graph, exportInfo, module);
    }
 
-   // Remove left out imports/exports after binding
-   for (const module of scriptModules) {
-      /**
-       * Remove from ast without using path.remove() because we still need to
-       * use them on the next runs.
-       */
-      const ast = module.ast;
-      ast.program.body = ast.program.body.filter(
-         (node) =>
-            node.type !== "ExportDefaultDeclaration" &&
-            node.type !== "ExportAllDeclaration" &&
-            node.type !== "ExportNamedDeclaration" &&
-            node.type !== "ImportDeclaration"
-      );
-   }
+   /**
+    * Remove left out imports/exports after binding - and we shouldn't use
+    * path.remove() because we still need to use them on the next runs.
+    */
+   const ast = module.ast;
+   ast.program.body = ast.program.body.filter(
+      (node) =>
+         node.type !== "ExportDefaultDeclaration" &&
+         node.type !== "ExportAllDeclaration" &&
+         node.type !== "ExportNamedDeclaration" &&
+         node.type !== "ImportDeclaration"
+   );
 }
