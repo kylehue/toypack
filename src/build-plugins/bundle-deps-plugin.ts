@@ -31,6 +31,7 @@ export default function (): Plugin {
       name: "bundle-deps-plugin",
       transform(context) {
          if (context.type != "script") return;
+         if (this.bundler.config.bundle.mode != "production") return;
          context.traverse({
             ImportDeclaration: (path) => resolve(this.bundler, path),
             ExportAllDeclaration: (path) => resolve(this.bundler, path),
