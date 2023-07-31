@@ -23,7 +23,7 @@ export function resyncSourceMap(
    for (const module of scriptModules) {
       const sourceMap =
          (module.asset.type == "text" ? module.asset.map : null) || module.map;
-      if (!sourceMap) {
+      if (!sourceMap || (sourceMap && !sourceMap.mappings.length)) {
          unmappedScripts[module.source] = module.content;
          continue;
       }
