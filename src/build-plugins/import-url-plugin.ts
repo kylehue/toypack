@@ -77,7 +77,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
       cached.asset ??= asset;
       assets[url] = asset;
 
-      const rawContent = await response.text();
+      const rawContent = await response.clone().text();
       let dependencies: string[] = [];
 
       if (type == "script") {
