@@ -12,7 +12,6 @@ import { ParsedScriptResult } from "../parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "../parse/parse-style-chunk.js";
 import { LoadResult, ModuleInfo } from "../parse/load-chunk.js";
 import { SpecifierOptions } from "../utils/get-import-code.js";
-import { BundleGenerator } from "../utils/BundleGenerator.js";
 import { TraverseOptions } from "@babel/traverse";
 
 // Interfaces
@@ -60,13 +59,6 @@ export type ParsedHook = (this: PluginContext, parseInfo: ParseInfo) => void;
 export type StartHook = (this: PluginContextBase) => void;
 export type EndHook = (this: PluginContextBase, result: BundleResult) => void;
 export type SetupHook = (this: PluginContextBase) => void;
-export type GenerateBundleHook = (
-   this: PluginContextBase,
-   context: {
-      type: "script" | "style";
-      generator: BundleGenerator;
-   }
-) => void;
 
 // Context
 export interface PluginContextBase {
@@ -155,8 +147,6 @@ export interface PluginHooks {
    buildEnd: EndHook | ConfigurableHook<EndHook>;
    /** Hook called everytime a module is parsed. */
    parsed: ParsedHook | ConfigurableHook<ParsedHook>;
-   /** Hook called everytime bundle generation has started. */
-   generateBundle: GenerateBundleHook | ConfigurableHook<GenerateBundleHook>;
    /** Hook called only once, useful for setting up things. */
    setup: SetupHook;
 }

@@ -2,20 +2,10 @@ import MapConverter from "convert-source-map";
 import { Toypack } from "../Toypack.js";
 import { compileStyle } from "./compile-style.js";
 import { DependencyGraph } from "../types.js";
-import { BundleGenerator } from "../utils/BundleGenerator.js";
+import { BundleGenerator } from "./BundleGenerator.js";
 
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    const bundleGenerator = new BundleGenerator();
-
-   this._pluginManager.triggerHook({
-      name: "generateBundle",
-      args: [
-         {
-            type: "style",
-            generator: bundleGenerator,
-         },
-      ],
-   });
 
    for (const source in graph) {
       const chunk = graph[source];
