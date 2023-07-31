@@ -16,14 +16,16 @@ import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ParseInfo } from "../plugin/hook-types.js";
-import { ExportInfo, Exports } from "src/parse/extract-exports.js";
+import {
+   AggregatedNameExport,
+   AggregatedNamespaceExport,
+   ExportInfo,
+   Exports,
+} from "src/parse/extract-exports.js";
 import { ImportInfo, Imports } from "src/parse/extract-imports.js";
 import { NodePath } from "@babel/traverse";
 
-function getImportPosition(
-   content: string,
-   importSource: string,
-) {
+function getImportPosition(content: string, importSource: string) {
    let index: number | null = null;
    const esmImportRegex = new RegExp(
       `(?:import|export).*(?:from)?.*(["']${escapeRegex(importSource)}["'])`,
@@ -43,10 +45,7 @@ function getImportCodeFrame(
    const asset = this.getAsset(source);
    let codeFrame = "";
    if (asset?.type == "text") {
-      const pos = getImportPosition(
-         asset.content,
-         importSource,
-      );
+      const pos = getImportPosition(asset.content, importSource);
       codeFrame = !pos
          ? ""
          : codeFrameColumns(asset.content, {
@@ -138,7 +137,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       if (!loaded) return;
 
-      let chunk;
+      let chunk: ScriptDependency | StyleDependency | ResourceDependency;
       if (loaded.type == "resource") {
          chunk = createChunk(rawSource, loaded, importers, undefined, isEntry);
          graph[rawSource] = chunk;
@@ -188,7 +187,14 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                source: resolved,
             },
             callback(result) {
-               if (result) resolved = result;
+               if (result) {
+                  // Resync the imports/exports
+                  if (chunk.type == "script") {
+                     resyncSources(chunk, resolved, result);
+                  }
+
+                  resolved = result;
+               }
             },
          });
 
@@ -239,6 +245,29 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
    await recurse(entry.source, null);
    return graph;
+}
+
+function resyncSources(
+   module: ScriptDependency,
+   oldSource: string,
+   newSource: string
+) {
+   // Sync imports/exports
+   const sourcedPorts = [
+      ...Object.values(module.imports.default),
+      ...Object.values(module.imports.dynamic),
+      ...Object.values(module.imports.namespace),
+      ...Object.values(module.imports.sideEffect),
+      ...Object.values(module.imports.specifier),
+      ...Object.values(module.exports.aggregatedAll),
+      ...Object.values(module.exports.aggregatedName),
+      ...Object.values(module.exports.aggregatedNamespace),
+   ];
+
+   for (const port of sourcedPorts) {
+      if (port.source !== oldSource) continue;
+      port.source = newSource;
+   }
 }
 
 function createChunk<
