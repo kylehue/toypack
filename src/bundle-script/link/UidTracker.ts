@@ -111,7 +111,6 @@ export namespace UidTracker {
 
       // Initial add
       for (const module of scriptModules) {
-         if (_map[module.source]) continue;
          const { idMap } = (_map[module.source] ??= {
             module,
             idMap: {},
@@ -124,18 +123,21 @@ export namespace UidTracker {
             let name, id;
             if (type == "declared") {
                name = exportInfo.name;
+               if (idMap[name]) return;
                id = UidGenerator.generateBasedOnScope(
                   scope,
                   name == "default" ? createDefaultName(module.source) : name
                );
             } else if (type == "declaredDefault") {
                name = "default";
+               if (idMap[name]) return;
                id = UidGenerator.generateBasedOnScope(
                   scope,
                   createDefaultName(module.source)
                );
             } else if (type == "declaredDefaultExpression") {
                name = "default";
+               if (idMap[name]) return;
                id = UidGenerator.generateBasedOnScope(
                   scope,
                   createDefaultName(module.source)
@@ -144,8 +146,10 @@ export namespace UidTracker {
                const { source } = exportInfo;
                const resolved = module.dependencyMap[source];
                name = exportInfo.specifier.exported.name;
+               if (idMap[name]) return;
                id = _namespaceMap[resolved];
             }
+            
             idMap[name] = id;
          });
       }
