@@ -44,19 +44,25 @@ export function extractExports(
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const exports: Exports = {
-      aggregatedAll: [],
-      others: {},
+      aggregatedAll: {},
+      aggregatedName: {},
+      aggregatedNamespace: {},
+      declaredDefault: {},
+      declaredDefaultExpression: {},
+      declared: {},
    };
+
    const options: TraverseOptions = {
       ExportAllDeclaration(path) {
          const { node } = path;
          const source = node.source?.value;
-         exports.aggregatedAll.push({
-            id: `$${uid++}`,
+         uid++;
+         exports.aggregatedAll[uid] = {
+            id: `$${uid}`,
             type: "aggregatedAll",
             path,
             source,
-         });
+         };
       },
       ExportNamedDeclaration(path) {
          const { node } = path;
@@ -72,7 +78,7 @@ export function extractExports(
                    * export * as foo from "module.js";
                    */
                   const name = specifier.exported.name;
-                  exports.others[name] = {
+                  exports.aggregatedNamespace[name] = {
                      id: `$${uid++}`,
                      type: "aggregatedNamespace",
                      specifier,
@@ -90,7 +96,7 @@ export function extractExports(
                      exported.type == "Identifier"
                         ? exported.name
                         : exported.value;
-                  exports.others[name] = {
+                  exports.aggregatedName[name] = {
                      id: `$${uid++}`,
                      type: "aggregatedName",
                      specifier,
@@ -112,7 +118,7 @@ export function extractExports(
                   }
 
                   const name = id.name;
-                  exports.others[id.name] = {
+                  exports.declared[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
@@ -139,7 +145,7 @@ export function extractExports(
                   }
 
                   const name = id.name;
-                  exports.others[id.name] = {
+                  exports.declared[id.name] = {
                      id: `$${uid++}`,
                      type: "declared",
                      path,
@@ -173,7 +179,7 @@ export function extractExports(
                         );
                      }
 
-                     exports.others[name] = {
+                     exports.declared[name] = {
                         id: `$${uid++}`,
                         type: "declared",
                         path,
@@ -208,7 +214,7 @@ export function extractExports(
                throw new TypeError("Invalid declaration.");
             }
 
-            exports.others["default"] = {
+            exports.declaredDefault["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
@@ -228,7 +234,7 @@ export function extractExports(
                throw new Error(`No declaration found for "${name}"`);
             }
 
-            exports.others["default"] = {
+            exports.declaredDefault["default"] = {
                id: `$${uid++}`,
                type: "declaredDefault",
                path,
@@ -249,7 +255,7 @@ export function extractExports(
                throw new TypeError("Invalid declaration.");
             }
 
-            exports.others["default"] = {
+            exports.declaredDefaultExpression["default"] = {
                id: `$${uid++}`,
                type: "declaredDefaultExpression",
                path,
@@ -329,15 +335,12 @@ export interface DeclaredDefaultExpressionExport extends ExportBase {
 }
 
 export interface Exports {
-   aggregatedAll: AggregatedAllExport[];
-   others: Record<
-      string,
-      | AggregatedNameExport
-      | AggregatedNamespaceExport
-      | DeclaredExport
-      | DeclaredDefaultExport
-      | DeclaredDefaultExpressionExport
-   >;
+   aggregatedAll: Record<number, AggregatedAllExport>;
+   aggregatedName: Record<string, AggregatedNameExport>;
+   aggregatedNamespace: Record<string, AggregatedNamespaceExport>;
+   declared: Record<string, DeclaredExport>;
+   declaredDefault: Record<string, DeclaredDefaultExport>;
+   declaredDefaultExpression: Record<string, DeclaredDefaultExpressionExport>;
 }
 
 export type ExportInfo =

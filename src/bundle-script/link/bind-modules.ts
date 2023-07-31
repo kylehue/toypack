@@ -159,13 +159,20 @@ export function bindModules(
 ) {
    // Bind ids
    for (const importInfo of [
-      ...Object.values(module.imports.others),
-      ...module.imports.dynamic,
+      ...Object.values(module.imports.default),
+      ...Object.values(module.imports.dynamic),
+      ...Object.values(module.imports.namespace),
+      ...Object.values(module.imports.specifier),
    ]) {
       bindImport.call(this, graph, module, importInfo);
    }
 
-   for (const exportInfo of Object.values(module.exports.others)) {
+   for (const exportInfo of [
+      ...Object.values(module.exports.declared),
+      ...Object.values(module.exports.declaredDefault),
+      ...Object.values(module.exports.declaredDefaultExpression),
+      ...Object.values(module.exports.aggregatedNamespace),
+   ]) {
       bindExport.call(this, graph, exportInfo, module);
    }
 

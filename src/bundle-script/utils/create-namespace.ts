@@ -4,7 +4,9 @@ import template from "@babel/template";
 
 export function createNamespace(module: ScriptDependency) {
    const name = UidTracker.getNamespaceFor(module.source);
-   const exports = Object.entries(UidTracker.getModuleExports(module.source));
+   const exports = Object.entries(
+      UidTracker.getModuleExports(module.source)
+   );
 
    const exportObject =
       "{\n" +

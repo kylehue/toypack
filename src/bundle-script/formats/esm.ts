@@ -108,7 +108,13 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
    // Add entry's exports
    const entry = scriptModules.find((x) => x.isEntry)!;
    const exportSpecifiers: Record<string, ExportSpecifier> = {};
-   Object.values(entry.exports.others).forEach((exportInfo) => {
+   [
+      ...Object.values(entry.exports.declared),
+      ...Object.values(entry.exports.declaredDefault),
+      ...Object.values(entry.exports.declaredDefaultExpression),
+      ...Object.values(entry.exports.aggregatedName),
+      ...Object.values(entry.exports.aggregatedNamespace),
+   ].forEach((exportInfo) => {
       const { type, path } = exportInfo;
       const id = UidTracker.get(entry.source, exportInfo.name);
       if (!id) return;
@@ -134,7 +140,7 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
       }
    });
 
-   entry.exports.aggregatedAll.forEach((exportInfo) => {
+   Object.values(entry.exports.aggregatedAll).forEach((exportInfo) => {
       const { source } = exportInfo;
       const resolved = entry.dependencyMap[source];
       const aggrExports = UidTracker.getModuleExports(resolved);

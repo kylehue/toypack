@@ -15,9 +15,11 @@ export function extractImports(
    traverseFn?: (options: TraverseOptions) => void
 ) {
    const imports: Imports = {
-      sideEffect: [],
-      dynamic: [],
-      others: {},
+      sideEffect: {},
+      dynamic: {},
+      default: {},
+      namespace: {},
+      specifier: {},
    };
 
    const options: TraverseOptions = {
@@ -30,12 +32,13 @@ export function extractImports(
           * import "./module.js";
           */
          if (!node.specifiers.length) {
-            imports.sideEffect.push({
-               id: `$${uid++}`,
+            uid++;
+            imports.sideEffect[uid] = {
+               id: `$${uid}`,
                type: "sideEffect",
                path,
                source,
-            });
+            };
          }
 
          for (const specifier of node.specifiers) {
@@ -44,7 +47,7 @@ export function extractImports(
                 * For default imports e.g.
                 * import foo from "./module.js";
                 */
-               imports.others[specifier.local.name] = {
+               imports.default[specifier.local.name] = {
                   id: `$${uid++}`,
                   type: "default",
                   source,
@@ -56,7 +59,7 @@ export function extractImports(
                 * For namespace imports e.g.
                 * import * as foo from "./module.js";
                 */
-               imports.others[specifier.local.name] = {
+               imports.namespace[specifier.local.name] = {
                   id: `$${uid++}`,
                   type: "namespace",
                   source,
@@ -68,7 +71,7 @@ export function extractImports(
                 * For specified imports e.g.
                 * import { foo, bar } from "./module.js";
                 */
-               imports.others[specifier.local.name] = {
+               imports.specifier[specifier.local.name] = {
                   id: `$${uid++}`,
                   type: "specifier",
                   source,
@@ -84,12 +87,13 @@ export function extractImports(
          const isDynamicImport = callee.type == "Import";
          if (isDynamicImport && argNode.type == "StringLiteral") {
             const source = argNode.value;
-            imports.dynamic.push({
-               id: `$${uid++}`,
+            uid++;
+            imports.dynamic[uid] = {
+               id: `$${uid}`,
                type: "dynamic",
                path,
                source,
-            });
+            };
          }
       },
    };
@@ -139,9 +143,11 @@ export interface SideEffectImport {
 }
 
 export interface Imports {
-   sideEffect: SideEffectImport[];
-   dynamic: DynamicImport[];
-   others: Record<string, NamespaceImport | SpecifierImport | DefaultImport>;
+   sideEffect: Record<number, SideEffectImport>;
+   dynamic: Record<number, DynamicImport>;
+   namespace: Record<string, NamespaceImport>;
+   specifier: Record<string, SpecifierImport>;
+   default: Record<string, DefaultImport>;
 }
 
 export type ImportInfo =

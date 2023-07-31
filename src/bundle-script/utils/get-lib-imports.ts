@@ -5,14 +5,12 @@ import { isLocal } from "../../utils";
 export function getLibImports(scriptModules: ScriptDependency[]) {
    const imports: Record<string, ImportInfo[]> = {};
    for (const module of scriptModules) {
-      const moduleImports = module.imports.others;
-      const sideEffectImports = module.imports.sideEffect;
-      const dynamicImports = module.imports.dynamic;
-
       [
-         ...Object.values(moduleImports),
-         ...sideEffectImports,
-         ...dynamicImports,
+         ...Object.values(module.imports.default),
+         ...Object.values(module.imports.dynamic),
+         ...Object.values(module.imports.namespace),
+         ...Object.values(module.imports.sideEffect),
+         ...Object.values(module.imports.specifier),
       ].forEach((importInfo) => {
          const source = importInfo.source;
          if (isLocal(source)) return;
