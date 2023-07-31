@@ -13,13 +13,14 @@ function createDefaultName(source: string) {
 }
 
 export namespace UidTracker {
-   let _map: Record<string, Record<string, string>> = {};
+   let _map: Record<
+      string,
+      {
+         module: ScriptDependency;
+         idMap: Record<string, string>;
+      }
+   > = {};
    let _namespaceMap: Record<string, string> = {};
-   export function set(source: string, exported: string, id: string) {
-      _map[source] ??= {};
-      _map[source][exported] = id;
-      return id;
-   }
 
    export function getNamespaceFor(source: string) {
       const namespace = _namespaceMap[source];
@@ -34,11 +35,30 @@ export namespace UidTracker {
       return Object.values(_namespaceMap);
    }
 
-   export function get(source: string, exported: string) {
-      const group = _map[source];
-      if (group) {
-         return group[exported];
+   export function get(source: string, exported: string): string | undefined {
+      if (!_map[source]) return;
+
+      const { idMap, module } = _map[source];
+      let id: string | undefined = idMap[exported];
+      if (!id) {
+         /**
+          * If export id is not found, try if it's in any of the
+          * aggregated exports e.g.
+          * export * from "./module.js";
+          * export { name } from "./module.js";
+          */
+         for (const exportInfo of getExports(module)) {
+            if (
+               exportInfo.type != "aggregatedAll" &&
+               exportInfo.type != "aggregatedName"
+            ) {
+               continue;
+            }
+            return get(exportInfo.source, exported);
+         }
       }
+
+      return id;
    }
 
    export function clear() {
@@ -47,7 +67,7 @@ export namespace UidTracker {
    }
 
    export function getModuleExports(source: string) {
-      return _map[source];
+      return _map[source].idMap;
    }
 
    export function resyncModules(scriptModules: ScriptDependency[]) {
@@ -66,6 +86,17 @@ export namespace UidTracker {
       }
    }
 
+   function getExports(module: ScriptDependency) {
+      return [
+         ...Object.values(module.exports.declared),
+         ...Object.values(module.exports.declaredDefault),
+         ...Object.values(module.exports.declaredDefaultExpression),
+         ...Object.values(module.exports.aggregatedAll),
+         ...Object.values(module.exports.aggregatedName),
+         ...Object.values(module.exports.aggregatedNamespace),
+      ];
+   }
+
    export function assignWithModules(scriptModules: ScriptDependency[]) {
       resyncModules(scriptModules);
 
@@ -81,11 +112,15 @@ export namespace UidTracker {
       // Initial add
       for (const module of scriptModules) {
          if (_map[module.source]) continue;
-         const idMap = (_map[module.source] ??= {});
+         const { idMap } = (_map[module.source] ??= {
+            module,
+            idMap: {},
+         });
          const scope = module.programPath.scope;
-         Object.values(module.exports.others).forEach((exportInfo) => {
+         getExports(module).forEach((exportInfo) => {
             const { type } = exportInfo;
             if (type == "aggregatedName") return;
+            if (type == "aggregatedAll") return;
             let name, id;
             if (type == "declared") {
                name = exportInfo.name;
@@ -117,8 +152,11 @@ export namespace UidTracker {
 
       // Fix implicit aggregates (ones that are bound to an import declaration)
       for (const module of scriptModules) {
-         const idMap = (_map[module.source] ??= {});
-         Object.values(module.exports.others).forEach((exportInfo) => {
+         const { idMap } = (_map[module.source] ??= {
+            module,
+            idMap: {},
+         });
+         getExports(module).forEach((exportInfo) => {
             const { type } = exportInfo;
             if (
                type != "declared" &&
@@ -137,40 +175,15 @@ export namespace UidTracker {
             const specifier = declaration.node;
             if (specifier.type == "ImportSpecifier") {
                const imported = getStringOrIdValue(specifier.imported);
-               idMap[exportInfo.name] = _map[importSource][imported];
+               idMap[exportInfo.name] = _map[importSource].idMap[imported];
             } else if (specifier.type == "ImportDefaultSpecifier") {
-               idMap[exportInfo.name] = _map[importSource]["default"];
+               idMap[exportInfo.name] = _map[importSource].idMap["default"];
             } else if (specifier.type == "ImportNamespaceSpecifier") {
                idMap[exportInfo.name] = _namespaceMap[importSource];
             }
          });
       }
 
-      // Now add the aggregated named exports
-      for (const module of scriptModules) {
-         const idMap = (_map[module.source] ??= {});
-         Object.values(module.exports.others).forEach((exportInfo) => {
-            const { type } = exportInfo;
-            if (type != "aggregatedName") return;
-            const { source } = exportInfo;
-            const resolved = module.dependencyMap[source];
-            idMap[exportInfo.name] =
-               _map[resolved][exportInfo.specifier.local.name];
-         });
-      }
-
-      // Lastly, the aggregated star exports
-      for (const module of scriptModules) {
-         const idMap = (_map[module.source] ??= {});
-         module.exports.aggregatedAll.forEach((exportInfo) => {
-            const { source } = exportInfo;
-            const resolved = module.dependencyMap[source];
-            const aggrExports = _map[resolved];
-            for (const [key, value] of Object.entries(aggrExports)) {
-               if (key == "default") continue;
-               idMap[key] = value;
-            }
-         });
-      }
+      console.log(_map);
    }
 }
