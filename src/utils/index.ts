@@ -11,7 +11,6 @@ export { isNodeModule } from "./is-node-module.js";
 export { isSupported } from "./is-supported.js";
 export { isUrl, isDataUrl } from "./is-url.js";
 export { isValidAssetSource } from "./is-valid-asset-source.js";
-export { mergeObjects } from "./merge-objects.js";
 export { mergeSourceMapToBundle } from "./merge-source-map-bundle.js";
 export { mergeSourceMaps } from "./merge-source-maps.js";
 export { mergeTraverseOptions } from "./merge-traverse-options.js";

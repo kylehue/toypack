@@ -11,7 +11,14 @@ import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./parse/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
-import type { Asset, ResolveOptions, Plugin, TextAsset, Error, ScriptDependency } from "./types";
+import type {
+   Asset,
+   ResolveOptions,
+   Plugin,
+   TextAsset,
+   Error,
+   ScriptDependency,
+} from "./types";
 import {
    ERRORS,
    EXTENSIONS,
@@ -19,7 +26,6 @@ import {
    isLocal,
    isUrl,
    isValidAssetSource,
-   mergeObjects,
    parsePackageName,
 } from "./utils";
 import { createAsset } from "./utils/create-asset.js";
@@ -29,6 +35,7 @@ import { ParsedScriptResult } from "./parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
+import { cloneDeep, merge } from "lodash-es";
 
 let _lastId = 0;
 export class Toypack extends Hooks {
@@ -40,7 +47,7 @@ export class Toypack extends Hooks {
       script: [...EXTENSIONS.script],
    };
    private _assets = new Map<string, Asset>();
-   private _config: ToypackConfig = JSON.parse(JSON.stringify(defaultConfig));
+   private _config: ToypackConfig = cloneDeep(defaultConfig);
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
    private _configHash: string = "";
@@ -238,7 +245,6 @@ export class Toypack extends Hooks {
          for (const ext of plugin.extensions || []) {
             if (!this._hasExtension(ext[0], ext[1])) {
                this._extensions[ext[0]].push(ext[1]);
-               
             }
          }
       }
@@ -246,7 +252,7 @@ export class Toypack extends Hooks {
 
    /**
     * Removes a plugin.
-    * 
+    *
     * Note: This won't remove the extensions that was added by the plugin.
     */
    public removePlugin(plugin: string | Plugin) {
@@ -254,7 +260,7 @@ export class Toypack extends Hooks {
    }
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
-      this._config = mergeObjects(this._config, config as ToypackConfig);
+      this._config = merge(this._config, config as ToypackConfig);
       this._configHash = getHash(JSON.stringify(this._config));
    }
 
@@ -263,7 +269,7 @@ export class Toypack extends Hooks {
    }
 
    public resetConfig() {
-      this.setConfig(JSON.parse(JSON.stringify(defaultConfig)));
+      this.setConfig(cloneDeep(defaultConfig));
    }
 
    public getAssetSources() {
