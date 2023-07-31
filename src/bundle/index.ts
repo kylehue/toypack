@@ -1,5 +1,5 @@
 import { Toypack } from "../Toypack.js";
-import { DependencyGraph } from "../types";
+import { DependencyGraph, ImportMapConfig } from "../types";
 import { bundleScript } from "../bundle-script/index.js";
 import { bundleStyle } from "../bundle-style/bundle-style.js";
 import { getUsableResourcePath } from "../utils";
@@ -7,18 +7,23 @@ import { getUsableResourcePath } from "../utils";
 let previousScriptUrl: string | undefined = undefined;
 let previousLinkUrl: string | undefined = undefined;
 
-function getHtml(scriptSrc = "", linkHref = "") {
-   return `
-<!DOCTYPE html>
-<html lang="en">
-   <head>
-      <link rel="stylesheet" href="${linkHref}"></link>
-      <script defer type="module" src="${scriptSrc}"></script>
-   </head>
-   <body>
-   </body>
-</html>
-`.trim();
+function getHtml(scriptSrc = "", linkHref = "", importMap?: ImportMapConfig) {
+   return [
+      `<!DOCTYPE html>`,
+      `<html lang="en">`,
+      `  <head>`,
+      `     <link rel="stylesheet" href="${linkHref}"></link>`,
+      importMap
+         ? `<script type="importmap">${JSON.stringify(importMap)}</script>`
+         : undefined,
+      `     <script defer type="module" src="${scriptSrc}"></script>`,
+      `  </head>`,
+      `  <body>`,
+      `  </body>`,
+      `</html>`,
+   ]
+      .filter((x) => !!x)
+      .join("\n");
 }
 
 export async function bundle(this: Toypack, graph: DependencyGraph) {
@@ -79,7 +84,11 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
          })
       );
 
-      result.html.content = getHtml(previousScriptUrl, previousLinkUrl);
+      result.html.content = getHtml(
+         previousScriptUrl,
+         previousLinkUrl,
+         config.bundle.importMap
+      );
    } else {
       // Extract resources from graph
       for (const source in graph) {
@@ -115,7 +124,8 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
 
       result.html.content = getHtml(
          "./" + result.js.source,
-         "./" + result.css.source
+         "./" + result.css.source,
+         config.bundle.importMap
       );
    }
 

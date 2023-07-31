@@ -69,6 +69,7 @@ export const defaultConfig = {
        * @default "auto"
        */
       includeDeps: "auto",
+      importMap: {} as ImportMapConfig,
    },
    /**
     * Configuration for the parser.
@@ -103,6 +104,10 @@ export type SourceMapConfig = {
    include?: string[] | RegExp | ((source: string) => boolean | void);
    /** Paths to exclude from source maps. */
    exclude?: string[] | RegExp | ((source: string) => boolean | void);
+};
+export type ImportMapConfig = {
+   imports: Record<string, string>;
+   scopes: Record<string, Record<string, string>>;
 };
 
 export type BabelParseConfig = Omit<

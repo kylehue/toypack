@@ -84,6 +84,19 @@ function compile(
          node.remove();
       }
 
+      /**
+       * Add import maps to config
+       */
+      if (node.tagName == "SCRIPT" && node.attributes.type == "importmap") {
+         node.remove();
+         const text = node.structuredText.trim();
+         this.bundler.setConfig({
+            bundle: {
+               importMap: text.length ? JSON.parse(text) : {}
+            }
+         });
+      }
+
       if (
          typeof node.attributes.style == "string" &&
          node.attributes.style.length
@@ -142,7 +155,7 @@ function injectAstToHtml(content: string, astToInject: HTMLElement) {
    // Inject head in head
    const headToInject = astToInject.querySelector("head");
    headToInject?.childNodes.forEach((node) => {
-      headAst.childNodes.unshift(node.clone());
+      headAst.appendChild(node.clone());
    });
 
    return htmlAst.toString();
