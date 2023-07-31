@@ -1,39 +1,38 @@
 import { Scope } from "@babel/traverse";
 import runtime from "../runtime";
 import { camelCase } from "lodash-es";
+import { UidTracker } from "./UidTracker";
 
 export namespace UidGenerator {
    let _idCountMap: Record<string, number> = {};
-   let _reservedVars = new Set<string>();
-   export function generate(name = "temp") {
+   let _reservedVars = new Map<string, Scope>();
+   function generate(name = "temp") {
       name = camelCase(name);
-      _idCountMap[name] ??= 0;
       let generated = name;
-      while (_reservedVars.has(generated) || generated in runtime) {
-         generated = name + "_" + _idCountMap[name]++;
+      _idCountMap[generated] ??= 0;
+      if (_idCountMap[generated] >= 0) {
+         generated = name + "_" + _idCountMap[generated]++;
       }
-
-      _reservedVars.add(generated);
 
       return generated;
    }
 
    export function generateBasedOnScope(scope: Scope, name?: string) {
+      let namespaces = UidTracker.getAllNamespaces();
       let generated = generate(name);
-      while (scope.hasBinding(generated)) {
+
+      let isNamespace = namespaces.includes(generated);
+      let isRuntime = generated in runtime;
+      let isTaken = scope.hasBinding(generated) || _reservedVars.has(generated);
+      while (isTaken || isRuntime || isNamespace) {
          generated = generate(name);
+         isTaken = scope.hasBinding(generated) || _reservedVars.has(generated);
+         isRuntime = generated in runtime;
+         isNamespace = namespaces.includes(generated);
       }
 
-      return generate(name);
-   }
+      _reservedVars.set(generated, scope);
 
-   export function addReservedVars(reservedVars: string | string[]) {
-      if (!Array.isArray(reservedVars)) reservedVars = [reservedVars];
-      _reservedVars = new Set([..._reservedVars, ...reservedVars]);
-   }
-
-   export function reset() {
-      _idCountMap = {};
-      _reservedVars = new Set();
+      return generated;
    }
 }

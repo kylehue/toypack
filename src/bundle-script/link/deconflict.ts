@@ -19,7 +19,4 @@ export function deconflict(module: ScriptDependency) {
       scope.rename(name, newName);
       identifier.name = newName;
    }
-
-   const reservedVars = Object.keys(bindings);
-   UidGenerator.addReservedVars(reservedVars);
 }
