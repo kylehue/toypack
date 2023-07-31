@@ -48,10 +48,8 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    try {
       UidTracker.assignWithModules(scriptModules);
       for (const module of scriptModules) {
-         if (
-            !this._getCache("compiled", module.source) ||
-            module.asset.modified
-         ) {
+         const isCached = !!this._getCache("compiled", module.source)?.module;
+         if (!isCached || module.asset.modified) {
             this._pushToDebugger("verbose", `Compiling "${module.source}"...`);
 
             // order matters here
@@ -66,11 +64,14 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          }
       }
 
-      // Bundle
+      // Add all the modules first
       for (const module of scriptModules) {
-         resultAst.program.body.unshift(...module.ast.program.body);
+         const cached = this._getCache("compiled", module.source);
+         if (!cached?.module?.ast) continue;
+         resultAst.program.body.unshift(...cached.module.ast.program.body);
       }
 
+      // Then the namespaces (on top)
       for (const module of scriptModules) {
          if (!this._getCache("compiled", module.source)?.needsNamespace) {
             continue;
@@ -82,6 +83,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          runtimesUsed.add("__export");
       }
 
+      // Lastly, the runtimes (on top)
       for (const name of runtimesUsed) {
          const statements = template.ast(runtime[name]);
          const arr = Array.isArray(statements) ? statements : [statements];
@@ -108,7 +110,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       generated.map = resyncSourceMap(generated.map, scriptModules);
    }
 
-   // console.log(getCode(generated.code));
+   console.log(getCode(generated.code));
 
    return {
       content: generated.code,

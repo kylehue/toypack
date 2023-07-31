@@ -39,6 +39,7 @@ import cpath, { resolve as cresolve } from "path-browserify";
 import * as crpath from "path-browserify";
 
 const indexJs = 123;
+const pathBrowserify = 123;
 console.log(cpath, cresolve, crpath, indexJs);
 
 
