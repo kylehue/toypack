@@ -5,7 +5,7 @@ import { UidTracker } from "./UidTracker";
 
 export namespace UidGenerator {
    let _idCountMap: Record<string, number> = {};
-   let _reservedVars = new Map<string, Scope>();
+   let _reservedVars = new Set<string>();
    function generate(name = "temp") {
       name = camelCase(name);
       let generated = name;
@@ -17,21 +17,26 @@ export namespace UidGenerator {
       return generated;
    }
 
-   export function generateBasedOnScope(scope: Scope, name?: string) {
+   export function isConflicted(name: string) {
       let namespaces = UidTracker.getAllNamespaces();
+      let isNamespace = namespaces.includes(name);
+      return _reservedVars.has(name) || name in runtime || isNamespace;
+   }
+
+   export function addReservedVars(...vars: string[]) {
+      _reservedVars = new Set([..._reservedVars, ...vars]);
+   }
+
+   export function generateBasedOnScope(scope: Scope, name?: string) {
       let generated = generate(name);
 
-      let isNamespace = namespaces.includes(generated);
-      let isRuntime = generated in runtime;
-      let isTaken = scope.hasBinding(generated) || _reservedVars.has(generated);
-      while (isTaken || isRuntime || isNamespace) {
+      let isTaken = scope.hasBinding(generated) || isConflicted(generated);
+      while (isTaken) {
          generated = generate(name);
-         isTaken = scope.hasBinding(generated) || _reservedVars.has(generated);
-         isRuntime = generated in runtime;
-         isNamespace = namespaces.includes(generated);
+         isTaken = scope.hasBinding(generated) || isConflicted(generated);
       }
 
-      _reservedVars.set(generated, scope);
+      _reservedVars.add(generated);
 
       return generated;
    }
