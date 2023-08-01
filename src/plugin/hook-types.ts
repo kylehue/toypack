@@ -107,8 +107,11 @@ export interface PluginContext extends PluginContextBase {
    graph: DependencyGraph;
    /** Returns the modules that imported the current module. */
    getImporters: () => Importers;
-   /** Returns the module that imported the current module. */
-   getCurrentImporter: () => ScriptDependency | StyleDependency;
+   /**
+    * Returns the module that imported the current module. If it's the
+    * entry, then it will return undefined.
+    */
+   getCurrentImporter: () => ScriptDependency | StyleDependency | undefined;
    /** Returns true if the current module should have source maps or not. */
    shouldMap: () => boolean;
    /** Pre-loads an asset. */
