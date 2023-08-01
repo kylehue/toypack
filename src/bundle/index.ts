@@ -91,8 +91,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       );
    } else {
       // Extract resources from graph
-      for (const source in graph) {
-         const chunk = graph[source];
+      for (const [_, chunk] of graph) {
          if (chunk.type != "resource") continue;
          const useableSource = getUsableResourcePath(this, chunk.asset.source);
          if (!useableSource) continue;

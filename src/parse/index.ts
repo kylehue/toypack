@@ -10,19 +10,15 @@ import {
    escapeRegex,
    indexToPosition,
    isLocal,
+   isUrl,
    parseURL,
 } from "../utils/index.js";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ParseInfo } from "../plugin/hook-types.js";
-import {
-   AggregatedNameExport,
-   AggregatedNamespaceExport,
-   ExportInfo,
-   Exports,
-} from "src/parse/extract-exports.js";
-import { ImportInfo, Imports } from "src/parse/extract-imports.js";
+import { Exports } from "src/parse/extract-exports.js";
+import { Imports } from "src/parse/extract-imports.js";
 import { NodePath } from "@babel/traverse";
 
 function getImportPosition(content: string, importSource: string) {
@@ -105,10 +101,34 @@ async function loadAndParse(
 }
 
 /**
+ * Re-orders graph when needed. It assures that the imported module's
+ * position in the graph is before the importer's position.
+ */
+function maintainImportOrder(
+   graph: DependencyGraph,
+   importer: ScriptDependency | StyleDependency,
+   importedSource: string
+) {
+   const current = graph.get(importedSource)!;
+   const arr = Object.values(Object.fromEntries(graph));
+   const indexOfImporter = arr.indexOf(importer);
+   const indexOfCurrent = arr.indexOf(current);
+   if (indexOfImporter > indexOfCurrent) {
+      arr.splice(indexOfCurrent, 1);
+      arr.splice(indexOfImporter, 0, current);
+   }
+
+   graph.clear();
+   for (const dep of arr) {
+      graph.set(dep.source, dep);
+   }
+}
+
+/**
  * Recursively get the dependency graph of an asset.
  */
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
-   const graph: DependencyGraph = {};
+   const graph: DependencyGraph = new Map();
 
    const importersMap: Record<string, Importers> = {};
    const recurse = async (
@@ -122,7 +142,13 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       const importers = importersMap[rawSource];
 
-      if (graph[rawSource]) {
+      if (graph.has(rawSource)) {
+         /**
+          * If it's already in the graph, we have to skip BUT we also have
+          * to re-order.
+          */
+         if (!previous) return;
+         maintainImportOrder(graph, previous, rawSource);
          return;
       }
 
@@ -140,21 +166,20 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       let chunk: ScriptDependency | StyleDependency | ResourceDependency;
       if (loaded.type == "resource") {
          chunk = createChunk(rawSource, loaded, importers, undefined, isEntry);
-         graph[rawSource] = chunk;
+         graph.set(rawSource, chunk);
          /**
           * Resources doesn't have dependencies so we can skip all
           * the procedures below.
           */
          return;
-      } else {
-         /**
-          * `parsed` can't possibly be falsy if it's not a resource
-          * but we do this anyway to make typescript happy.
-          */
-         if (!parsed) return;
-         chunk = createChunk(rawSource, loaded, importers, parsed, isEntry);
-         graph[rawSource] = chunk;
       }
+
+      if (!parsed) {
+         throw new Error(`Failed to parse '${rawSource}'.`);
+      }
+
+      chunk = createChunk(rawSource, loaded, importers, parsed, isEntry);
+      graph.set(rawSource, chunk);
 
       // Trigger parsed hook
       await this._pluginManager.triggerHook({
@@ -174,7 +199,12 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       });
 
       // Scan dependency's dependencies recursively
-      for (const depSource of parsed.dependencies) {
+      /**
+       * We need to reverse the deps so that we can get the proper order
+       * of import hierarchy.
+       */
+      const orderedDeps = [...parsed.dependencies].reverse();
+      for (const depSource of orderedDeps) {
          const parsed = parseURL(depSource);
          let resolved: string = depSource;
          // Resolve source with plugins
@@ -190,7 +220,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
                if (result) {
                   // Resync the imports/exports
                   if (chunk.type == "script") {
-                     resyncSources(chunk, resolved, result);
+                     // resyncSources(chunk, resolved, result);
                   }
 
                   resolved = result;
@@ -200,11 +230,13 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
          // skip externals
          if (!isLocal(resolved)) continue;
+         if (isUrl(resolved)) continue;
 
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
             const nonVirtualResolution = this.resolve(resolved, {
                baseDir: path.dirname(rawSource.replace(/^virtual:/, "")),
+               includeCoreModules: false,
             });
 
             if (!nonVirtualResolution) {
@@ -252,7 +284,6 @@ function resyncSources(
    oldSource: string,
    newSource: string
 ) {
-   // Sync imports/exports
    const sourcedPorts = [
       ...Object.values(module.imports.default),
       ...Object.values(module.imports.dynamic),
@@ -342,8 +373,6 @@ function createChunk<
  * Get the dependency graph of the bundler starting from the entry point.
  */
 export async function getDependencyGraph(this: Toypack) {
-   const graph: DependencyGraph = {};
-
    await this._pluginManager.triggerHook({
       name: "buildStart",
       args: [],
@@ -356,18 +385,18 @@ export async function getDependencyGraph(this: Toypack) {
 
    const entryAsset = entrySource ? this.getAsset(entrySource) : null;
 
+   const dummyGraph: DependencyGraph = new Map();
    if (!entryAsset) {
       this._pushToDebugger("error", ERRORS.entryNotFound());
-      return graph;
+      return dummyGraph;
    }
 
    if (entryAsset.type != "text") {
       this._pushToDebugger("error", ERRORS.invalidEntry(entryAsset.source));
-      return graph;
+      return dummyGraph;
    }
 
-   Object.assign(graph, await getGraphRecursive.call(this, entryAsset));
-   return graph;
+   return await getGraphRecursive.call(this, entryAsset);
 }
 
 interface DependencyBase {
@@ -413,4 +442,4 @@ export type Dependency =
    | StyleDependency
    | ResourceDependency;
 
-export type DependencyGraph = Record<string, Dependency>;
+export type DependencyGraph = Map<string, Dependency>;

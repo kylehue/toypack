@@ -2,18 +2,17 @@ import generate from "@babel/generator";
 import template from "@babel/template";
 import { file, program } from "@babel/types";
 import MapConverter from "convert-source-map";
-import { DependencyGraph } from "../parse/index.js";
+import { DependencyGraph, ScriptDependency } from "../parse/index.js";
 import { UidTracker } from "./link/UidTracker.js";
 import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
 import { bindModules } from "./link/bind-modules.js";
 import { cleanComments } from "./utils/clean-comments.js";
-import { getSortedScripts } from "./utils/get-sorted-modules.js";
 import { resyncSourceMap } from "./utils/resync-source-map.js";
 import { createNamespace } from "./utils/create-namespace.js";
 import { formatEsm } from "./formats/esm.js";
 import { Toypack } from "../Toypack.js";
-import { ERRORS } from "../utils/index.js";
+import { ERRORS, isNodeModule } from "../utils/index.js";
 import runtime from "./runtime.js";
 
 // TODO: remove
@@ -39,9 +38,15 @@ import { codeFrameColumns } from "@babel/code-frame";
    );
 };
 
+export function getModules(graph: DependencyGraph) {
+   return Object.values(Object.fromEntries(graph)).filter(
+      (g): g is ScriptDependency => g.type == "script"
+   );
+}
+
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
-   const scriptModules = getSortedScripts(graph);
+   const scriptModules = getModules(graph);
    const runtimesUsed = new Set<keyof typeof runtime>();
 
    const resultAst = file(program([]));
@@ -56,6 +61,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
             transformToVars(module);
             deconflict(module);
             bindModules.call(this, graph, module);
+            // module.ast.program.body = [{ type: "EmptyStatement" }];
             cleanComments(module);
 
             this._setCache("compiled", module.source, {
@@ -93,10 +99,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       // Format
       formatEsm(resultAst, scriptModules);
    } catch (error: any) {
-      this._pushToDebugger(
-         "error",
-         ERRORS.bundle(error)
-      );
+      this._pushToDebugger("error", ERRORS.bundle(error));
    }
 
    const generated = generate(resultAst, {

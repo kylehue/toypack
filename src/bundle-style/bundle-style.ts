@@ -7,8 +7,7 @@ import { BundleGenerator } from "./BundleGenerator.js";
 export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    const bundleGenerator = new BundleGenerator();
 
-   for (const source in graph) {
-      const chunk = graph[source];
+   for (const [_, chunk] of graph) {
       if (chunk.type != "style") continue;
 
       const compiled = compileStyle.call(this, chunk, graph);
