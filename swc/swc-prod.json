@@ -1,0 +1,11 @@
+{
+   "$schema": "https://json.schemastore.org/swcrc",
+   "jsc": {
+      "minify": {
+         "compress": {
+            "pure_funcs": ["console.log"],
+            "defaults": false
+         }
+      }
+   }
+}

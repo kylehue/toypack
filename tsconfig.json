@@ -6,8 +6,6 @@
       "module": "esnext",
       "target": "es2022",
       "moduleResolution": "Bundler",
-      "allowImportingTsExtensions": true,
-      "emitDeclarationOnly": true,
       "rootDir": "./src",
       "outDir": "build",
       "baseUrl": ".",

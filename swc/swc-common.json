@@ -3,11 +3,6 @@
    "jsc": {
       "parser": {
          "syntax": "typescript"
-      },
-      "minify": {
-         "compress": {
-            "pure_funcs": ["console.log"]
-         }
       }
    },
    "module": {
