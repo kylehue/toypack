@@ -3,15 +3,22 @@ import MapConverter from "convert-source-map";
 import generateScript from "@babel/generator";
 import { generate as generateStyle } from "css-tree";
 import { resolve, getType } from "../package-manager/utils";
-import { Plugin, Toypack } from "../types.js";
+import {
+   Plugin,
+   ScriptDependency,
+   StyleDependency,
+   Toypack,
+} from "../types.js";
 import { isUrl, mergeSourceMaps } from "../utils";
 import { parseScriptAsset } from "../parse/parse-script-chunk.js";
 import { parseStyleAsset } from "../parse/parse-style-chunk.js";
 import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
 import { fetchSourceMapInContent } from "../package-manager/fetch-source-map";
+import path from "path-browserify";
 interface ExternalAssetBase {
    url: string;
    source: string;
+   lang?: string;
 }
 interface ExternalScriptAsset extends ExternalAssetBase {
    type: "script";
@@ -55,9 +62,10 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
 
       const response = cached?.response ? cached.response : await fetch(url);
       cached.response ??= response;
+      const type = getType(response);
 
       const source = "virtual:" + url;
-      const type = getType(response);
+
       if (type == "resource") {
          cached.asset ??= assets[url] = {
             type: "resource",
@@ -73,6 +81,7 @@ async function fetchUrl(this: Toypack, entryUrl: string) {
          type,
          url,
          source,
+         lang: type == "script" ? "js" : "css",
       } as ExternalScriptAsset | ExternalStyleAsset;
       cached.asset ??= asset;
       assets[url] = asset;
@@ -179,13 +188,11 @@ export default function (): Plugin {
             // Fetch if it doesn't exist yet
             if (!(dep.source in fetchedAssets)) {
                const fetched = await fetchUrl.call(this.bundler, url);
-               for (const fetchedAsset of Object.values(fetched)) {
-                  fetchedAssets[fetchedAsset.source] = fetchedAsset;
-               }
+               Object.assign(fetchedAssets, fetched);
             }
 
             // Out
-            const asset = fetchedAssets[dep.source];
+            const asset = fetchedAssets[url];
             if (asset) {
                return asset;
             }
