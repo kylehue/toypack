@@ -12,10 +12,10 @@ export function getLibImports(scriptModules: ScriptDependency[]) {
          ...Object.values(module.imports.sideEffect),
          ...Object.values(module.imports.specifier),
       ].forEach((importInfo) => {
-         const source = importInfo.source;
-         if (isLocal(source)) return;
-         imports[source] ??= [];
-         imports[source].push(importInfo);
+         const resolved = module.dependencyMap[importInfo.source];
+         if (isLocal(importInfo.source) || !!resolved) return;
+         imports[importInfo.source] ??= [];
+         imports[importInfo.source].push(importInfo);
       });
    }
 

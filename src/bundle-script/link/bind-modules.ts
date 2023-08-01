@@ -20,9 +20,7 @@ function getAssignedId(source: string, name: string) {
    const uid = UidTracker.get(source, name);
 
    if (!uid) {
-      throw new Error(
-         `Failed to get the assigned id for "${name}" in ${source}.`
-      );
+      throw new Error(`The export '${name}' doesn't exist in '${source}'.`);
    }
 
    return uid;
@@ -90,7 +88,7 @@ function bindExport(
       exportInfo.path.replaceWith(varDecl);
    } else if (exportInfo.type == "aggregatedNamespace") {
       const parentSource = exportInfosModule.dependencyMap[exportInfo.source];
-      const namespacedModule = graph[parentSource] as ScriptDependency;
+      const namespacedModule = graph.get(parentSource) as ScriptDependency;
       this._setCache("compiled", namespacedModule.source, {
          needsNamespace: true,
       });
@@ -107,13 +105,19 @@ function bindImport(
    importer: ScriptDependency,
    importInfo: ImportInfo
 ) {
-   if (!isLocal(importInfo.source)) return;
+   // skip non-locals
+   const importSource = importer.dependencyMap[importInfo.source];
+   const isResolved = typeof importSource == "string";
+   if (!isLocal(importInfo.source) && !isResolved) return;
+
+   const importedModule = graph.get(importSource);
+   if (importedModule?.type != "script") {
+      throw new Error(
+         `Failed to resolve '${importInfo.source}' in '${importer.source}'.`
+      );
+   }
 
    const importScope = importInfo.path.scope;
-   const importSource = importer.dependencyMap[importInfo.source];
-   const importedModule = graph[importSource];
-   if (importedModule?.type != "script") return;
-
    if (importInfo.type == "specifier" || importInfo.type == "default") {
       const importedName =
          importInfo.type == "specifier"
@@ -122,7 +126,7 @@ function bindImport(
       const localName = importInfo.specifier.local.name;
       importScope.rename(localName, getAssignedId(importSource, importedName));
    } else if (importInfo.type == "namespace") {
-      const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
+      const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
       this._setCache("compiled", namespacedModule.source, {
          needsNamespace: true,
@@ -131,10 +135,10 @@ function bindImport(
       const localName = importInfo.specifier.local.name;
       importScope.rename(localName, namespace);
    } else if (importInfo.type == "dynamic") {
-      const namespacedModule = graph[importer.dependencyMap[importInfo.source]];
+      const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
       this._setCache("compiled", namespacedModule.source, {
-         needsNamespace: true
+         needsNamespace: true,
       });
       const namespace = UidTracker.getNamespaceFor(namespacedModule.source);
 
@@ -155,7 +159,7 @@ function bindImport(
 export function bindModules(
    this: Toypack,
    graph: DependencyGraph,
-   module: ScriptDependency,
+   module: ScriptDependency
 ) {
    // Bind ids
    for (const importInfo of [
