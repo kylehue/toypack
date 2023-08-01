@@ -54,6 +54,11 @@ export namespace UidTracker {
             ) {
                continue;
             }
+            
+            if (exportInfo.type == "aggregatedAll" && exported == "default") {
+               continue;
+            }
+
             return get(exportInfo.source, exported);
          }
       }
