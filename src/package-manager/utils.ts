@@ -23,10 +23,12 @@ export const _cache = new Map<
 
 export function queryParamsToString(params?: Record<string, string | true>) {
    if (!params) return "";
+   const entries = Object.entries(params);
+   if (!entries.length) return "";
 
    let str = "?";
 
-   for (const [key, value] of Object.entries(params)) {
+   for (const [key, value] of entries) {
       str += `${key}${typeof value == "string" && value ? `=${value}` : ""}&`;
    }
 

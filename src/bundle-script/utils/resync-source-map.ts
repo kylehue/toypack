@@ -1,6 +1,4 @@
-import { ScriptDependency } from "../../parse/index.js";
 import {
-   EncodedSourceMap,
    GenMapping,
    maybeAddMapping,
    toEncodedMap,
@@ -12,10 +10,11 @@ import {
    generatedPositionFor,
    sourceContentFor,
 } from "@jridgewell/trace-mapping";
+import type { ScriptModule } from "src/types";
 
 export function resyncSourceMap(
    map: SourceMapInput,
-   scriptModules: ScriptDependency[]
+   scriptModules: ScriptModule[]
 ) {
    const mergedMapGenerator = new GenMapping();
    const generatedMap = new TraceMap(map);

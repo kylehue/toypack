@@ -1,10 +1,10 @@
-import { ScriptDependency } from "src/parse";
+import type { ScriptModule } from "src/types";
 
-export function getModulesMap(scriptModules: ScriptDependency[]) {
+export function getModulesMap(scriptModules: ScriptModule[]) {
    const modulesMap = scriptModules.reduce((acc, cur) => {
       acc[cur.source] = cur;
       return acc;
-   }, {} as Record<string, ScriptDependency>);
+   }, {} as Record<string, ScriptModule>);
 
    return modulesMap;
 }

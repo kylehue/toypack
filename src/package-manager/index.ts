@@ -21,7 +21,7 @@ export async function getPackage(
       dtsAssets: [] as PackageAsset[],
    };
 
-   const providers = this._getPackageProviders();
+   const providers = this.getPackageProviders();
    if (!providers.length) {
       this._pushToDebugger(
          "error",
@@ -79,7 +79,7 @@ export async function getPackageTest(
       { name: "@types/babel__core", version: "latest" },
    ];
 
-   const providers = this._getPackageProviders();
+   const providers = this.getPackageProviders();
    const skypackProvider = providers.find((p) => p.host == "cdn.skypack.dev")!;
    const esmshProvider = providers.find((p) => p.host == "esm.sh")!;
    const jsdelivrProvider = providers.find(

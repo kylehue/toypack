@@ -1,11 +1,9 @@
-import { ScriptDependency } from "src/parse";
-import { UidGenerator } from "./UidGenerator";
-import { UidTracker } from "./UidTracker";
+import type { ScriptModule, Toypack } from "src/types";
 
 /**
  * Deconflicts all of the top-level variables in script modules.
  */
-export function deconflict(module: ScriptDependency) {
+export function deconflict(this: Toypack, module: ScriptModule) {
    const { scope } = module.programPath;
    const bindings = scope.getAllBindings();
 
@@ -27,11 +25,11 @@ export function deconflict(module: ScriptDependency) {
          continue;
       }
       
-      if (!UidGenerator.isConflicted(name)) {
+      if (!this._uidGenerator.isConflicted(name)) {
          continue;
       }
       
-      const newName = UidGenerator.generateBasedOnScope(
+      const newName = this._uidGenerator.generateBasedOnScope(
          binding.path.scope,
          name
       );
@@ -40,5 +38,5 @@ export function deconflict(module: ScriptDependency) {
       identifier.name = newName;
    }
 
-   UidGenerator.addReservedVars(...Object.keys(bindings));
+   this._uidGenerator.addReservedVars(...Object.keys(bindings));
 }

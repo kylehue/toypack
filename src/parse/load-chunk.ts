@@ -5,12 +5,12 @@ import {
    ERRORS,
    shouldProduceSourceMap,
 } from "../utils/index.js";
-import {
+import type {
    Asset,
    DependencyGraph,
    ResourceAsset,
    TextAsset,
-} from "../types.js";
+} from "src/types";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { createAsset } from "../utils/create-asset.js";
 import path from "path-browserify";

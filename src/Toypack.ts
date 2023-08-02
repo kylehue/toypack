@@ -6,6 +6,7 @@ import rawPlugin from "./build-plugins/raw-plugin.js";
 import importUrlPlugin from "./build-plugins/import-url-plugin.js";
 import importMetaPlugin from "./build-plugins/import-meta-plugin.js";
 import bundleDepsPlugin from "./build-plugins/bundle-deps-plugin.js";
+import autoDepsPlugin from "./build-plugins/auto-deps-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./parse/index.js";
@@ -17,7 +18,7 @@ import type {
    Plugin,
    TextAsset,
    Error,
-   ScriptDependency,
+   ScriptModule,
 } from "./types";
 import {
    ERRORS,
@@ -36,6 +37,8 @@ import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { cloneDeep, merge } from "lodash-es";
+import { UidTracker } from "./utils/UidTracker.js";
+import { UidGenerator } from "./utils/UidGenerator.js";
 
 let _lastId = 0;
 export class Toypack extends Hooks {
@@ -61,6 +64,8 @@ export class Toypack extends Hooks {
       info: [] as string[],
       verbose: [] as string[],
    };
+   protected _uidTracker = new UidTracker();
+   protected _uidGenerator = new UidGenerator();
    protected _virtualAssets = new Map<string, Asset>();
    protected _pluginManager = new PluginManager(this);
 
@@ -78,7 +83,8 @@ export class Toypack extends Hooks {
          rawPlugin(),
          importUrlPlugin(),
          importMetaPlugin(),
-         bundleDepsPlugin()
+         bundleDepsPlugin(),
+         autoDepsPlugin()
       );
 
       this.usePackageProvider({
@@ -162,7 +168,7 @@ export class Toypack extends Hooks {
       return this._getExtensions(type).includes(extension);
    }
 
-   protected _getPackageProviders() {
+   public getPackageProviders() {
       return this._packageProviders;
    }
 
@@ -171,10 +177,11 @@ export class Toypack extends Hooks {
     * @param source The source of the package to install.
     * @param version The version of the package to install. Defaults to
     * latest.
+    * @returns The installed package.
     */
    public async installPackage(source: string, version = "latest") {
       const pkg = await getPackage.call(this, source, version);
-      if (!pkg.assets.length) return;
+      if (!pkg.assets.length) return pkg;
 
       this._dependencies[pkg.name] = pkg.version;
 
@@ -217,6 +224,8 @@ export class Toypack extends Hooks {
       }
 
       this._trigger("onInstallPackage", pkg);
+
+      return pkg;
    }
 
    /**
@@ -431,6 +440,8 @@ export class Toypack extends Hooks {
       });
 
       this.clearCache();
+      this._uidGenerator.reset();
+      this._uidTracker.reset();
    }
 
    public clearCache() {
@@ -598,7 +609,7 @@ interface Cache {
          content?: string;
          map?: EncodedSourceMap | null;
          needsNamespace?: boolean;
-         module?: ScriptDependency;
+         module?: ScriptModule;
       }
    >;
 }

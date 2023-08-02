@@ -2,8 +2,6 @@ import generate from "@babel/generator";
 import template from "@babel/template";
 import { file, program } from "@babel/types";
 import MapConverter from "convert-source-map";
-import { DependencyGraph, ScriptDependency } from "../parse/index.js";
-import { UidTracker } from "./link/UidTracker.js";
 import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
 import { bindModules } from "./link/bind-modules.js";
@@ -11,12 +9,13 @@ import { cleanComments } from "./utils/clean-comments.js";
 import { resyncSourceMap } from "./utils/resync-source-map.js";
 import { createNamespace } from "./utils/create-namespace.js";
 import { formatEsm } from "./formats/esm.js";
-import { Toypack } from "../Toypack.js";
-import { ERRORS, isNodeModule } from "../utils/index.js";
+import { ERRORS } from "../utils/index.js";
 import runtime from "./runtime.js";
+import type { Toypack, DependencyGraph } from "src/types";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
+import { ScriptModule } from "src/types.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -40,7 +39,7 @@ import { codeFrameColumns } from "@babel/code-frame";
 
 export function getModules(graph: DependencyGraph) {
    return Object.values(Object.fromEntries(graph)).filter(
-      (g): g is ScriptDependency => g.type == "script"
+      (g): g is ScriptModule => g.isScriptModule()
    );
 }
 
@@ -48,18 +47,20 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const config = this.getConfig();
    const scriptModules = getModules(graph);
    const runtimesUsed = new Set<keyof typeof runtime>();
+   this._uidGenerator.addReservedVars(...Object.keys(runtime));
+   this._uidTracker.assignWithModules(this._uidGenerator, scriptModules);
+   this._uidGenerator.addReservedVars(...this._uidTracker.getAllNamespaces());
 
    const resultAst = file(program([]));
    try {
-      UidTracker.assignWithModules(scriptModules);
       for (const module of scriptModules) {
          const isCached = !!this._getCache("compiled", module.source)?.module;
          if (!isCached || module.asset.modified) {
             this._pushToDebugger("verbose", `Compiling "${module.source}"...`);
 
             // order matters here
-            transformToVars(module);
-            deconflict(module);
+            transformToVars.call(this, module);
+            deconflict.call(this, module);
             bindModules.call(this, graph, module);
             // module.ast.program.body = [{ type: "EmptyStatement" }];
             cleanComments(module);
@@ -83,7 +84,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
             continue;
          }
 
-         const statements = createNamespace(module);
+         const statements = createNamespace.call(this, module);
          const arr = Array.isArray(statements) ? statements : [statements];
          resultAst.program.body.unshift(...arr);
          runtimesUsed.add("__export");
@@ -97,7 +98,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       }
 
       // Format
-      formatEsm(resultAst, scriptModules);
+      formatEsm.call(this, resultAst, scriptModules);
    } catch (error: any) {
       this._pushToDebugger("error", ERRORS.bundle(error));
    }

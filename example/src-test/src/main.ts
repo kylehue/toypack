@@ -1,14 +1,14 @@
 // @ts-nocheck
 /* Package related tests */
-import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
+// import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 // import "../react";
-import "../vue";
-import confetti from "canvas-confetti";
-const meowButton = document.getElementById("meow");
-meowButton.onclick = () => confetti();
-import * as Vue from "vue";
-console.log(Vue);
+// import "../vue";
+// import confetti from "https://esm.sh/canvas-confetti";
+// const meowButton = document.getElementById("meow");
+// meowButton.onclick = () => confetti();
+// import * as Vue from "vue";
+// console.log(Vue);
 
 /* Bundler test */
 // import pkgjson from "../package";
@@ -22,20 +22,27 @@ console.log(Vue);
 // console.log(o, bar, test);
 // import counter, { Adder, dog as goodBoy } from "./testing.mjs";
 // console.log(counter, Adder, goodBoy);
-// // import a, {add} from "../classes/createNum2";
-// // console.log(a, add);
+// import a, {add} from "../classes/createNum2";
+// console.log(a, add);
 // export default 123;
 // export { counter, Adder };
 // export { dog } from "./testing.mjs";
 // export * as NM from "../classes/createNum2";
 // export * from "../classes/createNum2";
 
-
+// import isOdd from "is-odd";
+// // import isOdd from "https://esm.sh/is-odd";
 // import a, {add} from "../classes/createNum2";
-// console.log(a, add);
+// console.log(a, add, isOdd(3));
+
+// export { isOdd };
 
 
-// import cpath, { resolve as cresolve } from "path-browserify";
+
+import {dog, superCoolBook, coolLibrary, createNum} from "./testing.mjs";
+console.log(dog, superCoolBook, coolLibrary, createNum);
+
+
 // import * as crpath from "path-browserify";
 
 // const indexJs = 123;

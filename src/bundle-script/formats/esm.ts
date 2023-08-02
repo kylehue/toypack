@@ -16,16 +16,23 @@ import {
    importSpecifier,
    stringLiteral,
 } from "@babel/types";
-import { ScriptDependency } from "src/parse";
 import { getLibImports } from "../utils/get-lib-imports";
-import { UidGenerator } from "../link/UidGenerator";
-import { UidTracker } from "../link/UidTracker";
+import {
+   getIdWithError,
+   getNamespaceWithError,
+   resolveWithError,
+} from "../utils/get-with-error";
+import type { ScriptModule, Toypack } from "src/types";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
 }
 
-export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
+export function formatEsm(
+   this: Toypack,
+   ast: File,
+   scriptModules: ScriptModule[]
+) {
    const body = ast.program.body;
    const libImports = getLibImports(scriptModules);
    const importDecls: Record<
@@ -38,8 +45,6 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
 
    // Add each modules' imports
    for (const [source, importInfos] of Object.entries(libImports)) {
-      const idMap: Record<string, string> = {};
-      const namespaceMap: Record<string, string> = {};
       const specifiers: Record<
          string,
          ImportDefaultSpecifier | ImportNamespaceSpecifier | ImportSpecifier
@@ -60,28 +65,18 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
          const local = specifier.local.name;
          if (type == "specifier") {
             const imported = getStringOrIdValue(specifier.imported);
-            const id = (idMap[imported] ??= UidGenerator.generateBasedOnScope(
-               importInfo.path.scope,
-               imported
-            ));
+            const id = getIdWithError.call(this, importInfo.source, imported);
             scope.rename(local, id);
             specifiers[id] = importSpecifier(
                identifier(id),
                specifier.imported
             );
          } else if (type == "default") {
-            const id = (idMap["default"] ??= UidGenerator.generateBasedOnScope(
-               importInfo.path.scope,
-               source.split("/")[0] + "_default"
-            ));
+            const id = getIdWithError.call(this, importInfo.source, "default");
             scope.rename(local, id);
             specifiers[id] = importDefaultSpecifier(identifier(id));
          } else if (type == "namespace") {
-            const id = (namespaceMap[source] ??=
-               UidGenerator.generateBasedOnScope(
-                  importInfo.path.scope,
-                  source.split("/")[0]
-               ));
+            const id = getNamespaceWithError.call(this, source);
             scope.rename(local, id);
             importDecls[source].namespace ??= importDeclaration(
                [importNamespaceSpecifier(identifier(id))],
@@ -116,7 +111,7 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
       ...Object.values(entry.exports.aggregatedNamespace),
    ].forEach((exportInfo) => {
       const { type, path } = exportInfo;
-      const id = UidTracker.get(entry.source, exportInfo.name);
+      const id = getIdWithError.call(this, entry.source, exportInfo.name);
       if (!id) return;
       if (
          type == "declared" ||
@@ -142,9 +137,9 @@ export function formatEsm(ast: File, scriptModules: ScriptDependency[]) {
 
    Object.values(entry.exports.aggregatedAll).forEach((exportInfo) => {
       const { source } = exportInfo;
-      const resolved = entry.dependencyMap[source];
-      const aggrExports = UidTracker.getModuleExports(resolved);
-      for (const [name, id] of Object.entries(aggrExports)) {
+      const resolved = resolveWithError(entry, source);
+      const aggrExports = this._uidTracker.getModuleExports(resolved);
+      for (const [name, id] of aggrExports) {
          if (name == "default") continue;
          exportSpecifiers[id] = exportSpecifier(
             identifier(id),

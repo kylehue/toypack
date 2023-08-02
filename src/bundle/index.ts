@@ -1,8 +1,7 @@
-import { Toypack } from "../Toypack.js";
-import { DependencyGraph, ImportMapConfig } from "../types";
 import { bundleScript } from "../bundle-script/index.js";
 import { bundleStyle } from "../bundle-style/bundle-style.js";
 import { getUsableResourcePath } from "../utils";
+import type { DependencyGraph, ImportMapConfig, Toypack } from "src/types";
 
 let previousScriptUrl: string | undefined = undefined;
 let previousLinkUrl: string | undefined = undefined;

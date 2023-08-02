@@ -69,7 +69,10 @@ export const defaultConfig = {
        * @default "auto"
        */
       includeDeps: "auto",
-      importMap: {} as ImportMapConfig,
+      importMap: {
+         imports: {},
+         scopes: {},
+      } as ImportMapConfig,
    },
    /**
     * Configuration for the parser.

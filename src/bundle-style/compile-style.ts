@@ -1,6 +1,8 @@
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MapConverter from "convert-source-map";
 import * as CSSTree from "css-tree";
-import { Toypack } from "../Toypack.js";
+import path from "path-browserify";
+import { SourceMapGenerator } from "source-map-js";
 import {
    getUsableResourcePath,
    isLocal,
@@ -8,16 +10,9 @@ import {
    mergeSourceMaps,
    shouldProduceSourceMap,
 } from "../utils/index.js";
-import { DependencyGraph, StyleDependency } from "../types.js";
-import path from "path-browserify";
-import { EncodedSourceMap } from "@jridgewell/gen-mapping";
-import { SourceMapGenerator } from "source-map-js";
+import type { StyleModule, Toypack } from "src/types";
 
-export function compileStyle(
-   this: Toypack,
-   chunk: StyleDependency,
-   graph: DependencyGraph
-) {
+export function compileStyle(this: Toypack, chunk: StyleModule) {
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(
@@ -77,7 +72,9 @@ export function compileStyle(
 
    let map: EncodedSourceMap | null = null;
    if (shouldMap && typeof compiled != "string" && compiled.map) {
-      map = MapConverter.fromJSON(compiled.map.toString()).toObject() as EncodedSourceMap;
+      map = MapConverter.fromJSON(
+         compiled.map.toString()
+      ).toObject() as EncodedSourceMap;
       map.sourcesContent = [chunk.content];
       map.sources = [chunk.source];
       if (chunk.map) {

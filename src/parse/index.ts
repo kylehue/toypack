@@ -1,10 +1,6 @@
-import { File, Program } from "@babel/types";
 import { codeFrameColumns } from "@babel/code-frame";
-import { CssNode, Url } from "css-tree";
 import path from "path-browserify";
-import { EncodedSourceMap } from "@jridgewell/gen-mapping";
-import Toypack from "../Toypack.js";
-import { TextAsset, Asset, ResourceAsset } from "../types.js";
+import type { TextAsset, Toypack } from "src/types";
 import {
    ERRORS,
    escapeRegex,
@@ -13,13 +9,13 @@ import {
    isUrl,
    parseURL,
 } from "../utils/index.js";
+import { ParseInfo } from "../plugin/hook-types.js";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
-import { ParseInfo } from "../plugin/hook-types.js";
-import { Exports } from "src/parse/extract-exports.js";
-import { Imports } from "src/parse/extract-imports.js";
-import { NodePath } from "@babel/traverse";
+import { ResourceModule } from "./classes/ResourceModule.js";
+import { ScriptModule } from "./classes/ScriptModule.js";
+import { StyleModule } from "./classes/StyleModule.js";
 
 function getImportPosition(content: string, importSource: string) {
    let index: number | null = null;
@@ -106,7 +102,7 @@ async function loadAndParse(
  */
 function maintainImportOrder(
    graph: DependencyGraph,
-   importer: ScriptDependency | StyleDependency,
+   importer: ScriptModule | StyleModule,
    importedSource: string
 ) {
    const current = graph.get(importedSource)!;
@@ -116,11 +112,11 @@ function maintainImportOrder(
    if (indexOfImporter > indexOfCurrent) {
       arr.splice(indexOfCurrent, 1);
       arr.splice(indexOfImporter, 0, current);
-   }
 
-   graph.clear();
-   for (const dep of arr) {
-      graph.set(dep.source, dep);
+      graph.clear();
+      for (const dep of arr) {
+         graph.set(dep.source, dep);
+      }
    }
 }
 
@@ -133,7 +129,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const importersMap: Record<string, Importers> = {};
    const recurse = async (
       rawSource: string,
-      previous: ScriptDependency | StyleDependency | null
+      previous: ScriptModule | StyleModule | null
    ) => {
       importersMap[rawSource] ??= {};
       if (previous) {
@@ -163,9 +159,9 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
       if (!loaded) return;
 
-      let chunk: ScriptDependency | StyleDependency | ResourceDependency;
+      let chunk: ScriptModule | StyleModule | ResourceModule;
       if (loaded.type == "resource") {
-         chunk = createChunk(rawSource, loaded, importers, undefined, isEntry);
+         chunk = createModule(rawSource, loaded, importers, undefined, isEntry);
          graph.set(rawSource, chunk);
          /**
           * Resources doesn't have dependencies so we can skip all
@@ -178,7 +174,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          throw new Error(`Failed to parse '${rawSource}'.`);
       }
 
-      chunk = createChunk(rawSource, loaded, importers, parsed, isEntry);
+      chunk = createModule(rawSource, loaded, importers, parsed, isEntry);
       graph.set(rawSource, chunk);
 
       // Trigger parsed hook
@@ -218,19 +214,15 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             },
             callback(result) {
                if (result) {
-                  // Resync the imports/exports
-                  if (chunk.type == "script") {
-                     // resyncSources(chunk, resolved, result);
-                  }
-
                   resolved = result;
                }
             },
          });
 
          // skip externals
-         if (!isLocal(resolved)) continue;
-         if (isUrl(resolved)) continue;
+         if (!isLocal(resolved) || isUrl(resolved)) {
+            continue;
+         }
 
          // If not a virtual module, resolve source with bundler
          if (!resolved.startsWith("virtual:")) {
@@ -267,7 +259,10 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
           * to avoid duplicates.
           */
          const rawQuery = depSource.split("?")[1];
-         chunk.dependencyMap[depSource] = resolved.split("?")[0] + parsed.query;
+         chunk.dependencyMap.set(
+            depSource,
+            resolved.split("?")[0] + parsed.query
+         );
          await recurse(
             resolved.split("?")[0] + (rawQuery ? "?" + rawQuery : ""),
             chunk
@@ -279,36 +274,14 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    return graph;
 }
 
-function resyncSources(
-   module: ScriptDependency,
-   oldSource: string,
-   newSource: string
-) {
-   const sourcedPorts = [
-      ...Object.values(module.imports.default),
-      ...Object.values(module.imports.dynamic),
-      ...Object.values(module.imports.namespace),
-      ...Object.values(module.imports.sideEffect),
-      ...Object.values(module.imports.specifier),
-      ...Object.values(module.exports.aggregatedAll),
-      ...Object.values(module.exports.aggregatedName),
-      ...Object.values(module.exports.aggregatedNamespace),
-   ];
-
-   for (const port of sourcedPorts) {
-      if (port.source !== oldSource) continue;
-      port.source = newSource;
-   }
-}
-
-function createChunk<
+function createModule<
    T extends LoadChunkResult,
    K extends ParsedScriptResult | ParsedStyleResult,
    R extends T extends LoadChunkResource
-      ? ResourceDependency
+      ? ResourceModule
       : K extends ParsedScriptResult
-      ? ScriptDependency
-      : StyleDependency
+      ? ScriptModule
+      : StyleModule
 >(
    source: string,
    loaded: T,
@@ -316,31 +289,12 @@ function createChunk<
    parsed?: K,
    isEntry?: boolean
 ): R {
-   let chunk: ScriptDependency | StyleDependency | ResourceDependency;
-   const allCommon = {
-      source,
-      importers,
-      lang: loaded.lang,
-   };
+   let chunk: ScriptModule | StyleModule | ResourceModule;
 
    if (loaded.type == "resource") {
-      chunk = {
-         ...allCommon,
-         type: "resource",
-         asset: loaded.asset,
-      };
-
+      chunk = new ResourceModule(loaded.asset, source, loaded.lang, importers);
       return chunk as R;
    }
-
-   const textCommon = {
-      ...allCommon,
-      asset: loaded.asset,
-      content: loaded.content,
-      dependencyMap: {},
-      map: loaded.map,
-      isEntry: isEntry || false,
-   };
 
    if (!parsed) {
       throw new Error(
@@ -349,21 +303,31 @@ function createChunk<
    }
 
    if (parsed.type == "script") {
-      chunk = {
-         ...textCommon,
-         type: "script",
-         ast: parsed.ast,
-         exports: parsed.exports,
-         imports: parsed.imports,
-         programPath: parsed.programPath,
-      };
+      chunk = new ScriptModule(
+         loaded.asset,
+         source,
+         loaded.content,
+         loaded.lang,
+         importers,
+         parsed.ast,
+         isEntry,
+         parsed.exports,
+         parsed.imports,
+         parsed.programPath,
+         loaded.map
+      );
    } else {
-      chunk = {
-         ...textCommon,
-         type: "style",
-         ast: parsed.ast,
-         urlNodes: parsed.urlNodes,
-      };
+      chunk = new StyleModule(
+         loaded.asset,
+         source,
+         loaded.content,
+         loaded.lang,
+         importers,
+         parsed.ast,
+         isEntry,
+         parsed.urlNodes,
+         loaded.map
+      );
    }
 
    return chunk as R;
@@ -399,47 +363,6 @@ export async function getDependencyGraph(this: Toypack) {
    return await getGraphRecursive.call(this, entryAsset);
 }
 
-interface DependencyBase {
-   type: "script" | "style" | "resource";
-   source: string;
-   importers: Importers;
-   lang: string;
-}
-
-export type Importers = Record<string, ScriptDependency | StyleDependency>;
-
-export interface ScriptDependency extends DependencyBase {
-   type: "script";
-   ast: File;
-   content: string;
-   dependencyMap: Record<string, string>;
-   asset: Asset;
-   map?: EncodedSourceMap | null;
-   isEntry: boolean;
-   exports: Exports;
-   imports: Imports;
-   programPath: NodePath<Program>;
-}
-
-export interface StyleDependency extends DependencyBase {
-   type: "style";
-   ast: CssNode;
-   content: string;
-   dependencyMap: Record<string, string>;
-   asset: Asset;
-   map?: EncodedSourceMap | null;
-   isEntry: boolean;
-   urlNodes: Url[];
-}
-
-export interface ResourceDependency extends DependencyBase {
-   type: "resource";
-   asset: ResourceAsset;
-}
-
-export type Dependency =
-   | ScriptDependency
-   | StyleDependency
-   | ResourceDependency;
-
+export type Importers = Record<string, ScriptModule | StyleModule>;
+export type Dependency = ScriptModule | StyleModule | ResourceModule;
 export type DependencyGraph = Map<string, Dependency>;

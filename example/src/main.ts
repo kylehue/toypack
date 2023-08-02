@@ -52,11 +52,12 @@ const toypack = new ToypackESM({
 // await toypack.installPackage("react");
 // await toypack.installPackage("vue", "3.1.2");
 // await toypack.installPackage("matter-js");
-await toypack.installPackage("vue");
 // await toypack.installPackage("react", "18");
 // await toypack.installPackage("react-dom/client", "18");
-await toypack.installPackage("canvas-confetti");
-await toypack.installPackage("path-browserify");
+// await toypack.installPackage("vue");
+// await toypack.installPackage("canvas-confetti");
+// await toypack.installPackage("path-browserify");
+// await toypack.installPackage("is-odd");
 
 (window as any).toypack = toypack;
 console.log(toypack);

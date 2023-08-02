@@ -10,6 +10,7 @@
          console.log(add(3, 4));
       </script>
       <style>
+         @import "https://esm.sh/bootstrap@5.3.0/dist/css/bootstrap.min.css";
          #cat {
             background: url(./images/kitty-cat-sandwich.gif);
          }
@@ -22,9 +23,7 @@
       <script type="importmap">
          {
             "imports": {
-               "path-browserify": "https://esm.sh/path-browserify",
-               "vue": "https://esm.sh/vue",
-               "canvas-confetti": "https://esm.sh/canvas-confetti"
+               "path-browserify": "https://esm.sh/path-browserify"
             }
          }
       </script>
@@ -32,7 +31,7 @@
    </head>
    <body class="cool">
       <div id="cat">
-         <button id="meow" style="cursor: pointer">
+         <button id="meow" class="w-50" style="cursor: pointer">
             <i class="bi bi-emoji-heart-eyes-fill"></i>
             Meow!
          </button>

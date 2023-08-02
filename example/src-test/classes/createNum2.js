@@ -27,6 +27,6 @@ var defs = 123;
 function go(defs_0) {
    console.log(defs);
 }
-
+// import cpath, { resolve as cresolve } from "/node_modules/testing";
 
 // export default defs;

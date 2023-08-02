@@ -1,18 +1,19 @@
-import { Asyncify } from "type-fest";
-import {
-   DependencyGraph,
-   Importers,
-   ScriptDependency,
-   StyleDependency,
-} from "../parse/index.js";
-import { Toypack } from "../Toypack.js";
+import { TraverseOptions } from "@babel/traverse";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
-import { BundleResult } from "../types";
+import { Asyncify } from "type-fest";
+import { Importers } from "../parse/index.js";
+import { Toypack } from "../Toypack.js";
 import { ParsedScriptResult } from "../parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "../parse/parse-style-chunk.js";
-import { LoadResult, ModuleInfo } from "../parse/load-chunk.js";
 import { SpecifierOptions } from "../utils/get-import-code.js";
-import { TraverseOptions } from "@babel/traverse";
+import type {
+   StyleModule,
+   ScriptModule,
+   DependencyGraph,
+   BundleResult,
+   LoadResult,
+   ModuleInfo,
+} from "src/types";
 
 // Interfaces
 export interface ScriptTransformContext {
@@ -32,12 +33,12 @@ export interface StyleTransformContext {
 export type ParseInfo =
    | {
         type: "script";
-        chunk: ScriptDependency;
+        chunk: ScriptModule;
         parsed: ParsedScriptResult;
      }
    | {
         type: "style";
-        chunk: StyleDependency;
+        chunk: StyleModule;
         parsed: ParsedStyleResult;
      };
 
@@ -111,7 +112,7 @@ export interface PluginContext extends PluginContextBase {
     * Returns the module that imported the current module. If it's the
     * entry, then it will return undefined.
     */
-   getCurrentImporter: () => ScriptDependency | StyleDependency | undefined;
+   getCurrentImporter: () => ScriptModule | StyleModule | undefined;
    /** Returns true if the current module should have source maps or not. */
    shouldMap: () => boolean;
    /** Pre-loads an asset. */

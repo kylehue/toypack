@@ -1,12 +1,16 @@
-import { ScriptDependency } from "src/types";
-import { UidTracker } from "../link/UidTracker";
 import template from "@babel/template";
+import { getNamespaceWithError } from "./get-with-error";
+import type { ScriptModule, Toypack } from "src/types";
 
-export function createNamespace(module: ScriptDependency) {
-   const name = UidTracker.getNamespaceFor(module.source);
-   const exports = Object.entries(
-      UidTracker.getModuleExports(module.source)
-   );
+export function createNamespace(this: Toypack, module: ScriptModule) {
+   const name = getNamespaceWithError.call(this, module.source);
+   const exportsMap = this._uidTracker.getModuleExports(module.source);
+
+   if (!exportsMap) {
+      throw new Error(`No exports map found for '${module.source}'.`);
+   }
+
+   const exports = Object.entries(Object.fromEntries(exportsMap));
 
    const exportObject =
       "{\n" +

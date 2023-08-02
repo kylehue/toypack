@@ -1,11 +1,9 @@
-import { ScriptDependency } from "src/parse";
-import { UidGenerator } from "./UidGenerator";
-import { getModulesMap } from "../utils/get-module-map";
+import type { ScriptModule, Toypack } from "src/types";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.
  */
-export function transformToVars(module: ScriptDependency) {
+export function transformToVars(this: Toypack, module: ScriptModule) {
    const bindings = Object.values(module.programPath.scope.getAllBindings());
 
    for (const binding of bindings) {
@@ -25,7 +23,10 @@ export function transformToVars(module: ScriptDependency) {
          if (hasConflict && !isSameScope) {
             scope.rename(
                id.name,
-               UidGenerator.generateBasedOnScope(binding.path.scope, id.name)
+               this._uidGenerator.generateBasedOnScope(
+                  binding.path.scope,
+                  id.name
+               )
             );
          }
       });
