@@ -31,7 +31,8 @@ export function deconflict(this: Toypack, module: ScriptModule) {
       
       const newName = this._uidGenerator.generateBasedOnScope(
          binding.path.scope,
-         name
+         name,
+         binding
       );
       
       scope.rename(name, newName);

@@ -1,4 +1,4 @@
-import { Scope } from "@babel/traverse";
+import { Binding, Scope } from "@babel/traverse";
 import { camelCase } from "lodash-es";
 
 export class UidGenerator {
@@ -23,13 +23,16 @@ export class UidGenerator {
       this._reservedVars = new Set([...this._reservedVars, ...vars]);
    }
 
-   public generateBasedOnScope(scope: Scope, name?: string) {
+   public generateBasedOnScope(scope: Scope, name?: string, binding?: Binding) {
       let generated = this.generate(name);
 
-      let isTaken = scope.hasBinding(generated) || this.isConflicted(generated);
-      while (isTaken) {
+      const isTaken = () =>
+         scope.hasBinding(generated) ||
+         this.isConflicted(generated) ||
+         !!binding?.referencePaths.find((x) => x.scope.hasBinding(generated));
+      
+      while (isTaken()) {
          generated = this.generate(name);
-         isTaken = scope.hasBinding(generated) || this.isConflicted(generated);
       }
 
       this._reservedVars.add(generated);

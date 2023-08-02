@@ -25,7 +25,8 @@ export function transformToVars(this: Toypack, module: ScriptModule) {
                id.name,
                this._uidGenerator.generateBasedOnScope(
                   binding.path.scope,
-                  id.name
+                  id.name,
+                  binding
                )
             );
          }
