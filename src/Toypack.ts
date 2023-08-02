@@ -278,7 +278,8 @@ export class Toypack extends Hooks {
    }
 
    public resetConfig() {
-      this.setConfig(cloneDeep(defaultConfig));
+      this._config = cloneDeep(defaultConfig);
+      this.setConfig({}); // to update the hash
    }
 
    public getAssetSources() {
