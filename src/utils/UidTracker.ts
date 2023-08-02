@@ -157,16 +157,24 @@ export class UidTracker {
 
          exports.forEach((exportInfo) => {
             const { type } = exportInfo;
-            let name: string | undefined, id: string | undefined;
-            if (type == "declared") {
-               name = exportInfo.name;
-               id = name == "default" ? createDefaultName(module.source) : name;
-            } else if (
+            let name: string | undefined;
+            if (
+               type == "declared" ||
                type == "declaredDefault" ||
                type == "declaredDefaultExpression"
             ) {
-               name = "default";
-               id = createDefaultName(module.source);
+               name = exportInfo.name;
+               if (!idMap.has(name)) {
+                  idMap.set(
+                     name,
+                     uidGenerator.generateBasedOnScope(
+                        exportInfo.path.scope,
+                        name == "default"
+                           ? createDefaultName(module.source)
+                           : name
+                     )
+                  );
+               }
             } else {
                const { source } = exportInfo;
                const resolved = module.dependencyMap.get(source);
@@ -176,16 +184,10 @@ export class UidTracker {
                }
 
                name = exportInfo.specifier.exported.name;
-               id = this.getNamespaceFor(resolved);
-            }
-
-            if (!idMap.has(name)) {
-               const assignedId = uidGenerator.generateBasedOnScope(
-                  exportInfo.path.scope,
-                  id
-               );
-
-               idMap.set(name, assignedId);
+               idMap.set(name, {
+                  to: resolved,
+                  name: symbols.namespace,
+               });
             }
 
             /**
