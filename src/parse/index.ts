@@ -97,30 +97,6 @@ async function loadAndParse(
 }
 
 /**
- * Re-orders graph when needed. It assures that the imported module's
- * position in the graph is before the importer's position.
- */
-function maintainImportOrder(
-   graph: DependencyGraph,
-   importer: ScriptModule | StyleModule,
-   importedSource: string
-) {
-   const current = graph.get(importedSource)!;
-   const arr = Object.values(Object.fromEntries(graph));
-   const indexOfImporter = arr.indexOf(importer);
-   const indexOfCurrent = arr.indexOf(current);
-   if (indexOfImporter > indexOfCurrent) {
-      arr.splice(indexOfCurrent, 1);
-      arr.splice(indexOfImporter, 0, current);
-
-      graph.clear();
-      for (const dep of arr) {
-         graph.set(dep.source, dep);
-      }
-   }
-}
-
-/**
  * Recursively get the dependency graph of an asset.
  */
 async function getGraphRecursive(this: Toypack, entry: TextAsset) {
@@ -131,22 +107,14 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       rawSource: string,
       previous: ScriptModule | StyleModule | null
    ) => {
-      importersMap[rawSource] ??= {};
+      importersMap[rawSource] ??= new Map();
       if (previous) {
-         importersMap[rawSource][previous.source] = previous;
+         importersMap[rawSource].set(previous.source, previous);
       }
 
       const importers = importersMap[rawSource];
 
-      if (graph.has(rawSource)) {
-         /**
-          * If it's already in the graph, we have to skip BUT we also have
-          * to re-order.
-          */
-         if (!previous) return;
-         maintainImportOrder(graph, previous, rawSource);
-         return;
-      }
+      if (graph.has(rawSource)) return;
 
       const isEntry = rawSource === entry.source;
       const { loaded, parsed } = await loadAndParse.call(
@@ -170,9 +138,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          return;
       }
 
-      if (!parsed) {
-         throw new Error(`Failed to parse '${rawSource}'.`);
-      }
+      if (!parsed) return;
 
       chunk = createModule(rawSource, loaded, importers, parsed, isEntry);
       graph.set(rawSource, chunk);
@@ -204,12 +170,14 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          const parsed = parseURL(depSource);
          let resolved: string = depSource;
          // Resolve source with plugins
+         const importers: Importers = new Map();
+         importers.set(chunk.source, chunk);
          await this._pluginManager.triggerHook({
             name: "resolve",
             args: () => [resolved],
             context: {
                graph,
-               importers: { [chunk.source]: chunk },
+               importers,
                source: resolved,
             },
             callback(result) {
@@ -271,7 +239,46 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    };
 
    await recurse(entry.source, null);
+   fixGraphOrder(graph);
    return graph;
+}
+
+/**
+ * Check if `x` (or any of its depedencies) is dependent to `source`.
+ */
+function isDependent(x: ScriptModule | StyleModule, source: string) {
+   if (x.importers.has(source)) {
+      return true;
+   } else {
+      for (const [_, module] of x.importers) {
+         return isDependent(module, source);
+      }
+   }
+
+   return false;
+}
+
+function fixGraphOrder(graph: DependencyGraph) {
+   const deps = Object.values(Object.fromEntries(graph));
+
+   const ordered = deps.sort((a, b) => {
+      if (a.isResource() || b.isResource()) return 0;
+
+      if (isDependent(a, b.source)) {
+         return 1;
+      }
+
+      if (isDependent(b, a.source)) {
+         return -1;
+      }
+
+      return 0;
+   });
+
+   graph.clear();
+   for (const module of ordered) {
+      graph.set(module.source, module);
+   }
 }
 
 function createModule<
@@ -363,6 +370,6 @@ export async function getDependencyGraph(this: Toypack) {
    return await getGraphRecursive.call(this, entryAsset);
 }
 
-export type Importers = Record<string, ScriptModule | StyleModule>;
+export type Importers = Map<string, ScriptModule | StyleModule>;
 export type Dependency = ScriptModule | StyleModule | ResourceModule;
 export type DependencyGraph = Map<string, Dependency>;

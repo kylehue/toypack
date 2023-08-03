@@ -36,10 +36,12 @@ it("should have proper order (simple)", async () => {
    toypack.addOrUpdateAsset("D.js", ``);
 
    const graph: DependencyGraph = await getDependencyGraph.call(toypack);
-
-   const expectedOrder = ["/A.js", "/C.js", "/B.js", "/D.js"];
-   const receivedOrder = Object.keys(Object.fromEntries(graph));
-   expect(receivedOrder).toEqual(expectedOrder);
+   expect(Object.keys(Object.fromEntries(graph))).toEqual([
+      "/A.js",
+      "/C.js",
+      "/B.js",
+      "/D.js",
+   ]);
 });
 
 it("should have proper order (complex)", async () => {
@@ -84,12 +86,14 @@ it("should have proper order (complex)", async () => {
    );
 
    const graph: DependencyGraph = await getDependencyGraph.call(toypack);
-
-   const expectedOrder = ["/A.js", "/B.js", "/F.js", "/C.js", "/D.js", "/E.js"];
-   const receivedOrder = Object.keys(Object.fromEntries(graph));
-   console.log(receivedOrder);
-
-   expect(receivedOrder).toEqual(expectedOrder);
+   expect(Object.keys(Object.fromEntries(graph))).toEqual([
+      "/A.js",
+      "/B.js",
+      "/F.js",
+      "/C.js",
+      "/D.js",
+      "/E.js",
+   ]);
 });
 
 it("should re-order", async () => {
@@ -127,5 +131,56 @@ it("should re-order", async () => {
       "/A.js",
       "/B.js",
       "/C.js",
+   ]);
+});
+
+it("should re-order (with deps)", async () => {
+   toypack.addOrUpdateAsset(
+      "A.js",
+      `
+      import "./B.js";
+      import "/node_modules/vue/index.js";
+      `
+   );
+
+   toypack.addOrUpdateAsset(
+      "B.js",
+      `
+      import "/node_modules/vue/index.js";
+      `
+   );
+
+   toypack.addOrUpdateAsset(
+      "/node_modules/vue/index.js",
+      `
+      import "/node_modules/vue/runtime-dom.js";
+      `
+   );
+
+   toypack.addOrUpdateAsset(
+      "/node_modules/vue/runtime-dom.js",
+      `
+      import "/node_modules/vue/runtime-core.js";
+      import "/node_modules/vue/shared.js";
+      `
+   );
+   toypack.addOrUpdateAsset(
+      "/node_modules/vue/runtime-core.js",
+      `
+      import "/node_modules/vue/shared.js";
+      `
+   );
+   toypack.addOrUpdateAsset("/node_modules/vue/shared.js", ``);
+
+   const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+   console.log(Object.keys(Object.fromEntries(graph)));
+
+   expect(Object.keys(Object.fromEntries(graph))).toEqual([
+      "/A.js",
+      "/B.js",
+      "/node_modules/vue/index.js",
+      "/node_modules/vue/runtime-dom.js",
+      "/node_modules/vue/runtime-core.js",
+      "/node_modules/vue/shared.js",
    ]);
 });
