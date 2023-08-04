@@ -14,7 +14,7 @@ export class UidGenerator {
    public generate(name = "temp") {
       name = removeLeadingNums(name);
       name = camelCase(name);
-      let generated = name;
+      let generated = name || "_";
       this._idCountMap[name] ??= -1;
       if (this._idCountMap[name] >= 0) {
          generated = name + "_" + this._idCountMap[name];
