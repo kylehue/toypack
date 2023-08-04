@@ -161,12 +161,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       });
 
       // Scan dependency's dependencies recursively
-      /**
-       * We need to reverse the deps so that we can get the proper order
-       * of import hierarchy.
-       */
-      const orderedDeps = [...parsed.dependencies].reverse();
-      for (const depSource of orderedDeps) {
+      for (const depSource of parsed.dependencies) {
          const parsed = parseURL(depSource);
          let resolved: string = depSource;
          // Resolve source with plugins
@@ -259,24 +254,31 @@ function isDependent(x: ScriptModule | StyleModule, source: string) {
 }
 
 function fixGraphOrder(graph: DependencyGraph) {
-   const deps = Object.values(Object.fromEntries(graph));
+   const visitedModules = new Set<string>();
+   const sortedModules: Dependency[] = [];
 
-   const ordered = deps.sort((a, b) => {
-      if (a.isResource() || b.isResource()) return 0;
-
-      if (isDependent(a, b.source)) {
-         return 1;
+   function depthFirstSearch(module: Dependency) {
+      if (visitedModules.has(module.source)) {
+         return;
       }
 
-      if (isDependent(b, a.source)) {
-         return -1;
+      visitedModules.add(module.source);
+
+      for (const [_, importer] of module.importers) {
+         depthFirstSearch(importer);
       }
 
-      return 0;
-   });
+      sortedModules.push(module);
+   }
 
+   const modules = Object.values(Object.fromEntries(graph));
+   for (const module of modules) {
+      if (visitedModules.has(module.source)) continue;
+      depthFirstSearch(module);
+   }
+   
    graph.clear();
-   for (const module of ordered) {
+   for (const module of sortedModules) {
       graph.set(module.source, module);
    }
 }
