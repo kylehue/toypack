@@ -7,15 +7,15 @@ export type ModuleType = "script" | "style" | "resource";
 export class Module {
    constructor(public type: ModuleType) {}
 
-   isScriptModule(): this is ScriptModule {
+   isScript(): this is ScriptModule {
       return this.type == "script";
    }
 
-   isStyleModule(): this is StyleModule {
+   isStyle(): this is StyleModule {
       return this.type == "style";
    }
 
-   isResourceModule(): this is ResourceModule {
+   isResource(): this is ResourceModule {
       return this.type == "resource";
    }
 }

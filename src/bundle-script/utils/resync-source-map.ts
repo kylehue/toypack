@@ -10,12 +10,15 @@ import {
    generatedPositionFor,
    sourceContentFor,
 } from "@jridgewell/trace-mapping";
-import type { ScriptModule } from "src/types";
+import { shouldProduceSourceMap } from "../../utils";
+import type { ScriptModule, Toypack } from "src/types";
 
 export function resyncSourceMap(
+   this: Toypack,
    map: SourceMapInput,
    scriptModules: ScriptModule[]
 ) {
+   const config = this.getConfig();
    const mergedMapGenerator = new GenMapping();
    const generatedMap = new TraceMap(map);
    const unmappedScripts: Record<string, string> = {};
@@ -23,10 +26,12 @@ export function resyncSourceMap(
       const sourceMap =
          (module.asset.type == "text" ? module.asset.map : null) || module.map;
       if (!sourceMap || (sourceMap && !sourceMap.mappings.length)) {
-         unmappedScripts[module.source] = module.content;
+         if (shouldProduceSourceMap(module.source, config.bundle.sourceMap)) {
+            unmappedScripts[module.source] = module.content;
+         }
          continue;
       }
-      
+
       const traceMap = new TraceMap(sourceMap);
       let lastCol = 0;
       eachMapping(traceMap, (map) => {
@@ -41,7 +46,7 @@ export function resyncSourceMap(
          if (lastCol == genPos.column) return;
 
          if (genPos.line == null) return;
-         
+
          maybeAddMapping(mergedMapGenerator, {
             generated: {
                line: genPos.line,

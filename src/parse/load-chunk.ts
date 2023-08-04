@@ -50,7 +50,7 @@ export async function loadChunk(
    }
 
    const lang = path.extname(rawSource.split("?")[0]).replace(".", "");
-   const moduleInfo = getModuleInfo(type, rawSource, isEntry, asset, lang);
+   const moduleInfo = createModuleInfo(type, rawSource, isEntry, asset, lang);
    const config = this.getConfig();
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(rawSource, sourceMapConfig);
@@ -159,7 +159,7 @@ function appendLangToRawSource(rawSource: string, moduleInfo: ModuleInfo) {
    return moduleInfo.lang ? `${source}.${moduleInfo.lang}?${query}` : rawSource;
 }
 
-function getModuleInfo(
+function createModuleInfo(
    type: "script" | "style" | "resource" | "virtual",
    source: string,
    isEntry: boolean,

@@ -16,6 +16,7 @@ export default "Default expression!";
 
 const test = 4;
 export { test };
+export const test1 = 23;
    
 // const defs = 123;
 // if (true) {
@@ -24,9 +25,11 @@ export { test };
 // }
 
 var defs = 123;
-function go(defs_0) {
-   console.log(defs);
+function go(defs_0, defs_1) {
+   defs = 45;
+   // console.log(defs);
 }
+var defs_2 = 123;
+export { createNum as cnum };
 // import cpath, { resolve as cresolve } from "/node_modules/testing";
-
 // export default defs;

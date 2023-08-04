@@ -16,7 +16,7 @@ import type { Toypack, DependencyGraph } from "src/types";
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
 import { ScriptModule } from "src/types.js";
-import { startRename } from "./utils/rename-binding.js";
+import { startRename } from "./utils/renamer.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"

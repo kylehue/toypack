@@ -231,7 +231,9 @@ export class PluginManager {
             graph: fullContext.graph,
             getImporters: () => fullContext.importers,
             getCurrentImporter: () => {
-               const importersArr = Object.values(fullContext.importers);
+               const importersArr = Object.values(
+                  Object.fromEntries(fullContext.importers)
+               );
                return importersArr[importersArr.length - 1];
             },
             shouldMap: () => {

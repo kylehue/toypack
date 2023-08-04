@@ -270,7 +270,6 @@ export class Toypack extends Hooks {
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
       this._config = merge(this._config, config as ToypackConfig);
-      this._configHash = getHash(JSON.stringify(this._config));
    }
 
    public getConfig(): ToypackConfig {
@@ -279,7 +278,6 @@ export class Toypack extends Hooks {
 
    public resetConfig() {
       this._config = cloneDeep(defaultConfig);
-      this.setConfig({}); // to update the hash
    }
 
    public getAssetSources() {
@@ -497,8 +495,9 @@ export class Toypack extends Hooks {
          map.forEach((item, key) => {
             if (!item.source || !item.importers) return;
             const isVirtual = item.source.startsWith("virtual:");
-            const isUnused = Object.values(item.importers).length == 1;
-            const isDependentChunk = !!item.importers[asset.source];
+            const isUnused =
+               Object.values(Object.fromEntries(item.importers)).length == 1;
+            const isDependentChunk = item.importers.has(asset.source);
             const isDisposable = isVirtual && isUnused && isDependentChunk;
             if (item.source == asset.source || isDisposable) {
                map.delete(key);
@@ -577,6 +576,8 @@ export class Toypack extends Hooks {
             console.info(verbose);
          }
       }
+      
+      this._configHash = getHash(JSON.stringify(this._config));
 
       return result;
    }

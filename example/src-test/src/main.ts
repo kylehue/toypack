@@ -3,7 +3,7 @@
 // import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 // import "../react";
-// import "../vue";
+import "../vue";
 // import confetti from "https://esm.sh/canvas-confetti";
 // const meowButton = document.getElementById("meow");
 // meowButton.onclick = () => confetti();
@@ -16,31 +16,39 @@
 // const foo: string = "bar";
 // console.log(foo);
 /* test */
-// import adder, { dog, balloon, bay, eleven } from "../classes/adder";
-// console.log(adder, dog, balloon, bay, eleven);
-// import { foo as o, bar, "hello there" as test } from "../classes/createNum";
-// console.log(o, bar, test);
-// import counter, { Adder, dog as goodBoy } from "./testing.mjs";
-// console.log(counter, Adder, goodBoy);
-// import a, {add} from "../classes/createNum2";
-// console.log(a, add);
-// export default 123;
-// export { counter, Adder };
-// export { dog } from "./testing.mjs";
-// export * as NM from "../classes/createNum2";
-// export * from "../classes/createNum2";
-
+import * as Vue from "vue";
+console.log(Vue);
+import adder, { dog, balloon, bay, eleven } from "../classes/adder";
+console.log(adder, dog, balloon, bay, eleven);
+import { foo as o, bar, "hello there" as test } from "../classes/createNum";
+console.log(o, bar, test);
+import counter, { Adder, dog as goodBoy } from "./testing.mjs";
+console.log(counter, Adder, goodBoy);
+import defs, {add} from "../classes/createNum2";
+console.log(defs, add);
+export default 123;
+export { counter, Adder };
+export { dog } from "./testing.mjs";
+export * as NM from "../classes/createNum2";
+export * from "../classes/createNum2";
 // import isOdd from "is-odd";
 // // import isOdd from "https://esm.sh/is-odd";
-// import a, {add} from "../classes/createNum2";
+// import "../classes/createNum2";
+// const defs = 45;
+// const Book = 12;
+// const add = 123;
 // console.log(a, add, isOdd(3));
 
 // export { isOdd };
 
 
 
-import {dog, superCoolBook, coolLibrary, createNum} from "./testing.mjs";
-console.log(dog, superCoolBook, coolLibrary, createNum);
+// import {dog, superCoolBook, coolLibrary, createNum} from "./testing.mjs";
+// console.log(dog, superCoolBook, coolLibrary, createNum);
+
+// import defs from "./testing.mjs?raw";
+// console.log(defs);
+
 
 
 // import * as crpath from "path-browserify";

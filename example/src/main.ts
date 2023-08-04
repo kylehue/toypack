@@ -33,7 +33,9 @@ const toypack = new ToypackESM({
          },
       },
       mode: "development",
-      sourceMap: true,
+      sourceMap: {
+         exclude: ["/node_modules/"]
+      },
       globalName: "MyLib",
    },
    parser: {
@@ -54,7 +56,7 @@ const toypack = new ToypackESM({
 // await toypack.installPackage("matter-js");
 // await toypack.installPackage("react", "18");
 // await toypack.installPackage("react-dom/client", "18");
-// await toypack.installPackage("vue");
+await toypack.installPackage("vue");
 // await toypack.installPackage("canvas-confetti");
 // await toypack.installPackage("path-browserify");
 // await toypack.installPackage("is-odd");
