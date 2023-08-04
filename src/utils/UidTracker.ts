@@ -112,6 +112,23 @@ export class UidTracker {
       for (const [name, id] of data.idMap) {
          exports.set(name, this.get(source, name)!);
       }
+
+      // extract aggregated * exports because they're not in `idMap`
+      const aggrExports = data.module?.getExports(["aggregatedAll"]) || [];
+      for (const exportInfo of aggrExports) {
+         const module = data.module!;
+         const resolved = module!.dependencyMap.get(exportInfo.source);
+         if (!resolved) {
+            throw new Error(
+               `Failed to resolve '${exportInfo.source}' in ${module.source}.`
+            );
+         }
+
+         for (const [key, value] of this.getModuleExports(resolved)) {
+            exports.set(key, value);
+         }
+      }
+
       return exports;
    }
 
@@ -175,12 +192,14 @@ export class UidTracker {
                      )
                   );
                }
-            } else {
+            } else if (type == "aggregatedNamespace") {
                const { source } = exportInfo;
                const resolved = module.dependencyMap.get(source);
 
                if (!resolved) {
-                  throw new Error(`Failed to resolve '${source}'.`);
+                  throw new Error(
+                     `Failed to resolve '${source}' in ${module.source}.`
+                  );
                }
 
                name = exportInfo.specifier.exported.name;
