@@ -58,17 +58,8 @@ export const defaultConfig = {
        */
       sourceMap: true as SourceMapConfig | boolean,
       /**
-       * The global name under which the exports of the output code
-       * will be accessible.
+       * Inject import map to HTML output.
        */
-      globalName: undefined as string | undefined,
-      /**
-       * Set to true to include the node_modules dependencies in the bundle.
-       * Set to "auto" to only include it in the production bundles - which
-       * will speed up the bundles in development mode.
-       * @default "auto"
-       */
-      includeDeps: "auto",
       importMap: {
          imports: {},
          scopes: {},
