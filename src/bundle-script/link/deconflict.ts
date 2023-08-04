@@ -1,7 +1,5 @@
 import type { ScriptModule, Toypack } from "src/types";
-import { renameId } from "../utils/renamer";
-
-const done = new Set();
+import { renameBinding } from "../utils/renamer";
 
 /**
  * Deconflicts all of the top-level variables in script modules.
@@ -20,15 +18,23 @@ export function deconflict(this: Toypack, module: ScriptModule) {
       const identifier = binding.identifier;
       let { name } = identifier;
 
+      if (!this._uidGenerator.isConflicted(name)) {
+         continue;
+      }
+
       /**
        * We can skip the exports because they will be renamed anyway
-       * when we bind the modules
+       * when we bind the modules.
        */
       if (declaredExports.has(name)) {
          continue;
       }
 
-      if (!this._uidGenerator.isConflicted(name)) {
+      /**
+       * We can also skip bindings that are in import declaration because
+       * they will be removed anyway.
+       */
+      if (binding.path.find((x) => x.isImportDeclaration())) {
          continue;
       }
 
@@ -38,16 +44,7 @@ export function deconflict(this: Toypack, module: ScriptModule) {
          binding
       );
 
-      renameId(module, name, newName);
-
-      // if (done.has(newName)) {
-      //    console.log(`duplicated alert! ${newName} is done!`);
-         
-      // }
-      // done.add(newName);
-
-      // scope.rename(name, newName);
-      // identifier.name = newName;
+      renameBinding(module, binding, newName);
    }
 
    this._uidGenerator.addReservedVars(...Object.keys(bindings));

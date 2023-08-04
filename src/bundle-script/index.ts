@@ -6,17 +6,16 @@ import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
 import { bindModules } from "./link/bind-modules.js";
 import { cleanComments } from "./utils/clean-comments.js";
-import { resyncSourceMap } from "./utils/resync-source-map.js";
 import { createNamespace } from "./utils/create-namespace.js";
+import { beginRename } from "./utils/renamer.js";
+import { resyncSourceMap } from "./utils/resync-source-map.js";
 import { formatEsm } from "./formats/esm.js";
 import { ERRORS } from "../utils/index.js";
 import runtime from "./runtime.js";
-import type { Toypack, DependencyGraph } from "src/types";
+import type { Toypack, DependencyGraph, ScriptModule } from "src/types";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
-import { ScriptModule } from "src/types.js";
-import { startRename } from "./utils/renamer.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -54,6 +53,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    const resultAst = file(program([]));
    try {
+      const unrenamedModules = new Set<string>();
       for (const module of scriptModules) {
          const isCached = !!this._getCache("compiled", module.source)?.module;
          if (!isCached || module.asset.modified) {
@@ -65,6 +65,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
             bindModules.call(this, graph, module);
             // module.ast.program.body = [{ type: "EmptyStatement" }];
             cleanComments(module);
+            unrenamedModules.add(module.source);
 
             this._setCache("compiled", module.source, {
                module,
@@ -101,8 +102,11 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
       // Format
       formatEsm.call(this, resultAst, scriptModules);
+
+      // Begin renaming
       for (const module of scriptModules) {
-         startRename(module);
+         if (!unrenamedModules.has(module.source)) continue;
+         beginRename(module);
       }
    } catch (error: any) {
       this._pushToDebugger("error", ERRORS.bundle(error));
@@ -119,7 +123,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       generated.map = resyncSourceMap.call(this, generated.map, scriptModules);
    }
 
-   // console.log(getCode(generated.code));
+   console.log(getCode(generated.code));
 
    return {
       content: generated.code,

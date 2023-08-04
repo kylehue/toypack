@@ -23,7 +23,7 @@ import {
    resolveWithError,
 } from "../utils/get-with-error";
 import type { ScriptModule, Toypack } from "src/types";
-import { renameId } from "../utils/renamer";
+import { renameBinding } from "../utils/renamer";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -64,10 +64,11 @@ export function formatEsm(
          const { type, path, specifier } = importInfo;
          const importScope = path.scope;
          const local = specifier.local.name;
+         const binding = importScope.getBinding(local)!;
          if (type == "specifier") {
             const imported = getStringOrIdValue(specifier.imported);
             const id = getIdWithError.call(this, importInfo.source, imported);
-            renameId(module, local, id);
+            renameBinding(module, binding, id);
             // importScope.rename(local, id);
             specifiers[id] = importSpecifier(
                identifier(id),
@@ -75,12 +76,12 @@ export function formatEsm(
             );
          } else if (type == "default") {
             const id = getIdWithError.call(this, importInfo.source, "default");
-            renameId(module, local, id);
+            renameBinding(module, binding, id);
             // importScope.rename(local, id);
             specifiers[id] = importDefaultSpecifier(identifier(id));
          } else if (type == "namespace") {
             const id = getNamespaceWithError.call(this, source);
-            renameId(module, local, id);
+            renameBinding(module, binding, id);
             // importScope.rename(local, id);
             importDecls[source].namespace ??= importDeclaration(
                [importNamespaceSpecifier(identifier(id))],

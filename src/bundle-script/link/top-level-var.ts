@@ -1,5 +1,5 @@
 import type { ScriptModule, Toypack } from "src/types";
-import { renameId } from "../utils/renamer";
+import { renameBinding } from "../utils/renamer";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.
@@ -28,12 +28,7 @@ export function transformToVars(this: Toypack, module: ScriptModule) {
                binding
             );
 
-            renameId(module, id.name, newName);
-
-            // scope.rename(
-            //    id.name,
-            //    newName
-            // );
+            renameBinding(module, otherBinding, newName);
          }
       });
 
