@@ -1,4 +1,5 @@
 import type { ScriptModule, Toypack } from "src/types";
+import { renameId } from "../utils/renamer";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.
@@ -21,14 +22,18 @@ export function transformToVars(this: Toypack, module: ScriptModule) {
          const isSameScope = otherBinding?.scope === scope.parent;
          // only rename if the conflicted var is not in the same scope
          if (hasConflict && !isSameScope) {
-            scope.rename(
+            const newName = this._uidGenerator.generateBasedOnScope(
+               binding.path.scope,
                id.name,
-               this._uidGenerator.generateBasedOnScope(
-                  binding.path.scope,
-                  id.name,
-                  binding
-               )
+               binding
             );
+
+            renameId(module, id.name, newName);
+
+            // scope.rename(
+            //    id.name,
+            //    newName
+            // );
          }
       });
 

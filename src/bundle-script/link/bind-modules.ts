@@ -8,6 +8,8 @@ import {
    Identifier,
    arrowFunctionExpression,
    callExpression,
+   functionDeclaration,
+   classDeclaration,
 } from "@babel/types";
 import { isLocal } from "../../utils";
 import {
@@ -22,6 +24,7 @@ import type {
    ImportInfo,
    ExportInfo,
 } from "src/types";
+import { renameId } from "../utils/renamer";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -41,15 +44,43 @@ function bindExport(
 
    if (exportInfo.type == "declared") {
       const id = getIdWithError.call(this, exportSource, exportInfo.name);
-      exportScope.rename(exportInfo.identifier.name, id);
+      const binding = exportScope.getBinding(exportInfo.identifier.name)!;
+      renameId(exportInfosModule, exportInfo.identifier.name, id);
+      const decl = exportInfo.declaration;
+      const isExportDeclared = !!decl.findParent((x) =>
+         x.isExportDeclaration()
+      );
 
+      if (decl.isVariableDeclarator() && isExportDeclared) {
+         exportInfo.path.replaceWith(variableDeclaration("var", [decl.node]));
+      } else if (decl.isFunctionDeclaration() && isExportDeclared) {
+         exportInfo.path.replaceWith(
+            functionDeclaration(
+               binding.identifier,
+               decl.node.params,
+               decl.node.body,
+               decl.node.async
+            )
+         );
+      } else if (decl.isClassDeclaration() && isExportDeclared) {
+         exportInfo.path.replaceWith(
+            classDeclaration(
+               binding.identifier,
+               decl.node.superClass,
+               decl.node.body,
+               decl.node.decorators
+            )
+         );
+      }
+
+      // exportScope.rename(exportInfo.identifier.name, id);
       /**
        * For some weird reason, the `identifier.name` sometimes doesn't
        * change to `id` on the next run, which causes the renaming to fail
        * and cause errors. One way to solve this is to assign the `id`
        * to `identifier.name` manually.
        */
-      exportInfo.identifier.name = id;
+      // exportInfo.identifier.name = id;
    } else if (exportInfo.type == "declaredDefault") {
       const declPath = exportInfo.declaration;
       if (declPath.isFunctionDeclaration() || declPath.isClassDeclaration()) {
@@ -77,8 +108,9 @@ function bindExport(
 
       const id = getIdWithError.call(this, exportSource, exportInfo.name);
       if (exportInfo.identifier) {
-         exportScope.rename(exportInfo.identifier.name, id);
-         exportInfo.identifier.name = id;
+         renameId(exportInfosModule, exportInfo.identifier.name, id);
+         // exportScope.rename(exportInfo.identifier.name, id);
+         // exportInfo.identifier.name = id;
       }
    } else if (exportInfo.type == "declaredDefaultExpression") {
       // Create a variable declaration for the expression
@@ -109,7 +141,7 @@ function bindImport(
    const importSource = importer.dependencyMap.get(importInfo.source);
    if (typeof importSource !== "string") return;
    // skip non-locals
-   if (!isLocal(importInfo.source)) return;
+   if (!isLocal(importInfo.source) && !importSource) return;
 
    const importedModule = graph.get(importSource);
    if (importedModule?.type != "script") {
@@ -125,10 +157,15 @@ function bindImport(
             ? getStringOrIdValue(importInfo.specifier.imported)
             : "default";
       const localName = importInfo.specifier.local.name;
-      importScope.rename(
+      renameId(
+         importer,
          localName,
          getIdWithError.call(this, importSource, importedName)
       );
+      // importScope.rename(
+      //    localName,
+      //    getIdWithError.call(this, importSource, importedName)
+      // );
    } else if (importInfo.type == "namespace") {
       const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
@@ -141,7 +178,8 @@ function bindImport(
       );
 
       const localName = importInfo.specifier.local.name;
-      importScope.rename(localName, namespace);
+      renameId(importer, localName, namespace);
+      // importScope.rename(localName, namespace);
    } else if (importInfo.type == "dynamic") {
       const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;

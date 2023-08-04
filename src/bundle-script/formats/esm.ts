@@ -23,6 +23,7 @@ import {
    resolveWithError,
 } from "../utils/get-with-error";
 import type { ScriptModule, Toypack } from "src/types";
+import { renameId } from "../utils/renamer";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -51,7 +52,7 @@ export function formatEsm(
       > = {};
       importDecls[source] ??= {};
       const sourceStringNode = stringLiteral(source);
-      for (const importInfo of importInfos) {
+      for (const { importInfo, module } of importInfos) {
          if (
             importInfo.type != "default" &&
             importInfo.type != "specifier" &&
@@ -61,23 +62,26 @@ export function formatEsm(
          }
 
          const { type, path, specifier } = importInfo;
-         const scope = path.scope;
+         const importScope = path.scope;
          const local = specifier.local.name;
          if (type == "specifier") {
             const imported = getStringOrIdValue(specifier.imported);
             const id = getIdWithError.call(this, importInfo.source, imported);
-            scope.rename(local, id);
+            renameId(module, local, id);
+            // importScope.rename(local, id);
             specifiers[id] = importSpecifier(
                identifier(id),
                specifier.imported
             );
          } else if (type == "default") {
             const id = getIdWithError.call(this, importInfo.source, "default");
-            scope.rename(local, id);
+            renameId(module, local, id);
+            // importScope.rename(local, id);
             specifiers[id] = importDefaultSpecifier(identifier(id));
          } else if (type == "namespace") {
             const id = getNamespaceWithError.call(this, source);
-            scope.rename(local, id);
+            renameId(module, local, id);
+            // importScope.rename(local, id);
             importDecls[source].namespace ??= importDeclaration(
                [importNamespaceSpecifier(identifier(id))],
                sourceStringNode

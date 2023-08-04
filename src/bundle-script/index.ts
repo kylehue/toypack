@@ -16,6 +16,7 @@ import type { Toypack, DependencyGraph } from "src/types";
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
 import { ScriptModule } from "src/types.js";
+import { startRename } from "./utils/rename-binding.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -39,7 +40,7 @@ import { ScriptModule } from "src/types.js";
 
 export function getModules(graph: DependencyGraph) {
    return Object.values(Object.fromEntries(graph)).filter(
-      (g): g is ScriptModule => g.isScriptModule()
+      (g): g is ScriptModule => g.isScript()
    );
 }
 
@@ -88,6 +89,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          const arr = Array.isArray(statements) ? statements : [statements];
          resultAst.program.body.unshift(...arr);
          runtimesUsed.add("__export");
+         cleanComments(module, arr);
       }
 
       // Lastly, the runtimes (on top)
@@ -99,6 +101,9 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
       // Format
       formatEsm.call(this, resultAst, scriptModules);
+      for (const module of scriptModules) {
+         startRename(module);
+      }
    } catch (error: any) {
       this._pushToDebugger("error", ERRORS.bundle(error));
    }
@@ -111,10 +116,10 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    if (generated.map) {
       // @ts-ignore mute readonly error
-      generated.map = resyncSourceMap(generated.map, scriptModules);
+      generated.map = resyncSourceMap.call(this, generated.map, scriptModules);
    }
 
-   console.log(getCode(generated.code));
+   // console.log(getCode(generated.code));
 
    return {
       content: generated.code,
