@@ -92,8 +92,8 @@ function compile(
          const text = node.structuredText.trim();
          this.bundler.setConfig({
             bundle: {
-               importMap: text.length ? JSON.parse(text) : {}
-            }
+               importMap: text.length ? JSON.parse(text) : {},
+            },
          });
       }
 
@@ -194,36 +194,24 @@ function htmlLoader(options?: HTMLPluginOptions): Loader {
             const styleVirtualId = `virtual:${
                moduleInfo.source
             }?style&index=${_id++}`;
-            this.setCache(
-               styleVirtualId,
-               {
-                  type: "style",
-                  lang: "css",
-                  content: compiled.bundledInlineStyles,
-               },
-               true
-            );
+            this.setCache(styleVirtualId, {
+               type: "style",
+               lang: "css",
+               content: compiled.bundledInlineStyles,
+            });
             mainVirtualModule += this.getImportCode(styleVirtualId);
          }
 
-         this.setCache(
-            moduleInfo.source,
-            {
-               source: moduleInfo.source,
-               content: mainVirtualModule,
-               resourceDependencies: compiled.resourceDependencies,
-            },
-            true
-         );
+         this.setCache(moduleInfo.source, {
+            source: moduleInfo.source,
+            content: mainVirtualModule,
+            resourceDependencies: compiled.resourceDependencies,
+         });
 
-         this.setCache<HTMLModule>(
-            injectHtmlKey,
-            {
-               source: moduleInfo.source,
-               ast: compiled.ast,
-            },
-            true
-         );
+         this.setCache<HTMLModule>(injectHtmlKey, {
+            source: moduleInfo.source,
+            ast: compiled.ast,
+         });
 
          return mainVirtualModule;
       },
@@ -241,19 +229,19 @@ export default function (options?: HTMLPluginOptions): Plugin {
          this.eachCache((_, source) => {
             if (this.bundler.getAsset(source)) return;
             if (source != injectHtmlKey) {
-               this.removeCache(source, true);
+               this.removeCache(source);
             }
             if (injectedHtml?.source == source) {
-               this.removeCache(injectHtmlKey, true);
+               this.removeCache(injectHtmlKey);
             }
          });
       },
       load(moduleInfo) {
          if (moduleInfo.type != "virtual") return;
-         return this.getCache(moduleInfo.source, true);
+         return this.getCache(moduleInfo.source);
       },
       buildEnd(result) {
-         const htmlToInject = this.getCache<HTMLModule>(injectHtmlKey, true);
+         const htmlToInject = this.getCache<HTMLModule>(injectHtmlKey);
          if (!htmlToInject) return;
          injectedHtml = htmlToInject;
          result.html.content = injectAstToHtml(
@@ -262,7 +250,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
          );
       },
       parsed({ chunk, parsed }) {
-         const cached = this.getCache(chunk.source, true);
+         const cached = this.getCache(chunk.source);
          if (!cached) return;
          cached.resourceDependencies?.forEach((item: any) =>
             parsed.dependencies.add(item)

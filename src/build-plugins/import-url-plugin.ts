@@ -43,7 +43,7 @@ interface CacheData {
 
 const cache = new Map<string, CacheData>();
 async function fetchUrl(this: Toypack, entryUrl: string) {
-   const config = this.getConfig();
+   const config = this.config;
    const shouldMap = !!config.bundle.sourceMap;
    let assets: Record<string, ExternalAsset> = {};
    const recurse = async (url: string) => {

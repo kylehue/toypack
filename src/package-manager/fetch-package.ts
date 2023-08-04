@@ -45,7 +45,7 @@ export async function fetchPackage(
    packagePath: string,
    packageVersion: string = "latest"
 ) {
-   const config = bundler.getConfig();
+   const config = bundler.config;
    const sourceMapConfig = config.bundle.sourceMap;
    let providerIndex = 0;
    let provider = providers[providerIndex];

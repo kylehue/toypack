@@ -18,7 +18,7 @@ export function resyncSourceMap(
    map: SourceMapInput,
    scriptModules: ScriptModule[]
 ) {
-   const config = this.getConfig();
+   const config = this.config;
    const mergedMapGenerator = new GenMapping();
    const generatedMap = new TraceMap(map);
    const unmappedScripts: Record<string, string> = {};

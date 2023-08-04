@@ -24,7 +24,7 @@ async function autoAddImportMap(bundler: Toypack, id: string) {
 }
 
 async function autoInstallPackage(bundler: Toypack, id: string) {
-   const config = bundler.getConfig();
+   const config = bundler.config;
    if (config.bundle.mode == "development") return;
    return await bundler.installPackage(id);
 }

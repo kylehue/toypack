@@ -17,7 +17,7 @@ export function getUsableResourcePath(
    const resolvedSource = bundler.resolve(source, { baseDir });
    const asset = resolvedSource ? bundler.getAsset(resolvedSource) : null;
    if (!asset || asset.type != "resource") return null;
-   if (bundler.getConfig().bundle.mode == "production") {
+   if (bundler.config.bundle.mode == "production") {
       return "./" + getHash(asset.source) + path.extname(asset.source);
    } else {
       return asset.contentURL;

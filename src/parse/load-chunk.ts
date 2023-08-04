@@ -1,3 +1,5 @@
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
+import path from "path-browserify";
 import { Toypack } from "../Toypack.js";
 import {
    mergeSourceMaps,
@@ -11,9 +13,7 @@ import type {
    ResourceAsset,
    TextAsset,
 } from "src/types";
-import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { createAsset } from "../utils/create-asset.js";
-import path from "path-browserify";
 import { Importers } from "./index.js";
 
 export async function loadChunk(
@@ -51,7 +51,7 @@ export async function loadChunk(
 
    const lang = path.extname(rawSource.split("?")[0]).replace(".", "");
    const moduleInfo = createModuleInfo(type, rawSource, isEntry, asset, lang);
-   const config = this.getConfig();
+   const config = this.config;
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(rawSource, sourceMapConfig);
 

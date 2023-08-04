@@ -13,7 +13,7 @@ import {
 import type { StyleModule, Toypack } from "src/types";
 
 export function compileStyle(this: Toypack, chunk: StyleModule) {
-   const config = this.getConfig();
+   const config = this.config;
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(
       chunk.asset.source,

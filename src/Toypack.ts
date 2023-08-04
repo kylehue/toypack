@@ -50,10 +50,10 @@ export class Toypack extends Hooks {
       script: [...EXTENSIONS.script],
    };
    private _assets = new Map<string, Asset>();
-   private _config: ToypackConfig = cloneDeep(defaultConfig);
+   private _config: ToypackConfig & { _hasChanged?: boolean } =
+      cloneDeep(defaultConfig);
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
-   private _configHash: string = "";
    private _cachedDeps: Cache = {
       parsed: new Map(),
       compiled: new Map(),
@@ -116,8 +116,7 @@ export class Toypack extends Hooks {
       K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
       R extends K extends Map<string, infer I> ? I : never
    >(loc: T, source: string): R | null {
-      const hashedSource = this._configHash + "-" + source;
-      return (this._cachedDeps[loc].get(hashedSource) || null) as R | null;
+      return (this._cachedDeps[loc].get(source) || null) as R | null;
    }
 
    protected _setCache<
@@ -125,16 +124,12 @@ export class Toypack extends Hooks {
       K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
       R extends K extends Map<string, infer I> ? I : never
    >(loc: T, source: string, value: Omit<R, "source">) {
-      const hashedSource = this._configHash + "-" + source;
       const cacheData = { source, ...value };
       const cached = this._getCache(loc, source);
       if (cached) {
-         this._cachedDeps[loc].set(
-            hashedSource,
-            Object.assign(cached, cacheData)
-         );
+         this._cachedDeps[loc].set(source, Object.assign(cached, cacheData));
       } else {
-         this._cachedDeps[loc].set(hashedSource, cacheData);
+         this._cachedDeps[loc].set(source, cacheData);
       }
    }
 
@@ -264,16 +259,15 @@ export class Toypack extends Hooks {
     *
     * Note: This won't remove the extensions that was added by the plugin.
     */
-   public removePlugin(plugin: string | Plugin) {
+   public removePlugin(plugin: Plugin) {
       this._pluginManager.removePlugin(plugin);
    }
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
+      const oldHash = getHash(JSON.stringify(this.config));
       this._config = merge(this._config, config as ToypackConfig);
-   }
-
-   public getConfig(): ToypackConfig {
-      return this._config;
+      const newHash = getHash(JSON.stringify(this.config));
+      this._config._hasChanged = oldHash !== newHash;
    }
 
    public resetConfig() {
@@ -439,13 +433,14 @@ export class Toypack extends Hooks {
       });
 
       this.clearCache();
-      this._uidGenerator.reset();
-      this._uidTracker.reset();
    }
 
    public clearCache() {
       this._cachedDeps.compiled.clear();
       this._cachedDeps.parsed.clear();
+      this._uidGenerator.reset();
+      this._uidTracker.reset();
+      this._pluginManager.clearCache();
    }
 
    /**
@@ -509,16 +504,26 @@ export class Toypack extends Hooks {
       this._trigger("onRemoveAsset", asset);
    }
 
+   private _clearDebugger() {
+      this._debugger.error = [];
+      this._debugger.info = [];
+      this._debugger.warning = [];
+      this._debugger.verbose = [];
+   }
+
    /**
     * Starts the bundling process.
     * @returns An object containing the bundle result.
     */
    public async run() {
-      // Clear debug data
-      this._debugger.error = [];
-      this._debugger.info = [];
-      this._debugger.warning = [];
-      this._debugger.verbose = [];
+      this._clearDebugger();
+      
+      // Forget everything if config changed
+      if (this._config._hasChanged) {
+         this._pushToDebugger("info", "Config has changed. Clearing cache.");
+         this.clearCache();
+         this._config._hasChanged = false;
+      }
 
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
@@ -527,14 +532,11 @@ export class Toypack extends Hooks {
       const timeBeforeBundle = performance.now();
       const result = await bundle.call(this, graph);
       const timeAfterBundle = performance.now();
-      [this._assets, this._virtualAssets].forEach((assets) => {
-         assets.forEach((asset) => {
-            asset.modified = false;
-         });
-      });
       if (this._iframe && this._config.bundle.mode == "development") {
          this._iframe.srcdoc = result.html.content;
       }
+
+      // Log debug stuff
       const totalGraphTime = Math.round(timeAfterGraph - timeBeforeGraph);
       const totalBundleTime = Math.round(timeAfterBundle - timeBeforeBundle);
       const message =
@@ -543,7 +545,6 @@ export class Toypack extends Hooks {
          `⏲ Total  - ${totalGraphTime + totalBundleTime} ms`;
       this._pushToDebugger("info", message);
 
-      // Log debug data
       const logLevel = this._config.logLevel;
 
       const error = this._debugger.error[0];
@@ -576,18 +577,23 @@ export class Toypack extends Hooks {
             console.info(verbose);
          }
       }
-      
-      this._configHash = getHash(JSON.stringify(this._config));
+
+      //
+      [this._assets, this._virtualAssets].forEach((assets) => {
+         assets.forEach((asset) => {
+            asset.modified = false;
+         });
+      });
 
       return result;
    }
 
-   public get dependencies() {
-      return this._dependencies as ReadonlyDeep<typeof this._dependencies>;
+   public get dependencies(): Readonly<Record<string, string>> {
+      return this._dependencies;
    }
 
-   public get config() {
-      return this._config as ReadonlyDeep<typeof this._config>;
+   public get config(): Readonly<ToypackConfig> {
+      return this._config;
    }
 }
 

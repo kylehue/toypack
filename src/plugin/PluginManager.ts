@@ -58,15 +58,7 @@ type TriggerOptions<
 export class PluginManager {
    private _hooks: PluginHooksGroupMap = {};
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
-   private _cache = new Map<
-      string,
-      {
-         formattedKey: string;
-         originalKey: string;
-         value: any;
-         plugin: Plugin;
-      }
-   >();
+   private _cache = new WeakMap<Plugin, Map<string, any>>();
 
    constructor(private bundler: Toypack) {}
 
@@ -144,16 +136,6 @@ export class PluginManager {
       plugin: Plugin,
       fullContext?: T
    ): T extends FullContext ? PluginContext : PluginContextBase {
-      const createCacheKey = (str: string, isConfigConstrained?: boolean) => {
-         const common = `${plugin.name}.${str}`;
-         if (isConfigConstrained) {
-            // @ts-ignore
-            return `${this.bundler._configHash}.${common}`;
-         }
-
-         return common;
-      };
-
       const baseContext: PluginContextBase = {
          bundler: this.bundler,
          getUsableResourcePath(source: string, baseDir = ".") {
@@ -189,34 +171,30 @@ export class PluginManager {
                `[${plugin.name}]: ` + message
             );
          },
-         getCache: (key, isConfigDependent) => {
-            key = createCacheKey(key, isConfigDependent);
-            const cache = this._cache.get(key);
-            if (cache?.plugin === plugin) {
-               return cache.value;
-            }
+         getCache: (key) => {
+            const cache = this._cache.get(plugin);
+            if (!cache) return;
+            return cache.get(key);
          },
-         removeCache: (key, isConfigDependent) => {
-            key = createCacheKey(key, isConfigDependent);
-            const cache = this._cache.get(key);
-            if (cache?.plugin === plugin) {
-               this._cache.delete(key);
-            }
+         removeCache: (key) => {
+            const cache = this._cache.get(plugin);
+            if (!cache) return;
+            cache.delete(key);
          },
-         setCache: (key, value, isConfigDependent) => {
-            const formattedKey = createCacheKey(key, isConfigDependent);
-            this._cache.set(formattedKey, {
-               originalKey: key,
-               formattedKey,
-               value,
-               plugin,
-            });
+         setCache: (key, value) => {
+            let cache = this._cache.get(plugin);
+            if (!cache) {
+               cache = new Map();
+               this._cache.set(plugin, cache);
+            }
+            cache.set(key, value);
             return value;
          },
          eachCache: (callback) => {
-            this._cache.forEach((value) => {
-               if (value.plugin !== plugin) return;
-               callback(value.value, value.originalKey);
+            const cache = this._cache.get(plugin);
+            if (!cache) return;
+            cache.forEach((value, key) => {
+               callback(value, key);
             });
          },
       };
@@ -224,7 +202,7 @@ export class PluginManager {
       if (fullContext?.source && fullContext?.importers && fullContext?.graph) {
          const shouldMap = shouldProduceSourceMap(
             fullContext.source,
-            this.bundler.getConfig().bundle.sourceMap
+            this.bundler.config.bundle.sourceMap
          );
          const _fullContext: PluginContext = {
             ...baseContext,
@@ -267,6 +245,10 @@ export class PluginManager {
       return baseContext as PluginContext;
    }
 
+   public clearCache() {
+      this._cache = new WeakMap();
+   }
+
    public registerPlugin<T extends Plugin>(plugin: T) {
       for (const loader of plugin.loaders || []) {
          this._loaders.push({ loader, plugin });
@@ -289,20 +271,16 @@ export class PluginManager {
       }
    }
 
-   public removePlugin(plugin: string | Plugin) {
-      const isMatch = (_plugin: Plugin) =>
-         typeof plugin == "string"
-            ? _plugin.name === plugin
-            : _plugin === plugin;
+   public removePlugin(plugin: Plugin) {
       const removeFromHook = (hookName: keyof typeof this._hooks) => {
          for (let i = 0; i < (this._hooks[hookName]?.length || 0); i++) {
             const hook = this._hooks[hookName]![i];
-            if (isMatch(hook.plugin)) {
-               this._hooks[hookName]?.splice;
+            if (hook.plugin === plugin) {
+               this._hooks[hookName]?.splice(i, 1);
                break;
             }
          }
-      }
+      };
 
       for (const hookName in this._hooks) {
          removeFromHook(hookName as keyof typeof this._hooks);
@@ -310,14 +288,11 @@ export class PluginManager {
 
       for (let i = 0; i < this._loaders.length; i++) {
          const loader = this._loaders[i];
-         if (!isMatch(loader.plugin)) continue;
+         if (loader.plugin !== plugin) continue;
          this._loaders.splice(i, 1);
       }
 
-      for (const [key, cache] of this._cache) {
-         if (!isMatch(cache.plugin)) continue;
-         this._cache.delete(key);
-      }
+      this._cache.delete(plugin);
    }
 
    public async useLoaders(

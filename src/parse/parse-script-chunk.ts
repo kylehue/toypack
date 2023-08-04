@@ -44,7 +44,7 @@ export async function parseScriptAsset(
    content: string,
    options?: ParseScriptOptions
 ): Promise<ParsedScriptResult> {
-   const config = this.getConfig();
+   const config = this.config;
    const result: ParsedScriptResult = {
       type: "script",
       dependencies: new Set(),

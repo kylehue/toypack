@@ -44,7 +44,7 @@ export function getModules(graph: DependencyGraph) {
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
-   const config = this.getConfig();
+   const config = this.config;
    const scriptModules = getModules(graph);
    const runtimesUsed = new Set<keyof typeof runtime>();
    this._uidGenerator.addReservedVars(...Object.keys(runtime));

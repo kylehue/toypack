@@ -13,7 +13,7 @@ export async function parseStyleAsset(
    content: string,
    options?: ParseStyleOptions
 ): Promise<ParsedStyleResult> {
-   const config = this.getConfig();
+   const config = this.config;
    const result: ParsedStyleResult = {
       type: "style",
       dependencies: new Set(),

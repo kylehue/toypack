@@ -351,7 +351,7 @@ export async function getDependencyGraph(this: Toypack) {
       args: [],
    });
 
-   const config = this.getConfig();
+   const config = this.config;
    const entrySource = config.bundle.entry
       ? this.resolve(path.join("/", config.bundle.entry))
       : this.resolve("/");

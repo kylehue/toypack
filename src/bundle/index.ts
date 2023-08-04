@@ -44,7 +44,7 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       },
    };
 
-   const config = this.getConfig();
+   const config = this.config;
    const sourceMapConfig = config.bundle.sourceMap;
    const mode = config.bundle.mode;
    const js = await bundleScript.call(this, graph);
