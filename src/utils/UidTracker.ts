@@ -119,9 +119,9 @@ export class UidTracker {
       const modulesMap = getModulesMap(scriptModules);
 
       for (const [source, _] of this._map) {
-         if (!(source in modulesMap)) {
-            this._map.delete(source);
-         }
+         if (!isLocal(source)) continue;
+         if (source in modulesMap) continue;
+         this._map.delete(source);
       }
    }
 
