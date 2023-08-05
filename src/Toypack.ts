@@ -36,7 +36,7 @@ import { ParsedScriptResult } from "./parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
-import { cloneDeep, merge } from "lodash-es";
+import { cloneDeep, merge, mergeWith, union } from "lodash-es";
 import { UidTracker } from "./utils/UidTracker.js";
 import { UidGenerator } from "./utils/UidGenerator.js";
 
@@ -50,8 +50,8 @@ export class Toypack extends Hooks {
       script: [...EXTENSIONS.script],
    };
    private _assets = new Map<string, Asset>();
-   private _config: ToypackConfig & { _hasChanged?: boolean } =
-      cloneDeep(defaultConfig);
+   private _config: ToypackConfig = cloneDeep(defaultConfig);
+   private _configHash = { last: "", current: "" };
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
    private _cachedDeps: Cache = {
@@ -163,6 +163,19 @@ export class Toypack extends Hooks {
       return this._getExtensions(type).includes(extension);
    }
 
+   private _getConfigHash() {
+      const config: any = cloneDeep(this._config);
+      /**
+       * Ignore configs that doesn't require assets to recompile
+       * when changed.
+       */
+      config.bundle.template = null;
+      config.bundle.importMap = null;
+      config.bundle.sourceMap = null;
+      config.logLevel = null;
+      return getHash(JSON.stringify(config));
+   }
+
    public getPackageProviders() {
       return this._packageProviders;
    }
@@ -244,6 +257,8 @@ export class Toypack extends Hooks {
     */
    public usePlugin(...plugins: Plugin[]) {
       for (const plugin of plugins) {
+         if (this.config.plugins.includes(plugin)) continue;
+         if (this._pluginManager.hasPlugin(plugin)) continue;
          this._pluginManager.registerPlugin(plugin);
 
          for (const ext of plugin.extensions || []) {
@@ -251,6 +266,8 @@ export class Toypack extends Hooks {
                this._extensions[ext[0]].push(ext[1]);
             }
          }
+
+         this.config.plugins.push(plugin);
       }
    }
 
@@ -261,13 +278,49 @@ export class Toypack extends Hooks {
     */
    public removePlugin(plugin: Plugin) {
       this._pluginManager.removePlugin(plugin);
+      this.config.plugins.splice(this.config.plugins.indexOf(plugin), 1);
    }
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
-      const oldHash = getHash(JSON.stringify(this.config));
-      this._config = merge(this._config, config as ToypackConfig);
-      const newHash = getHash(JSON.stringify(this.config));
-      this._config._hasChanged = oldHash !== newHash;
+      const customizer = (objValue: any, srcValue: any) => {
+         if (Array.isArray(objValue) && Array.isArray(srcValue)) {
+            return union(objValue, srcValue);
+         }
+      };
+
+      const _config = this._config;
+      // basic types
+      _config.bundle.mode = config.bundle?.mode ?? _config.bundle.mode;
+      _config.bundle.entry = config.bundle?.entry ?? _config.bundle.entry;
+      _config.bundle.format = config.bundle?.format ?? _config.bundle.format;
+      _config.logLevel = config.logLevel ?? _config.logLevel;
+
+      // config.bundle.resolve
+      mergeWith(_config.bundle.resolve, config.bundle?.resolve, customizer);
+
+      // config.bundle.sourceMap
+      mergeWith(_config.bundle.sourceMap, config.bundle?.sourceMap, customizer);
+
+      // config.bundle.importMap
+      mergeWith(_config.bundle.importMap, config.bundle?.importMap, customizer);
+
+      // config.bundle.template
+      // not using `mergeWith` because the template arrays should
+      // be allowed to contain duplicates and should be overwritten
+      merge(_config.bundle.template, config.bundle?.template);
+
+      // config.parser
+      mergeWith(_config.parser, config.parser);
+
+      // config.packageManager
+      mergeWith(_config.packageManager, config.packageManager);
+
+      // config.plugins
+      for (const plugin of config.plugins || []) {
+         this.usePlugin(plugin);
+      }
+
+      this._configHash.current = this._getConfigHash();
    }
 
    public resetConfig() {
@@ -517,14 +570,12 @@ export class Toypack extends Hooks {
     */
    public async run() {
       this._clearDebugger();
-      
-      // Forget everything if config changed
-      if (this._config._hasChanged) {
+      // Forget everything if config has changed
+      if (this._configHash.last !== this._configHash.current) {
          this._pushToDebugger("info", "Config has changed. Clearing cache.");
          this.clearCache();
-         this._config._hasChanged = false;
       }
-
+      this._configHash.last = this._getConfigHash();
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
       const timeAfterGraph = performance.now();

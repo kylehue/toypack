@@ -58,7 +58,10 @@ type TriggerOptions<
 export class PluginManager {
    private _hooks: PluginHooksGroupMap = {};
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
-   private _cache = new WeakMap<Plugin, Map<string, any>>();
+   private _pluginsCache = new WeakMap<
+      Plugin,
+      Map<string | symbol | number, any>
+   >();
 
    constructor(private bundler: Toypack) {}
 
@@ -172,26 +175,26 @@ export class PluginManager {
             );
          },
          getCache: (key) => {
-            const cache = this._cache.get(plugin);
+            const cache = this._pluginsCache.get(plugin);
             if (!cache) return;
             return cache.get(key);
          },
          removeCache: (key) => {
-            const cache = this._cache.get(plugin);
+            const cache = this._pluginsCache.get(plugin);
             if (!cache) return;
             cache.delete(key);
          },
          setCache: (key, value) => {
-            let cache = this._cache.get(plugin);
+            let cache = this._pluginsCache.get(plugin);
             if (!cache) {
                cache = new Map();
-               this._cache.set(plugin, cache);
+               this._pluginsCache.set(plugin, cache);
             }
             cache.set(key, value);
             return value;
          },
          eachCache: (callback) => {
-            const cache = this._cache.get(plugin);
+            const cache = this._pluginsCache.get(plugin);
             if (!cache) return;
             cache.forEach((value, key) => {
                callback(value, key);
@@ -246,10 +249,15 @@ export class PluginManager {
    }
 
    public clearCache() {
-      this._cache = new WeakMap();
+      this._pluginsCache = new WeakMap();
+   }
+
+   public hasPlugin(plugin: Plugin) {
+      return this._pluginsCache.has(plugin);
    }
 
    public registerPlugin<T extends Plugin>(plugin: T) {
+      this._pluginsCache.set(plugin, new Map());
       for (const loader of plugin.loaders || []) {
          this._loaders.push({ loader, plugin });
       }
@@ -292,7 +300,7 @@ export class PluginManager {
          this._loaders.splice(i, 1);
       }
 
-      this._cache.delete(plugin);
+      this._pluginsCache.delete(plugin);
    }
 
    public async useLoaders(
