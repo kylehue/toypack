@@ -1,12 +1,10 @@
 import {
    ExportSpecifier,
-   File,
    Identifier,
    ImportDeclaration,
    ImportDefaultSpecifier,
    ImportNamespaceSpecifier,
    ImportSpecifier,
-   Statement,
    StringLiteral,
    exportNamedDeclaration,
    exportSpecifier,
@@ -18,25 +16,26 @@ import {
    stringLiteral,
 } from "@babel/types";
 import { getLibImports } from "../utils/get-lib-imports";
-import {
-   getIdWithError,
-   getNamespaceWithError,
-   resolveWithError,
-} from "../utils/get-with-error";
-import type { ScriptModule, Toypack } from "src/types";
+import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
 import { renameBinding } from "../utils/renamer";
+import { CompilationChunks } from "..";
+import type { ScriptModule, Toypack } from "src/types";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
 }
 
-export function formatEsm(this: Toypack, scriptModules: ScriptModule[]) {
+export function formatEsm(
+   this: Toypack,
+   chunks: CompilationChunks,
+   scriptModules: ScriptModule[]
+) {
    const libImports = getLibImports(scriptModules);
    const importDecls: Record<
       string,
       {
-         namespace?: ImportDeclaration;
-         others?: ImportDeclaration;
+         namespaced?: ImportDeclaration;
+         specified?: ImportDeclaration;
       }
    > = {};
 
@@ -65,7 +64,6 @@ export function formatEsm(this: Toypack, scriptModules: ScriptModule[]) {
             const imported = getStringOrIdValue(specifier.imported);
             const id = getIdWithError.call(this, importInfo.source, imported);
             renameBinding(module, binding, id);
-            // importScope.rename(local, id);
             specifiers[id] = importSpecifier(
                identifier(id),
                specifier.imported
@@ -73,85 +71,41 @@ export function formatEsm(this: Toypack, scriptModules: ScriptModule[]) {
          } else if (type == "default") {
             const id = getIdWithError.call(this, importInfo.source, "default");
             renameBinding(module, binding, id);
-            // importScope.rename(local, id);
             specifiers[id] = importDefaultSpecifier(identifier(id));
          } else if (type == "namespace") {
             const id = getNamespaceWithError.call(this, source);
             renameBinding(module, binding, id);
-            // importScope.rename(local, id);
-            importDecls[source].namespace ??= importDeclaration(
+            importDecls[source].namespaced ??= importDeclaration(
                [importNamespaceSpecifier(identifier(id))],
                sourceStringNode
             );
          }
       }
 
-      importDecls[source].others = importDeclaration(
+      importDecls[source].specified = importDeclaration(
          Object.values(specifiers),
          sourceStringNode
       );
    }
 
-   const header: Statement[] = [];
-
-   Object.values(importDecls).forEach(({ namespace, others }) => {
-      if (others) header.push(others);
-      if (namespace) header.push(namespace);
+   Object.values(importDecls).forEach(({ namespaced, specified }) => {
+      if (specified) chunks.header.push(specified);
+      if (namespaced) chunks.header.push(namespaced);
    });
 
    // Add entry's exports
    const entry = scriptModules.find((x) => x.isEntry)!;
    const exportSpecifiers: Record<string, ExportSpecifier> = {};
-   [
-      ...Object.values(entry.exports.declared),
-      ...Object.values(entry.exports.declaredDefault),
-      ...Object.values(entry.exports.declaredDefaultExpression),
-      ...Object.values(entry.exports.aggregatedName),
-      ...Object.values(entry.exports.aggregatedNamespace),
-   ].forEach((exportInfo) => {
-      const { type, path } = exportInfo;
-      const id = getIdWithError.call(this, entry.source, exportInfo.name);
-      if (!id) return;
-      if (
-         type == "declared" ||
-         type == "aggregatedName" ||
-         type == "aggregatedNamespace"
-      ) {
-         exportSpecifiers[id] = exportSpecifier(
-            identifier(id),
-            identifier(exportInfo.name)
-         );
-      } else if (type == "declaredDefault") {
-         exportSpecifiers["default"] = exportSpecifier(
-            identifier(id),
-            identifier("default")
-         );
-      } else if (type == "declaredDefaultExpression") {
-         exportSpecifiers["default"] = exportSpecifier(
-            identifier(id),
-            identifier("default")
-         );
-      }
+   const entryExports = this._uidTracker.getModuleExports(entry.source);
+   entryExports.forEach((id, name) => {
+      exportSpecifiers[name] = exportSpecifier(
+         identifier(id),
+         identifier(name)
+      );
    });
 
-   Object.values(entry.exports.aggregatedAll).forEach((exportInfo) => {
-      const { source } = exportInfo;
-      const resolved = resolveWithError(entry, source);
-      const aggrExports = this._uidTracker.getModuleExports(resolved);
-      for (const [name, id] of aggrExports) {
-         if (name == "default") continue;
-         exportSpecifiers[id] = exportSpecifier(
-            identifier(id),
-            identifier(name)
-         );
-      }
-   });
-
-   const footer: Statement[] = [];
    const exportSpecifiersArr = Object.values(exportSpecifiers);
    if (exportSpecifiersArr.length) {
-      footer.push(exportNamedDeclaration(null, exportSpecifiersArr));
+      chunks.footer.push(exportNamedDeclaration(null, exportSpecifiersArr));
    }
-
-   return { header, footer };
 }
