@@ -6,6 +6,7 @@ import {
    ImportDefaultSpecifier,
    ImportNamespaceSpecifier,
    ImportSpecifier,
+   Statement,
    StringLiteral,
    exportNamedDeclaration,
    exportSpecifier,
@@ -29,12 +30,7 @@ function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
 }
 
-export function formatEsm(
-   this: Toypack,
-   ast: File,
-   scriptModules: ScriptModule[]
-) {
-   const body = ast.program.body;
+export function formatEsm(this: Toypack, scriptModules: ScriptModule[]) {
    const libImports = getLibImports(scriptModules);
    const importDecls: Record<
       string,
@@ -96,13 +92,11 @@ export function formatEsm(
       );
    }
 
+   const header: Statement[] = [];
+
    Object.values(importDecls).forEach(({ namespace, others }) => {
-      if (others) {
-         body.unshift(others);
-      }
-      if (namespace) {
-         body.unshift(namespace);
-      }
+      if (others) header.push(others);
+      if (namespace) header.push(namespace);
    });
 
    // Add entry's exports
@@ -153,8 +147,11 @@ export function formatEsm(
       }
    });
 
+   const footer: Statement[] = [];
    const exportSpecifiersArr = Object.values(exportSpecifiers);
    if (exportSpecifiersArr.length) {
-      body.push(exportNamedDeclaration(null, exportSpecifiersArr));
+      footer.push(exportNamedDeclaration(null, exportSpecifiersArr));
    }
+
+   return { header, footer };
 }
