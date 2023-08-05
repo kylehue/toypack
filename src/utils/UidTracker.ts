@@ -1,3 +1,4 @@
+import { NodePath } from "@babel/traverse";
 import { Identifier, StringLiteral } from "@babel/types";
 import path from "path-browserify";
 import { UidGenerator } from "./UidGenerator";
@@ -45,7 +46,7 @@ export class UidTracker {
       string,
       {
          module?: ScriptModule;
-         idMap: Map<string, string | Redirect>;
+         exportsIdMap: Map<string, string | Redirect>;
          namespace: string;
       }
    >();
@@ -71,8 +72,8 @@ export class UidTracker {
    public get(source: string, name: string): string | undefined {
       const data = this._map.get(source);
       if (!data) return;
-      const { module, idMap } = data;
-      let supposedId = idMap.get(name);
+      const { module, exportsIdMap } = data;
+      let supposedId = exportsIdMap.get(name);
       let id = typeof supposedId == "string" ? supposedId : undefined;
       if (!supposedId && module) {
          /**
@@ -109,11 +110,11 @@ export class UidTracker {
       const exports = new Map<string, string>();
       const data = this._map.get(source);
       if (!data) return exports;
-      for (const [name, id] of data.idMap) {
+      for (const [name] of data.exportsIdMap) {
          exports.set(name, this.get(source, name)!);
       }
 
-      // extract aggregated * exports because they're not in `idMap`
+      // extract aggregated * exports because they're not in `exportsIdMap`
       const aggrExports = data.module?.getExports(["aggregatedAll"]) || [];
       for (const exportInfo of aggrExports) {
          const module = data.module!;
@@ -125,6 +126,7 @@ export class UidTracker {
          }
 
          for (const [key, value] of this.getModuleExports(resolved)) {
+            if (key == "default") continue;
             exports.set(key, value);
          }
       }
@@ -135,10 +137,34 @@ export class UidTracker {
    public resyncModules(scriptModules: ScriptModule[]) {
       const modulesMap = getModulesMap(scriptModules);
 
+      // delete module
       for (const [source, _] of this._map) {
          if (!isLocal(source)) continue;
          if (source in modulesMap) continue;
          this._map.delete(source);
+      }
+
+      // delete id maps
+      for (const module of scriptModules) {
+         const mapped = this._map.get(module.source);
+         if (!mapped) continue;
+         const { exportsIdMap } = mapped;
+         const exports = module
+            .getExports([
+               "aggregatedNamespace",
+               "declared",
+               "declaredDefault",
+               "declaredDefaultExpression",
+            ])
+            .reduce((acc, cur) => {
+               acc[cur.name] = cur;
+               return acc;
+            }, {} as Record<string, ExportInfo>);
+
+         for (const [name, _] of exportsIdMap) {
+            if (exports[name]) continue;
+            exportsIdMap.delete(name);
+         }
       }
    }
 
@@ -153,7 +179,7 @@ export class UidTracker {
          if (this._map.has(module.source)) continue;
          this._map.set(module.source, {
             module,
-            idMap: new Map(),
+            exportsIdMap: new Map(),
             namespace: uidGenerator.generateBasedOnScope(
                module.programPath.scope,
                path.basename(module.source)
@@ -163,7 +189,7 @@ export class UidTracker {
 
       // Initial add
       for (const module of scriptModules) {
-         const { idMap } = this._map.get(module.source)!;
+         const { exportsIdMap } = this._map.get(module.source)!;
 
          const exports = module.getExports([
             "declared",
@@ -171,6 +197,20 @@ export class UidTracker {
             "declaredDefaultExpression",
             "aggregatedNamespace",
          ]);
+
+         /**
+          * Used to assure that there's only 1 id per declaration.
+          *
+          * For example, if a declaration is exported multiple times
+          * with different aliases e.g.
+          *
+          * export function fn() {}
+          * export { fn as alias1 };
+          * export { fn as alias2 };
+          *
+          * Then those aliases should point to 1 id.
+          */
+         const assignedDeclIds = new WeakMap<NodePath, string>();
 
          exports.forEach((exportInfo) => {
             const { type } = exportInfo;
@@ -181,12 +221,18 @@ export class UidTracker {
                type == "declaredDefaultExpression"
             ) {
                name = exportInfo.name;
-               if (!idMap.has(name)) {
+               const assignedDeclId = assignedDeclIds.get(
+                  exportInfo.declaration
+               );
+               if (assignedDeclId) {
+                  exportsIdMap.set(name, assignedDeclId);
+               } else if (!exportsIdMap.has(name)) {
                   const id = uidGenerator.generateBasedOnScope(
                      exportInfo.path.scope,
                      name == "default" ? createDefaultName(module.source) : name
                   );
-                  idMap.set(name, id);
+                  exportsIdMap.set(name, id);
+                  assignedDeclIds.set(exportInfo.declaration, id);
                }
             } else if (type == "aggregatedNamespace") {
                const { source } = exportInfo;
@@ -199,7 +245,7 @@ export class UidTracker {
                }
 
                name = exportInfo.specifier.exported.name;
-               idMap.set(name, {
+               exportsIdMap.set(name, {
                   to: resolved,
                   name: symbols.namespace,
                });
@@ -242,17 +288,17 @@ export class UidTracker {
                }
 
                if (specifier.type == "ImportSpecifier") {
-                  idMap.set(name, {
+                  exportsIdMap.set(name, {
                      to: resolved,
                      name: getStringOrIdValue(specifier.imported),
                   });
                } else if (specifier.type == "ImportDefaultSpecifier") {
-                  idMap.set(name, {
+                  exportsIdMap.set(name, {
                      to: resolved,
                      name: "default",
                   });
                } else {
-                  idMap.set(name, {
+                  exportsIdMap.set(name, {
                      to: resolved,
                      name: symbols.namespace,
                   });
@@ -267,7 +313,7 @@ export class UidTracker {
             let data = this._map.get(source);
             if (!data) {
                data = {
-                  idMap: new Map(),
+                  exportsIdMap: new Map(),
                   namespace: uidGenerator.generateBasedOnScope(
                      importInfo.path.scope,
                      createName(source)
@@ -276,7 +322,7 @@ export class UidTracker {
                this._map.set(source, data);
             }
 
-            const { idMap } = data;
+            const { exportsIdMap } = data;
 
             let name, id;
             if (type == "default") {
@@ -287,8 +333,8 @@ export class UidTracker {
                id = name == "default" ? createDefaultName(module.source) : name;
             }
 
-            if (name && id && !idMap.has(name)) {
-               idMap.set(
+            if (name && id && !exportsIdMap.has(name)) {
+               exportsIdMap.set(
                   name,
                   uidGenerator.generateBasedOnScope(importInfo.path.scope, id)
                );
