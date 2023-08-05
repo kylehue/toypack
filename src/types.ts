@@ -8,7 +8,7 @@ import {
 export interface Plugin extends Partial<PluginHooks> {
    name: string;
    loaders?: Loader[];
-   extensions?: ["resource" | "script" | "style", string][];
+   extensions?: ["resource" | "script" | "style", `.${string}`][];
 }
 
 type CompileHandler = (
