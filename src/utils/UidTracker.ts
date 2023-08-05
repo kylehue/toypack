@@ -182,15 +182,11 @@ export class UidTracker {
             ) {
                name = exportInfo.name;
                if (!idMap.has(name)) {
-                  idMap.set(
-                     name,
-                     uidGenerator.generateBasedOnScope(
-                        exportInfo.path.scope,
-                        name == "default"
-                           ? createDefaultName(module.source)
-                           : name
-                     )
+                  const id = uidGenerator.generateBasedOnScope(
+                     exportInfo.path.scope,
+                     name == "default" ? createDefaultName(module.source) : name
                   );
+                  idMap.set(name, id);
                }
             } else if (type == "aggregatedNamespace") {
                const { source } = exportInfo;

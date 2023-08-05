@@ -8,12 +8,16 @@ function removeLeadingNums(str: string) {
    return split[split.length - 1];
 }
 
+function formatVar(str: string) {
+   str = removeLeadingNums(str);
+   return /^[\w$]+$/.test(str) ? str : camelCase(str);
+}
+
 export class UidGenerator {
    private _idCountMap: Record<string, number> = {};
    private _reservedVars = new Set<string>([...reservedWords]);
    public generate(name = "temp") {
-      name = removeLeadingNums(name);
-      name = camelCase(name);
+      name = formatVar(name);
       let generated = name || "_";
       this._idCountMap[name] ??= -1;
       if (this._idCountMap[name] >= 0) {
@@ -33,7 +37,7 @@ export class UidGenerator {
    }
 
    public generateBasedOnScope(scope: Scope, name = "temp", binding?: Binding) {
-      let generated = this.generate(name);
+      let generated = formatVar(name);
 
       const isTaken = () => {
          const _binding = scope.getBinding(generated);
@@ -52,7 +56,7 @@ export class UidGenerator {
          generated = this.generate(name);
       }
 
-      this._reservedVars.add(generated);
+      this.addReservedVars(generated);
 
       return generated;
    }

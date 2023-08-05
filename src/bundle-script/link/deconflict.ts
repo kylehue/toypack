@@ -9,16 +9,21 @@ export function deconflict(this: Toypack, module: ScriptModule) {
    const bindings = scope.getAllBindings();
 
    const declaredExports = new Set<string>();
-   Object.values(module.exports.declared).forEach((exportInfo) => {
+   module.getExports(["declared"]).forEach((exportInfo) => {
       const ids = exportInfo.declaration.getOuterBindingIdentifiers();
       Object.values(ids).forEach((id) => declaredExports.add(id.name));
    });
 
+   const varsToReserve = new Set<string>();
    for (const binding of Object.values(bindings)) {
       const identifier = binding.identifier;
       let { name } = identifier;
 
-      if (!this._uidGenerator.isConflicted(name)) {
+      /**
+       * We can skip bindings that are in import declaration because
+       * they will be removed anyway.
+       */
+      if (binding.path.find((x) => x.isImportDeclaration())) {
          continue;
       }
 
@@ -30,11 +35,8 @@ export function deconflict(this: Toypack, module: ScriptModule) {
          continue;
       }
 
-      /**
-       * We can also skip bindings that are in import declaration because
-       * they will be removed anyway.
-       */
-      if (binding.path.find((x) => x.isImportDeclaration())) {
+      if (!this._uidGenerator.isConflicted(name)) {
+         varsToReserve.add(name);
          continue;
       }
 
@@ -47,5 +49,5 @@ export function deconflict(this: Toypack, module: ScriptModule) {
       renameBinding(module, binding, newName);
    }
 
-   this._uidGenerator.addReservedVars(...Object.keys(bindings));
+   this._uidGenerator.addReservedVars(...varsToReserve);
 }
