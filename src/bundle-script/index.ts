@@ -187,8 +187,8 @@ function bundleChunks(
       const module = graph.get(source) as ScriptModule;
       const cached = this._getCache("compiled", source);
       const shouldMap = shouldProduceSourceMap(source, config.bundle.sourceMap);
-      let code: string,
-         map: EncodedSourceMap | null = null;
+      let code: string;
+      let map: EncodedSourceMap | null = null;
       if (cached && cached.content && !module.asset.modified) {
          code = cached.content || "";
          map = cached.map as EncodedSourceMap | null;
@@ -196,10 +196,15 @@ function bundleChunks(
       } else {
          compiles++;
          removeTopLevelComments(body);
-         const generated = generate(program(body), {
-            ...generatorOpts,
-            sourceMaps: shouldMap,
-         });
+         const generated = generate(
+            program(body),
+            {
+               ...generatorOpts,
+               sourceMaps: shouldMap,
+               sourceFileName: module.asset.source,
+            },
+            module.content as string
+         );
 
          code = generated.code;
          map = generated.map as EncodedSourceMap | null;
@@ -235,6 +240,8 @@ function bundleChunks(
 
    // Footer
    bundle.code += generate(program(chunks.footer), generatorOpts).code + "\n";
+
+   bundle.code = bundle.code.trimEnd();
 
    this._pushToDebugger(
       "verbose",

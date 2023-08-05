@@ -50,30 +50,15 @@ function bindExport(
       const isExportDeclared = !!decl.findParent((x) =>
          x.isExportDeclaration()
       );
-      if (isExportDeclared) {
-         if (decl.isVariableDeclarator()) {
-            exportInfo.path.replaceWith(
-               variableDeclaration("var", [decl.node])
-            );
-         } else if (decl.isFunctionDeclaration()) {
-            exportInfo.path.replaceWith(
-               functionDeclaration(
-                  binding.identifier,
-                  decl.node.params,
-                  decl.node.body,
-                  decl.node.async
-               )
-            );
-         } else if (decl.isClassDeclaration()) {
-            exportInfo.path.replaceWith(
-               classDeclaration(
-                  binding.identifier,
-                  decl.node.superClass,
-                  decl.node.body,
-                  decl.node.decorators
-               )
-            );
-         }
+      if (!isExportDeclared) return;
+      if (decl.isVariableDeclarator()) {
+         const varDecl = decl.findParent((x) => x.isVariableDeclaration());
+         exportInfo.path.replaceWith(
+            varDecl ? varDecl : variableDeclaration("var", [decl.node])
+         );
+      } else if (decl.isFunctionDeclaration() || decl.isClassDeclaration()) {
+         exportInfo.path.replaceWith(decl);
+         exportInfo.path.replaceWith(decl);
       }
    } else if (exportInfo.type == "declaredDefault") {
       const declPath = exportInfo.declaration;
