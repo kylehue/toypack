@@ -57,15 +57,15 @@ async function loadAndParse(
 ) {
    let loaded, parsed;
    let cached = this._getCache("parsed", source);
-
+   let isCached = false;
    if (cached && cached.loaded && !cached.loaded.asset.modified) {
       loaded = cached.loaded;
       parsed = cached.parsed;
+      isCached = true;
    }
 
    if (!loaded) {
       try {
-         this._pushToDebugger("verbose", `Loading "${source}"...`);
          loaded = await loadChunk.call(this, source, isEntry, graph, importers);
          this._setCache("parsed", source, {
             importers,
@@ -78,7 +78,6 @@ async function loadAndParse(
 
    if (!parsed && loaded && loaded.type != "resource") {
       try {
-         this._pushToDebugger("verbose", `Parsing "${source}"...`);
          parsed =
             loaded.type == "script"
                ? await parseScriptAsset.call(this, source, loaded.content)
@@ -93,7 +92,7 @@ async function loadAndParse(
       }
    }
 
-   return { loaded, parsed };
+   return { loaded, parsed, isCached };
 }
 
 /**
@@ -103,6 +102,8 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    const graph: DependencyGraph = new Map();
 
    const importersMap: Record<string, Importers> = {};
+   let parses = 0,
+      caches = 0;
    const recurse = async (
       rawSource: string,
       previous: ScriptModule | StyleModule | null
@@ -117,13 +118,19 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       if (graph.has(rawSource)) return;
 
       const isEntry = rawSource === entry.source;
-      const { loaded, parsed } = await loadAndParse.call(
+      const { loaded, parsed, isCached } = await loadAndParse.call(
          this,
          graph,
          rawSource,
          isEntry,
          importers
       );
+
+      if (isCached) {
+         caches++;
+      } else {
+         parses++;
+      }
 
       if (!loaded) return;
 
@@ -234,6 +241,12 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
    };
 
    await recurse(entry.source, null);
+
+   this._pushToDebugger(
+      "verbose",
+      `[parsing] Parsed ${parses} assets and cached ${caches} assets.`
+   );
+
    fixGraphOrder(graph);
    return graph;
 }
@@ -276,7 +289,7 @@ function fixGraphOrder(graph: DependencyGraph) {
       if (visitedModules.has(module.source)) continue;
       depthFirstSearch(module);
    }
-   
+
    graph.clear();
    for (const module of sortedModules) {
       graph.set(module.source, module);

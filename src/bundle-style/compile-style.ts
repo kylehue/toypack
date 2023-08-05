@@ -91,8 +91,6 @@ export function compileStyle(this: Toypack, chunk: StyleModule) {
          map: result.map,
          importers: chunk.importers,
       });
-
-      this._pushToDebugger("verbose", `Compiling ${chunk.source}...`);
    }
 
    return result;
