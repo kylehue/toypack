@@ -8,14 +8,11 @@ import {
    Identifier,
    arrowFunctionExpression,
    callExpression,
-   functionDeclaration,
-   classDeclaration,
 } from "@babel/types";
 import { isLocal } from "../../utils";
 import {
    getIdWithError,
    getNamespaceWithError,
-   resolveWithError,
 } from "../utils/get-with-error";
 import type {
    ScriptModule,
@@ -97,16 +94,6 @@ function bindExport(
          variableDeclarator(id, exportInfo.declaration.node),
       ]);
       exportInfo.path.replaceWith(varDecl);
-   } else if (exportInfo.type == "aggregatedNamespace") {
-      const parentSource = resolveWithError(
-         exportInfosModule,
-         exportInfo.source
-      );
-      // this should be guaranteed
-      const namespacedModule = graph.get(parentSource) as ScriptModule;
-      this._setCache("compiled", namespacedModule.source, {
-         needsNamespace: true,
-      });
    }
 }
 
@@ -128,7 +115,6 @@ function bindImport(
       );
    }
 
-   const importScope = importInfo.path.scope;
    if (importInfo.type == "specifier" || importInfo.type == "default") {
       const importedName =
          importInfo.type == "specifier"
@@ -144,9 +130,6 @@ function bindImport(
    } else if (importInfo.type == "namespace") {
       const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
-      this._setCache("compiled", namespacedModule.source, {
-         needsNamespace: true,
-      });
       const namespace = getNamespaceWithError.call(
          this,
          namespacedModule.source
@@ -155,13 +138,9 @@ function bindImport(
       const localName = importInfo.specifier.local.name;
       const binding = importInfo.path.scope.getBinding(localName)!;
       renameBinding(importer, binding, namespace);
-      // importScope.rename(localName, namespace);
    } else if (importInfo.type == "dynamic") {
       const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
-      this._setCache("compiled", namespacedModule.source, {
-         needsNamespace: true,
-      });
       const namespace = getNamespaceWithError.call(
          this,
          namespacedModule.source

@@ -19,7 +19,13 @@ import {
    shouldProduceSourceMap,
 } from "../utils/index.js";
 import runtime from "./runtime.js";
-import type { Toypack, DependencyGraph, ScriptModule } from "src/types";
+import type {
+   Toypack,
+   DependencyGraph,
+   ScriptModule,
+   NamespaceImport,
+   AggregatedNamespaceExport,
+} from "src/types";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
@@ -48,6 +54,26 @@ export function getModules(graph: DependencyGraph) {
    return Object.values(Object.fromEntries(graph))
       .filter((g): g is ScriptModule => g.isScript())
       .reverse();
+}
+
+function getNamespacedModules(modules: ScriptModule[]) {
+   const needsNamespace = new Set<string>();
+   const scan = (
+      module: ScriptModule,
+      ports: (NamespaceImport | AggregatedNamespaceExport)[]
+   ) => {
+      for (const portInfo of ports) {
+         const resolved = module.dependencyMap.get(portInfo.source)!;
+         needsNamespace.add(resolved);
+      }
+   };
+
+   for (const module of modules) {
+      scan(module, module.getImports(["namespace"]));
+      scan(module, module.getExports(["aggregatedNamespace"]));
+   }
+
+   return needsNamespace;
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
@@ -93,9 +119,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       );
 
       // Format
-      const { header, footer } = formatEsm.call(this, scriptModules);
-      chunks.header.unshift(...header);
-      chunks.footer.push(...footer);
+      formatEsm.call(this, chunks, scriptModules);
 
       // Begin renaming
       for (const module of scriptModules) {
@@ -111,11 +135,9 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       }
 
       // Namespaces
+      const needsNamespace = getNamespacedModules(scriptModules);
       for (const module of scriptModules) {
-         if (!this._getCache("compiled", module.source)?.needsNamespace) {
-            continue;
-         }
-
+         if (!needsNamespace.has(module.source)) continue;
          const statements = createNamespace.call(this, module);
          const arr = Array.isArray(statements) ? statements : [statements];
          chunks.namespace.set(module.source, arr);
@@ -160,7 +182,10 @@ function bundleChunks(
    };
 
    // Header
-   bundle.code += generate(program(chunks.header), generatorOpts).code + "\n";
+   const header = generate(program(chunks.header), generatorOpts).code;
+   if (header) {
+      bundle.code += header + "\n";
+   }
 
    // Runtimes
    for (const key of chunks.runtime) {
@@ -180,6 +205,7 @@ function bundleChunks(
    }
 
    // Modules
+   bundle.code = bundle.code.trim();
    let compiles = 0;
    let caches = 0;
    for (const [source, body] of chunks.module) {
@@ -223,10 +249,10 @@ function bundleChunks(
       }
 
       if (!code.length) continue;
+      if (bundle.code.length) bundle.code += "\n\n";
       bundle.code += `// ${source.replace(/^\//, "")}\n`;
       const linePos = bundle.code.split("\n").length;
       bundle.code += code;
-      bundle.code += "\n\n";
 
       if (map && shouldMap) {
          mergeSourceMapToBundle(sourceMap, map, {
@@ -239,7 +265,10 @@ function bundleChunks(
    bundle.map = toEncodedMap(sourceMap);
 
    // Footer
-   bundle.code += generate(program(chunks.footer), generatorOpts).code + "\n";
+   const footer = generate(program(chunks.footer), generatorOpts).code;
+   if (footer) {
+      bundle.code += "\n" + footer;
+   }
 
    bundle.code = bundle.code.trimEnd();
 
@@ -251,7 +280,7 @@ function bundleChunks(
    return bundle;
 }
 
-interface CompilationChunks {
+export interface CompilationChunks {
    header: Statement[];
    runtime: Set<keyof typeof runtime>;
    namespace: Map<string, Statement[]>;
