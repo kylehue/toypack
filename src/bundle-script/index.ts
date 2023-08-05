@@ -1,14 +1,16 @@
 import generate, { GeneratorOptions } from "@babel/generator";
-import template, { statement } from "@babel/template";
-import { Statement, file, program, removeComments } from "@babel/types";
+import { Statement, program, removeComments } from "@babel/types";
+import {
+   EncodedSourceMap,
+   GenMapping,
+   toEncodedMap,
+} from "@jridgewell/gen-mapping";
 import MapConverter from "convert-source-map";
 import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
 import { bindModules } from "./link/bind-modules.js";
-import { cleanComments } from "./utils/clean-comments.js";
 import { createNamespace } from "./utils/create-namespace.js";
 import { beginRename } from "./utils/renamer.js";
-import { resyncSourceMap } from "./utils/resync-source-map.js";
 import { formatEsm } from "./formats/esm.js";
 import {
    ERRORS,
@@ -21,11 +23,6 @@ import type { Toypack, DependencyGraph, ScriptModule } from "src/types";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
-import {
-   EncodedSourceMap,
-   GenMapping,
-   toEncodedMap,
-} from "@jridgewell/gen-mapping";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -51,12 +48,6 @@ export function getModules(graph: DependencyGraph) {
    return Object.values(Object.fromEntries(graph))
       .filter((g): g is ScriptModule => g.isScript())
       .reverse();
-}
-
-function removeTopLevelComments(body: Statement[]) {
-   body.forEach((node) => {
-      removeComments(node);
-   });
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
@@ -136,12 +127,18 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    const bundle = bundleChunks.call(this, chunks, graph);
 
-   // console.log(getCode(bundle.code));
+   console.log(getCode(bundle.code));
 
    return {
       content: bundle.code,
       map: bundle.map ? MapConverter.fromObject(bundle.map) : null,
    };
+}
+
+function removeTopLevelComments(body: Statement[]) {
+   body.forEach((node) => {
+      removeComments(node);
+   });
 }
 
 function bundleChunks(
