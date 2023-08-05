@@ -6,7 +6,7 @@ import {
    NodeType,
    Options,
 } from "node-html-parser";
-import { PluginContext, Loader, Plugin } from "../types.js";
+import { PluginContext, Loader, Plugin, Toypack } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
 import { indexToPosition } from "../utils/find-code-position.js";
 import path from "path-browserify";
@@ -136,29 +136,36 @@ function compile(
    };
 }
 
-function injectAstToHtml(content: string, astToInject: HTMLElement) {
-   const htmlAst = parseHTML(content);
-   const bodyAst = htmlAst.querySelector("body")!;
-   const headAst = htmlAst.querySelector("head")!;
-
+function injectAstToHtml(bundler: Toypack, astToInject: HTMLElement) {
    // Inject body in body
+   let body: string[] = [];
+   let head: string[] = [];
+   let bodyAttributes: Record<string, string> = {};
    const bodyToInject = astToInject.querySelector("body");
-   if (bodyToInject) {
-      bodyToInject.childNodes.forEach((node) => {
-         bodyAst.appendChild(node.clone());
-      });
-      for (const [key, value] of Object.entries(bodyToInject.attributes)) {
-         bodyAst.setAttribute(key, value);
-      }
-   }
-
-   // Inject head in head
-   const headToInject = astToInject.querySelector("head");
-   headToInject?.childNodes.forEach((node) => {
-      headAst.appendChild(node.clone());
+   bodyToInject?.childNodes.forEach((node) => {
+      const str = node.toString();
+      if (!str.trim().length) return;
+      body.push(str);
    });
 
-   return htmlAst.toString();
+   bodyAttributes = bodyToInject?.attributes || {};
+
+   const headToInject = astToInject.querySelector("head");
+   headToInject?.childNodes.forEach((node) => {
+      const str = node.toString();
+      if (!str.trim().length) return;
+      head.push(str);
+   });
+
+   bundler.setConfig({
+      bundle: {
+         template: {
+            head,
+            body,
+            bodyAttributes,
+         },
+      },
+   });
 }
 
 interface HTMLModule {
@@ -213,6 +220,8 @@ function htmlLoader(options?: HTMLPluginOptions): Loader {
             ast: compiled.ast,
          });
 
+         injectAstToHtml(this.bundler, compiled.ast);
+
          return mainVirtualModule;
       },
    };
@@ -227,7 +236,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
       buildStart() {
          // Remove in plugin's cache if the asset no longer exists
          this.eachCache((_, source) => {
-            if (this.bundler.getAsset(source)) return;
+            if (this.bundler.getAsset(source as string)) return;
             if (source != injectHtmlKey) {
                this.removeCache(source);
             }
@@ -239,15 +248,6 @@ export default function (options?: HTMLPluginOptions): Plugin {
       load(moduleInfo) {
          if (moduleInfo.type != "virtual") return;
          return this.getCache(moduleInfo.source);
-      },
-      buildEnd(result) {
-         const htmlToInject = this.getCache<HTMLModule>(injectHtmlKey);
-         if (!htmlToInject) return;
-         injectedHtml = htmlToInject;
-         result.html.content = injectAstToHtml(
-            result.html.content,
-            injectedHtml.ast
-         );
       },
       parsed({ chunk, parsed }) {
          const cached = this.getCache(chunk.source);

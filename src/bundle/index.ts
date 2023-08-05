@@ -1,3 +1,4 @@
+import { TemplateConfig } from "src/config.js";
 import { bundleScript } from "../bundle-script/index.js";
 import { bundleStyle } from "../bundle-style/bundle-style.js";
 import { getUsableResourcePath } from "../utils";
@@ -6,23 +7,40 @@ import type { DependencyGraph, ImportMapConfig, Toypack } from "src/types";
 let previousScriptUrl: string | undefined = undefined;
 let previousLinkUrl: string | undefined = undefined;
 
-function getHtml(scriptSrc = "", linkHref = "", importMap?: ImportMapConfig) {
+function getHtml(
+   scriptSrc = "",
+   linkHref = "",
+   importMap?: ImportMapConfig,
+   template?: TemplateConfig
+) {
+   template ??= {
+      head: [],
+      body: [],
+      bodyAttributes: {},
+   };
+
+   const stringifiedAttrs = Object.entries(template.bodyAttributes)
+      .map(([key, value]) => {
+         return `${key}="${value}"`;
+      })
+      .join(" ");
+
    return [
       `<!DOCTYPE html>`,
       `<html lang="en">`,
       `  <head>`,
-      `     <link rel="stylesheet" href="${linkHref}"></link>`,
-      importMap
-         ? `<script type="importmap">${JSON.stringify(importMap)}</script>`
-         : undefined,
-      `     <script defer type="module" src="${scriptSrc}"></script>`,
+      ...template.head,
+      `    <link rel="stylesheet" href="${linkHref}"></link>`,
+      `    <script type="importmap">`,
+      JSON.stringify(importMap || {}, undefined, 2),
+      `    </script>`,
+      `    <script type="module" src="${scriptSrc}"></script>`,
       `  </head>`,
-      `  <body>`,
+      `  <body ${stringifiedAttrs}>`,
+      ...template.body,
       `  </body>`,
       `</html>`,
-   ]
-      .filter((x) => !!x)
-      .join("\n");
+   ].join("\n");
 }
 
 export async function bundle(this: Toypack, graph: DependencyGraph) {
@@ -86,7 +104,8 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       result.html.content = getHtml(
          previousScriptUrl,
          previousLinkUrl,
-         config.bundle.importMap
+         config.bundle.importMap,
+         config.bundle.template
       );
    } else {
       // Extract resources from graph
@@ -123,7 +142,8 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       result.html.content = getHtml(
          "./" + result.js.source,
          "./" + result.css.source,
-         config.bundle.importMap
+         config.bundle.importMap,
+         config.bundle.template
       );
    }
 

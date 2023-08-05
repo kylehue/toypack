@@ -64,6 +64,14 @@ export const defaultConfig = {
          imports: {},
          scopes: {},
       } as ImportMapConfig,
+      /**
+       * Inject templates to HTML output.
+       */
+      template: {
+         head: [],
+         body: ["<h1>chotto matte!</h1>"],
+         bodyAttributes: {},
+      } as TemplateConfig,
    },
    /**
     * Configuration for the parser.
@@ -102,6 +110,11 @@ export type SourceMapConfig = {
 export type ImportMapConfig = {
    imports: Record<string, string>;
    scopes: Record<string, Record<string, string>>;
+};
+export type TemplateConfig = {
+   head: string[];
+   body: string[];
+   bodyAttributes: Record<string, string>;
 };
 
 export type BabelParseConfig = Omit<
