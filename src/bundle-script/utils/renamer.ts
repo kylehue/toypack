@@ -22,6 +22,11 @@ const scopeMap = new Map<
    }
 >();
 
+type ScopeMapValue = typeof scopeMap extends Map<string, infer V> ? V : never;
+type RenameMapValue = ScopeMapValue["renameMap"] extends Map<string, infer V>
+   ? V
+   : never;
+
 export function renameBinding(
    module: ScriptModule,
    binding: Binding,
@@ -47,12 +52,13 @@ export function renameBinding(
 function shouldBeRenamed(
    name: string,
    scope: Scope,
-   mappedBinding: Binding | null
+   mapped: RenameMapValue | null
 ) {
-   if (!mappedBinding) return false;
+   if (!mapped) return false;
    const binding = scope.getBinding(name);
    if (!binding) return false;
-   if (binding !== mappedBinding) return false;
+   if (binding !== mapped.binding) return false;
+   if (name === mapped.newName) return false;
    return true;
 }
 
@@ -66,7 +72,7 @@ export function beginRename(module: ScriptModule) {
          const name = node.name;
          const mapped = renameMap.get(name);
          if (!mapped) return;
-         if (!shouldBeRenamed(name, scope, mapped.binding)) {
+         if (!shouldBeRenamed(name, scope, mapped)) {
             return;
          }
 
@@ -77,7 +83,7 @@ export function beginRename(module: ScriptModule) {
          const { name } = node.key as Identifier;
          const mapped = renameMap.get(name);
          if (!mapped) return;
-         if (!shouldBeRenamed(name, scope, mapped.binding)) {
+         if (!shouldBeRenamed(name, scope, mapped)) {
             return;
          }
          node.shorthand = false;
@@ -92,7 +98,7 @@ export function beginRename(module: ScriptModule) {
          for (const name in ids) {
             const mapped = renameMap.get(name);
             if (!mapped) continue;
-            if (!shouldBeRenamed(name, path.scope, mapped.binding)) {
+            if (!shouldBeRenamed(name, path.scope, mapped)) {
                continue;
             }
 
@@ -100,4 +106,11 @@ export function beginRename(module: ScriptModule) {
          }
       },
    });
+
+   for (const [_, { binding, newName, oldName }] of renameMap) {
+      const scope = binding.scope;
+      scope.removeOwnBinding(oldName);
+      scope.bindings[newName] = binding;
+      binding.identifier.name = newName;
+   }
 }
