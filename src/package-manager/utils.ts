@@ -21,7 +21,7 @@ export const _cache = new Map<
      }
 >();
 
-export function queryParamsToString(params?: Record<string, string | true>) {
+export function queryParamsToString(params?: Record<string, string | boolean>) {
    if (!params) return "";
    const entries = Object.entries(params);
    if (!entries.length) return "";
@@ -29,6 +29,7 @@ export function queryParamsToString(params?: Record<string, string | true>) {
    let str = "?";
 
    for (const [key, value] of entries) {
+      if (value === false) continue;
       str += `${key}${typeof value == "string" && value ? `=${value}` : ""}&`;
    }
 

@@ -145,8 +145,8 @@ export interface PackageProvider {
     * Additional query parameters to be appended to the package requests.
     */
    queryParams?:
-      | Record<string, string | true>
-      | PackageFilterFunction<Record<string, string | true>>;
+      | Record<string, string | boolean>
+      | PackageFilterFunction<Record<string, string | boolean>>;
    /**
     * Specifies an additional path segment to be appended to the
     * package manager requests.
