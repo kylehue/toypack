@@ -96,7 +96,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       let caches = 0,
          binds = 0;
       for (const module of scriptModules) {
-         const isCached = !!this._getCache("compiled", module.source)?.module;
+         const isCached = !!this._getCache(module.source)?.module;
          if (!isCached || module.asset.modified) {
             // order matters here
             transformToVars.call(this, module);
@@ -104,7 +104,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
             bindModules.call(this, graph, module);
             unrenamedModules.add(module.source);
 
-            this._setCache("compiled", module.source, {
+            this._setCache(module.source, {
                module,
             });
             binds++;
@@ -129,7 +129,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
       // Modules
       for (const module of scriptModules) {
-         const cached = this._getCache("compiled", module.source);
+         const cached = this._getCache(module.source);
          if (!cached?.module?.ast) continue;
          chunks.module.set(module.source, cached.module.ast.program.body);
       }
@@ -184,14 +184,22 @@ function bundleChunks(
    // Header
    const header = generate(program(chunks.header), generatorOpts).code;
    if (header) {
-      bundle.code += header + "\n";
+      bundle.code += header;
+      bundle.code += "\n\n";
    }
+
+   bundle.code = bundle.code.trimEnd();
+   if (header) bundle.code += "\n\n";
 
    // Runtimes
    for (const key of chunks.runtime) {
       const code = runtime[key];
-      bundle.code += code + "\n";
+      bundle.code += code.trim();
+      bundle.code += "\n\n";
    }
+
+   bundle.code = bundle.code.trimEnd();
+   if (header || chunks.runtime.size) bundle.code += "\n\n";
 
    // Namespaces
    for (const [source, body] of chunks.namespace) {
@@ -204,14 +212,19 @@ function bundleChunks(
       bundle.code += "\n\n";
    }
 
+   bundle.code = bundle.code.trimEnd();
+   if (header || chunks.runtime.size || chunks.namespace.size) {
+      bundle.code += "\n\n";
+   }
+
    // Modules
-   bundle.code = bundle.code.trim();
    let compiles = 0;
    let caches = 0;
+   let addedModules = 0;
    for (const [source, body] of chunks.module) {
       if (!body.length) continue;
       const module = graph.get(source) as ScriptModule;
-      const cached = this._getCache("compiled", source);
+      const cached = this._getCache(source);
       const shouldMap = shouldProduceSourceMap(source, config.bundle.sourceMap);
       let code: string;
       let map: EncodedSourceMap | null = null;
@@ -242,17 +255,18 @@ function bundleChunks(
             map = !map ? loadedMap : mergeSourceMaps(map, loadedMap);
          }
 
-         this._setCache("compiled", source, {
+         this._setCache(source, {
             content: code,
             map,
          });
       }
 
       if (!code.length) continue;
-      if (bundle.code.length) bundle.code += "\n\n";
+      addedModules++;
       bundle.code += `// ${source.replace(/^\//, "")}\n`;
       const linePos = bundle.code.split("\n").length;
       bundle.code += code;
+      if (bundle.code.length) bundle.code += "\n\n";
 
       if (map && shouldMap) {
          mergeSourceMapToBundle(sourceMap, map, {
@@ -262,15 +276,18 @@ function bundleChunks(
       }
    }
 
-   bundle.map = toEncodedMap(sourceMap);
+   bundle.code = bundle.code.trimEnd();
+   if (header || chunks.runtime.size || chunks.namespace.size || addedModules) {
+      bundle.code += "\n\n";
+   }
 
    // Footer
    const footer = generate(program(chunks.footer), generatorOpts).code;
    if (footer) {
-      bundle.code += "\n" + footer;
+      bundle.code += footer;
    }
 
-   bundle.code = bundle.code.trimEnd();
+   bundle.map = toEncodedMap(sourceMap);
 
    this._pushToDebugger(
       "verbose",

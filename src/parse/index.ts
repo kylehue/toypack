@@ -56,7 +56,7 @@ async function loadAndParse(
    importers: Importers
 ) {
    let loaded, parsed;
-   let cached = this._getCache("parsed", source);
+   let cached = this._getCache(source);
    let isCached = false;
    if (cached && cached.loaded && !cached.loaded.asset.modified) {
       loaded = cached.loaded;
@@ -67,7 +67,7 @@ async function loadAndParse(
    if (!loaded) {
       try {
          loaded = await loadChunk.call(this, source, isEntry, graph, importers);
-         this._setCache("parsed", source, {
+         this._setCache(source, {
             importers,
             loaded,
          });
@@ -82,7 +82,7 @@ async function loadAndParse(
             loaded.type == "script"
                ? await parseScriptAsset.call(this, source, loaded.content)
                : await parseStyleAsset.call(this, source, loaded.content);
-         this._setCache("parsed", source, {
+         this._setCache(source, {
             importers,
             parsed,
             loaded,

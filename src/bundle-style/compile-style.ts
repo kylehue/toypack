@@ -21,7 +21,7 @@ export function compileStyle(this: Toypack, chunk: StyleModule) {
    );
 
    // Check cache
-   const cached = this._getCache("compiled", chunk.source);
+   const cached = this._getCache(chunk.source);
 
    if (cached && !chunk.asset.modified && cached.content) {
       return {
@@ -86,7 +86,7 @@ export function compileStyle(this: Toypack, chunk: StyleModule) {
 
    // Cache
    if (!cached || chunk.asset.modified) {
-      this._setCache("compiled", chunk.source, {
+      this._setCache(chunk.source, {
          content: result.content,
          map: result.map,
          importers: chunk.importers,

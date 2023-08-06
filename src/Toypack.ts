@@ -54,10 +54,7 @@ export class Toypack extends Hooks {
    private _configHash = { last: "", current: "" };
    private _packageProviders: PackageProvider[] = [];
    private _dependencies: Record<string, string> = {};
-   private _cachedDeps: Cache = {
-      parsed: new Map(),
-      compiled: new Map(),
-   };
+   private _cachedDeps = new Map<string, Cache>();
    private _debugger = {
       error: [] as Error[],
       warning: [] as string[],
@@ -91,7 +88,7 @@ export class Toypack extends Hooks {
          host: "esm.sh",
          dtsHeader: "X-Typescript-Types",
          queryParams: {
-            // dev: true
+            dev: this._config.bundle.mode === "development",
          },
       });
 
@@ -111,25 +108,17 @@ export class Toypack extends Hooks {
       this._debugger[type].push(data as any);
    }
 
-   protected _getCache<
-      T extends keyof typeof this._cachedDeps,
-      K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
-      R extends K extends Map<string, infer I> ? I : never
-   >(loc: T, source: string): R | null {
-      return (this._cachedDeps[loc].get(source) || null) as R | null;
+   protected _getCache(source: string) {
+      return this._cachedDeps.get(source) || null;
    }
 
-   protected _setCache<
-      T extends keyof typeof this._cachedDeps,
-      K extends T extends "parsed" ? Cache["parsed"] : Cache["compiled"],
-      R extends K extends Map<string, infer I> ? I : never
-   >(loc: T, source: string, value: Omit<R, "source">) {
-      const cacheData = { source, ...value };
-      const cached = this._getCache(loc, source);
+   protected _setCache(source: string, value: Partial<Cache>) {
+      const cached = this._getCache(source);
+      value.source = source;
       if (cached) {
-         this._cachedDeps[loc].set(source, Object.assign(cached, cacheData));
+         Object.assign(cached || {}, value);
       } else {
-         this._cachedDeps[loc].set(source, cacheData);
+         this._cachedDeps.set(source, value);
       }
    }
 
@@ -306,7 +295,7 @@ export class Toypack extends Hooks {
 
       // config.bundle.template
       // not using `mergeWith` because the template arrays should
-      // be allowed to contain duplicates and should be overwritten
+      // be allowed to contain duplicates
       merge(_config.bundle.template, config.bundle?.template);
 
       // config.parser
@@ -489,8 +478,7 @@ export class Toypack extends Hooks {
    }
 
    public clearCache() {
-      this._cachedDeps.compiled.clear();
-      this._cachedDeps.parsed.clear();
+      this._cachedDeps.clear();
       this._uidGenerator.reset();
       this._uidTracker.reset();
       this._pluginManager.clearCache();
@@ -539,19 +527,17 @@ export class Toypack extends Hooks {
       }
 
       // Remove from cache
-      [this._cachedDeps.compiled, this._cachedDeps.parsed].forEach((map) => {
-         map.forEach((item, key) => {
-            if (!item.source || !item.importers) return;
-            const isVirtual = item.source.startsWith("virtual:");
-            const isUnused =
-               Object.values(Object.fromEntries(item.importers)).length == 1;
-            const isDependentChunk = item.importers.has(asset.source);
-            const isDisposable = isVirtual && isUnused && isDependentChunk;
-            if (item.source == asset.source || isDisposable) {
-               map.delete(key);
-               if (isVirtual) this.removeAsset(item.source);
-            }
-         });
+      this._cachedDeps.forEach((item, key, map) => {
+         if (!item.source || !item.importers) return;
+         const isVirtual = item.source.startsWith("virtual:");
+         const isUnused =
+            Object.values(Object.fromEntries(item.importers)).length == 1;
+         const isDependentChunk = item.importers.has(asset.source);
+         const isDisposable = isVirtual && isUnused && isDependentChunk;
+         if (item.source == asset.source || isDisposable) {
+            map.delete(key);
+            if (isVirtual) this.removeAsset(item.source);
+         }
       });
 
       this._trigger("onRemoveAsset", asset);
@@ -575,7 +561,7 @@ export class Toypack extends Hooks {
          this._pushToDebugger("info", "Config has changed. Clearing cache.");
          this.clearCache();
       }
-      this._configHash.last = this._getConfigHash();
+      this._configHash.current = this._configHash.last = this._getConfigHash();
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
       const timeAfterGraph = performance.now();
@@ -651,24 +637,11 @@ export class Toypack extends Hooks {
 export default Toypack;
 
 interface Cache {
-   parsed: Map<
-      string,
-      {
-         source?: string;
-         importers?: Importers;
-         parsed?: ParsedScriptResult | ParsedStyleResult | null;
-         loaded?: LoadChunkResult;
-      }
-   >;
-   compiled: Map<
-      string,
-      {
-         source?: string;
-         importers?: Importers;
-         content?: string;
-         map?: EncodedSourceMap | null;
-         needsNamespace?: boolean;
-         module?: ScriptModule;
-      }
-   >;
+   source?: string;
+   importers?: Importers;
+   parsed?: ParsedScriptResult | ParsedStyleResult | null;
+   loaded?: LoadChunkResult;
+   content?: string;
+   map?: EncodedSourceMap | null;
+   module?: ScriptModule;
 }
