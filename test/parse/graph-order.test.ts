@@ -173,7 +173,6 @@ it("should re-order (with deps)", async () => {
    toypack.addOrUpdateAsset("/node_modules/vue/shared.js", ``);
 
    const graph: DependencyGraph = await getDependencyGraph.call(toypack);
-   console.log(Object.keys(Object.fromEntries(graph)));
 
    expect(Object.keys(Object.fromEntries(graph))).toEqual([
       "/A.js",
