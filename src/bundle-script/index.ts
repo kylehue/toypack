@@ -1,5 +1,6 @@
 import generate, { GeneratorOptions } from "@babel/generator";
 import { Statement, program, removeComments } from "@babel/types";
+import template from "@babel/template";
 import {
    EncodedSourceMap,
    GenMapping,
@@ -25,6 +26,7 @@ import type {
    ScriptModule,
    NamespaceImport,
    AggregatedNamespaceExport,
+   ModeConfig,
 } from "src/types";
 
 // TODO: remove
@@ -163,6 +165,11 @@ function removeTopLevelComments(body: Statement[]) {
    });
 }
 
+const cachedRuntimeGens = new Map<
+   `${keyof typeof runtime}-${ModeConfig}`,
+   string
+>();
+
 function bundleChunks(
    this: Toypack,
    chunks: CompilationChunks,
@@ -181,25 +188,41 @@ function bundleChunks(
       comments: config.bundle.mode == "development",
    };
 
+   const getSourceComment = (source: string) => {
+      if (config.bundle.mode == "production") return "";
+      return `// ${source.replace(/^\//, "")}\n`;
+   };
+
+   const lineChar = config.bundle.mode == "production" ? "" : "\n";
+
    // Header
    const header = generate(program(chunks.header), generatorOpts).code;
    if (header) {
       bundle.code += header;
-      bundle.code += "\n\n";
+      bundle.code += lineChar.repeat(2);
    }
 
    bundle.code = bundle.code.trimEnd();
-   if (header) bundle.code += "\n\n";
+   if (header) bundle.code += lineChar.repeat(2);
 
    // Runtimes
    for (const key of chunks.runtime) {
-      const code = runtime[key];
-      bundle.code += code.trim();
-      bundle.code += "\n\n";
+      const ast = template.ast(runtime[key]);
+      let code = cachedRuntimeGens.get(`${key}-${config.bundle.mode}`);
+      if (!code) {
+         code = generate(
+            program(Array.isArray(ast) ? ast : [ast]),
+            generatorOpts
+         ).code;
+         cachedRuntimeGens.set(`${key}-${config.bundle.mode}`, code);
+      }
+
+      bundle.code += code;
+      bundle.code += lineChar.repeat(2);
    }
 
    bundle.code = bundle.code.trimEnd();
-   if (header || chunks.runtime.size) bundle.code += "\n\n";
+   if (header || chunks.runtime.size) bundle.code += lineChar.repeat(2);
 
    // Namespaces
    for (const [source, body] of chunks.namespace) {
@@ -207,14 +230,14 @@ function bundleChunks(
       const generated = generate(program(body), generatorOpts);
 
       if (!generated.code.length) continue;
-      bundle.code += `// ${source.replace(/^\//, "")}\n`;
+      bundle.code += getSourceComment(source);
       bundle.code += generated.code;
-      bundle.code += "\n\n";
+      bundle.code += lineChar.repeat(2);
    }
 
    bundle.code = bundle.code.trimEnd();
    if (header || chunks.runtime.size || chunks.namespace.size) {
-      bundle.code += "\n\n";
+      bundle.code += lineChar.repeat(2);
    }
 
    // Modules
@@ -263,10 +286,10 @@ function bundleChunks(
 
       if (!code.length) continue;
       addedModules++;
-      bundle.code += `// ${source.replace(/^\//, "")}\n`;
+      bundle.code += getSourceComment(source);
       const linePos = bundle.code.split("\n").length;
       bundle.code += code;
-      if (bundle.code.length) bundle.code += "\n\n";
+      if (bundle.code.length) bundle.code += lineChar.repeat(2);
 
       if (map && shouldMap) {
          mergeSourceMapToBundle(sourceMap, map, {
@@ -278,7 +301,7 @@ function bundleChunks(
 
    bundle.code = bundle.code.trimEnd();
    if (header || chunks.runtime.size || chunks.namespace.size || addedModules) {
-      bundle.code += "\n\n";
+      bundle.code += lineChar.repeat(2);
    }
 
    // Footer
