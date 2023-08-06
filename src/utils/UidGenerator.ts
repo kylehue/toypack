@@ -14,16 +14,17 @@ function formatVar(str: string) {
 }
 
 export class UidGenerator {
-   private _idCountMap: Record<string, number> = {};
+   private _idCountMap = new Map<string, number>();
    private _reservedVars = new Set<string>([...reservedWords]);
    public generate(name = "temp") {
       name = formatVar(name);
       let generated = name || "_";
-      this._idCountMap[name] ??= -1;
-      if (this._idCountMap[name] >= 0) {
-         generated = name + "_" + this._idCountMap[name];
+      let count = this._idCountMap.get(name);
+      if (typeof count !== "number") count = -1;
+      if (count >= 0) {
+         generated = name + "_" + count;
       }
-      this._idCountMap[name]++;
+      this._idCountMap.set(name, count + 1);
 
       return generated;
    }
@@ -62,7 +63,7 @@ export class UidGenerator {
    }
 
    public reset() {
-      this._idCountMap = {};
+      this._idCountMap.clear();
       this._reservedVars = new Set([...reservedWords]);
    }
 }
