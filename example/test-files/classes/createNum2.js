@@ -2,9 +2,7 @@ export function createNum(num) {
    return num;
 }
 
-export class Book {
-
-}
+export class Book {}
 
 export const add = 123;
 
@@ -17,7 +15,7 @@ export default "Default expression!";
 const test = 4;
 export { test };
 export const test1 = 23;
-   
+
 // const defs = 123;
 // if (true) {
 //    const defs = 456;
@@ -33,3 +31,10 @@ var defs_2 = 123;
 export { createNum as cnum };
 // import cpath, { resolve as cresolve } from "/node_modules/testing";
 // export default defs;
+
+function testing(defs_3) {
+   defs = 23;
+   console.log(defs_3);
+}
+
+export { bar as TEST } from "./createNum";

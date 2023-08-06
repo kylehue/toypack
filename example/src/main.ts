@@ -1,5 +1,5 @@
 import "./style.css";
-import { sampleFiles } from "./sampleFiles.js";
+import testFiles from "./generated/test-files";
 import { Toypack as ToypackESM } from "toypack";
 import vuePlugin from "toypack-vue";
 import sassPlugin from "toypack-sass";
@@ -23,7 +23,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "index.html",
+      entry: "src/main",
       resolve: {
          alias: {
             "@classes": "/classes/",
@@ -36,7 +36,6 @@ const toypack = new ToypackESM({
       sourceMap: {
          exclude: ["/node_modules/"]
       },
-      globalName: "MyLib",
    },
    parser: {
       plugins: ["typescript", "jsx"],
@@ -48,7 +47,7 @@ const toypack = new ToypackESM({
       //    console.log(dts);
       // },
    },
-   logLevel: "info",
+   logLevel: "verbose",
 });
 
 // await toypack.installPackage("react");
@@ -56,7 +55,7 @@ const toypack = new ToypackESM({
 // await toypack.installPackage("matter-js");
 // await toypack.installPackage("react", "18");
 // await toypack.installPackage("react-dom/client", "18");
-await toypack.installPackage("vue");
+// await toypack.installPackage("vue");
 // await toypack.installPackage("canvas-confetti");
 // await toypack.installPackage("path-browserify");
 // await toypack.installPackage("is-odd");
@@ -84,7 +83,7 @@ downloadButton.onclick = async () => {
 
 toypack.setIFrame(iframe);
 
-for (let [source, content] of Object.entries(sampleFiles)) {
+for (let [source, content] of Object.entries(testFiles)) {
    toypack.addOrUpdateAsset(source, content);
 }
 
