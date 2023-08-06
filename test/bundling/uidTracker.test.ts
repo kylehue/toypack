@@ -13,6 +13,18 @@ const uidTracker = toypack._uidTracker;
 toypack.addOrUpdateAsset(
    "/index.js",
    `
+// Import exports
+import theTavern from "./module.js";
+export { theTavern as coolTavern };
+export { theTavern };
+import { getSomething1 as getSomethingOne } from "./module.js";
+export { getSomethingOne };
+export { getSomethingOne as goGetSomething };
+import * as ModuleNamespace from "./module.js";
+export { ModuleNamespace };
+export { ModuleNamespace as TheModuleNamespace };
+
+// Declared exports
 const o = {
    ant: "a",
    boat: "b",
@@ -63,9 +75,27 @@ export default tavern;
 
 await toypack.run();
 
+it("should have correct import exports", () => {
+   const exports = uidTracker.getModuleExports("/index.js");
+   
+   expect(exports.get("getSomethingOne")).toEqual("getSomething");
+   expect(exports.get("goGetSomething")).toEqual("getSomething");
+   expect(exports.get("coolTavern")).toEqual(
+      uidTracker.get("/module.js", "default")
+   );
+   expect(exports.get("theTavern")).toEqual(
+      uidTracker.get("/module.js", "default")
+   );
+   expect(exports.get("ModuleNamespace")).toEqual(
+      uidTracker.getNamespaceFor("/module.js")
+   );
+   expect(exports.get("TheModuleNamespace")).toEqual(
+      uidTracker.getNamespaceFor("/module.js")
+   );
+});
+
 it("should have correct basic exports", () => {
    const exports = uidTracker.getModuleExports("/index.js");
-   console.log(exports);
    
    // basics
    expect(exports.get("cat")).toEqual("cat");
@@ -97,6 +127,7 @@ it("should have correct basic exports", () => {
 
 it("should have correct aliased exports", () => {
    const exports = uidTracker.getModuleExports("/index.js");
+
    // aliased
    expect(exports.get("PI")).toEqual("PI");
    expect(exports.get("foo")).toEqual("PI");
@@ -116,6 +147,7 @@ it("should have correct aliased exports", () => {
 
 it("should have correct namespace exports", () => {
    const exports = uidTracker.getModuleExports("/index.js");
+
    expect(exports.get("orca")).toEqual(
       uidTracker.getNamespaceFor("/module.js")
    );

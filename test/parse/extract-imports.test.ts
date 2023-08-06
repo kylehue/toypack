@@ -2,71 +2,109 @@
  * @vitest-environment jsdom
  */
 
-import { expect, it } from "vitest";
-// import { extractImports } from "../../src/parse/extract-imports";
-// import { parseSync, TransformOptions } from "@babel/core";
-it.todo("Add test for extract-imports");
+import { expect, it, beforeEach } from "vitest";
+import { Toypack } from "../../build/Toypack";
+import { DependencyGraph, getDependencyGraph } from "../../src/parse";
+import { ScriptModule } from "../../src/types";
+const toypack = new Toypack();
 
-// const opts: TransformOptions = {
-//    parserOpts: {
-//       errorRecovery: true,
-//    },
-// };
+beforeEach(() => {
+   toypack.clearAssets();
+   toypack.addOrUpdateAsset(
+      "/module.js",
+      `
+      export const cat = "", dog = "";
+      export function greet() {}
+      export class Hunter {}
+      export const id = "", boat = "";
+      export { cat as "string name" };
+      export const PI = 3.14;
+      export default cat;
+      `
+   );
+});
 
-// const importsAst = parseSync(
-//    `
-// import ant from "./module.js";
-// import * as boat from "./module.js";
-// import { cat } from "./module.js";
-// import { dog as ear } from "./module.js";
-// import { default as fat } from "./module.js";
-// import { greet, Hunter } from "./module.js";
-// import { id, boat as jar, /* … */ } from "./module.js";
-// import { "string name" as keep } from "./module.js";
-// import lone, { PI, /* … */ } from "./module.js";
-// import Book, * as something from "./module.js";
-// `,
-//    opts
-// )!;
+it("should extract imports", async () => {
+   toypack.addOrUpdateAsset(
+      "index.js",
+      `
+      import { cat } from "./module.js";
+      import { dog as ear } from "./module.js";
+      import { default as fat } from "./module.js";
+      import { greet, Hunter } from "./module.js";
+      import { id, boat as jar } from "./module.js";
+      import { "string name" as keep } from "./module.js";
+      import { PI } from "./module.js";
+      `
+   );
 
-// const importsAstExpectedExports = [
-//    "ant",
-//    "boat",
-//    "cat",
-//    "ear",
-//    "fat",
-//    "greet",
-//    "Hunter",
-//    "id",
-//    "jar",
-//    "keep",
-//    "lone",
-//    "PI",
-//    "Book",
-//    "something",
-// ];
+   const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+   const module = graph.get("/index.js") as ScriptModule;
+   const imports = module
+      .getImports(["specifier"])
+      .map((x) => x.specifier.local.name);
+   expect(imports.sort()).toEqual(
+      ["cat", "ear", "fat", "greet", "Hunter", "id", "jar", "keep", "PI"].sort()
+   );
+});
 
-// it("should extract imports", () => {
-//    expect(Object.keys(extractImports(importsAst).others).sort()).toEqual(
-//       importsAstExpectedExports.sort()
-//    );
-// });
+it("should extract default imports", async () => {
+   toypack.addOrUpdateAsset(
+      "index.js",
+      `
+      import ant from "./module.js";
+      `
+   );
 
-// const sideEffectImportsAst = parseSync(
-//    `
-// import "./module0.js";
-// import "./module1.js";
-// import "./module2.js";
-// import "./module3.js";
-// import "./module4.js";
-// `,
-//    opts
-// )!;
+   const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+   const module = graph.get("/index.js") as ScriptModule;
+   const imports = module
+      .getImports(["default"])
+      .map((x) => x.specifier.local.name);
+   expect(imports).toEqual(["ant"]);
+});
 
-// const sideEffectImportsAstExpectedExports = ["0", "1", "2", "3", "4"];
+it("should extract namespace imports", async () => {
+   toypack.addOrUpdateAsset(
+      "index.js",
+      `
+      import * as namespace from "./module.js";
+      import * as _namespace from "./module.js";
+      `
+   );
 
-// it("should extract side-effect imports", () => {
-//    expect(
-//       Object.keys(extractImports(sideEffectImportsAst).sideEffect).sort()
-//    ).toEqual(sideEffectImportsAstExpectedExports.sort());
-// });
+   const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+   const module = graph.get("/index.js") as ScriptModule;
+   const imports = module
+      .getImports(["namespace"])
+      .map((x) => x.specifier.local.name);
+   expect(imports.sort()).toEqual(["namespace", "_namespace"].sort());
+});
+
+it("should extract side-effect imports", async () => {
+   toypack.addOrUpdateAsset(
+      "index.js",
+      `
+      import "./module.js";
+      `
+   );
+
+   const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+   const module = graph.get("/index.js") as ScriptModule;
+   const imports = module.getImports(["sideEffect"]);
+   expect(imports.length).toEqual(1);
+});
+
+it("should extract dynamic imports", async () => {
+   toypack.addOrUpdateAsset(
+      "index.js",
+      `
+      import("./module.js");
+      `
+   );
+
+   const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+   const module = graph.get("/index.js") as ScriptModule;
+   const imports = module.getImports(["dynamic"]);
+   expect(imports.length).toEqual(1);
+});
