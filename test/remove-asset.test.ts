@@ -61,13 +61,12 @@ beforeEach(async () => {
    await toypack.run();
 });
 
-// it("should be removed completely", () => {
-//    toypack.removeAsset("index.js");
-//    expect(getMapValues(assets).length).toBe(0);
-//    expect(getMapValues(virtualAssets).length).toBe(0);
-//    expect(getMapValues(cache.compiled).length).toBe(0);
-//    expect(getMapValues(cache.parsed).length).toBe(0);
-// });
+it("should be removed completely", () => {
+   toypack.removeAsset("index.js");
+   expect(getMapValues(assets).length).toBe(0);
+   expect(getMapValues(virtualAssets).length).toBe(0);
+   expect(getMapValues(cache).length).toBe(0);
+});
 
 it("should remove nothing", () => {
    const prevAssetCount = getMapValues(assets).length;
@@ -81,20 +80,19 @@ it("should remove nothing", () => {
    expect(newVirtualAssetsCount).toEqual(prevVirtualAssetsCount);
 });
 
-// it("should not remove if used by others", async () => {
-//    toypack.clearAssets();
-//    toypack.addOrUpdateAsset(
-//       "/sample.js",
-//       `import "${dummyVirtualModules[0]}";`
-//    );
-//    toypack.addOrUpdateAsset("/index.js", `import "./sample.js";`);
-//    await toypack.run();
-//    toypack.removeAsset("index.js");
+it("should not remove if used by others", async () => {
+   toypack.clearAssets();
+   toypack.addOrUpdateAsset(
+      "/sample.js",
+      `import "${dummyVirtualModules[0]}";`
+   );
+   toypack.addOrUpdateAsset("/index.js", `import "./sample.js";`);
+   await toypack.run();
+   toypack.removeAsset("index.js");
 
-//    expect(toypack.getAsset("/sample.js")).toBeTruthy();
-//    expect(toypack.getAsset("virtual:test1.js")).toBeTruthy();
+   expect(toypack.getAsset("/sample.js")).toBeTruthy();
+   expect(toypack.getAsset("virtual:test1.js")).toBeTruthy();
 
-//    // "/sample.js" and "virtual:test1.js" should stay
-//    expect(getMapValues(cache.compiled).length).toBe(2);
-//    expect(getMapValues(cache.parsed).length).toBe(2);
-// });
+   // "/sample.js" and "virtual:test1.js" should stay
+   expect(getMapValues(cache).length).toBe(2);
+});
