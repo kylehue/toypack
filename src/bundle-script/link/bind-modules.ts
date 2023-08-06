@@ -55,7 +55,6 @@ function bindExport(
          );
       } else if (decl.isFunctionDeclaration() || decl.isClassDeclaration()) {
          exportInfo.path.replaceWith(decl);
-         exportInfo.path.replaceWith(decl);
       }
    } else if (exportInfo.type == "declaredDefault") {
       const declPath = exportInfo.declaration;
