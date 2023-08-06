@@ -288,7 +288,19 @@ export class Toypack extends Hooks {
       mergeWith(_config.bundle.resolve, config.bundle?.resolve, customizer);
 
       // config.bundle.sourceMap
-      mergeWith(_config.bundle.sourceMap, config.bundle?.sourceMap, customizer);
+      if (
+         typeof _config.bundle?.sourceMap == "object" &&
+         typeof config.bundle?.sourceMap == "object"
+      ) {
+         mergeWith(
+            _config.bundle.sourceMap,
+            config.bundle?.sourceMap,
+            customizer
+         );
+      } else {
+         _config.bundle.sourceMap =
+            config.bundle?.sourceMap ?? _config.bundle.sourceMap;
+      }
 
       // config.bundle.importMap
       mergeWith(_config.bundle.importMap, config.bundle?.importMap, customizer);
