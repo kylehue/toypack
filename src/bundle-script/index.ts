@@ -310,6 +310,7 @@ function bundleChunks(
       bundle.code += footer;
    }
 
+   bundle.code = bundle.code.trimEnd();
    bundle.map = toEncodedMap(sourceMap);
 
    this._pushToDebugger(

@@ -69,7 +69,7 @@ export const defaultConfig = {
        */
       template: {
          head: [],
-         body: ["<h1>chotto matte!</h1>"],
+         body: [],
          bodyAttributes: {},
       } as TemplateConfig,
    },

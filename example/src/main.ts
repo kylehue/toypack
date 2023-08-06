@@ -23,7 +23,7 @@ const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
 const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
 const toypack = new ToypackESM({
    bundle: {
-      entry: "src/main",
+      entry: "index.html",
       resolve: {
          alias: {
             "@classes": "/classes/",
@@ -40,7 +40,12 @@ const toypack = new ToypackESM({
    parser: {
       plugins: ["typescript", "jsx"],
    },
-   plugins: [vuePlugin(), sassPlugin()],
+   plugins: [vuePlugin({
+      featureFlags: {
+         __VUE_OPTIONS_API__: false,
+         __VUE_PROD_DEVTOOLS__: false
+      }
+   }), sassPlugin()],
    packageManager: {
       // dts: true,
       // onDts(dts) {
