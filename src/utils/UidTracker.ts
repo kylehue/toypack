@@ -82,15 +82,19 @@ export class UidTracker {
           * export * from "./module.js";
           * export { name } from "./module.js";
           */
-         for (const exportInfo of module.getExports([
-            "aggregatedAll",
-            "aggregatedName",
-         ])) {
-            if (exportInfo.type == "aggregatedAll" && name == "default") {
-               continue;
+         if (name !== "default") {
+            for (const exportInfo of module.getExports(["aggregatedAll"])) {
+               const resolved = module.dependencyMap.get(exportInfo.source)!;
+               id = this.get(resolved, name);
+               if (id) break;
             }
+         }
 
-            id = this.get(exportInfo.source, name);
+         for (const exportInfo of module.getExports(["aggregatedName"])) {
+            if (exportInfo.name !== name) continue;
+            const resolved = module.dependencyMap.get(exportInfo.source)!;
+            const local = getStringOrIdValue(exportInfo.specifier.local);
+            id = this.get(resolved, local);
             if (id) break;
          }
       }
@@ -115,10 +119,10 @@ export class UidTracker {
       }
 
       // extract aggregated * exports because they're not in `exportsIdMap`
-      const aggrExports = data.module?.getExports(["aggregatedAll"]) || [];
-      for (const exportInfo of aggrExports) {
+      const aggrAllExports = data.module?.getExports(["aggregatedAll"]) || [];
+      for (const exportInfo of aggrAllExports) {
          const module = data.module!;
-         const resolved = module!.dependencyMap.get(exportInfo.source);
+         const resolved = module.dependencyMap.get(exportInfo.source);
          if (!resolved) {
             throw new Error(
                `Failed to resolve '${exportInfo.source}' in ${module.source}.`
@@ -129,6 +133,23 @@ export class UidTracker {
             if (key == "default") continue;
             exports.set(key, value);
          }
+      }
+
+      // extract aggregated name exports because they're not in `exportsIdMap`
+      const aggrNameExports = data.module?.getExports(["aggregatedName"]) || [];
+      for (const exportInfo of aggrNameExports) {
+         const module = data.module!;
+         const resolved = module.dependencyMap.get(exportInfo.source);
+         if (!resolved) {
+            throw new Error(
+               `Failed to resolve '${exportInfo.source}' in ${module.source}.`
+            );
+         }
+
+         exports.set(
+            exportInfo.name,
+            this.get(resolved, exportInfo.specifier.local.name)!
+         );
       }
 
       return exports;
@@ -209,8 +230,11 @@ export class UidTracker {
           * export { fn as alias2 };
           *
           * Then those aliases should point to 1 id.
+          *
+          * Also note that this is only for declared exports because
+          * other export types can't possibly have aliases.
           */
-         const assignedDeclIds = new WeakMap<NodePath, string>();
+         const assignedDeclIds = new Map<string, string>();
 
          exports.forEach((exportInfo) => {
             const { type } = exportInfo;
@@ -221,9 +245,9 @@ export class UidTracker {
                type == "declaredDefaultExpression"
             ) {
                name = exportInfo.name;
-               const assignedDeclId = assignedDeclIds.get(
-                  exportInfo.declaration
-               );
+               const assignedDeclId = exportInfo.identifier
+                  ? assignedDeclIds.get(exportInfo.identifier.name)
+                  : undefined;
                if (assignedDeclId) {
                   exportsIdMap.set(name, assignedDeclId);
                } else if (!exportsIdMap.has(name)) {
@@ -232,7 +256,9 @@ export class UidTracker {
                      name == "default" ? createDefaultName(module.source) : name
                   );
                   exportsIdMap.set(name, id);
-                  assignedDeclIds.set(exportInfo.declaration, id);
+                  if (exportInfo.identifier) {
+                     assignedDeclIds.set(exportInfo.identifier.name, id);
+                  }
                }
             } else if (type == "aggregatedNamespace") {
                const { source } = exportInfo;

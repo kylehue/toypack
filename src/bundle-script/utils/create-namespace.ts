@@ -1,5 +1,6 @@
 import template from "@babel/template";
 import { getNamespaceWithError } from "./get-with-error";
+import { isValidVar } from "./is-valid-var";
 import type { ScriptModule, Toypack } from "src/types";
 
 export function createNamespace(this: Toypack, module: ScriptModule) {
@@ -16,13 +17,7 @@ export function createNamespace(this: Toypack, module: ScriptModule) {
       "{\n" +
       exports
          .map(([name, id]) => {
-            // Add quotes if not a valid export name e.g. string exports
-            const isValidName =
-               /^[a-z0-9$_]+$/i.test(name) && !/^[0-9]+/.test(name);
-            if (!isValidName) {
-               name = `"${name}"`;
-            }
-
+            if (!isValidVar(name)) name = `"${name}"`;
             let line = `${name}: () => ${id}`;
 
             return line;

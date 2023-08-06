@@ -270,15 +270,23 @@ function fixGraphOrder(graph: DependencyGraph) {
    const visitedModules = new Set<string>();
    const sortedModules: Dependency[] = [];
 
-   function depthFirstSearch(module: Dependency) {
+   const depthFirstSearch = (module: Dependency) => {
       if (visitedModules.has(module.source)) {
+         return;
+      }
+
+      if (module.isResource()) {
+         sortedModules.push(module);
          return;
       }
 
       visitedModules.add(module.source);
 
-      for (const [_, importer] of module.importers) {
-         depthFirstSearch(importer);
+      for (const depSource of Object.values(
+         Object.fromEntries(module.dependencyMap)
+      )) {
+         const dep = graph.get(depSource)!;
+         depthFirstSearch(dep);
       }
 
       sortedModules.push(module);
@@ -291,7 +299,7 @@ function fixGraphOrder(graph: DependencyGraph) {
    }
 
    graph.clear();
-   for (const module of sortedModules) {
+   for (const module of sortedModules.reverse()) {
       graph.set(module.source, module);
    }
 }

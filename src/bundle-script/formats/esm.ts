@@ -20,6 +20,7 @@ import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
 import { renameBinding } from "../utils/renamer";
 import { CompilationChunks } from "..";
 import type { ScriptModule, Toypack } from "src/types";
+import { isValidVar } from "../utils/is-valid-var";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -98,10 +99,10 @@ export function formatEsm(
    const exportSpecifiers: Record<string, ExportSpecifier> = {};
    const entryExports = this._uidTracker.getModuleExports(entry.source);
    entryExports.forEach((id, name) => {
-      exportSpecifiers[name] = exportSpecifier(
-         identifier(id),
-         identifier(name)
-      );
+      const exported = isValidVar(name)
+         ? identifier(name)
+         : stringLiteral(name);
+      exportSpecifiers[name] = exportSpecifier(identifier(id), exported);
    });
 
    const exportSpecifiersArr = Object.values(exportSpecifiers);
