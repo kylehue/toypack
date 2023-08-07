@@ -84,7 +84,6 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    this._uidTracker.assignWithModules(this._uidGenerator, scriptModules);
    this._uidGenerator.addReservedVars(...this._uidTracker.getAllNamespaces());
 
-   // const resultAst = file(program([]));
    const chunks: CompilationChunks = {
       header: [],
       runtime: new Set(),
@@ -265,7 +264,7 @@ function bundleChunks(
                sourceMaps: shouldMap,
                sourceFileName: module.asset.source,
             },
-            module.content as string
+            module.content
          );
 
          code = generated.code;

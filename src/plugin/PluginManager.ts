@@ -58,10 +58,7 @@ type TriggerOptions<
 export class PluginManager {
    private _hooks: PluginHooksGroupMap = {};
    private _loaders: { plugin: Plugin; loader: Loader }[] = [];
-   private _pluginsCache = new WeakMap<
-      Plugin,
-      Map<string | symbol | number, any>
-   >();
+   private _pluginsCache = new WeakMap<Plugin, Map<any, any>>();
 
    constructor(private bundler: Toypack) {}
 

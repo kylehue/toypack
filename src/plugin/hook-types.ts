@@ -83,14 +83,14 @@ export interface PluginContextBase {
    /** Emits an info message. */
    emitInfo: (message: string) => void;
    /** Adds an item in the plugin's cache. */
-   setCache: <T = any>(key: string | symbol | number, value: T) => T;
+   setCache: <T = any>(key: any, value: T) => T;
    /** Retrieves an item in the plugin's cache. */
-   getCache: <T = any>(key: string | symbol | number) => T | undefined;
+   getCache: <T = any>(key: any) => T | undefined;
    /** Removes an item in the plugin's cache. */
-   removeCache: (key: string | symbol | number) => void;
+   removeCache: (key: any) => void;
    /** Performs the specified action for each cache. */
    eachCache: (
-      callback: (value: any, key: string | symbol | number) => void
+      callback: (value: any, key: any) => void
    ) => void;
 }
 
