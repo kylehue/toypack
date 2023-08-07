@@ -2,11 +2,11 @@
 /* Package related tests */
 // import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
-// import "../react";
+import "../react";
 import "../vue";
-// import confetti from "canvas-confetti";
-// const meowButton = document.getElementById("meow");
-// meowButton.onclick = () => confetti();
+import confetti from "canvas-confetti";
+const meowButton = document.getElementById("meow");
+meowButton.onclick = () => confetti();
 // import * as Vue from "vue";
 // console.log(Vue);
 
@@ -32,7 +32,7 @@ export { dog } from "./testing.mjs";
 export * as NM from "../classes/createNum2";
 export * from "../classes/createNum2";
 
-export const red = 1, gold = 2;
+export const red: number = 1, gold = 2;
 
 const blue = 3;
 const yellow = 4;

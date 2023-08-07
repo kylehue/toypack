@@ -3,6 +3,7 @@ import testFiles from "./generated/test-files";
 import { Toypack as ToypackESM } from "toypack";
 import vuePlugin from "toypack-vue";
 import sassPlugin from "toypack-sass";
+import babelPlugin from "toypack-babel";
 
 var saveData = (function () {
    var a = document.createElement("a");
@@ -34,18 +35,33 @@ const toypack = new ToypackESM({
       },
       mode: "development",
       sourceMap: {
-         exclude: ["/node_modules/"]
+         exclude: ["/node_modules/"],
       },
    },
    parser: {
       plugins: ["typescript", "jsx"],
    },
-   plugins: [vuePlugin({
-      featureFlags: {
-         __VUE_OPTIONS_API__: false,
-         __VUE_PROD_DEVTOOLS__: false
-      }
-   }), sassPlugin()],
+   plugins: [
+      vuePlugin({
+         featureFlags: {
+            __VUE_OPTIONS_API__: false,
+            __VUE_PROD_DEVTOOLS__: false,
+         },
+      }),
+      sassPlugin(),
+      babelPlugin({
+         presets: [
+            [
+               "env",
+               {
+                  modules: false,
+               },
+            ],
+            "react",
+            "typescript",
+         ],
+      }),
+   ],
    packageManager: {
       // dts: true,
       // onDts(dts) {

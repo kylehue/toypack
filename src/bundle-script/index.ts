@@ -150,7 +150,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
 
    const bundle = bundleChunks.call(this, chunks, graph);
 
-   console.log(getCode(bundle.code));
+   // console.log(getCode(bundle.code));
 
    return {
       content: bundle.code,

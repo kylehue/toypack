@@ -233,6 +233,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
             depSource,
             resolved.split("?")[0] + parsed.query
          );
+
          await recurse(
             resolved.split("?")[0] + (rawQuery ? "?" + rawQuery : ""),
             chunk
@@ -249,21 +250,6 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
    fixGraphOrder(graph);
    return graph;
-}
-
-/**
- * Check if `x` (or any of its depedencies) is dependent to `source`.
- */
-function isDependent(x: ScriptModule | StyleModule, source: string) {
-   if (x.importers.has(source)) {
-      return true;
-   } else {
-      for (const [_, module] of x.importers) {
-         return isDependent(module, source);
-      }
-   }
-
-   return false;
 }
 
 function fixGraphOrder(graph: DependencyGraph) {
@@ -290,7 +276,7 @@ function fixGraphOrder(graph: DependencyGraph) {
       }
 
       sortedModules.push(module);
-   }
+   };
 
    const modules = Object.values(Object.fromEntries(graph));
    for (const module of modules) {
