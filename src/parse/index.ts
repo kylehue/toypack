@@ -271,6 +271,7 @@ function fixGraphOrder(graph: DependencyGraph) {
       for (const depSource of Object.values(
          Object.fromEntries(module.dependencyMap)
       )) {
+         // this should be guaranteed
          const dep = graph.get(depSource)!;
          depthFirstSearch(dep);
       }
@@ -308,7 +309,7 @@ function createModule<
    let chunk: ScriptModule | StyleModule | ResourceModule;
 
    if (loaded.type == "resource") {
-      chunk = new ResourceModule(loaded.asset, source, loaded.lang, importers);
+      chunk = new ResourceModule(loaded.asset, source, importers);
       return chunk as R;
    }
 
@@ -323,7 +324,6 @@ function createModule<
          loaded.asset,
          source,
          loaded.content,
-         loaded.lang,
          importers,
          parsed.ast,
          isEntry,
@@ -337,7 +337,6 @@ function createModule<
          loaded.asset,
          source,
          loaded.content,
-         loaded.lang,
          importers,
          parsed.ast,
          isEntry,

@@ -14,7 +14,6 @@ export class ScriptModule extends Module {
       public asset: Asset,
       public source: string,
       public content: string,
-      public lang: string,
       public importers: Importers,
       public ast: File,
       public isEntry: boolean = false,

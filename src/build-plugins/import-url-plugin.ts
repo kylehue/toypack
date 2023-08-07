@@ -175,7 +175,7 @@ export default function (): Plugin {
       load: {
          async: true,
          async handler(dep) {
-            if (dep.type != "virtual") return;
+            if (!/^virtual:/.test(dep.source)) return;
             const url = dep.source.replace("virtual:", "");
             if (!isUrl(url)) return;
 

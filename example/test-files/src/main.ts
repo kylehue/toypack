@@ -4,20 +4,13 @@
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "../react";
 import "../vue";
+// import * as Vue from "vue";
+// console.log(Vue);
 import confetti from "canvas-confetti";
 const meowButton = document.getElementById("meow");
 meowButton.onclick = () => confetti();
-// import * as Vue from "vue";
-// console.log(Vue);
 
 /* Bundler test */
-// import pkgjson from "../package";
-// console.log(pkgjson);
-// const foo: string = "bar";
-// console.log(foo);
-/* test */
-import * as Vue from "vue";
-console.log(Vue);
 import adder, { dog, balloon, bay, eleven } from "../classes/adder";
 console.log(adder, dog, balloon, bay, eleven);
 import { foo as o, bar, "hello there" as test } from "../classes/createNum";
@@ -32,7 +25,7 @@ export { dog } from "./testing.mjs";
 export * as NM from "../classes/createNum2";
 export * from "../classes/createNum2";
 
-export const red: number = 1, gold = 2;
+export const red = 1, gold = 2;
 
 const blue = 3;
 const yellow = 4;

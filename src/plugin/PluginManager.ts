@@ -1,13 +1,7 @@
 import { SpecifierOptions } from "src/utils/get-import-code.js";
 import { Importers } from "../parse/index.js";
 import Toypack from "../Toypack.js";
-import {
-   DependencyGraph,
-   Loader,
-   LoadResult,
-   ModuleInfo,
-   Plugin,
-} from "../types";
+import { DependencyGraph, Plugin } from "../types";
 import {
    getImportCode,
    getUsableResourcePath,
@@ -57,32 +51,9 @@ type TriggerOptions<
 
 export class PluginManager {
    private _hooks: PluginHooksGroupMap = {};
-   private _loaders: { plugin: Plugin; loader: Loader }[] = [];
-   private _pluginsCache = new WeakMap<Plugin, Map<any, any>>();
+   private _pluginsCache = new Map<Plugin, Map<any, any>>();
 
    constructor(private bundler: Toypack) {}
-
-   private _getLoadersFor(source: string) {
-      const result: typeof this._loaders = [];
-      for (const { loader, plugin } of this._loaders) {
-         let hasMatched = false;
-         if (typeof loader.test == "function" && loader.test(source)) {
-            hasMatched = true;
-         } else if (
-            loader.test instanceof RegExp &&
-            loader.test.test(source.split("?")[0])
-         ) {
-            hasMatched = true;
-         }
-
-         if (hasMatched) {
-            result.push({ loader, plugin });
-            if (loader.disableChaining === true) break;
-         }
-      }
-
-      return result;
-   }
 
    private _registerHook<HookName extends keyof PluginHooks>(
       plugin: Plugin,
@@ -138,6 +109,7 @@ export class PluginManager {
    ): T extends FullContext ? PluginContext : PluginContextBase {
       const baseContext: PluginContextBase = {
          bundler: this.bundler,
+         cache: this._pluginsCache.get(plugin)!,
          getUsableResourcePath(source: string, baseDir = ".") {
             return getUsableResourcePath(this.bundler, source, baseDir);
          },
@@ -170,32 +142,6 @@ export class PluginManager {
                "info",
                `[${plugin.name}]: ` + message
             );
-         },
-         getCache: (key) => {
-            const cache = this._pluginsCache.get(plugin);
-            if (!cache) return;
-            return cache.get(key);
-         },
-         removeCache: (key) => {
-            const cache = this._pluginsCache.get(plugin);
-            if (!cache) return;
-            cache.delete(key);
-         },
-         setCache: (key, value) => {
-            let cache = this._pluginsCache.get(plugin);
-            if (!cache) {
-               cache = new Map();
-               this._pluginsCache.set(plugin, cache);
-            }
-            cache.set(key, value);
-            return value;
-         },
-         eachCache: (callback) => {
-            const cache = this._pluginsCache.get(plugin);
-            if (!cache) return;
-            cache.forEach((value, key) => {
-               callback(value, key);
-            });
          },
       };
 
@@ -246,7 +192,9 @@ export class PluginManager {
    }
 
    public clearCache() {
-      this._pluginsCache = new WeakMap();
+      for (const [_, map] of this._pluginsCache) {
+         map.clear();
+      }
    }
 
    public hasPlugin(plugin: Plugin) {
@@ -255,19 +203,11 @@ export class PluginManager {
 
    public registerPlugin<T extends Plugin>(plugin: T) {
       this._pluginsCache.set(plugin, new Map());
-      for (const loader of plugin.loaders || []) {
-         this._loaders.push({ loader, plugin });
-      }
 
       plugin.setup?.call(this._createContext(plugin));
 
       for (const prop in plugin) {
-         if (
-            prop == "name" ||
-            prop == "extensions" ||
-            prop == "loaders" ||
-            prop == "setup"
-         ) {
+         if (prop == "name" || prop == "extensions" || prop == "setup") {
             continue;
          }
 
@@ -291,45 +231,7 @@ export class PluginManager {
          removeFromHook(hookName as keyof typeof this._hooks);
       }
 
-      for (let i = 0; i < this._loaders.length; i++) {
-         const loader = this._loaders[i];
-         if (loader.plugin !== plugin) continue;
-         this._loaders.splice(i, 1);
-      }
-
       this._pluginsCache.delete(plugin);
-   }
-
-   public async useLoaders(
-      source: string,
-      graph: DependencyGraph,
-      importers: Importers,
-      moduleInfo: ModuleInfo,
-      callback: (loadResult: string | LoadResult) => void
-   ) {
-      const loaders = this._getLoadersFor(source);
-      for (const { loader, plugin } of loaders) {
-         const context = this._createContext(plugin, {
-            graph,
-            importers,
-            source,
-         });
-
-         let loaderResult;
-         const compile = loader.compile;
-         if (typeof compile == "function") {
-            loaderResult = compile.call(context, moduleInfo);
-         } else {
-            if (compile.async) {
-               loaderResult = await compile.handler.call(context, moduleInfo);
-            } else {
-               loaderResult = compile.handler.call(context, moduleInfo);
-            }
-         }
-
-         if (!loaderResult) continue;
-         callback(loaderResult);
-      }
    }
 
    public async triggerHook<

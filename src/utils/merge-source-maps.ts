@@ -15,11 +15,11 @@ import {
 } from "@jridgewell/trace-mapping";
 
 export function mergeSourceMaps(
-   oldMap: SourceMapInput,
-   newMap: SourceMapInput
+   leftMap: SourceMapInput,
+   rightMap: SourceMapInput
 ) {
-   const oldMapConsumer = new TraceMap(Object.assign({}, oldMap));
-   const newMapConsumer = new TraceMap(Object.assign({}, newMap));
+   const oldMapConsumer = new TraceMap(Object.assign({}, leftMap));
+   const newMapConsumer = new TraceMap(Object.assign({}, rightMap));
    const mergedMapGenerator = new GenMapping();
 
    eachMapping(oldMapConsumer, function (map) {

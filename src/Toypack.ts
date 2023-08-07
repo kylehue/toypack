@@ -203,8 +203,8 @@ export class Toypack extends Hooks {
             type: pkgAsset.type,
          };
 
-         asset.forceContentTypeAs ||=
-            pkgAsset.type != "resource" ? pkgAsset.type : undefined;
+         // asset.forceContentTypeAs ||=
+         //    pkgAsset.type != "resource" ? pkgAsset.type : undefined;
 
          if (pkgAsset.type != "resource") {
             asset.map = pkgAsset.map;
@@ -326,6 +326,7 @@ export class Toypack extends Hooks {
 
    public resetConfig() {
       this._config = cloneDeep(defaultConfig);
+      this._configHash.current = this._getConfigHash();
    }
 
    public getAssetSources() {

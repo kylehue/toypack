@@ -60,6 +60,7 @@ const toypack = new ToypackESM({
             "react",
             "typescript",
          ],
+         plugins: ["transform-runtime"]
       }),
    ],
    packageManager: {

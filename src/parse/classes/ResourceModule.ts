@@ -7,7 +7,6 @@ export class ResourceModule extends Module {
    constructor(
       public asset: ResourceAsset,
       public source: string,
-      public lang: string,
       public importers: Importers
    ) {
       super("resource");

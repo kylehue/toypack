@@ -5,7 +5,6 @@
 import { expect, it, beforeEach } from "vitest";
 import { Toypack } from "../..";
 import { loadChunk } from "../../src/parse/load-chunk.js";
-import { Loader } from "../../build/types.js";
 
 const unknownPath = "unknown.js";
 const unknownContent = "console.log(null);";
@@ -14,23 +13,20 @@ import "${unknownPath}";
 `;
 const toypack = new Toypack();
 
-const dummyLoader: Loader = {
-   test: /index\.js/g,
-   compile(moduleInfo) {
-      return moduleInfo.content + "\nconsole.log('loader');";
+toypack.usePlugin({
+   name: "dummy-plugin",
+   load: {
+      order: "post",
+      handler(dep) {
+         if (/index\.js/.test(dep.source)) {
+            return dep.content + "\nconsole.log('post');";
+         }
+      },
    },
-};
-
-const dummyLoader2: Loader = {
-   test: /should not match/g,
-   compile(moduleInfo) {
-      return moduleInfo.content + "\nconsole.log('loader2');";
-   },
-};
+});
 
 toypack.usePlugin({
    name: "dummy-plugin",
-   loaders: [dummyLoader, dummyLoader2],
    extensions: [["style", ".cba"]],
    resolve: {
       order: "pre",
@@ -52,16 +48,43 @@ toypack.usePlugin({
    },
 });
 
+toypack.usePlugin({
+   name: "dummy-plugin",
+   load: {
+      handler(dep) {
+         if (/index\.js/.test(dep.source)) {
+            return dep.content + "\nconsole.log('hi');";
+         }
+      },
+   },
+});
+
+toypack.usePlugin({
+   name: "dummy-plugin",
+   load: {
+      order: "pre",
+      handler(dep) {
+         if (/index\.js/.test(dep.source)) {
+            return dep.content + "\nconsole.log('pre');";
+         }
+      },
+   },
+});
+
 beforeEach(async () => {
    toypack.clearAssets();
    toypack.addOrUpdateAsset("index.js", indexJsContent);
    await toypack.run();
 });
 
-it("should load", async () => {
+it("should chain", async () => {
    const loaded = await loadChunk.call(toypack, "/index.js", true, {}, {});
    expect(loaded.content).toEqual(
-      indexJsContent + "\nconsole.log('plugin');" + "\nconsole.log('loader');"
+      indexJsContent +
+         "\nconsole.log('pre');" +
+         "\nconsole.log('plugin');" +
+         "\nconsole.log('hi');" +
+         "\nconsole.log('post');"
    );
 });
 
@@ -79,7 +102,6 @@ it("should accept new extensions", async () => {
       type: "style",
       content: "",
       asset,
-      lang: "cba",
    });
 });
 

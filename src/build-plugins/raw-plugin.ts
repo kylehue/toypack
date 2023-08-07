@@ -4,24 +4,20 @@ import { parseURL } from "../utils";
 export default function (): Plugin {
    return {
       name: "raw-plugin",
-      loaders: [
-         {
-            test(source) {
-               return parseURL(source).params.raw === true;
-            },
-            disableChaining: true,
-            compile(dep) {
-               if (typeof dep.content != "string") {
-                  this.emitError("Blob contents are not supported.");
-                  return;
-               }
+      load: {
+         chaining: false,
+         handler(moduleInfo) {
+            if (parseURL(moduleInfo.source).params.raw !== true) return;
+            if (typeof moduleInfo.content != "string") {
+               this.emitError("Blob contents are not supported.");
+               return;
+            }
 
-               return {
-                  type: "script",
-                  content: this.getDefaultExportCode(`\`${dep.content}\``),
-               };
-            },
+            return {
+               type: "script",
+               content: this.getDefaultExportCode(`\`${moduleInfo.content}\``),
+            };
          },
-      ],
+      },
    };
 }

@@ -72,7 +72,10 @@ export function formatEsm(
          } else if (type == "default") {
             const id = getIdWithError.call(this, importInfo.source, "default");
             renameBinding(module, binding, id);
-            specifiers[id] = importDefaultSpecifier(identifier(id));
+            specifiers[id] = importSpecifier(
+               identifier(id),
+               identifier("default"),
+            );
          } else if (type == "namespace") {
             const id = getNamespaceWithError.call(this, source);
             renameBinding(module, binding, id);

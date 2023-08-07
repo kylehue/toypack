@@ -6,7 +6,7 @@ import {
    NodeType,
    Options,
 } from "node-html-parser";
-import { PluginContext, Loader, Plugin, Toypack } from "../types.js";
+import { PluginContext, Plugin, Toypack } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
 import { indexToPosition } from "../utils/find-code-position.js";
 import path from "path-browserify";
@@ -21,11 +21,10 @@ const resourceSrcAttrTags = [
    "VIDEO",
 ];
 
-const injectHtmlKey = "***html***";
 const linkTagRelDeps = ["stylesheet", "icon"];
 let _id = 0;
 
-function traverse(ast: AST, callback: ITraverseCallback) {
+function traverse(ast: AST, callback: TraverseCallback) {
    if (!ast) return;
 
    callback(ast);
@@ -168,89 +167,73 @@ function injectAstToHtml(bundler: Toypack, astToInject: HTMLElement) {
    });
 }
 
-interface HTMLModule {
-   source: string;
-   ast: HTMLElement;
-}
-
-function htmlLoader(options?: HTMLPluginOptions): Loader {
-   return {
-      test: /\.html$/,
-      compile(moduleInfo) {
-         if (typeof moduleInfo.content != "string") {
-            this.emitError("Blob contents are not supported.");
-            return;
-         }
-
-         let mainVirtualModule = "";
-
-         const compiled = compile.call(
-            this,
-            moduleInfo.source,
-            moduleInfo.content,
-            options
-         );
-
-         // Import dependencies
-         for (const depSource of compiled.dependencies) {
-            mainVirtualModule += this.getImportCode(depSource) + "\n";
-         }
-
-         // Import inline styles as a virtual module
-         if (compiled.bundledInlineStyles.length) {
-            const styleVirtualId = `virtual:${
-               moduleInfo.source
-            }?style&index=${_id++}`;
-            this.setCache(styleVirtualId, {
-               type: "style",
-               lang: "css",
-               content: compiled.bundledInlineStyles,
-            });
-            mainVirtualModule += this.getImportCode(styleVirtualId);
-         }
-
-         this.setCache(moduleInfo.source, {
-            source: moduleInfo.source,
-            content: mainVirtualModule,
-            resourceDependencies: compiled.resourceDependencies,
-         });
-
-         this.setCache<HTMLModule>(injectHtmlKey, {
-            source: moduleInfo.source,
-            ast: compiled.ast,
-         });
-
-         injectAstToHtml(this.bundler, compiled.ast);
-
-         return mainVirtualModule;
-      },
-   };
-}
-
 export default function (options?: HTMLPluginOptions): Plugin {
-   let injectedHtml: HTMLModule | null = null;
    return {
       name: "html-plugin",
-      loaders: [htmlLoader(options)],
       extensions: [["script", ".html"]],
       buildStart() {
          // Remove in plugin's cache if the asset no longer exists
-         this.eachCache((_, source) => {
-            if (this.bundler.getAsset(source as string)) return;
-            if (source != injectHtmlKey) {
-               this.removeCache(source);
-            }
-            if (injectedHtml?.source == source) {
-               this.removeCache(injectHtmlKey);
-            }
+         this.cache.forEach((_, source) => {
+            if (this.bundler.getAsset(source)) return;
+            this.cache.delete(source);
          });
       },
-      load(moduleInfo) {
-         if (moduleInfo.type != "virtual") return;
-         return this.getCache(moduleInfo.source);
+      load: {
+         handler(moduleInfo) {
+            const cached = this.cache.get(moduleInfo.source);
+            if (typeof cached?.content === "string") {
+               return {
+                  type: "style",
+                  content: cached.content,
+               };
+            }
+
+            // guard
+            const isHtml = /\.html$/.test(moduleInfo.source.split("?")[0]);
+            if (!isHtml) return;
+            
+            if (typeof moduleInfo.content != "string") {
+               this.emitError("Blob contents are not supported.");
+               return;
+            }
+
+            let mainVirtualModule = "";
+
+            const compiled = compile.call(
+               this,
+               moduleInfo.source,
+               moduleInfo.content,
+               options
+            );
+
+            // Import dependencies
+            for (const depSource of compiled.dependencies) {
+               mainVirtualModule += this.getImportCode(depSource) + "\n";
+            }
+
+            // Import inline styles as a virtual module
+            if (compiled.bundledInlineStyles.length) {
+               const styleId = `virtual:${
+                  moduleInfo.source
+               }?style&index=${_id++}`;
+               this.cache.set(styleId, {
+                  content: compiled.bundledInlineStyles,
+                  from: moduleInfo.source,
+               });
+               mainVirtualModule += this.getImportCode(styleId);
+            }
+
+            this.cache.set(moduleInfo.source, {
+               resourceDependencies: compiled.resourceDependencies,
+            });
+
+            injectAstToHtml(this.bundler, compiled.ast);
+
+            return mainVirtualModule;
+         },
       },
       parsed({ chunk, parsed }) {
-         const cached = this.getCache(chunk.source);
+         const cached = this.cache.get(chunk.source);
          if (!cached) return;
          cached.resourceDependencies?.forEach((item: any) =>
             parsed.dependencies.add(item)
@@ -260,7 +243,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
 }
 
 type AST = HTMLElement | Node;
-type ITraverseCallback = (node: AST) => void;
+type TraverseCallback = (node: AST) => void;
 export interface HTMLPluginOptions {
    parserOptions?: Partial<Options>;
 }

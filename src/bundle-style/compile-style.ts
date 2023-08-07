@@ -85,13 +85,11 @@ export function compileStyle(this: Toypack, chunk: StyleModule) {
    }
 
    // Cache
-   if (!cached || chunk.asset.modified) {
-      this._setCache(chunk.source, {
-         content: result.content,
-         map: result.map,
-         importers: chunk.importers,
-      });
-   }
+   this._setCache(chunk.source, {
+      content: result.content,
+      map: result.map,
+      importers: chunk.importers,
+   });
 
    return result;
 }

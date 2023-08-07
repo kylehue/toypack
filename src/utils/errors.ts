@@ -7,12 +7,10 @@ export function any(reason: string): Error {
    };
 }
 
-export function loadFailure(source: string, lang?: string): Error {
+export function loadFailure(source: string): Error {
    return {
       code: 1,
-      reason: `Failed to load '${source}'. You might want to add a plugin for ${
-         lang ? `'${lang}'` : "this"
-      } file type.`,
+      reason: `Failed to load '${source}'. You might want to add a plugin for this file type.`,
    };
 }
 

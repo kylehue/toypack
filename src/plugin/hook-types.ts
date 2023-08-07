@@ -59,6 +59,7 @@ export type SetupHook = (this: PluginContextBase) => void;
 // Context
 export interface PluginContextBase {
    bundler: Toypack;
+   cache: Map<any, any>;
    /**
     * Convert a resource's source path to a useable source path.
     * If in development mode, the resource path will become a blob url.
@@ -82,16 +83,6 @@ export interface PluginContextBase {
    emitWarning: (message: string) => void;
    /** Emits an info message. */
    emitInfo: (message: string) => void;
-   /** Adds an item in the plugin's cache. */
-   setCache: <T = any>(key: any, value: T) => T;
-   /** Retrieves an item in the plugin's cache. */
-   getCache: <T = any>(key: any) => T | undefined;
-   /** Removes an item in the plugin's cache. */
-   removeCache: (key: any) => void;
-   /** Performs the specified action for each cache. */
-   eachCache: (
-      callback: (value: any, key: any) => void
-   ) => void;
 }
 
 export interface PluginContext extends PluginContextBase {
