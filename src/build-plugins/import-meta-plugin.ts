@@ -65,16 +65,15 @@ function transformMetaUrl(path: NodePath<MemberExpression>, source: string) {
 export default function (): Plugin {
    return {
       name: "import-meta-plugin",
-      transform(context) {
-         if (context.type != "script") return;
-         context.traverse({
+      transform(source) {
+         return {
             MemberExpression(path) {
-               transformMetaUrl(path, context.source);
+               transformMetaUrl(path, source);
             },
             CallExpression: (path) => {
-               transformMetaResolve.call(this, context.source, path);
+               transformMetaResolve.call(this, source, path);
             },
-         });
+         };
       },
    };
 }

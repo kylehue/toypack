@@ -89,14 +89,10 @@ export async function parseScriptAsset(
 
    await this._pluginManager.triggerHook({
       name: "transform",
-      args: [
-         {
-            type: "script",
-            traverse,
-            source,
-            content,
-         },
-      ],
+      args: [source, content, result.ast],
+      callback(result) {
+         traverse(result);
+      },
    });
 
    // Extract dependencies

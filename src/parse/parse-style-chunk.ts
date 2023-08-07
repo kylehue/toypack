@@ -45,17 +45,11 @@ export async function parseStyleAsset(
    result.ast = AST;
 
    await this._pluginManager.triggerHook({
-      name: "transform",
-      args: [
-         {
-            type: "style",
-            traverse: (opts) => {
-               cssTree.walk(result.ast, opts);
-            },
-            source,
-            content,
-         },
-      ],
+      name: "transformStyle",
+      args: [source, content, result.ast],
+      callback(opts) {
+         cssTree.walk(result.ast, opts);
+      },
    });
 
    // Extract dependencies

@@ -1,4 +1,5 @@
 import { TraverseOptions } from "@babel/traverse";
+import { File } from "@babel/types";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
 import { Asyncify } from "type-fest";
 import { Importers } from "../parse/index.js";
@@ -16,20 +17,6 @@ import type {
 } from "src/types";
 
 // Interfaces
-export interface ScriptTransformContext {
-   type: "script";
-   traverse: (options: TraverseOptions) => void;
-   source: string;
-   content: string;
-}
-
-export interface StyleTransformContext {
-   type: "style";
-   traverse: (options: EnterOrLeaveFn<CssNode> | WalkOptions) => void;
-   source: string;
-   content: string;
-}
-
 export type ParseInfo =
    | {
         type: "script";
@@ -50,13 +37,21 @@ export type LoadHook = (
 
 export type ResolveHook = (this: PluginContext, id: string) => string | void;
 
-export type TransformHook = (
+export type TransformScriptHook = (
    this: PluginContextBase,
-   context: ScriptTransformContext | StyleTransformContext
-) => void;
+   source: string,
+   content: string,
+   ast: File
+) => TraverseOptions | void;
+
+export type TransformStyleHook = (
+   this: PluginContextBase,
+   source: string,
+   content: string,
+   ast: CssNode
+) => EnterOrLeaveFn<CssNode> | WalkOptions | void;
 
 export type ParsedHook = (this: PluginContext, parseInfo: ParseInfo) => void;
-
 export type StartHook = (this: PluginContextBase) => void;
 export type EndHook = (this: PluginContextBase, result: BundleResult) => void;
 export type SetupHook = (this: PluginContextBase) => void;
@@ -138,8 +133,10 @@ export interface PluginHooks {
    load: LoadHook | ConfigurableHook<LoadHook>;
    /** Hook called everytime a module needs to be resolved. */
    resolve: ResolveHook | ConfigurableHook<ResolveHook>;
-   /** Hook called everytime a module needs to be transformed. */
-   transform: TransformHook | ConfigurableHook<TransformHook>;
+   /** Hook called everytime a script module needs to be transformed. */
+   transform: TransformScriptHook | ConfigurableHook<TransformScriptHook>;
+   /** Hook called everytime a style module needs to be transformed. */
+   transformStyle: TransformStyleHook | ConfigurableHook<TransformStyleHook>;
    /** Hook called at the start of getting the dependency graph. */
    buildStart: StartHook | ConfigurableHook<StartHook>;
    /** Hook called at the end of the bundling process. */

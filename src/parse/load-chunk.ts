@@ -124,20 +124,20 @@ export async function loadChunk(
 
    // Load with loaders
    const formattedSource = appendLangToRawSource(rawSource, moduleInfo);
-   let isLoaded = false;
+   let isLoadedThroughLoader = false;
    await this._pluginManager.useLoaders(
       formattedSource,
       graph,
       importers,
       moduleInfo,
       (result) => {
-         isLoaded = true;
+         isLoadedThroughLoader = true;
          handleLoad(result);
       }
    );
 
    const sourceType = this._getTypeFromSource(formattedSource);
-   const isNotLoaded = !isSupported(formattedSource) && !isLoaded;
+   const isNotLoaded = !isSupported(formattedSource) && !isLoadedThroughLoader;
    const isStillVirtual = moduleInfo.type == "virtual" && !sourceType;
    if (isNotLoaded || isStillVirtual) {
       this._pushToDebugger(
