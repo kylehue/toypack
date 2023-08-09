@@ -1,5 +1,5 @@
 import type { PackageAsset } from "./package-manager/fetch-package";
-import type { Asset, Error } from "./types";
+import type { Asset, BundleResult, Error } from "./types";
 
 const eventMap = {
    onError: (error: Error) => undefined,
@@ -7,6 +7,7 @@ const eventMap = {
    onAddOrUpdateAsset: (asset: Asset) => undefined,
    onRemoveAsset: (asset: Asset) => undefined,
    onResolve: (resolveInfo: ResolveInfo) => undefined,
+   onRun: (bundle: BundleResult) => undefined,
 } as const;
 
 export class Hooks implements IHooks {
@@ -92,6 +93,13 @@ export class Hooks implements IHooks {
     */
    onResolve(callback: EventMap["onResolve"]): Function {
       return this._createListener("onResolve", callback);
+   }
+
+   /**
+    * Emit a function every bundle execution.
+    */
+   onRun(callback: EventMap["onRun"]): Function {
+      return this._createListener("onRun", callback);
    }
 }
 
