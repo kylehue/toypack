@@ -19,6 +19,7 @@ import type {
    TextAsset,
    Error,
    ScriptModule,
+   BundleResult,
 } from "./types";
 import {
    ERRORS,
@@ -61,6 +62,7 @@ export class Toypack extends Hooks {
       info: [] as string[],
       verbose: [] as string[],
    };
+   private _lastBundleResult: BundleResult | null = null;
    protected _uidTracker = new UidTracker();
    protected _uidGenerator = new UidGenerator();
    protected _virtualAssets = new Map<string, Asset>();
@@ -165,6 +167,13 @@ export class Toypack extends Hooks {
       return getHash(JSON.stringify(config));
    }
 
+   private _clearDebugger() {
+      this._debugger.error = [];
+      this._debugger.info = [];
+      this._debugger.warning = [];
+      this._debugger.verbose = [];
+   }
+
    public getPackageProviders() {
       return this._packageProviders;
    }
@@ -258,6 +267,10 @@ export class Toypack extends Hooks {
 
          this.config.plugins.push(plugin);
       }
+
+      if (plugins.length) {
+         this.clearCache();
+      }
    }
 
    /**
@@ -268,6 +281,7 @@ export class Toypack extends Hooks {
    public removePlugin(plugin: Plugin) {
       this._pluginManager.removePlugin(plugin);
       this.config.plugins.splice(this.config.plugins.indexOf(plugin), 1);
+      this.clearCache();
    }
 
    public setConfig(config: PartialDeep<ToypackConfig>) {
@@ -502,15 +516,18 @@ export class Toypack extends Hooks {
     * @param source The source where all the assets will be removed.
     */
    public removeDirectory(source: string) {
-      if (!source) return;
-      if (source.startsWith("virtual:")) return;
+      const removedAssets: Asset[] = [];
+      if (!source) return removedAssets;
+      if (source.startsWith("virtual:")) return removedAssets;
       source = path.join("/", source);
-
       for (const [_, asset] of this._assets) {
          if (asset.source.startsWith(source) && asset.source != source) {
             this.removeAsset(asset.source);
+            removedAssets.push(asset);
          }
       }
+
+      return removedAssets;
    }
 
    /**
@@ -549,6 +566,7 @@ export class Toypack extends Hooks {
          const isDisposable = isVirtual && isUnused && isDependentChunk;
          if (item.source == asset.source || isDisposable) {
             map.delete(key);
+            this._uidTracker.remove(item.source);
             if (isVirtual) this.removeAsset(item.source);
          }
       });
@@ -556,11 +574,48 @@ export class Toypack extends Hooks {
       this._trigger("onRemoveAsset", asset);
    }
 
-   private _clearDebugger() {
-      this._debugger.error = [];
-      this._debugger.info = [];
-      this._debugger.warning = [];
-      this._debugger.verbose = [];
+   /**
+    * Moves an asset.
+    * @param oldSource The source of the asset to move.
+    * @param newSource The target source of the asset.
+    * @returns The moved asset.
+    */
+   moveAsset(oldSource: string, newSource: string) {
+      const oldAsset = this.getAsset(oldSource);
+      if (!oldAsset) return;
+      const newAsset = this.addOrUpdateAsset(newSource, oldAsset.content);
+      newAsset.metadata = oldAsset.metadata;
+      this.removeAsset(oldAsset.source);
+      return newAsset;
+   }
+
+   /**
+    * Moves a directory.
+    * @param oldSource The source of the directory to move.
+    * @param newSource The target source of the directory.
+    */
+   moveDirectory(oldSource: string, newSource: string) {
+      const movedAssets: {
+         oldSource: string;
+         newSource: string;
+         asset: Asset;
+      }[] = [];
+      for (const [_, oldAsset] of this._assets) {
+         if (!oldAsset.source.startsWith(oldSource)) continue;
+         const newAsset = this.moveAsset(oldAsset.source, newSource);
+         if (!newAsset) continue;
+         movedAssets.push({
+            oldSource: oldAsset.source,
+            newSource: newAsset.source,
+            asset: newAsset,
+         });
+      }
+
+      return movedAssets;
+   }
+
+   getLastBundleResult() {
+      return this._lastBundleResult;
    }
 
    /**
@@ -585,6 +640,7 @@ export class Toypack extends Hooks {
       if (this._iframe && this._config.bundle.mode == "development") {
          this._iframe.srcdoc = result.html.content;
       }
+      this._lastBundleResult = result;
 
       // Log debug stuff
       const totalGraphTime = Math.round(timeAfterGraph - timeBeforeGraph);
@@ -634,6 +690,8 @@ export class Toypack extends Hooks {
             asset.modified = false;
          });
       });
+
+      this._trigger("onRun", result);
 
       return result;
    }
