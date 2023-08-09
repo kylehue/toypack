@@ -1,28 +1,133 @@
+:root {
+   --accent: mediumslateblue;
+}
+
 html,
-body {
-   height: 100vh;
-   width: 100vw;
-   margin: 0;
-   background-color: #23272e;
-   color: #d2d3d7;
-}
-
-#app {
-   height: 100%;
-   width: 100%;
-}
-
-* {
-   box-sizing: border-box;
-}
-
 body {
    display: flex;
    flex-direction: column;
+   height: 100vh;
+   width: 100vw;
+   margin: 0;
+   background-color: #151515;
+   color: #d2d3d7;
 }
 
-iframe {
-   border: 5px solid black;
-   width: 800px;
-   height: 500px;
+::-webkit-scrollbar {
+   width: 10px;
+   height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+   background: none;
+}
+
+::-webkit-scrollbar-thumb {
+   background-color: rgba(122, 122, 122, 0.2);
+   transition: background-color 100ms;
+}
+
+::-webkit-scrollbar-thumb:hover {
+   background-color: rgba(122, 122, 122, 0.3);
+}
+
+
+.container-navbar {
+   height: 40px;
+   background-color: #1a1a1b;
+}
+
+.container-files {
+   background-color: #151515;
+   width: 250px;
+   overflow: hidden;
+}
+
+.container-monaco {
+}
+
+.container-preview {
+}
+
+#preview {
+   background-color: white;
+}
+
+button {
+   border: none;
+   box-shadow: 0 0 0 1px #151515;
+   background-color: mediumslateblue;
+   transition: background-color 100ms;
+   color: #151515;
+   font-weight: 600;
+   padding: 3px 15px;
+   border-radius: 3px;
+   font-size: 0.9em;
+}
+
+button:hover {
+   background-color: rgb(139, 120, 246);
+}
+
+button:active {
+   background-color: rgb(159, 143, 252);
+}
+
+button.button-secondary {
+   box-shadow: none;
+   background-color: transparent;
+   color: var(--accent);
+   transition: border 100ms;
+}
+
+button.button-secondary:hover {
+   box-shadow: 0 0 0 1px var(--accent);
+}
+
+.icon-button {
+   background: none !important;
+   color: white;
+   font-weight: bold;
+   opacity: 0.5;
+   transition: opacity 100ms;
+}
+
+.icon-button:hover {
+   opacity: 1;
+}
+
+.drawer-file {
+   padding: 0 5px;
+}
+
+.drawer-animated .drawer-file,
+.drawer-animated .drawer-folder-head {
+   transition-duration: 100ms !important;
+}
+
+.drawer-animated .drawer-indent-guide {
+   transition-duration: 100ms !important;
+}
+
+.drawer-animated .drawer-folder-icon-chevron {
+   transition-duration: 100ms !important;
+}
+
+.splash-screen {
+   position: absolute;
+   display: flex;
+   flex-direction: row;
+   align-items: center;
+   justify-content: center;
+   width: 100vw;
+   height: 100vh;
+   z-index: 1000;
+   background-color: #151515;
+}
+
+.splash-screen.hidden {
+   opacity: 0;
+   transition: 300ms;
+   pointer-events: none;
 }

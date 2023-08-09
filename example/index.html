@@ -1,18 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Example</title>
-  </head>
-  <body>
-    <div id="app">
-      <div class="">
-         <button id="runSandbox">Run</button>
-         <button id="download">Download</button>
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Example</title>
+      <link rel="stylesheet" href="./src/style.css" />
+   </head>
+   <body>
+      <div class="splash-screen">
+         <h3>Loading...</h3>
       </div>
-      <iframe style="background:white;" id="sandbox" frameborder="0"></iframe>
-    </div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+      <nav
+         class="container-navbar d-flex flex-row flex-shrink-0 align-items-center justify-content-between ps-3 pe-3"
+      >
+         <div class="left">
+            <h6 class="m-0">Playground</h6>
+         </div>
+         <div class="right">
+            <button id="download" class="button-secondary">
+               <span class="bi bi-download"></span>
+               Download
+            </button>
+            <button id="reset-cache" class="button-secondary">Reset</button>
+            <button id="toggle-preview" class="button-secondary">
+               <span class="text">View Bundle</span>
+            </button>
+            <button id="toggle-auto-run" class="button-secondary">
+               <span class="text">Enable Auto-run</span>
+            </button>
+            <button id="run">
+               <span class="bi bi-play-fill"></span>
+               Run
+            </button>
+         </div>
+      </nav>
+      <main class="d-flex flex-row w-100 flex-grow-1 overflow-hidden">
+         <div class="container-files d-flex flex-column h-100 flex-shrink-0">
+            <div
+               class="header d-flex align-items-center justify-content-between w-100 p-2"
+            >
+               <p class="fw-bold m-0">Files</p>
+               <button id="add-file" class="icon-button">
+                  <span class="bi bi-plus"></span>
+               </button>
+            </div>
+            <div class="body w-100 h-100"></div>
+         </div>
+         <div class="container-monaco d-flex h-100 w-50"></div>
+         <div class="container-preview d-flex h-100 w-50">
+            <iframe id="preview" class="w-100 h-100"></iframe>
+            <div id="preview-bundle" class="w-100 h-100 d-none"></div>
+         </div>
+      </main>
+      <script type="module" src="/src/index.ts"></script>
+   </body>
 </html>

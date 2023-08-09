@@ -1,6 +1,6 @@
 // @ts-nocheck
 /* Package related tests */
-// import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
+import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "../react";
 import "../vue";

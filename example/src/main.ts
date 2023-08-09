@@ -1,115 +1,98 @@
-import "./style.css";
+import * as monaco from "monaco-editor";
+import { editor } from "./monaco";
+import { drawer } from "./drawer";
+import { toypack } from "./toypack";
+import { FileManager } from "./file-manager";
 import testFiles from "./generated/test-files";
-import { Toypack as ToypackESM } from "toypack";
-import vuePlugin from "toypack-vue";
-import sassPlugin from "toypack-sass";
-import babelPlugin from "toypack-babel";
 
-var saveData = (function () {
-   var a = document.createElement("a");
-   document.body.appendChild(a);
-   a.style.display = "none";
-   return function (data: any, fileName: string, type: string) {
-      var blob = new Blob([data], { type }),
-         url = window.URL.createObjectURL(blob);
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      window.URL.revokeObjectURL(url);
-   };
-})();
+const fileManager = new FileManager(editor, drawer, toypack);
 
-const iframe = document.querySelector<HTMLIFrameElement>("#sandbox")!;
-const runButton = document.querySelector<HTMLButtonElement>("#runSandbox")!;
-const downloadButton = document.querySelector<HTMLButtonElement>("#download")!;
-const toypack = new ToypackESM({
-   bundle: {
-      entry: "index.html",
-      resolve: {
-         alias: {
-            "@classes": "/classes/",
-         },
-         fallback: {
-            path: false,
-         },
-      },
-      mode: "development",
-      sourceMap: {
-         exclude: ["/node_modules/"],
-      },
-   },
-   parser: {
-      plugins: ["typescript", "jsx"],
-   },
-   plugins: [
-      vuePlugin({
-         featureFlags: {
-            __VUE_OPTIONS_API__: false,
-            __VUE_PROD_DEVTOOLS__: false,
-         },
-      }),
-      sassPlugin(),
-      babelPlugin({
-         presets: [
-            [
-               "env",
-               {
-                  modules: false,
-               },
-            ],
-            "react",
-            "typescript",
-         ],
-         plugins: ["transform-runtime"]
-      }),
-   ],
-   packageManager: {
-      // dts: true,
-      // onDts(dts) {
-      //    console.log(dts);
-      // },
-   },
-   logLevel: "verbose",
+const addFileButton = document.querySelector("#add-file") as HTMLButtonElement;
+addFileButton.addEventListener("click", () => {
+   const source = window.prompt("Enter the path");
+   if (!source) return;
+   fileManager.addFile(source, "");
 });
 
-// await toypack.installPackage("react");
-// await toypack.installPackage("vue", "3.1.2");
-// await toypack.installPackage("matter-js");
-// await toypack.installPackage("react", "18");
-// await toypack.installPackage("react-dom/client", "18");
-// await toypack.installPackage("vue");
-// await toypack.installPackage("canvas-confetti");
-// await toypack.installPackage("path-browserify");
-// await toypack.installPackage("is-odd");
-
+console.log(monaco, editor, drawer, toypack);
 (window as any).toypack = toypack;
-console.log(toypack);
+(window as any).monaco = monaco;
+(window as any).drawer = drawer;
+(window as any).toypack = toypack;
 
-runButton.onclick = async () => {
-   console.log(await toypack.run());
-};
-
-downloadButton.onclick = async () => {
-   toypack.setConfig({ bundle: { mode: "production" } });
-   let result = await toypack.run();
-   toypack.setConfig({ bundle: { mode: "development" } });
-
-   for (let resource of result.resources) {
-      saveData(resource.content, resource.source, resource.content.type);
-   }
-
-   saveData(result.js.content, result.js.source, "application/javascript");
-   saveData(result.css.content, result.css.source, "text/css");
-   saveData(result.html.content, result.html.source, "text/html");
-};
-
-toypack.setIFrame(iframe);
-
-for (let [source, content] of Object.entries(testFiles)) {
-   toypack.addOrUpdateAsset(source, content);
+for (const [source, content] of Object.entries(testFiles)) {
+   fileManager.addFile(source, window.localStorage.getItem(source) || content);
 }
 
-console.log(await toypack.run());
+// Setup bundle code preview
+const previewBundle = document.querySelector("#preview-bundle") as HTMLElement;
+const previewIframe = document.querySelector("#preview") as HTMLIFrameElement;
+const togglePreviewButton = document.querySelector(
+   "#toggle-preview"
+) as HTMLButtonElement;
+const previewBundleModel = monaco.editor.createModel("", "javascript");
+monaco.editor.create(previewBundle, {
+   readOnly: true,
+   wordWrap: "on",
+   model: previewBundleModel,
+   automaticLayout: true,
+});
+togglePreviewButton.onclick = () => {
+   const textEl = togglePreviewButton.querySelector(".text")!;
+   const text = textEl.textContent?.trim();
+   if (text == "View Bundle") {
+      previewIframe.classList.add("d-none");
+      previewBundle.classList.remove("d-none");
+      textEl.textContent = "View HTML";
+   } else {
+      previewIframe.classList.remove("d-none");
+      previewBundle.classList.add("d-none");
+      textEl.textContent = "View Bundle";
+   }
+};
+toypack.onRun((bundle) => {
+   previewBundleModel.setValue(bundle.js.content);
+});
+
+// Setup auto-run
+const toggleAutoRunButton = document.querySelector(
+   "#toggle-auto-run"
+) as HTMLButtonElement;
+let autoRun = false;
+toggleAutoRunButton.onclick = () => {
+   const textEl = toggleAutoRunButton.querySelector(".text")!;
+   let text = textEl.textContent?.trim();
+   if (text == "Enable Auto-run") {
+      textEl.textContent = "Disable Auto-run";
+      autoRun = true;
+   } else {
+      textEl.textContent = "Enable Auto-run";
+      autoRun = false;
+   }
+};
+const autoRunDelayInMs = 500;
+const timers: NodeJS.Timeout[] = [];
+editor.onDidChangeModelContent(() => {
+   if (autoRun) {
+      for (const timer of timers) {
+         clearTimeout(timer);
+         timers.splice(timers.indexOf(timer), 1);
+      }
+      const timer = setTimeout(() => {
+         toypack.run();
+      }, autoRunDelayInMs);
+      timers.push(timer);
+   }
+});
+
+// Setup resetting cache
+const resetCacheButton = document.querySelector(
+   "#reset-cache"
+) as HTMLButtonElement;
+resetCacheButton.onclick = () => {
+   // drawer.root.delete("/");
+   window.localStorage.clear();
+};
 
 // hot reload
 import.meta.hot?.accept();
