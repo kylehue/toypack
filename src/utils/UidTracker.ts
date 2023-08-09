@@ -55,6 +55,10 @@ export class UidTracker {
       this._map.clear();
    }
 
+   public remove(source: string) {
+      this._map.delete(source);
+   }
+
    public getNamespaceFor(source: string) {
       const namespace = this._map.get(source)?.namespace;
       return namespace;

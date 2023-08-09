@@ -9,7 +9,6 @@ export function createAsset<T extends string | Blob>(
       source,
       metadata: options?.metadata || {},
       modified: false,
-      forceContentTypeAs: options?.forceContentTypeAs,
    };
 
    let asset: Asset;
@@ -35,14 +34,12 @@ export function createAsset<T extends string | Blob>(
 export interface AssetOptions {
    metadata?: AssetBase["metadata"];
    map?: EncodedSourceMap | null;
-   forceContentTypeAs?: "script" | "style";
 }
 
 interface AssetBase {
    source: string;
    modified: boolean;
    metadata: Record<string, any>;
-   forceContentTypeAs?: "script" | "style";
 }
 
 export interface ResourceAsset extends AssetBase {
