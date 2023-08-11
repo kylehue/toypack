@@ -1,11 +1,13 @@
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 
+let id = 0;
 export function createAsset<T extends string | Blob>(
    source: string,
    content: T,
    options?: AssetOptions
 ): Asset<T> {
    const common = {
+      id: `$${id++}`,
       source,
       metadata: options?.metadata || {},
       modified: false,
@@ -37,6 +39,7 @@ export interface AssetOptions {
 }
 
 interface AssetBase {
+   id: string;
    source: string;
    modified: boolean;
    metadata: Record<string, any>;
