@@ -19,12 +19,21 @@ export class FileManager {
       private _drawer: Drawer,
       private _bundler: Toypack
    ) {
-      _drawer.onDidClickItem(({ item }) => {
+      _drawer.onDidClickItem(({ item, event }) => {
+         if (event.ctrlKey) {
+            if (item.type === "file") {
+               this.removeFile(item.source);
+            } else {
+               this.removeDirectory(item.source);
+            }
+         }
+
          if (item.type != "file") return;
          const clickedItem = this._stored.get(item.source);
          if (!clickedItem?.monacoModel) return;
          this._editor.setModel(clickedItem.monacoModel);
          this._editor.focus();
+         
       });
 
       _drawer.onDidRenameItem((event) => {
