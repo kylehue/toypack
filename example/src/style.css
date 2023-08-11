@@ -57,7 +57,7 @@ body {
 button {
    border: none;
    box-shadow: 0 0 0 1px #151515;
-   background-color: mediumslateblue;
+   background-color: rgb(123, 104, 238);
    transition: background-color 100ms;
    color: #151515;
    font-weight: 600;
@@ -67,22 +67,24 @@ button {
 }
 
 button:hover {
-   background-color: rgb(139, 120, 246);
+   background-color: rgb(92, 74, 182);
 }
 
 button:active {
-   background-color: rgb(159, 143, 252);
+   background-color: rgb(74, 54, 139);
 }
 
 button.button-secondary {
    box-shadow: none;
    background-color: transparent;
-   color: var(--accent);
-   transition: border 100ms;
+   transition-duration: 100ms;
+   transition-property: box-shadow, color;
+   color: rgb(130, 130, 133);
 }
 
 button.button-secondary:hover {
    box-shadow: 0 0 0 1px var(--accent);
+   color: var(--accent);
 }
 
 .icon-button {

@@ -26,14 +26,14 @@ function createIconFromPaths(paths: string, size = 24, color = "red") {
 const drawer = new Drawer({
    element: document.querySelector(".container-files > .body") as HTMLElement,
    fileIcon: (source) => {
-      if (/\.js$/.test(source)) {
+      if (/\.(js|mjs|cjs)$/.test(source)) {
          return createIconFromPaths(mdiLanguageJavascript, 20, "#ffda4b");
-      } else if (/\.ts$/.test(source)) {
+      } else if (/\.(ts|mts|cts)$/.test(source)) {
          return createIconFromPaths(mdiLanguageTypescript, 20, "#62bcd3");
       } else if (/\.css$/.test(source)) {
          return createIconFromPaths(mdiLanguageCss3, 20, "#66d3ff");
       } else if (/\.(sass|scss)$/.test(source)) {
-         return createIconFromPaths(mdiSass, 20, "#ff818c");
+         return createIconFromPaths(mdiSass, 20, "#ff5665");
       } else if (/\.html$/.test(source)) {
          return createIconFromPaths(mdiLanguageHtml5, 20, "#dd7934");
       } else if (/\.vue$/.test(source)) {
