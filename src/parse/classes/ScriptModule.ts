@@ -2,27 +2,27 @@ import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { NodePath } from "@babel/traverse";
 import { File, Program } from "@babel/types";
 import { Module } from "./Module";
-import { Exports } from "../extract-exports";
-import { Imports } from "../extract-imports";
 import { Importers } from "../index";
-import type { Asset, ImportInfo, ExportInfo } from "src/types";
+import { GroupedExports } from "../extract-exports";
+import { GroupedImports } from "../extract-imports";
+import type { Asset, ExportInfo, ImportInfo } from "src/types";
 
 export class ScriptModule extends Module {
    public type = "script" as const;
    public dependencyMap = new Map<string, string>();
    constructor(
-      public asset: Asset,
+      asset: Asset,
       public source: string,
       public content: string,
       public importers: Importers,
       public ast: File,
       public isEntry: boolean = false,
-      public exports: Exports,
-      public imports: Imports,
+      public exports: GroupedExports,
+      public imports: GroupedImports,
       public programPath: NodePath<Program>,
       public map?: EncodedSourceMap | null
    ) {
-      super("script");
+      super("script", asset);
    }
 
    public getExports<T extends ExportInfo["type"][]>(

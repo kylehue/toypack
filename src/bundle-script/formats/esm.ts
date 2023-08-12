@@ -10,7 +10,6 @@ import {
    exportSpecifier,
    identifier,
    importDeclaration,
-   importDefaultSpecifier,
    importNamespaceSpecifier,
    importSpecifier,
    stringLiteral,
@@ -19,19 +18,21 @@ import { getLibImports } from "../utils/get-lib-imports";
 import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
 import { renameBinding } from "../utils/renamer";
 import { CompilationChunks } from "..";
-import type { ScriptModule, Toypack } from "src/types";
 import { isValidVar } from "../utils/is-valid-var";
+import { ModuleDescriptor } from "../utils/module-descriptor";
+import { UidTracker } from "../link/UidTracker";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
 }
 
 export function formatEsm(
-   this: Toypack,
+   uidTracker: UidTracker,
    chunks: CompilationChunks,
-   scriptModules: ScriptModule[]
+   moduleDescriptors: ModuleDescriptor[]
 ) {
-   const libImports = getLibImports(scriptModules);
+   const modules = moduleDescriptors.map((x) => x.module);
+   const libImports = getLibImports(modules);
    const importDecls: Record<
       string,
       {
@@ -46,9 +47,13 @@ export function formatEsm(
          string,
          ImportDefaultSpecifier | ImportNamespaceSpecifier | ImportSpecifier
       > = {};
-      importDecls[source] ??= {};
       const sourceStringNode = stringLiteral(source);
+      importDecls[source] ??= {};
       for (const { importInfo, module } of importInfos) {
+         const moduleDescriptor = moduleDescriptors.find(
+            (x) => x.module.source === module.source
+         )!;
+
          if (
             importInfo.type != "default" &&
             importInfo.type != "specifier" &&
@@ -63,24 +68,32 @@ export function formatEsm(
          const binding = importScope.getBinding(local)!;
          if (type == "specifier") {
             const imported = getStringOrIdValue(specifier.imported);
-            const id = getIdWithError.call(this, importInfo.source, imported);
-            renameBinding(module, binding, id);
-            specifiers[id] = importSpecifier(
-               identifier(id),
+            const newName = getIdWithError(
+               uidTracker,
+               importInfo.source,
+               imported
+            );
+            renameBinding(binding, newName, moduleDescriptor);
+            specifiers[newName] = importSpecifier(
+               identifier(newName),
                specifier.imported
             );
          } else if (type == "default") {
-            const id = getIdWithError.call(this, importInfo.source, "default");
-            renameBinding(module, binding, id);
-            specifiers[id] = importSpecifier(
-               identifier(id),
-               identifier("default"),
+            const newName = getIdWithError(
+               uidTracker,
+               importInfo.source,
+               "default"
+            );
+            renameBinding(binding, newName, moduleDescriptor);
+            specifiers[newName] = importSpecifier(
+               identifier(newName),
+               identifier("default")
             );
          } else if (type == "namespace") {
-            const id = getNamespaceWithError.call(this, source);
-            renameBinding(module, binding, id);
+            const newName = getNamespaceWithError(uidTracker, source);
+            renameBinding(binding, newName, moduleDescriptor);
             importDecls[source].namespaced ??= importDeclaration(
-               [importNamespaceSpecifier(identifier(id))],
+               [importNamespaceSpecifier(identifier(newName))],
                sourceStringNode
             );
          }
@@ -98,9 +111,9 @@ export function formatEsm(
    });
 
    // Add entry's exports
-   const entry = scriptModules.find((x) => x.isEntry)!;
+   const entry = modules.find((x) => x.isEntry)!;
    const exportSpecifiers: Record<string, ExportSpecifier> = {};
-   const entryExports = this._uidTracker.getModuleExports(entry.source);
+   const entryExports = uidTracker.getModuleExports(entry.source);
    entryExports.forEach((id, name) => {
       const exported = isValidVar(name)
          ? identifier(name)

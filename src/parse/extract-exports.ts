@@ -1,6 +1,5 @@
-import { NodePath, Scope, TraverseOptions } from "@babel/traverse";
+import { NodePath, Scope, Visitor } from "@babel/traverse";
 import {
-   Node,
    Identifier,
    VariableDeclarator,
    ExportAllDeclaration,
@@ -19,8 +18,8 @@ import {
    ImportSpecifier,
    ImportDefaultSpecifier,
    ImportNamespaceSpecifier,
+   Program,
 } from "@babel/types";
-import traverse from "@babel/traverse";
 
 export function getBindingDeclaration(scope: Scope, name: string) {
    const binding = scope.getBinding(name);
@@ -39,11 +38,8 @@ export function getBindingDeclaration(scope: Scope, name: string) {
 }
 
 let uid = 0;
-export function extractExports(
-   ast: Node,
-   traverseFn?: (options: TraverseOptions) => void
-) {
-   const exports: Exports = {
+export function extractExports(programPath: NodePath<Program>) {
+   const exports: GroupedExports = {
       aggregatedAll: {},
       aggregatedName: {},
       aggregatedNamespace: {},
@@ -52,7 +48,7 @@ export function extractExports(
       declared: {},
    };
 
-   const options: TraverseOptions = {
+   const visitor: Visitor = {
       ExportAllDeclaration(path) {
          const { node } = path;
          const source = node.source?.value;
@@ -85,6 +81,7 @@ export function extractExports(
                      source,
                      path,
                      name,
+                     local: name,
                   };
                } else if (specifier.type == "ExportSpecifier") {
                   /**
@@ -103,6 +100,7 @@ export function extractExports(
                      source,
                      path,
                      name,
+                     local: specifier.local.name,
                   };
                }
             }
@@ -116,7 +114,7 @@ export function extractExports(
                   if (!declPath) {
                      throw new Error(`No declaration found for "${id.name}"`);
                   }
-
+                  
                   const name = id.name;
                   exports.declared[id.name] = {
                      id: `$${uid++}`,
@@ -125,6 +123,8 @@ export function extractExports(
                      declaration: declPath,
                      identifier: id,
                      name,
+                     local: name,
+                     isExportDeclared: true
                   };
                });
             } else {
@@ -152,6 +152,8 @@ export function extractExports(
                      declaration: declPath,
                      identifier: id,
                      name,
+                     local: name,
+                     isExportDeclared: true,
                   };
                } else {
                   for (const specifier of node.specifiers) {
@@ -186,6 +188,8 @@ export function extractExports(
                         declaration: declPath,
                         identifier: local,
                         name,
+                        local: specifier.local.name,
+                        isExportDeclared: false,
                      };
                   }
                }
@@ -220,6 +224,7 @@ export function extractExports(
                path,
                declaration: declPath,
                name: "default",
+               isExportDeclared: true,
             };
          } else if (isIdentifier(node.declaration)) {
             /**
@@ -241,6 +246,8 @@ export function extractExports(
                declaration: declPath,
                identifier: node.declaration,
                name: "default",
+               local: node.declaration.name,
+               isExportDeclared: false,
             };
          } else if (isExpression(node.declaration)) {
             /**
@@ -266,11 +273,7 @@ export function extractExports(
       },
    };
 
-   if (traverseFn) {
-      traverseFn(options);
-   } else {
-      traverse(ast, options);
-   }
+   programPath.traverse(visitor);
 
    return exports;
 }
@@ -285,6 +288,7 @@ export interface AggregatedNameExport extends ExportBase {
    source: string;
    specifier: ExportSpecifier;
    path: NodePath<ExportNamedDeclaration>;
+   local: string;
 }
 
 export interface AggregatedNamespaceExport extends ExportBase {
@@ -292,6 +296,7 @@ export interface AggregatedNamespaceExport extends ExportBase {
    source: string;
    specifier: ExportNamespaceSpecifier;
    path: NodePath<ExportNamedDeclaration>;
+   local: string;
 }
 
 export interface AggregatedAllExport {
@@ -305,19 +310,22 @@ export interface DeclaredExport extends ExportBase {
    type: "declared";
    identifier: Identifier;
    path: NodePath<ExportNamedDeclaration>;
+   local: string;
    declaration:
       | NodePath<ClassDeclaration>
       | NodePath<FunctionDeclaration>
       | NodePath<VariableDeclarator>
       | NodePath<ImportSpecifier>
       | NodePath<ImportDefaultSpecifier>
-      | NodePath<ImportNamespaceSpecifier>;
+   | NodePath<ImportNamespaceSpecifier>;
+   isExportDeclared: boolean;
 }
 
 export interface DeclaredDefaultExport extends ExportBase {
    type: "declaredDefault";
    path: NodePath<ExportDefaultDeclaration>;
    identifier?: Identifier;
+   local?: string;
    declaration:
       | NodePath<ClassDeclaration>
       | NodePath<FunctionDeclaration>
@@ -325,6 +333,7 @@ export interface DeclaredDefaultExport extends ExportBase {
       | NodePath<ImportSpecifier>
       | NodePath<ImportDefaultSpecifier>
       | NodePath<ImportNamespaceSpecifier>;
+   isExportDeclared: boolean;
 }
 
 export interface DeclaredDefaultExpressionExport extends ExportBase {
@@ -334,7 +343,7 @@ export interface DeclaredDefaultExpressionExport extends ExportBase {
    identifier?: Identifier;
 }
 
-export interface Exports {
+export interface GroupedExports {
    aggregatedAll: Record<number, AggregatedAllExport>;
    aggregatedName: Record<string, AggregatedNameExport>;
    aggregatedNamespace: Record<string, AggregatedNamespaceExport>;

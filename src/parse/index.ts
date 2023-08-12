@@ -64,11 +64,14 @@ async function loadAndParse(
       isCached = true;
    }
 
+   this._setCache(source, {
+      importers,
+   });
+
    if (!loaded) {
       try {
          loaded = await loadChunk.call(this, source, isEntry, graph, importers);
          this._setCache(source, {
-            importers,
             loaded,
          });
       } catch (error: any) {
@@ -83,9 +86,7 @@ async function loadAndParse(
                ? await parseScriptAsset.call(this, source, loaded.content)
                : await parseStyleAsset.call(this, source, loaded.content);
          this._setCache(source, {
-            importers,
             parsed,
-            loaded,
          });
       } catch (error: any) {
          this._pushToDebugger("error", ERRORS.parse(error.message || error));

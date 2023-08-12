@@ -43,19 +43,19 @@ const toypack = new Toypack({
          },
       }),
       sassPlugin(),
-      babelPlugin({
-         presets: [
-            [
-               "env",
-               {
-                  modules: false,
-               },
-            ],
-            "react",
-            "typescript",
-         ],
-         plugins: ["transform-runtime"],
-      }),
+      // babelPlugin({
+      //    presets: [
+      //       [
+      //          "env",
+      //          {
+      //             modules: false,
+      //          },
+      //       ],
+      //       "react",
+      //       "typescript",
+      //    ],
+      //    plugins: ["transform-runtime"],
+      // }),
    ],
    packageManager: {
       // dts: true,
@@ -74,7 +74,7 @@ toypack.setIFrame(iframe);
 // await toypack.installPackage("matter-js");
 // await toypack.installPackage("react", "18");
 // await toypack.installPackage("react-dom/client", "18");
-// await toypack.installPackage("vue");
+await toypack.installPackage("vue");
 // await toypack.installPackage("canvas-confetti");
 // await toypack.installPackage("path-browserify");
 // await toypack.installPackage("is-odd");

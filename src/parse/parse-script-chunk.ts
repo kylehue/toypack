@@ -15,8 +15,14 @@ import {
 import { Toypack } from "../Toypack.js";
 import { mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
-import { Exports, extractExports } from "./extract-exports.js";
-import { Imports, extractImports } from "./extract-imports.js";
+import {
+   extractExports,
+   GroupedExports,
+} from "./extract-exports.js";
+import {
+   extractImports,
+   GroupedImports,
+} from "./extract-imports.js";
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -49,8 +55,8 @@ export async function parseScriptAsset(
       type: "script",
       dependencies: new Set(),
       ast: file(program([])),
-      exports: {} as Exports,
-      imports: {} as Imports,
+      exports: {} as GroupedExports,
+      imports: {} as GroupedImports,
       programPath: {} as NodePath<Program>,
    };
 
@@ -99,6 +105,8 @@ export async function parseScriptAsset(
    traverse({
       Program(path) {
          result.programPath = path;
+         result.exports = extractExports(path);
+         result.imports = extractImports(path);
       },
       ImportDeclaration(path) {
          result.dependencies.add(path.node.source.value);
@@ -128,9 +136,6 @@ export async function parseScriptAsset(
          options?.inspectDependencies?.(path.node.argument, path);
       },
    });
-
-   result.exports = extractExports(result.ast, traverse);
-   result.imports = extractImports(result.ast, traverse);
 
    /**
     * Scan `///<reference [path/types]="..." />` in dts files.
@@ -168,8 +173,8 @@ export interface ParsedScriptResult {
    type: "script";
    dependencies: Set<string>;
    ast: File;
-   exports: Exports;
-   imports: Imports;
+   exports: GroupedExports;
+   imports: GroupedImports;
    programPath: NodePath<Program>;
 }
 

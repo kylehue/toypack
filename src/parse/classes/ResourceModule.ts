@@ -5,10 +5,10 @@ import { Importers } from "..";
 export class ResourceModule extends Module {
    public type = "resource" as const;
    constructor(
-      public asset: ResourceAsset,
+      asset: ResourceAsset,
       public source: string,
       public importers: Importers
    ) {
-      super("resource");
+      super("resource", asset);
    }
 }

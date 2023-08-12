@@ -10,10 +10,8 @@ import {
    callExpression,
 } from "@babel/types";
 import { isLocal } from "../../utils";
-import {
-   getIdWithError,
-   getNamespaceWithError,
-} from "../utils/get-with-error";
+import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
+import { renameBinding } from "../utils/renamer";
 import type {
    ScriptModule,
    DependencyGraph,
@@ -21,7 +19,8 @@ import type {
    ImportInfo,
    ExportInfo,
 } from "src/types";
-import { renameBinding } from "../utils/renamer";
+import { ModuleDescriptor } from "../utils/module-descriptor";
+import { UidTracker } from "./UidTracker";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -31,84 +30,61 @@ function getStringOrIdValue(node: StringLiteral | Identifier) {
  * Binds the imported module to the exported declarations.
  */
 function bindExport(
-   this: Toypack,
-   graph: DependencyGraph,
-   exportInfo: ExportInfo,
-   exportInfosModule: ScriptModule
+   uidTracker: UidTracker,
+   exporterModuleDescriptor: ModuleDescriptor,
+   exportInfo: ExportInfo
 ) {
+   const { module: exporter } = exporterModuleDescriptor;
    const exportScope = exportInfo.path.scope;
-   const exportSource = exportInfosModule.source;
+   const exportSource = exporter.source;
+   const exportNode = exportInfo.path.node;
 
    if (exportInfo.type == "declared") {
-      const id = getIdWithError.call(this, exportSource, exportInfo.name);
-      const binding = exportScope.getBinding(exportInfo.identifier.name)!;
-      renameBinding(exportInfosModule, binding, id);
       const decl = exportInfo.declaration;
-      const isExportDeclared = !!decl.findParent((x) =>
-         x.isExportDeclaration()
-      );
-      if (!isExportDeclared) return;
-      if (decl.isVariableDeclarator()) {
-         const varDecl = decl.findParent((x) => x.isVariableDeclaration());
-         exportInfo.path.replaceWith(
-            varDecl ? varDecl : variableDeclaration("var", [decl.node])
-         );
-      } else if (decl.isFunctionDeclaration() || decl.isClassDeclaration()) {
-         exportInfo.path.replaceWith(decl);
-      }
+      // Rename
+      const newName = getIdWithError(uidTracker, exportSource, exportInfo.name);
+      const binding = exportScope.getBinding(exportInfo.identifier.name)!;
+      renameBinding(binding, newName, exporterModuleDescriptor);
    } else if (exportInfo.type == "declaredDefault") {
-      const declPath = exportInfo.declaration;
-      if (declPath.isFunctionDeclaration() || declPath.isClassDeclaration()) {
+      const decl = exportInfo.declaration;
+
+      // Rename
+      const newName = getIdWithError(uidTracker, exportSource, "default");
+      if (exportInfo.identifier) {
+         const binding = exportScope.getBinding(exportInfo.identifier.name)!;
+         renameBinding(binding, newName, exporterModuleDescriptor);
+      } else {
          /**
           * Function/Class declarations are allowed to not have
           * ids when exported as default. So in here, we must make
           * sure that they get id'd
           */
-         if (!declPath.node.id) {
-            declPath.node.id = identifier(
-               getIdWithError.call(this, exportSource, "default")
-            );
-            exportScope.registerDeclaration(declPath);
-         }
-         // Remove from its `export` declaration
-         const exportDecl = exportInfo.path.node.declaration;
-         if (
-            isFunctionDeclaration(exportDecl) ||
-            isClassDeclaration(exportDecl)
-         ) {
-            exportInfo.path.replaceWith(declPath.node);
-            exportInfo.identifier = declPath.node.id;
-         }
-      }
-
-      const id = getIdWithError.call(this, exportSource, exportInfo.name);
-      if (exportInfo.identifier) {
-         const binding = exportScope.getBinding(exportInfo.identifier.name)!;
-         renameBinding(exportInfosModule, binding, id);
+         exporterModuleDescriptor.insertAt(
+            exportNode.start!,
+            `var ${newName} = `
+         );
       }
    } else if (exportInfo.type == "declaredDefaultExpression") {
       // Create a variable declaration for the expression
-      const id = identifier(getIdWithError.call(this, exportSource, "default"));
-      const varDecl = variableDeclaration("var", [
-         variableDeclarator(id, exportInfo.declaration.node),
-      ]);
-      exportInfo.path.replaceWith(varDecl);
+      const newName = getIdWithError(uidTracker, exportSource, "default");
+      exporterModuleDescriptor.insertAt(exportNode.start!, `var ${newName} = `);
    }
 }
 
 function bindImport(
-   this: Toypack,
+   uidTracker: UidTracker,
    graph: DependencyGraph,
-   importer: ScriptModule,
+   importerModuleDescriptor: ModuleDescriptor,
    importInfo: ImportInfo
 ) {
+   const { module: importer } = importerModuleDescriptor;
+   const importScope = importInfo.path.scope;
+   const importNode = importInfo.path.node;
    const importSource = importer.dependencyMap.get(importInfo.source);
    if (typeof importSource !== "string") return;
    // skip non-locals
    if (!isLocal(importInfo.source) && !importSource) return;
-
-   const importedModule = graph.get(importSource);
-   if (importedModule?.type != "script") {
+   if (!importSource) {
       throw new Error(
          `Failed to resolve '${importInfo.source}' in '${importer.source}'.`
       );
@@ -120,37 +96,32 @@ function bindImport(
             ? getStringOrIdValue(importInfo.specifier.imported)
             : "default";
       const localName = importInfo.specifier.local.name;
-      const binding = importInfo.path.scope.getBinding(localName)!;
-      renameBinding(
-         importer,
-         binding,
-         getIdWithError.call(this, importSource, importedName)
-      );
+      const binding = importScope.getBinding(localName)!;
+      const newName = getIdWithError(uidTracker, importSource, importedName);
+      renameBinding(binding, newName, importerModuleDescriptor);
    } else if (importInfo.type == "namespace") {
       const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
-      const namespace = getNamespaceWithError.call(
-         this,
+      const namespace = getNamespaceWithError(
+         uidTracker,
          namespacedModule.source
       );
-
       const localName = importInfo.specifier.local.name;
-      const binding = importInfo.path.scope.getBinding(localName)!;
-      renameBinding(importer, binding, namespace);
+      const binding = importScope.getBinding(localName)!;
+      renameBinding(binding, namespace, importerModuleDescriptor);
    } else if (importInfo.type == "dynamic") {
+      // Transform dynamic imports
       const namespacedModule = graph.get(importSource);
       if (namespacedModule?.type != "script") return;
-      const namespace = getNamespaceWithError.call(
-         this,
+      const namespace = getNamespaceWithError(
+         uidTracker,
          namespacedModule.source
       );
 
-      // transform dynamic imports
-      importInfo.path.replaceWith(
-         callExpression(
-            arrowFunctionExpression([], identifier(namespace), true),
-            []
-         )
+      importerModuleDescriptor.update(
+         importNode.start!,
+         importNode.end!,
+         `(async () => ${namespace})()`
       );
    }
 }
@@ -160,43 +131,19 @@ function bindImport(
  * declarations of other modules
  */
 export function bindModules(
-   this: Toypack,
+   uidTracker: UidTracker,
    graph: DependencyGraph,
-   module: ScriptModule
+   moduleDescriptor: ModuleDescriptor
 ) {
+   const { module } = moduleDescriptor;
    // Bind ids
-   const imports = module.getImports([
-      "default",
-      "dynamic",
-      "namespace",
-      "specifier",
-   ]);
-
+   const imports = module.getImports();
    for (const importInfo of imports) {
-      bindImport.call(this, graph, module, importInfo);
+      bindImport(uidTracker, graph, moduleDescriptor, importInfo);
    }
 
-   const exports = module.getExports([
-      "declared",
-      "declaredDefault",
-      "declaredDefaultExpression",
-      "aggregatedNamespace",
-   ]);
-
+   const exports = module.getExports();
    for (const exportInfo of exports) {
-      bindExport.call(this, graph, exportInfo, module);
+      bindExport(uidTracker, moduleDescriptor, exportInfo);
    }
-
-   /**
-    * Remove left out imports/exports after binding - and we shouldn't use
-    * path.remove() because we still need to use them on the next runs.
-    */
-   const ast = module.ast;
-   ast.program.body = ast.program.body.filter(
-      (node) =>
-         node.type !== "ExportDefaultDeclaration" &&
-         node.type !== "ExportAllDeclaration" &&
-         node.type !== "ExportNamedDeclaration" &&
-         node.type !== "ImportDeclaration"
-   );
 }

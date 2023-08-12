@@ -16,9 +16,9 @@ export function getLibImports(scriptModules: ScriptModule[]) {
          imports[importInfo.source] ??= [];
          imports[importInfo.source].push({
             importInfo,
-            module,
-         });
+         module,
       });
+   });
    }
 
    return imports;

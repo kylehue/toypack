@@ -24,6 +24,8 @@ for (const [source, content] of Object.entries(testFiles)) {
    fileManager.addFile(source, window.localStorage.getItem(source) || content);
 }
 
+toypack.run();
+
 // Setup bundle code preview
 const previewBundle = document.querySelector("#preview-bundle") as HTMLElement;
 const previewIframe = document.querySelector("#preview") as HTMLIFrameElement;
@@ -59,20 +61,23 @@ const toggleAutoRunButton = document.querySelector(
    "#toggle-auto-run"
 ) as HTMLButtonElement;
 let autoRun = false;
+let autoRunDelayInMs = 500;
 toggleAutoRunButton.onclick = () => {
    const textEl = toggleAutoRunButton.querySelector(".text")!;
    let text = textEl.textContent?.trim();
    if (text == "Enable Auto-run") {
       textEl.textContent = "Disable Auto-run";
       autoRun = true;
+      autoRunDelayInMs = parseInt(
+         window.prompt("Enter the delay", autoRunDelayInMs.toString()) || "500"
+      );
    } else {
       textEl.textContent = "Enable Auto-run";
       autoRun = false;
    }
 };
-const autoRunDelayInMs = 500;
 const timers: NodeJS.Timeout[] = [];
-editor.onDidChangeModelContent(() => {
+editor.onDidChangeModelContent((e) => {
    if (autoRun) {
       for (const timer of timers) {
          clearTimeout(timer);
@@ -83,6 +88,15 @@ editor.onDidChangeModelContent(() => {
       }, autoRunDelayInMs);
       timers.push(timer);
    }
+
+   // const currentModel = editor.getModel();
+   // const source = currentModel?.uri.path;
+   // const asset = toypack.getAsset(source || "");
+   // console.log(e);
+   
+   // if (asset) {
+   //    asset.modified = true;
+   // }
 });
 
 // Setup resetting cache
@@ -91,7 +105,9 @@ const resetCacheButton = document.querySelector(
 ) as HTMLButtonElement;
 resetCacheButton.onclick = () => {
    // drawer.root.delete("/");
-   window.localStorage.clear();
+   if (window.confirm("Are you sure you want to clear the cache?")) {
+      window.localStorage.clear();
+   }
 };
 
 // hot reload

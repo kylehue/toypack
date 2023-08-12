@@ -1,6 +1,6 @@
 import { Binding, Scope } from "@babel/traverse";
 import { camelCase } from "lodash-es";
-import { reservedWords } from "./reserved-words";
+import { reservedWords } from "../../utils/reserved-words";
 
 function removeLeadingNums(str: string) {
    if (!/^[0-9]/.test(str)) return str;

@@ -6,12 +6,16 @@ import {
    GenMapping,
    toEncodedMap,
 } from "@jridgewell/gen-mapping";
+import MagicString from "magic-string";
 import MapConverter from "convert-source-map";
 import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
 import { bindModules } from "./link/bind-modules.js";
 import { createNamespace } from "./utils/create-namespace.js";
-import { beginRename } from "./utils/renamer.js";
+import {
+   ModuleDescriptor,
+   getModuleDescriptors,
+} from "./utils/module-descriptor.js";
 import { formatEsm } from "./formats/esm.js";
 import {
    ERRORS,
@@ -27,10 +31,14 @@ import type {
    NamespaceImport,
    AggregatedNamespaceExport,
    ModeConfig,
+   DynamicImport,
 } from "src/types";
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
+import { UidGenerator } from "./link/UidGenerator.js";
+import { UidTracker } from "./link/UidTracker.js";
+import { removePorts } from "./utils/remove-ports.js";
 (window as any).getCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
@@ -62,7 +70,7 @@ function getNamespacedModules(modules: ScriptModule[]) {
    const needsNamespace = new Set<string>();
    const scan = (
       module: ScriptModule,
-      ports: (NamespaceImport | AggregatedNamespaceExport)[]
+      ports: (NamespaceImport | DynamicImport | AggregatedNamespaceExport)[]
    ) => {
       for (const portInfo of ports) {
          const resolved = module.dependencyMap.get(portInfo.source)!;
@@ -71,7 +79,7 @@ function getNamespacedModules(modules: ScriptModule[]) {
    };
 
    for (const module of modules) {
-      scan(module, module.getImports(["namespace"]));
+      scan(module, module.getImports(["namespace", "dynamic"]));
       scan(module, module.getExports(["aggregatedNamespace"]));
    }
 
@@ -79,10 +87,14 @@ function getNamespacedModules(modules: ScriptModule[]) {
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
-   const scriptModules = getModules(graph);
-   this._uidGenerator.addReservedVars(...Object.keys(runtime));
-   this._uidTracker.assignWithModules(this._uidGenerator, scriptModules);
-   this._uidGenerator.addReservedVars(...this._uidTracker.getAllNamespaces());
+   const moduleDescriptors = getModuleDescriptors(graph);
+   const modules = moduleDescriptors.map((x) => x.module);
+   const uidGenerator = new UidGenerator();
+   const uidTracker = new UidTracker(uidGenerator);
+   uidTracker.instantiateModules(modules);
+   uidTracker.assignWithModules(modules);
+   uidGenerator.addReservedVars(...Object.keys(runtime));
+   uidGenerator.addReservedVars(...uidTracker.getAllNamespaces());
 
    const chunks: CompilationChunks = {
       header: [],
@@ -93,53 +105,29 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    };
 
    try {
-      const unrenamedModules = new Set<string>();
-      let caches = 0,
-         binds = 0;
-      for (const module of scriptModules) {
-         const isCached = !!this._getCache(module.source)?.module;
-         if (!isCached || module.asset.modified) {
-            // order matters here
-            transformToVars.call(this, module);
-            deconflict.call(this, module);
-            bindModules.call(this, graph, module);
-            unrenamedModules.add(module.source);
-
-            this._setCache(module.source, {
-               module,
-            });
-            binds++;
-         } else {
-            caches++;
-         }
+      for (const moduleDesc of moduleDescriptors) {
+         // order matters here
+         transformToVars(moduleDesc);
+         deconflict(uidTracker, moduleDesc);
+         bindModules(uidTracker, graph, moduleDesc);
       }
-
-      this._pushToDebugger(
-         "verbose",
-         `[binding] Bound ${binds} assets and cached ${caches} assets.`
-      );
 
       // Format
-      formatEsm.call(this, chunks, scriptModules);
-
-      // Begin renaming
-      for (const module of scriptModules) {
-         if (!unrenamedModules.has(module.source)) continue;
-         beginRename(module);
-      }
+      formatEsm(uidTracker, chunks, moduleDescriptors);
+      removePorts(moduleDescriptors);
 
       // Modules
-      for (const module of scriptModules) {
-         const cached = this._getCache(module.source);
-         if (!cached?.module?.ast) continue;
-         chunks.module.set(module.source, cached.module.ast.program.body);
+      for (const moduleDescriptor of moduleDescriptors) {
+         const { module } = moduleDescriptor;
+         chunks.module.set(module.source, moduleDescriptor);
       }
 
       // Namespaces
-      const needsNamespace = getNamespacedModules(scriptModules);
-      for (const module of scriptModules) {
+      const needsNamespace = getNamespacedModules(modules);
+      for (const moduleDescriptor of moduleDescriptors) {
+         const { module } = moduleDescriptor;
          if (!needsNamespace.has(module.source)) continue;
-         const statements = createNamespace.call(this, module);
+         const statements = createNamespace(uidTracker, module);
          const arr = Array.isArray(statements) ? statements : [statements];
          chunks.namespace.set(module.source, arr);
          chunks.runtime.add("__export");
@@ -151,14 +139,15 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    const bundle = bundleChunks.call(this, chunks, graph);
 
    return {
-      content: bundle.code,
+      content: bundle.content,
       map: bundle.map ? MapConverter.fromObject(bundle.map) : null,
    };
 }
 
-function removeTopLevelComments(body: Statement[]) {
-   body.forEach((node) => {
-      removeComments(node);
+function removeTopLevelComments(moduleDescriptor: ModuleDescriptor) {
+   const { module } = moduleDescriptor;
+   module.ast.comments?.forEach((comment) => {
+      moduleDescriptor.update(comment.start!, comment.end!, "");
    });
 }
 
@@ -174,7 +163,7 @@ function bundleChunks(
 ) {
    const config = this.config;
    const bundle = {
-      code: "",
+      content: "",
       map: null as EncodedSourceMap | null,
    };
 
@@ -195,12 +184,12 @@ function bundleChunks(
    // Header
    const header = generate(program(chunks.header), generatorOpts).code;
    if (header) {
-      bundle.code += header;
-      bundle.code += lineChar.repeat(2);
+      bundle.content += header;
+      bundle.content += lineChar.repeat(2);
    }
 
-   bundle.code = bundle.code.trimEnd();
-   if (header) bundle.code += lineChar.repeat(2);
+   bundle.content = bundle.content.trimEnd();
+   if (header) bundle.content += lineChar.repeat(2);
 
    // Runtimes
    for (const key of chunks.runtime) {
@@ -214,12 +203,12 @@ function bundleChunks(
          cachedRuntimeGens.set(`${key}-${config.bundle.mode}`, code);
       }
 
-      bundle.code += code;
-      bundle.code += lineChar.repeat(2);
+      bundle.content += code;
+      bundle.content += lineChar.repeat(2);
    }
 
-   bundle.code = bundle.code.trimEnd();
-   if (header || chunks.runtime.size) bundle.code += lineChar.repeat(2);
+   bundle.content = bundle.content.trimEnd();
+   if (header || chunks.runtime.size) bundle.content += lineChar.repeat(2);
 
    // Namespaces
    for (const [source, body] of chunks.namespace) {
@@ -227,93 +216,71 @@ function bundleChunks(
       const generated = generate(program(body), generatorOpts);
 
       if (!generated.code.length) continue;
-      bundle.code += getSourceComment(source);
-      bundle.code += generated.code;
-      bundle.code += lineChar.repeat(2);
+      bundle.content += getSourceComment(source);
+      bundle.content += generated.code;
+      bundle.content += lineChar.repeat(2);
    }
 
-   bundle.code = bundle.code.trimEnd();
+   bundle.content = bundle.content.trimEnd();
    if (header || chunks.runtime.size || chunks.namespace.size) {
-      bundle.code += lineChar.repeat(2);
+      bundle.content += lineChar.repeat(2);
    }
 
    // Modules
-   let compiles = 0;
-   let caches = 0;
    let addedModules = 0;
-   for (const [source, body] of chunks.module) {
-      if (!body.length) continue;
-      const module = graph.get(source) as ScriptModule;
-      const cached = this._getCache(source);
+   for (const [source, moduleDescriptor] of chunks.module) {
+      const { module } = moduleDescriptor;
       const shouldMap = shouldProduceSourceMap(source, config.bundle.sourceMap);
-      let code: string;
-      let map: EncodedSourceMap | null = null;
-      if (cached && cached.content && !module.asset.modified) {
-         code = cached.content || "";
-         map = cached.map as EncodedSourceMap | null;
-         caches++;
+      removeTopLevelComments(moduleDescriptor);
+      let generated = { content: "", map: null as EncodedSourceMap | null };
+      const cached = this._getCache(module.source);
+      if (cached?.content && !module.asset.modified) {
+         generated = {
+            content: cached.content,
+            map: cached.map as EncodedSourceMap | null,
+         };
       } else {
-         compiles++;
-         removeTopLevelComments(body);
-         const generated = generate(
-            program(body),
-            {
-               ...generatorOpts,
-               sourceMaps: shouldMap,
-               sourceFileName: module.asset.source,
-            },
-            module.content
-         );
-
-         code = generated.code;
-         map = generated.map as EncodedSourceMap | null;
-
-         const loadedMap =
-            (module.asset.type == "text" ? module.asset.map : null) ||
-            module.map;
-         if (loadedMap) {
-            map = !map ? loadedMap : mergeSourceMaps(map, loadedMap);
-         }
-
-         this._setCache(source, {
-            content: code,
-            map,
-         });
+         generated = moduleDescriptor.generate();
+         this._setCache(module.source, generated);
       }
 
-      if (!code.length) continue;
+      if (!generated.content.trim().length) continue;
       addedModules++;
-      bundle.code += getSourceComment(source);
-      const linePos = bundle.code.split("\n").length;
-      bundle.code += code;
-      if (bundle.code.length) bundle.code += lineChar.repeat(2);
 
-      if (map && shouldMap) {
-         mergeSourceMapToBundle(sourceMap, map, {
+      const loadedMap =
+         (module.asset.type == "text" ? module.asset.map : null) || module.map;
+      if (loadedMap) {
+         generated.map = !generated.map
+            ? loadedMap
+            : mergeSourceMaps(generated.map, loadedMap);
+      }
+
+      bundle.content += getSourceComment(source);
+      const linePos = bundle.content.split("\n").length;
+      bundle.content += generated.content;
+      if (bundle.content.length) bundle.content += lineChar.repeat(2);
+
+      if (generated.map && shouldMap) {
+         mergeSourceMapToBundle(sourceMap, generated.map, {
             line: linePos,
             column: 0,
          });
       }
    }
 
-   bundle.code = bundle.code.trimEnd();
+   bundle.content = bundle.content.trimEnd();
    if (header || chunks.runtime.size || chunks.namespace.size || addedModules) {
-      bundle.code += lineChar.repeat(2);
+      bundle.content += lineChar.repeat(2);
    }
 
    // Footer
    const footer = generate(program(chunks.footer), generatorOpts).code;
    if (footer) {
-      bundle.code += footer;
+      bundle.content += footer;
    }
 
-   bundle.code = bundle.code.trimEnd();
+   bundle.content = bundle.content.trimEnd();
    bundle.map = toEncodedMap(sourceMap);
-
-   this._pushToDebugger(
-      "verbose",
-      `[compiling] Compiled ${compiles} assets and cached ${caches} assets.`
-   );
 
    return bundle;
 }
@@ -322,6 +289,6 @@ export interface CompilationChunks {
    header: Statement[];
    runtime: Set<keyof typeof runtime>;
    namespace: Map<string, Statement[]>;
-   module: Map<string, Statement[]>;
+   module: Map<string, ModuleDescriptor>;
    footer: Statement[];
 }

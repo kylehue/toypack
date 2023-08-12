@@ -1,20 +1,16 @@
-import { NodePath, TraverseOptions } from "@babel/traverse";
+import { NodePath, Visitor } from "@babel/traverse";
 import {
-   Node,
    ImportDeclaration,
    ImportDefaultSpecifier,
    ImportSpecifier,
    ImportNamespaceSpecifier,
    CallExpression,
+   Program,
 } from "@babel/types";
-import { traverse } from "@babel/core";
 
 let uid = 0;
-export function extractImports(
-   ast: Node,
-   traverseFn?: (options: TraverseOptions) => void
-) {
-   const imports: Imports = {
+export function extractImports(programPath: NodePath<Program>) {
+   const imports: GroupedImports = {
       sideEffect: {},
       dynamic: {},
       default: {},
@@ -22,7 +18,7 @@ export function extractImports(
       specifier: {},
    };
 
-   const options: TraverseOptions = {
+   const visitor: Visitor = {
       ImportDeclaration(path) {
          const { node } = path;
          const source = node.source.value;
@@ -53,6 +49,7 @@ export function extractImports(
                   source,
                   path,
                   specifier,
+                  local: specifier.local.name,
                };
             } else if (specifier.type == "ImportNamespaceSpecifier") {
                /**
@@ -65,6 +62,7 @@ export function extractImports(
                   source,
                   path,
                   specifier,
+                  local: specifier.local.name,
                };
             } else if (specifier.type == "ImportSpecifier") {
                /**
@@ -77,6 +75,7 @@ export function extractImports(
                   source,
                   path,
                   specifier,
+                  local: specifier.local.name,
                };
             }
          }
@@ -98,11 +97,7 @@ export function extractImports(
       },
    };
 
-   if (traverseFn) {
-      traverseFn(options);
-   } else {
-      traverse(ast, options);
-   }
+   programPath.traverse(visitor);
 
    return imports;
 }
@@ -116,18 +111,21 @@ export interface DefaultImport extends BaseImport {
    type: "default";
    specifier: ImportDefaultSpecifier;
    path: NodePath<ImportDeclaration>;
+   local: string;
 }
 
 export interface SpecifierImport extends BaseImport {
    type: "specifier";
    specifier: ImportSpecifier;
    path: NodePath<ImportDeclaration>;
+   local: string;
 }
 
 export interface NamespaceImport extends BaseImport {
    type: "namespace";
    specifier: ImportNamespaceSpecifier;
    path: NodePath<ImportDeclaration>;
+   local: string;
 }
 
 export interface DynamicImport extends BaseImport {
@@ -142,7 +140,7 @@ export interface SideEffectImport {
    path: NodePath<ImportDeclaration>;
 }
 
-export interface Imports {
+export interface GroupedImports {
    sideEffect: Record<number, SideEffectImport>;
    dynamic: Record<number, DynamicImport>;
    namespace: Record<string, NamespaceImport>;

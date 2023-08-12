@@ -1,5 +1,5 @@
 import path from "path-browserify";
-import { PartialDeep, ReadonlyDeep } from "type-fest";
+import { PartialDeep } from "type-fest";
 import htmlPlugin from "./build-plugins/html-plugin.js";
 import jsonPlugin from "./build-plugins/json-plugin.js";
 import rawPlugin from "./build-plugins/raw-plugin.js";
@@ -38,8 +38,6 @@ import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { cloneDeep, merge, mergeWith, union } from "lodash-es";
-import { UidTracker } from "./utils/UidTracker.js";
-import { UidGenerator } from "./utils/UidGenerator.js";
 
 let _lastId = 0;
 export class Toypack extends Hooks {
@@ -63,8 +61,6 @@ export class Toypack extends Hooks {
       verbose: [] as string[],
    };
    private _lastBundleResult: BundleResult | null = null;
-   protected _uidTracker = new UidTracker();
-   protected _uidGenerator = new UidGenerator();
    protected _virtualAssets = new Map<string, Asset>();
    protected _pluginManager = new PluginManager(this);
 
@@ -472,7 +468,7 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Returns an asset.
+    * Retrieves an asset by source.
     * @param source The source file path of the asset.
     * @returns The Asset object if found, otherwise null.
     */
@@ -506,8 +502,6 @@ export class Toypack extends Hooks {
 
    public clearCache() {
       this._cachedDeps.clear();
-      this._uidGenerator.reset();
-      this._uidTracker.reset();
       this._pluginManager.clearCache();
    }
 
@@ -566,7 +560,6 @@ export class Toypack extends Hooks {
          const isDisposable = isVirtual && isUnused && isDependentChunk;
          if (item.source == asset.source || isDisposable) {
             map.delete(key);
-            this._uidTracker.remove(item.source);
             if (isVirtual) this.removeAsset(item.source);
          }
       });
@@ -584,6 +577,7 @@ export class Toypack extends Hooks {
       const oldAsset = this.getAsset(oldSource);
       if (!oldAsset) return;
       const newAsset = this.addOrUpdateAsset(newSource, oldAsset.content);
+      newAsset.id = oldAsset.id;
       newAsset.metadata = oldAsset.metadata;
       this.removeAsset(oldAsset.source);
       return newAsset;
@@ -614,7 +608,43 @@ export class Toypack extends Hooks {
       return movedAssets;
    }
 
-   getLastBundleResult() {
+   /**
+    * Retrieves an asset by id.
+    * @param source The id of the asset to get.
+    * @returns The Asset object if found, otherwise null.
+    */
+   public getAssetById(id: string) {
+      for (const [_, asset] of this._assets) {
+         if (asset.id === id) return asset;
+      }
+
+      return null;
+   }
+
+   /**
+    * Removes an asset by id.
+    * @param source The id of the asset to remove.
+    */
+   public removeAssetById(id: string) {
+      const asset = this.getAssetById(id);
+      if (asset) {
+         this.removeAsset(asset.source);
+      }
+   }
+
+   /**
+    * Updates an asset by id.
+    * @param id The id of the asset to update.
+    * @param content The new content of the asset.
+    */
+   public updateAssetById(id: string, content: string | Blob) {
+      const asset = this.getAssetById(id);
+      if (asset) {
+         return this.addOrUpdateAsset(asset.source, content);
+      }
+   }
+
+   public getLastBundleResult() {
       return this._lastBundleResult;
    }
 

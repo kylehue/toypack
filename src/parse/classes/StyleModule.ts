@@ -8,7 +8,7 @@ export class StyleModule extends Module {
    public type = "style" as const;
    public dependencyMap = new Map<string, string>();
    constructor(
-      public asset: Asset,
+      asset: Asset,
       public source: string,
       public content: string,
       public importers: Importers,
@@ -17,6 +17,6 @@ export class StyleModule extends Module {
       public urlNodes: Url[],
       public map?: EncodedSourceMap | null
    ) {
-      super("style");
+      super("style", asset);
    }
 }

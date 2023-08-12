@@ -46,14 +46,18 @@ export function switchModelToNewUri(
 }
 
 const languages: Record<string, string> = {
-   txt: "text/html",
-   html: "text/html",
+   txt: "plaintext",
+   html: "html",
    css: "css",
    sass: "scss",
    scss: "scss",
    js: "typescript",
+   mjs: "typescript",
+   cjs: "typescript",
    jsx: "typescript",
    ts: "typescript",
+   mts: "typescript",
+   cts: "typescript",
    tsx: "typescript",
    json: "json",
    vue: "vue",
@@ -62,5 +66,5 @@ const languages: Record<string, string> = {
 export function getLang(str: string) {
    let ext = path.extname(str);
 
-   return languages[ext.substring(1)] || "text/html";
+   return languages[ext.substring(1)] || "plaintext";
 }
