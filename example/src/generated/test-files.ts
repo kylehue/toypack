@@ -5,8 +5,6 @@ export default {
 "/images/cat.png": await (await fetch(new URL("../../test-files/images/cat.png", import.meta.url).href)).blob(),
 "/images/kitty-cat-sandwich.gif": await (await fetch(new URL("../../test-files/images/kitty-cat-sandwich.gif", import.meta.url).href)).blob(),
 "/index.html": (await import("../../test-files/index.html?raw")).default,
-"/nm/pb/index.js": (await import("../../test-files/nm/pb/index.js?raw")).default,
-"/nm/testing/index.js": (await import("../../test-files/nm/testing/index.js?raw")).default,
 "/package.json": (await import("../../test-files/package.json?raw")).default,
 "/react/App.jsx": (await import("../../test-files/react/App.jsx?raw")).default,
 "/react/index.jsx": (await import("../../test-files/react/index.jsx?raw")).default,

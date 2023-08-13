@@ -23,5 +23,6 @@
        "@test/*": ["./src-test/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["test-files/**/*"]
 }

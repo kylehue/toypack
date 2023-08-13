@@ -5,6 +5,9 @@ import * as monaco from "monaco-editor";
 import { getLang, switchModelToNewUri } from "./utils";
 import path from "path-browserify";
 
+const videoExtensions = /\.(mp4|webp|avi)$/;
+const imageExtensions = /\.(jpe?g|gif|png)$/;
+
 export class FileManager {
    private _stored = new Map<
       string,
@@ -19,6 +22,9 @@ export class FileManager {
       private _drawer: Drawer,
       private _bundler: Toypack
    ) {
+      const monacoPreview = document.querySelector(".container-monaco")!;
+      const imagePreview = document.querySelector(".container-preview-image")!;
+      const videoPreview = document.querySelector(".container-preview-video")!;
       _drawer.onDidClickItem(({ item, event }) => {
          if (event.ctrlKey) {
             if (item.type === "file") {
@@ -30,10 +36,32 @@ export class FileManager {
 
          if (item.type != "file") return;
          const clickedItem = this._stored.get(item.source);
-         if (!clickedItem?.monacoModel) return;
-         this._editor.setModel(clickedItem.monacoModel);
-         this._editor.focus();
-         
+         if (clickedItem?.monacoModel) {
+            this._editor.setModel(clickedItem.monacoModel);
+            this._editor.focus();
+         }
+
+         const asset = _bundler.getAsset(item.source);
+         if (asset?.type == "resource" && imageExtensions.test(asset.source)) {
+            monacoPreview.classList.add("d-none");
+            imagePreview.classList.remove("d-none");
+            videoPreview.classList.add("d-none");
+            const el = imagePreview.querySelector("img")!;
+            el.setAttribute("src", asset.contentURL);
+         } else if (
+            asset?.type == "resource" &&
+            videoExtensions.test(asset.source)
+         ) {
+            monacoPreview.classList.add("d-none");
+            imagePreview.classList.add("d-none");
+            videoPreview.classList.remove("d-none");
+            const el = videoPreview.querySelector("video")!;
+            el.setAttribute("src", asset.contentURL);
+         } else {
+            monacoPreview.classList.remove("d-none");
+            imagePreview.classList.add("d-none");
+            videoPreview.classList.add("d-none");
+         }
       });
 
       _drawer.onDidRenameItem((event) => {

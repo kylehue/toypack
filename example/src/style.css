@@ -133,3 +133,23 @@ button.button-secondary:hover {
    transition: 300ms;
    pointer-events: none;
 }
+
+.container-preview-image {
+   background-color: #1e1e1e;
+}
+
+.container-preview-image img {
+   max-width: calc(100% - 20px);
+   max-height: calc(100% - 20px);
+   border-radius: 5px;
+}
+
+.container-preview-video {
+   background-color: #1e1e1e;
+}
+
+.container-preview-video video {
+   max-width: calc(100% - 20px);
+   max-height: calc(100% - 20px);
+   border-radius: 5px;
+}

@@ -1,1 +1,0 @@
-console.log("path-browserify test");

@@ -1,13 +1,10 @@
-// @ts-nocheck
-/* Package related tests */
 import "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css";
 // // import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "../react";
 import "../vue";
-// import * as Vue from "vue";
-// console.log(Vue);
+
 import confetti from "canvas-confetti";
-const meowButton = document.getElementById("meow");
+const meowButton = document.getElementById("meow")!;
 meowButton.onclick = () => confetti();
 
 /* Bundler test */
@@ -15,12 +12,12 @@ import adder, { dog, balloon, bay, eleven } from "../classes/adder";
 console.log(adder, dog, balloon, bay, eleven);
 import { foo as o, bar, "hello there" as test } from "../classes/createNum";
 console.log(o, bar, test);
-import counter, { Adder, dog as goodBoy } from "./testing.mjs";
-console.log(counter, Adder, goodBoy);
+import counter, { AdderJs, dog as goodBoy } from "./testing.mjs";
+console.log(counter, AdderJs, goodBoy);
 import defs, {add} from "../classes/createNum2";
 console.log(defs, add);
 export default 123;
-export { counter, Adder };
+export { counter, AdderJs as Adder };
 export { dog } from "./testing.mjs";
 export * as NM from "../classes/createNum2";
 export * from "../classes/createNum2";
@@ -32,51 +29,6 @@ const yellow = 4;
 
 export { blue, yellow };
 
-// import isOdd from "is-odd";
-// // import isOdd from "https://esm.sh/is-odd";
-// import "../classes/createNum2";
-// const defs = 45;
-// const Book = 12;
-// const add = 123;
-// console.log(a, add, isOdd(3));
-
-// export { isOdd };
-
-
-
-// import {dog, superCoolBook, coolLibrary, createNum} from "./testing.mjs";
-// console.log(dog, superCoolBook, coolLibrary, createNum);
-
-// import defs from "./testing.mjs?raw";
-// console.log(defs);
-
-
-
-// import * as crpath from "path-browserify";
-
-// const indexJs = 123;
-// const pathBrowserify = 123;
-// console.log(cpath, cresolve, crpath, indexJs);
-
-
-// const def_0 = 45;
-// const def_1 = 45;
-// var cook = 45;
-// console.log(def, add, createNum);
-
-// export var foos = "foo", bars = "bar";
-// export const [[hello, hi], hey] = [[1, 2], 3];
-// const bingbong = "beepboop";
-// console.log(bingbong);
-// import "../styles/sample.css";
-// export const fourFiveTwo = 452;
-
-// (async () => {
-//    const test = await import("../index.html?raw");
-//    console.log(test);
-// })();
-
-// export default var a = 2;
 
 /* Import test */
 // import ant from "./module.js";
