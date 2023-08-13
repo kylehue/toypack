@@ -9,7 +9,7 @@ export async function bundleStyle(this: Toypack, graph: DependencyGraph) {
    for (const [_, chunk] of graph) {
       if (chunk.type != "style") continue;
 
-      const compiled = await compileStyle.call(this, chunk);
+      const compiled = await compileStyle.call(this, graph, chunk);
       if (!compiled.content) continue;
       bundleGenerator.add(compiled.content, {
          map: compiled.map,

@@ -10,9 +10,13 @@ import {
    mergeSourceMaps,
    shouldProduceSourceMap,
 } from "../utils/index.js";
-import type { StyleModule, Toypack } from "src/types";
+import type { StyleModule, Toypack, DependencyGraph } from "src/types";
 
-export async function compileStyle(this: Toypack, chunk: StyleModule) {
+export async function compileStyle(
+   this: Toypack,
+   graph: DependencyGraph,
+   chunk: StyleModule
+) {
    const config = this.config;
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(
@@ -35,6 +39,11 @@ export async function compileStyle(this: Toypack, chunk: StyleModule) {
       args: [chunk.source, chunk.content, chunk.ast],
       callback(opts) {
          CSSTree.walk(chunk.ast, opts);
+      },
+      context: {
+         graph,
+         importers: chunk.importers,
+         source: chunk.source,
       },
    });
 

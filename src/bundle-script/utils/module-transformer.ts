@@ -120,6 +120,7 @@ export class ModuleTransformer {
 
 async function transformModulesWithPlugins(
    this: Toypack,
+   graph: DependencyGraph,
    moduleTransformers: ModuleTransformer[]
 ) {
    for (const moduleTransformer of moduleTransformers) {
@@ -131,6 +132,11 @@ async function transformModulesWithPlugins(
          args: [module.source, module.content, module.ast],
          callback(result) {
             traverseOptionsArray.push(result);
+         },
+         context: {
+            graph,
+            importers: module.importers,
+            source: module.source,
          },
       });
       if (!traverseOptionsArray.length) continue;
@@ -183,6 +189,6 @@ export async function getModuleTransformersFromGraph(
 
          return cached;
       });
-   await transformModulesWithPlugins.call(this, moduleTransformers);
+   await transformModulesWithPlugins.call(this, graph, moduleTransformers);
    return moduleTransformers;
 }

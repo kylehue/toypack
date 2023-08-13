@@ -40,13 +40,13 @@ export type StartHook = (this: PluginContextBase) => void;
 export type EndHook = (this: PluginContextBase, result: BundleResult) => void;
 export type SetupHook = (this: PluginContextBase) => void;
 export type TransformScriptHook = (
-   this: PluginContextBase,
+   this: PluginContext,
    source: string,
    content: string,
    ast: File
 ) => TraverseOptions | void;
 export type TransformStyleHook = (
-   this: PluginContextBase,
+   this: PluginContext,
    source: string,
    content: string,
    ast: CssNode
