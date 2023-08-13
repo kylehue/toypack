@@ -15,14 +15,8 @@ import {
 import { Toypack } from "../Toypack.js";
 import { mergeTraverseOptions } from "../utils/index.js";
 import { codeFrameColumns } from "@babel/code-frame";
-import {
-   extractExports,
-   GroupedExports,
-} from "./extract-exports.js";
-import {
-   extractImports,
-   GroupedImports,
-} from "./extract-imports.js";
+import { extractExports, GroupedExports } from "./extract-exports.js";
+import { extractImports, GroupedImports } from "./extract-imports.js";
 
 const referencePathRegex = /\/ <\s*reference\s+path\s*=\s*['"](.*)['"]\s*\/>/;
 const referenceTypesRegex = /\/ <\s*reference\s+types\s*=\s*['"](.*)['"]\s*\/>/;
@@ -105,8 +99,6 @@ export async function parseScriptAsset(
    traverse({
       Program(path) {
          result.programPath = path;
-         result.exports = extractExports(path);
-         result.imports = extractImports(path);
       },
       ImportDeclaration(path) {
          result.dependencies.add(path.node.source.value);
@@ -136,6 +128,9 @@ export async function parseScriptAsset(
          options?.inspectDependencies?.(path.node.argument, path);
       },
    });
+
+   result.exports = extractExports(traverse);
+   result.imports = extractImports(traverse);
 
    /**
     * Scan `///<reference [path/types]="..." />` in dts files.

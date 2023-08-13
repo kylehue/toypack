@@ -1,4 +1,4 @@
-import { NodePath, Scope, Visitor } from "@babel/traverse";
+import { NodePath, Scope, TraverseOptions, Visitor } from "@babel/traverse";
 import {
    Identifier,
    VariableDeclarator,
@@ -38,7 +38,7 @@ export function getBindingDeclaration(scope: Scope, name: string) {
 }
 
 let uid = 0;
-export function extractExports(programPath: NodePath<Program>) {
+export function extractExports(traverser: (opts: TraverseOptions) => void) {
    const exports: GroupedExports = {
       aggregatedAll: {},
       aggregatedName: {},
@@ -114,7 +114,7 @@ export function extractExports(programPath: NodePath<Program>) {
                   if (!declPath) {
                      throw new Error(`No declaration found for "${id.name}"`);
                   }
-                  
+
                   const name = id.name;
                   exports.declared[id.name] = {
                      id: `$${uid++}`,
@@ -124,7 +124,7 @@ export function extractExports(programPath: NodePath<Program>) {
                      identifier: id,
                      name,
                      local: name,
-                     isExportDeclared: true
+                     isExportDeclared: true,
                   };
                });
             } else {
@@ -273,7 +273,7 @@ export function extractExports(programPath: NodePath<Program>) {
       },
    };
 
-   programPath.traverse(visitor);
+   traverser.call(null, visitor);
 
    return exports;
 }

@@ -1,4 +1,4 @@
-import { NodePath, Visitor } from "@babel/traverse";
+import { NodePath, TraverseOptions, Visitor } from "@babel/traverse";
 import {
    ImportDeclaration,
    ImportDefaultSpecifier,
@@ -9,7 +9,7 @@ import {
 } from "@babel/types";
 
 let uid = 0;
-export function extractImports(programPath: NodePath<Program>) {
+export function extractImports(traverser: (opts: TraverseOptions) => void) {
    const imports: GroupedImports = {
       sideEffect: {},
       dynamic: {},
@@ -97,7 +97,7 @@ export function extractImports(programPath: NodePath<Program>) {
       },
    };
 
-   programPath.traverse(visitor);
+   traverser.call(null, visitor);
 
    return imports;
 }
