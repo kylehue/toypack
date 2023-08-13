@@ -12,7 +12,7 @@ import {
 } from "../utils/index.js";
 import type { StyleModule, Toypack } from "src/types";
 
-export function compileStyle(this: Toypack, chunk: StyleModule) {
+export async function compileStyle(this: Toypack, chunk: StyleModule) {
    const config = this.config;
    const sourceMapConfig = config.bundle.sourceMap;
    const shouldMap = shouldProduceSourceMap(
@@ -22,7 +22,6 @@ export function compileStyle(this: Toypack, chunk: StyleModule) {
 
    // Check cache
    const cached = this._getCache(chunk.source);
-
    if (cached && !chunk.asset.modified && cached.content) {
       return {
          source: chunk.source,
@@ -30,6 +29,14 @@ export function compileStyle(this: Toypack, chunk: StyleModule) {
          map: cached.map,
       };
    }
+
+   await this._pluginManager.triggerHook({
+      name: "transformStyle",
+      args: [chunk.source, chunk.content, chunk.ast],
+      callback(opts) {
+         CSSTree.walk(chunk.ast, opts);
+      },
+   });
 
    for (const node of chunk.urlNodes) {
       /**

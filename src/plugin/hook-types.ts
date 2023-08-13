@@ -45,6 +45,12 @@ export type TransformScriptHook = (
    content: string,
    ast: File
 ) => TraverseOptions | void;
+export type TransformStyleHook = (
+   this: PluginContextBase,
+   source: string,
+   content: string,
+   ast: CssNode
+) => EnterOrLeaveFn<CssNode> | WalkOptions | void;
 
 // Context
 export interface PluginContextBase {
@@ -122,6 +128,8 @@ export interface PluginHooks {
    parsed: ParsedHook | ConfigurableHook<ParsedHook>;
    /** Hook called everytime a script module needs to be transformed. */
    transform: TransformScriptHook | ConfigurableHook<TransformScriptHook>;
+   /** Hook called everytime a style module needs to be transformed. */
+   transformStyle: TransformStyleHook | ConfigurableHook<TransformStyleHook>;
    /** Hook called only once, useful for setting up things. */
    setup: SetupHook;
 }
