@@ -1,7 +1,10 @@
+import generate from "@babel/generator";
+import traverse, { TraverseOptions } from "@babel/traverse";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MagicString from "magic-string";
-import { mergeSourceMaps } from "../../utils";
-import type { ScriptModule } from "src/types";
+import { parseScriptAsset } from "../../parse/parse-script-chunk";
+import { mergeSourceMaps, mergeTraverseOptions } from "../../utils";
+import type { DependencyGraph, ScriptModule, Toypack } from "src/types";
 
 export class ModuleTransformer {
    private _s: MagicString;
@@ -11,7 +14,7 @@ export class ModuleTransformer {
    private _doneInserts: [number, string][] = [];
    private _previousGenerated?: { content: string; map?: EncodedSourceMap };
    constructor(public module: ScriptModule) {
-      this._s = new MagicString(module.content);
+      this._s = new MagicString(this.module.content);
    }
 
    // TODO: remove
@@ -65,6 +68,10 @@ export class ModuleTransformer {
       }
    }
 
+   public reinstantiate() {
+      this._s = new MagicString(this.module.content);
+   }
+
    public update(start: number, end: number, content: string) {
       if (this._isDoneUpdate(start, end, content)) return;
       this._toUpdate.push([[start, end], content]);
@@ -109,4 +116,73 @@ export class ModuleTransformer {
 
       return generated;
    }
+}
+
+async function transformModulesWithPlugins(
+   this: Toypack,
+   moduleTransformers: ModuleTransformer[]
+) {
+   for (const moduleTransformer of moduleTransformers) {
+      if (!moduleTransformer.needsChange()) continue;
+      const { module } = moduleTransformer;
+      const traverseOptionsArray: TraverseOptions[] = [];
+      await this._pluginManager.triggerHook({
+         name: "transform",
+         args: [module.source, module.content, module.ast],
+         callback(result) {
+            traverseOptionsArray.push(result);
+         },
+      });
+      if (!traverseOptionsArray.length) continue;
+      traverse(module.ast, mergeTraverseOptions(traverseOptionsArray));
+
+      // generate
+      const transformed = generate(module.ast, {
+         sourceFileName: module.source,
+         sourceMaps: true,
+      });
+      const content = transformed.code;
+      const map = transformed.map as EncodedSourceMap | null;
+      module.content = content;
+      module.map =
+         map && module.map
+            ? mergeSourceMaps(map, module.map)
+            : map || module.map;
+
+      // re-parse
+      const newParsed = await parseScriptAsset.call(
+         this,
+         module.source,
+         content
+      );
+      module.ast = newParsed.ast;
+      module.exports = newParsed.exports;
+      module.imports = newParsed.imports;
+      module.programPath = newParsed.programPath;
+
+      moduleTransformer.reinstantiate();
+   }
+}
+
+export async function getModuleTransformersFromGraph(
+   this: Toypack,
+   graph: DependencyGraph
+) {
+   const moduleTransformers = Object.values(Object.fromEntries(graph))
+      .filter((g): g is ScriptModule => g.isScript())
+      .reverse()
+      .map((x) => {
+         const cached = this._getCache(x.source)?.moduleTransformer;
+         if (x.asset.modified || !cached) {
+            const moduleDesc = new ModuleTransformer(x);
+            this._setCache(x.source, {
+               moduleTransformer: moduleDesc,
+            });
+            return moduleDesc;
+         }
+
+         return cached;
+      });
+   await transformModulesWithPlugins.call(this, moduleTransformers);
+   return moduleTransformers;
 }

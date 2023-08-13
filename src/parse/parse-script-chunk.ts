@@ -87,14 +87,6 @@ export async function parseScriptAsset(
       traverseOptionsArray.push(options);
    };
 
-   await this._pluginManager.triggerHook({
-      name: "transform",
-      args: [source, content, result.ast],
-      callback(result) {
-         traverse(result);
-      },
-   });
-
    // Extract dependencies
    traverse({
       Program(path) {

@@ -9,13 +9,13 @@ import {
    isUrl,
    parseURL,
 } from "../utils/index.js";
-import { ParseInfo } from "../plugin/hook-types.js";
 import { LoadChunkResource, LoadChunkResult, loadChunk } from "./load-chunk.js";
 import { ParsedScriptResult, parseScriptAsset } from "./parse-script-chunk.js";
 import { ParsedStyleResult, parseStyleAsset } from "./parse-style-chunk.js";
 import { ResourceModule } from "./classes/ResourceModule.js";
 import { ScriptModule } from "./classes/ScriptModule.js";
 import { StyleModule } from "./classes/StyleModule.js";
+import { ParseInfo } from "src/plugin/hook-types.js";
 
 function getImportPosition(content: string, importSource: string) {
    let index: number | null = null;
@@ -161,7 +161,7 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
          },
          args: [
             {
-               type: loaded.type,
+               type: chunk.type,
                parsed,
                chunk,
             } as ParseInfo,

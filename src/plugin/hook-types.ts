@@ -17,44 +17,34 @@ import type {
 } from "src/types";
 
 // Interfaces
-export type ParseInfo =
-   | {
-        type: "script";
-        chunk: ScriptModule;
-        parsed: ParsedScriptResult;
-     }
-   | {
-        type: "style";
-        chunk: StyleModule;
-        parsed: ParsedStyleResult;
-     };
+interface ScriptParseInfo {
+   type: "script";
+   chunk: ScriptModule;
+   parsed: ParsedScriptResult;
+}
+interface StyleParseInfo {
+   type: "style";
+   chunk: StyleModule;
+   parsed: ParsedStyleResult;
+}
+export type ParseInfo = ScriptParseInfo | StyleParseInfo;
 
 // Hooks
 export type LoadHook = (
    this: PluginContext,
    moduleInfo: ModuleInfo
 ) => LoadResult | string | void;
-
 export type ResolveHook = (this: PluginContext, id: string) => string | void;
-
+export type ParsedHook = (this: PluginContext, parseInfo: ParseInfo) => void;
+export type StartHook = (this: PluginContextBase) => void;
+export type EndHook = (this: PluginContextBase, result: BundleResult) => void;
+export type SetupHook = (this: PluginContextBase) => void;
 export type TransformScriptHook = (
    this: PluginContextBase,
    source: string,
    content: string,
    ast: File
 ) => TraverseOptions | void;
-
-export type TransformStyleHook = (
-   this: PluginContextBase,
-   source: string,
-   content: string,
-   ast: CssNode
-) => EnterOrLeaveFn<CssNode> | WalkOptions | void;
-
-export type ParsedHook = (this: PluginContext, parseInfo: ParseInfo) => void;
-export type StartHook = (this: PluginContextBase) => void;
-export type EndHook = (this: PluginContextBase, result: BundleResult) => void;
-export type SetupHook = (this: PluginContextBase) => void;
 
 // Context
 export interface PluginContextBase {
@@ -124,16 +114,14 @@ export interface PluginHooks {
    load: LoadHook | ConfigurableHook<LoadHook>;
    /** Hook called everytime a module needs to be resolved. */
    resolve: ResolveHook | ConfigurableHook<ResolveHook>;
-   /** Hook called everytime a script module needs to be transformed. */
-   transform: TransformScriptHook | ConfigurableHook<TransformScriptHook>;
-   /** Hook called everytime a style module needs to be transformed. */
-   transformStyle: TransformStyleHook | ConfigurableHook<TransformStyleHook>;
    /** Hook called at the start of getting the dependency graph. */
    buildStart: StartHook | ConfigurableHook<StartHook>;
    /** Hook called at the end of the bundling process. */
    buildEnd: EndHook | ConfigurableHook<EndHook>;
    /** Hook called everytime a module is parsed. */
    parsed: ParsedHook | ConfigurableHook<ParsedHook>;
+   /** Hook called everytime a script module needs to be transformed. */
+   transform: TransformScriptHook | ConfigurableHook<TransformScriptHook>;
    /** Hook called only once, useful for setting up things. */
    setup: SetupHook;
 }

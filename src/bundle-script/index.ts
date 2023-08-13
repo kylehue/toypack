@@ -13,13 +13,15 @@ import { bindModules } from "./link/bind-modules.js";
 import { UidGenerator } from "./link/UidGenerator.js";
 import { UidTracker } from "./link/UidTracker.js";
 import { createNamespace } from "./utils/create-namespace.js";
-import { ModuleTransformer } from "./utils/module-transformer.js";
+import {
+   ModuleTransformer,
+   getModuleTransformersFromGraph,
+} from "./utils/module-transformer.js";
 import { finalizeModule } from "./utils/finalize-module.js";
 import { formatEsm } from "./formats/esm.js";
 import {
    ERRORS,
    mergeSourceMapToBundle,
-   mergeSourceMaps,
    shouldProduceSourceMap,
 } from "../utils/index.js";
 import runtime from "./runtime.js";
@@ -56,24 +58,6 @@ window.getHighlightedCode = function (ast: any) {
    );
 };
 
-function getModuleTransformers(this: Toypack, graph: DependencyGraph) {
-   return Object.values(Object.fromEntries(graph))
-      .filter((g): g is ScriptModule => g.isScript())
-      .reverse()
-      .map((x) => {
-         const cached = this._getCache(x.source)?.moduleTransformer;
-         if (x.asset.modified || !cached) {
-            const moduleDesc = new ModuleTransformer(x);
-            this._setCache(x.source, {
-               moduleTransformer: moduleDesc,
-            });
-            return moduleDesc;
-         }
-
-         return cached;
-      });
-}
-
 function getNamespacedModules(modules: ScriptModule[]) {
    const needsNamespace = new Set<string>();
    const scan = (
@@ -95,7 +79,10 @@ function getNamespacedModules(modules: ScriptModule[]) {
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
-   const moduleTransformers = getModuleTransformers.call(this, graph);
+   const moduleTransformers = await getModuleTransformersFromGraph.call(
+      this,
+      graph
+   );
    const modules = moduleTransformers.map((x) => x.module);
 
    const uidGenerator = new UidGenerator();
