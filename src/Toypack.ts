@@ -107,17 +107,17 @@ export class Toypack extends Hooks {
       this._debugger[type].push(data as any);
    }
 
-   protected _getCache(source: string) {
-      return this._cachedDeps.get(source) || null;
+   protected _getCache(key: any) {
+      return this._cachedDeps.get(key) || null;
    }
 
-   protected _setCache(source: string, value: Partial<Cache>) {
-      const cached = this._getCache(source);
-      value.source = source;
+   protected _setCache(key: any, value: Partial<Cache>) {
+      const cached = this._getCache(key);
+      value.source = key;
       if (cached) {
          Object.assign(cached || {}, value);
       } else {
-         this._cachedDeps.set(source, value);
+         this._cachedDeps.set(key, value);
       }
    }
 
@@ -183,6 +183,7 @@ export class Toypack extends Hooks {
     * @returns The installed package.
     */
    public async installPackage(source: string, version = "latest") {
+      if (typeof source != "string") return null;
       const pkg = await getPackage.call(this, source, version);
       if (!pkg.assets.length) return pkg;
 
@@ -313,14 +314,6 @@ export class Toypack extends Hooks {
             config.bundle?.sourceMap ?? _config.bundle.sourceMap;
       }
 
-      // config.bundle.importMap
-      mergeWith(_config.bundle.importMap, config.bundle?.importMap, customizer);
-
-      // config.bundle.template
-      // not using `mergeWith` because the template arrays should
-      // be allowed to contain duplicates
-      merge(_config.bundle.template, config.bundle?.template);
-
       // config.parser
       mergeWith(_config.parser, config.parser);
 
@@ -351,6 +344,7 @@ export class Toypack extends Hooks {
     * @returns The resolved absolute path.
     */
    public resolve(source: string, options?: Partial<ResolveOptions>) {
+      if (typeof source != "string") return null;
       if (source.startsWith("virtual:")) {
          return this._virtualAssets.get(source)?.source || null;
       }
@@ -437,7 +431,7 @@ export class Toypack extends Hooks {
       source: string,
       content: string | Blob = ""
    ): T {
-      if (!isValidAssetSource(source)) {
+      if (typeof source != "string" || !isValidAssetSource(source)) {
          this._pushToDebugger("error", ERRORS.invalidAssetSource(source));
          return {} as T;
       }
@@ -474,7 +468,7 @@ export class Toypack extends Hooks {
     * @returns The Asset object if found, otherwise null.
     */
    public getAsset(source: string) {
-      if (!source) return null;
+      if (typeof source !== "string") return null;
       if (source.startsWith("virtual:")) {
          const asset = this._virtualAssets.get(source);
          if (asset) return asset;
@@ -512,6 +506,7 @@ export class Toypack extends Hooks {
     */
    public removeDirectory(source: string) {
       const removedAssets: Asset[] = [];
+      if (typeof source != "string") return removedAssets;
       if (!source) return removedAssets;
       if (source.startsWith("virtual:")) return removedAssets;
       source = path.join("/", source);
@@ -530,7 +525,7 @@ export class Toypack extends Hooks {
     * @param source The source of the asset to remove.
     */
    public removeAsset(source: string) {
-      if (!source) return;
+      if (typeof source != "string") return;
       const isVirtual = source.startsWith("virtual:");
       if (!isVirtual) {
          source = path.join("/", source);
@@ -575,6 +570,8 @@ export class Toypack extends Hooks {
     * @returns The moved asset.
     */
    moveAsset(oldSource: string, newSource: string) {
+      if (typeof oldSource != "string") return;
+      if (typeof newSource != "string") return;
       const oldAsset = this.getAsset(oldSource);
       if (!oldAsset) return;
       const newAsset = this.addOrUpdateAsset(newSource, oldAsset.content);
@@ -595,6 +592,8 @@ export class Toypack extends Hooks {
          newSource: string;
          asset: Asset;
       }[] = [];
+      if (typeof oldSource != "string") return movedAssets;
+      if (typeof newSource != "string") return movedAssets;
       for (const [_, oldAsset] of this._assets) {
          if (!oldAsset.source.startsWith(oldSource)) continue;
          const newAsset = this.moveAsset(oldAsset.source, newSource);
@@ -615,6 +614,7 @@ export class Toypack extends Hooks {
     * @returns The Asset object if found, otherwise null.
     */
    public getAssetById(id: string) {
+      if (typeof id != "string") return null;
       for (const [_, asset] of this._assets) {
          if (asset.id === id) return asset;
       }
@@ -627,6 +627,7 @@ export class Toypack extends Hooks {
     * @param source The id of the asset to remove.
     */
    public removeAssetById(id: string) {
+      if (typeof id != "string") return null;
       const asset = this.getAssetById(id);
       if (asset) {
          this.removeAsset(asset.source);
@@ -639,10 +640,13 @@ export class Toypack extends Hooks {
     * @param content The new content of the asset.
     */
    public updateAssetById(id: string, content: string | Blob) {
+      if (typeof id != "string") return null;
       const asset = this.getAssetById(id);
       if (asset) {
          return this.addOrUpdateAsset(asset.source, content);
       }
+
+      return null;
    }
 
    public getLastBundleResult() {
@@ -746,4 +750,5 @@ interface Cache {
    moduleTransformer?: ModuleTransformer;
    content?: string;
    map?: EncodedSourceMap | null;
+   metadata?: any;
 }

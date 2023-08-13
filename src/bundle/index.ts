@@ -1,43 +1,21 @@
-import { TemplateConfig } from "src/config.js";
 import { bundleScript } from "../bundle-script/index.js";
 import { bundleStyle } from "../bundle-style/bundle-style.js";
 import { getUsableResourcePath } from "../utils";
-import type { DependencyGraph, ImportMapConfig, Toypack } from "src/types";
+import { transformHtml } from "./transform-html.js";
+import type { DependencyGraph, Toypack } from "src/types";
 
 let previousScriptUrl: string | undefined = undefined;
 let previousLinkUrl: string | undefined = undefined;
 
-function getHtml(
-   scriptSrc = "",
-   linkHref = "",
-   importMap?: ImportMapConfig,
-   template?: TemplateConfig
-) {
-   template ??= {
-      head: [],
-      body: [],
-      bodyAttributes: {},
-   };
-
-   const stringifiedAttrs = Object.entries(template.bodyAttributes)
-      .map(([key, value]) => {
-         return `${key}="${value}"`;
-      })
-      .join(" ");
-
+function getHtml(scriptSrc = "", linkHref = "") {
    return [
       `<!DOCTYPE html>`,
       `<html lang="en">`,
       `  <head>`,
-      ...template.head,
       `    <link rel="stylesheet" href="${linkHref}"></link>`,
-      `    <script type="importmap">`,
-      JSON.stringify(importMap || {}, undefined, 2),
-      `    </script>`,
       `    <script type="module" src="${scriptSrc}"></script>`,
       `  </head>`,
-      `  <body ${stringifiedAttrs}>`,
-      ...template.body,
+      `  <body>`,
       `  </body>`,
       `</html>`,
    ].join("\n");
@@ -76,6 +54,9 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
       if (css.map) css.map.sourcemap.sourcesContent = undefined;
    }
 
+   let indexScriptUrl;
+   let indexStyleUrl;
+
    result.js.content = js.content;
    result.css.content = css.content;
 
@@ -101,12 +82,8 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
          })
       );
 
-      result.html.content = getHtml(
-         previousScriptUrl,
-         previousLinkUrl,
-         config.bundle.importMap,
-         config.bundle.template
-      );
+      indexScriptUrl = previousScriptUrl;
+      indexStyleUrl = previousLinkUrl;
    } else {
       // Extract resources from graph
       for (const [_, chunk] of graph) {
@@ -139,13 +116,18 @@ export async function bundle(this: Toypack, graph: DependencyGraph) {
          });
       }
 
-      result.html.content = getHtml(
-         "./" + result.js.source,
-         "./" + result.css.source,
-         config.bundle.importMap,
-         config.bundle.template
-      );
+      indexScriptUrl = "./" + result.js.source;
+      indexStyleUrl = "./" + result.css.source;
    }
+
+   const html = await transformHtml.call(
+      this,
+      getHtml(indexScriptUrl, indexStyleUrl),
+      indexScriptUrl,
+      indexStyleUrl
+   );
+
+   result.html.content = html;
 
    await this._pluginManager.triggerHook({
       name: "buildEnd",

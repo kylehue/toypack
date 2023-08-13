@@ -1,50 +1,103 @@
+import { merge } from "lodash-es";
 import { getFetchUrlFromProvider } from "../package-manager/utils.js";
 import { fetchVersion } from "../package-manager/fetch-version.js";
-import { Plugin, Toypack } from "../types.js";
+import { Plugin } from "../types.js";
 import { parsePackageName, isLocal } from "../utils/index.js";
-
-async function autoAddImportMap(bundler: Toypack, id: string) {
-   if (bundler.config.bundle.importMap.imports[id]) return;
-   const provider = bundler.getPackageProviders()[0];
-   if (!provider) return;
-
-   const { name, subpath, version: _version } = parsePackageName(id);
-   const version = await fetchVersion(name, _version);
-   const url = getFetchUrlFromProvider(provider, name, version, subpath);
-
-   bundler.setConfig({
-      bundle: {
-         importMap: {
-            imports: {
-               [id]: url,
-            },
-         },
-      },
-   });
-}
-
-async function autoInstallPackage(bundler: Toypack, id: string) {
-   const config = bundler.config;
-   if (config.bundle.mode == "development") return;
-   return await bundler.installPackage(id);
-}
+import { Node } from "node-html-parser";
 
 /**
- * Auto-add import maps and packages.
+ * If in production mode, it will auto-install packages, and if in development
+ * mode, it will auto-add import-maps.
  */
 export default function (): Plugin {
+   const importMaps = new Map<string, string>();
    return {
       name: "auto-deps-plugin",
       resolve: {
          async: true,
          async handler(id) {
             if (isLocal(id)) return;
-            await autoAddImportMap(this.bundler, id);
-            const pkg = await autoInstallPackage(this.bundler, id);
-            if (pkg) {
-               return pkg.assets.find(x => x.isEntry)?.source;
+            if (this.bundler.config.bundle.mode == "production") {
+               const pkg = await this.bundler.installPackage(id);
+               if (pkg) {
+                  return pkg.assets.find((x) => x.isEntry)?.source;
+               }
+            } else {
+               if (importMaps.get(id)) return;
+
+               const provider = this.bundler.getPackageProviders()[0];
+               if (!provider) return;
+
+               const {
+                  name,
+                  subpath,
+                  version: _version,
+               } = parsePackageName(id);
+               const version = await fetchVersion(name, _version);
+               const url = getFetchUrlFromProvider(
+                  provider,
+                  name,
+                  version,
+                  subpath
+               );
+
+               importMaps.set(id, url);
             }
          },
+      },
+      transformHtml() {
+         const objectImportMap = {
+            imports: Object.entries(Object.fromEntries(importMaps)).reduce(
+               (acc, [id, url]) => {
+                  acc[id] = url;
+                  return acc;
+               },
+               {} as Record<string, string>
+            ),
+         };
+
+         let importMapNode: Node;
+         return {
+            HtmlElement() {
+               this.traverse({
+                  ScriptElement(node) {
+                     if (
+                        node.attributes["type"]?.toLowerCase() !== "importmap"
+                     ) {
+                        return;
+                     }
+                     importMapNode = node;
+                     this.stop();
+                  },
+               });
+            },
+            HeadElement(node) {
+               if (importMapNode) {
+                  // edit the import map if it exists
+                  const json = JSON.parse(importMapNode.textContent);
+                  merge(json, objectImportMap);
+                  importMapNode.textContent = JSON.stringify(
+                     json,
+                     undefined,
+                     2
+                  );
+               } else {
+                  // add the import map if it doesn't exist
+                  const stringifiedImportMap = JSON.stringify(
+                     objectImportMap,
+                     undefined,
+                     2
+                  );
+                  node.insertAdjacentHTML(
+                     "afterbegin",
+                     `<script type="importmap">${stringifiedImportMap}</script>`
+                  );
+               }
+
+               node.removeWhitespace();
+               this.stop();
+            },
+         };
       },
    };
 }

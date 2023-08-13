@@ -1,4 +1,3 @@
-import { codeFrameColumns } from "@babel/code-frame";
 import {
    parse as parseHTML,
    Node,
@@ -8,8 +7,8 @@ import {
 } from "node-html-parser";
 import { PluginContext, Plugin, Toypack } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
-import { indexToPosition } from "../utils/find-code-position.js";
 import path from "path-browserify";
+import { merge } from "lodash-es";
 
 const resourceSrcAttrTags = [
    "EMBED",
@@ -64,6 +63,7 @@ function compile(
    const htmlAst = parseHTML(content, htmlPluginOptions?.parserOptions);
    const dependencies = new Set<string>();
    const resourceDependencies = new Set<string>();
+   let importMap: Record<string, string> = {};
    let bundledInlineStyles = "";
    traverse(htmlAst, (node) => {
       if (!(node instanceof HTMLElement)) return;
@@ -89,11 +89,7 @@ function compile(
       if (node.tagName == "SCRIPT" && node.attributes.type == "importmap") {
          node.remove();
          const text = node.structuredText.trim();
-         this.bundler.setConfig({
-            bundle: {
-               importMap: text.length ? JSON.parse(text) : {},
-            },
-         });
+         importMap = text.length ? JSON.parse(text) : {};
       }
 
       if (
@@ -132,40 +128,34 @@ function compile(
       dependencies,
       resourceDependencies,
       bundledInlineStyles,
+      importMap,
    };
 }
 
-function injectAstToHtml(bundler: Toypack, astToInject: HTMLElement) {
-   // Inject body in body
-   let body: string[] = [];
-   let head: string[] = [];
-   let bodyAttributes: Record<string, string> = {};
-   const bodyToInject = astToInject.querySelector("body");
-   bodyToInject?.childNodes.forEach((node) => {
-      const str = node.toString();
-      if (!str.trim().length) return;
-      body.push(str);
-   });
-
-   bodyAttributes = bodyToInject?.attributes || {};
-
-   const headToInject = astToInject.querySelector("head");
-   headToInject?.childNodes.forEach((node) => {
-      const str = node.toString();
-      if (!str.trim().length) return;
-      head.push(str);
-   });
-
-   bundler.setConfig({
-      bundle: {
-         template: {
-            head,
-            body,
-            bodyAttributes,
-         },
-      },
-   });
+function injectImportMap(
+   headNode: HTMLElement,
+   importMap: Record<string, string>,
+   importMapNode?: Node
+) {
+   if (importMapNode) {
+      // edit the import map if it exists
+      const json = JSON.parse(importMapNode.textContent);
+      merge(json, importMap);
+      importMapNode.textContent = JSON.stringify(json, undefined, 2);
+   } else {
+      // add the import map if it doesn't exist
+      const stringifiedImportMap = JSON.stringify(importMap, undefined, 2);
+      headNode.insertAdjacentHTML(
+         "afterbegin",
+         `<script type="importmap">${stringifiedImportMap}</script>`
+      );
+   }
 }
+
+const symbols = {
+   importMap: Symbol("importMap"),
+   ast: Symbol("ast"),
+};
 
 export default function (options?: HTMLPluginOptions): Plugin {
    return {
@@ -174,6 +164,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
       buildStart() {
          // Remove in plugin's cache if the asset no longer exists
          this.cache.forEach((_, source) => {
+            if (typeof source == "symbol") return;
             if (this.bundler.getAsset(source)) return;
             this.cache.delete(source);
          });
@@ -191,13 +182,11 @@ export default function (options?: HTMLPluginOptions): Plugin {
             // guard
             const isHtml = /\.html$/.test(moduleInfo.source.split("?")[0]);
             if (!isHtml) return;
-            
+
             if (typeof moduleInfo.content != "string") {
                this.emitError("Blob contents are not supported.");
                return;
             }
-
-            let mainVirtualModule = "";
 
             const compiled = compile.call(
                this,
@@ -205,6 +194,11 @@ export default function (options?: HTMLPluginOptions): Plugin {
                moduleInfo.content,
                options
             );
+
+            this.cache.set(symbols.importMap, compiled.importMap);
+            this.cache.set(symbols.ast, compiled.ast);
+
+            let mainVirtualModule = "";
 
             // Import dependencies
             for (const depSource of compiled.dependencies) {
@@ -227,8 +221,6 @@ export default function (options?: HTMLPluginOptions): Plugin {
                resourceDependencies: compiled.resourceDependencies,
             });
 
-            injectAstToHtml(this.bundler, compiled.ast);
-
             return mainVirtualModule;
          },
       },
@@ -238,6 +230,64 @@ export default function (options?: HTMLPluginOptions): Plugin {
          cached.resourceDependencies?.forEach((item: any) =>
             parsed.dependencies.add(item)
          );
+      },
+      transformHtml() {
+         const ast = this.cache.get(symbols.ast) as HTMLElement | null;
+         const importMap = this.cache.get(symbols.importMap);
+         if (!ast && !importMap) return;
+         const head = ast?.querySelector("head");
+         const body = ast?.querySelector("body");
+
+         let hasBody = false;
+         let hasHead = false;
+         let importMapNode: Node;
+         return {
+            // assure that head and body exists
+            HtmlElement(node) {
+               this.traverse({
+                  HeadElement() {
+                     hasHead = true;
+                  },
+                  BodyElement() {
+                     hasBody = true;
+                     this.skip();
+                  },
+                  ScriptElement(node) {
+                     if (
+                        node.attributes["type"]?.toLowerCase() !== "importmap"
+                     ) {
+                        return;
+                     }
+                     importMapNode = node;
+                  },
+               });
+
+               if (head && !hasHead) {
+                  node.insertAdjacentHTML("afterbegin", `<head></head>`);
+               }
+               if (body && !hasBody) {
+                  node.insertAdjacentHTML("beforeend", `<body></body>`);
+               }
+            },
+            HeadElement(node) {
+               if (importMap) {
+                  injectImportMap(node, importMap, importMapNode);
+               }
+
+               if (head) {
+                  node.insertAdjacentHTML("beforeend", head.innerHTML);
+               }
+            },
+            BodyElement(node) {
+               if (body) {
+                  for (const [attr, value] of Object.entries(body.attributes)) {
+                     node.setAttribute(attr, value);
+                  }
+
+                  node.insertAdjacentHTML("beforeend", body.innerHTML);
+               }
+            },
+         };
       },
    };
 }

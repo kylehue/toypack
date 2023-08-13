@@ -15,6 +15,7 @@ import type {
    LoadResult,
    ModuleInfo,
 } from "src/types";
+import { TraverseHtmlOptions } from "src/bundle/transform-html.js";
 
 // Interfaces
 interface ScriptParseInfo {
@@ -51,6 +52,12 @@ export type TransformStyleHook = (
    content: string,
    ast: CssNode
 ) => EnterOrLeaveFn<CssNode> | WalkOptions | void;
+export type TransformHtmlHook = (
+   this: PluginContextBase,
+   html: string,
+   indexScriptUrl: string,
+   indexStyleUrl: string
+) => TraverseHtmlOptions | void;
 
 // Context
 export interface PluginContextBase {
@@ -130,6 +137,8 @@ export interface PluginHooks {
    transform: TransformScriptHook | ConfigurableHook<TransformScriptHook>;
    /** Hook called everytime a style module needs to be transformed. */
    transformStyle: TransformStyleHook | ConfigurableHook<TransformStyleHook>;
+   /** Hook called everytime the main html needs to be transformed. */
+   transformHtml: TransformHtmlHook | ConfigurableHook<TransformHtmlHook>;
    /** Hook called only once, useful for setting up things. */
    setup: SetupHook;
 }

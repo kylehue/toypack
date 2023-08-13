@@ -57,21 +57,6 @@ export const defaultConfig = {
        * @default true
        */
       sourceMap: true as SourceMapConfig | boolean,
-      /**
-       * Inject import map to HTML output.
-       */
-      importMap: {
-         imports: {},
-         scopes: {},
-      } as ImportMapConfig,
-      /**
-       * Inject templates to HTML output.
-       */
-      template: {
-         head: [],
-         body: [],
-         bodyAttributes: {},
-      } as TemplateConfig,
    },
    /**
     * Configuration for the parser.
