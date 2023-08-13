@@ -1,21 +1,20 @@
 import generate, { GeneratorOptions } from "@babel/generator";
-import { Statement, program, removeComments } from "@babel/types";
+import { Statement, program } from "@babel/types";
 import template from "@babel/template";
 import {
    EncodedSourceMap,
    GenMapping,
    toEncodedMap,
 } from "@jridgewell/gen-mapping";
-import MagicString from "magic-string";
 import MapConverter from "convert-source-map";
 import { deconflict } from "./link/deconflict.js";
 import { transformToVars } from "./link/top-level-var.js";
 import { bindModules } from "./link/bind-modules.js";
+import { UidGenerator } from "./link/UidGenerator.js";
+import { UidTracker } from "./link/UidTracker.js";
 import { createNamespace } from "./utils/create-namespace.js";
-import {
-   ModuleDescriptor,
-   getModuleDescriptors,
-} from "./utils/module-descriptor.js";
+import { ModuleTransformer } from "./utils/module-transformer.js";
+import { finalizeModule } from "./utils/finalize-module.js";
 import { formatEsm } from "./formats/esm.js";
 import {
    ERRORS,
@@ -36,10 +35,7 @@ import type {
 
 // TODO: remove
 import { codeFrameColumns } from "@babel/code-frame";
-import { UidGenerator } from "./link/UidGenerator.js";
-import { UidTracker } from "./link/UidTracker.js";
-import { removePorts } from "./utils/remove-ports.js";
-(window as any).getCode = function (ast: any) {
+window.getHighlightedCode = function (ast: any) {
    return codeFrameColumns(
       typeof ast == "string"
          ? ast
@@ -60,10 +56,22 @@ import { removePorts } from "./utils/remove-ports.js";
    );
 };
 
-export function getModules(graph: DependencyGraph) {
+function getModuleTransformers(this: Toypack, graph: DependencyGraph) {
    return Object.values(Object.fromEntries(graph))
       .filter((g): g is ScriptModule => g.isScript())
-      .reverse();
+      .reverse()
+      .map((x) => {
+         const cached = this._getCache(x.source)?.moduleTransformer;
+         if (x.asset.modified || !cached) {
+            const moduleDesc = new ModuleTransformer(x);
+            this._setCache(x.source, {
+               moduleTransformer: moduleDesc,
+            });
+            return moduleDesc;
+         }
+
+         return cached;
+      });
 }
 
 function getNamespacedModules(modules: ScriptModule[]) {
@@ -87,11 +95,11 @@ function getNamespacedModules(modules: ScriptModule[]) {
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
-   const moduleDescriptors = getModuleDescriptors(graph);
-   const modules = moduleDescriptors.map((x) => x.module);
+   const moduleTransformers = getModuleTransformers.call(this, graph);
+   const modules = moduleTransformers.map((x) => x.module);
+
    const uidGenerator = new UidGenerator();
-   const uidTracker = new UidTracker(uidGenerator);
-   uidTracker.instantiateModules(modules);
+   const uidTracker = new UidTracker(this, uidGenerator);
    uidTracker.assignWithModules(modules);
    uidGenerator.addReservedVars(...Object.keys(runtime));
    uidGenerator.addReservedVars(...uidTracker.getAllNamespaces());
@@ -105,38 +113,44 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    };
 
    try {
-      for (const moduleDesc of moduleDescriptors) {
+      for (const moduleTransformer of moduleTransformers) {
+         if (!moduleTransformer.needsChange()) continue;
          // order matters here
-         transformToVars(moduleDesc);
-         deconflict(uidTracker, moduleDesc);
-         bindModules(uidTracker, graph, moduleDesc);
+         transformToVars.call(this, moduleTransformer);
+         deconflict.call(this, uidTracker, moduleTransformer);
+         bindModules.call(this, uidTracker, graph, moduleTransformer);
       }
 
-      // Format
-      formatEsm(uidTracker, chunks, moduleDescriptors);
-      removePorts(moduleDescriptors);
+      // Format to esm
+      formatEsm.call(this, uidTracker, chunks, moduleTransformers);
 
-      // Modules
-      for (const moduleDescriptor of moduleDescriptors) {
-         const { module } = moduleDescriptor;
-         chunks.module.set(module.source, moduleDescriptor);
+      // finalize
+      for (const moduleTransformer of moduleTransformers) {
+         if (!moduleTransformer.needsChange()) continue;
+         finalizeModule(moduleTransformer);
       }
 
-      // Namespaces
+      // chunks.module
+      for (const moduleTransformer of moduleTransformers) {
+         const { module } = moduleTransformer;
+         chunks.module.set(module.source, moduleTransformer);
+      }
+
+      // chunks.namespace
       const needsNamespace = getNamespacedModules(modules);
-      for (const moduleDescriptor of moduleDescriptors) {
-         const { module } = moduleDescriptor;
+      for (const moduleTransformer of moduleTransformers) {
+         const { module } = moduleTransformer;
          if (!needsNamespace.has(module.source)) continue;
-         const statements = createNamespace(uidTracker, module);
+         const statements = createNamespace.call(this, uidTracker, module);
          const arr = Array.isArray(statements) ? statements : [statements];
          chunks.namespace.set(module.source, arr);
-         chunks.runtime.add("__export");
+         chunks.runtime.add("createNamespace");
       }
    } catch (error: any) {
       this._pushToDebugger("error", ERRORS.bundle(error));
    }
 
-   const bundle = bundleChunks.call(this, chunks, graph);
+   const bundle = bundleChunks.call(this, chunks);
 
    return {
       content: bundle.content,
@@ -144,23 +158,12 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    };
 }
 
-function removeTopLevelComments(moduleDescriptor: ModuleDescriptor) {
-   const { module } = moduleDescriptor;
-   module.ast.comments?.forEach((comment) => {
-      moduleDescriptor.update(comment.start!, comment.end!, "");
-   });
-}
-
 const cachedRuntimeGens = new Map<
    `${keyof typeof runtime}-${ModeConfig}`,
    string
 >();
 
-function bundleChunks(
-   this: Toypack,
-   chunks: CompilationChunks,
-   graph: DependencyGraph
-) {
+function bundleChunks(this: Toypack, chunks: CompilationChunks) {
    const config = this.config;
    const bundle = {
       content: "",
@@ -228,32 +231,12 @@ function bundleChunks(
 
    // Modules
    let addedModules = 0;
-   for (const [source, moduleDescriptor] of chunks.module) {
-      const { module } = moduleDescriptor;
+   for (const [source, moduleTransformer] of chunks.module) {
       const shouldMap = shouldProduceSourceMap(source, config.bundle.sourceMap);
-      removeTopLevelComments(moduleDescriptor);
-      let generated = { content: "", map: null as EncodedSourceMap | null };
-      const cached = this._getCache(module.source);
-      if (cached?.content && !module.asset.modified) {
-         generated = {
-            content: cached.content,
-            map: cached.map as EncodedSourceMap | null,
-         };
-      } else {
-         generated = moduleDescriptor.generate();
-         this._setCache(module.source, generated);
-      }
+      const generated = moduleTransformer.generate();
 
       if (!generated.content.trim().length) continue;
       addedModules++;
-
-      const loadedMap =
-         (module.asset.type == "text" ? module.asset.map : null) || module.map;
-      if (loadedMap) {
-         generated.map = !generated.map
-            ? loadedMap
-            : mergeSourceMaps(generated.map, loadedMap);
-      }
 
       bundle.content += getSourceComment(source);
       const linePos = bundle.content.split("\n").length;
@@ -280,7 +263,7 @@ function bundleChunks(
    }
 
    bundle.content = bundle.content.trimEnd();
-   bundle.map = toEncodedMap(sourceMap);
+   bundle.map = bundle.content.length ? toEncodedMap(sourceMap) : null;
 
    return bundle;
 }
@@ -289,6 +272,6 @@ export interface CompilationChunks {
    header: Statement[];
    runtime: Set<keyof typeof runtime>;
    namespace: Map<string, Statement[]>;
-   module: Map<string, ModuleDescriptor>;
+   module: Map<string, ModuleTransformer>;
    footer: Statement[];
 }

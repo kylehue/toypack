@@ -2,14 +2,15 @@ import { NodePath } from "@babel/traverse";
 import { Identifier, ImportDeclaration, StringLiteral } from "@babel/types";
 import path from "path-browserify";
 import { UidGenerator } from "./UidGenerator";
-import { getModulesMap } from "../utils/get-module-map";
-import { isLocal } from "../../utils";
+import { ERRORS, isLocal } from "../../utils";
 import type {
    ScriptModule,
    ExportInfo,
    DeclaredDefaultExport,
    DeclaredExport,
+   Toypack,
 } from "src/types";
+import { getResolvedWithError } from "../utils/get-with-error";
 
 function getStringOrIdValue(exported: StringLiteral | Identifier) {
    return exported.type == "Identifier" ? exported.name : exported.value;
@@ -54,22 +55,31 @@ function getImportDeclaration(exportInfo: ExportInfo) {
  * @returns An object representing the redirection of the id.
  */
 function getImportedExportIdRedirection(
+   this: Toypack,
    module: ScriptModule,
    exportInfo: DeclaredDefaultExport | DeclaredExport,
    importDeclaration: NodePath<ImportDeclaration>
 ) {
    const resolved = module.dependencyMap.get(
       importDeclaration.node.source.value
-   )!;
+   );
    if (!resolved) {
-      throw new Error(`Redirected import is found but it cannot be resolved.`);
+      this._pushToDebugger(
+         "error",
+         ERRORS.any(`Redirected import is found but it cannot be resolved.`)
+      );
+      return;
    }
    const imports = module.getImports(["default", "specifier", "namespace"]);
    const imported = imports.find((x) => x.local === exportInfo.local);
    if (!imported) {
-      throw new Error(
-         `Redirected import is found but its specifier is not found.`
+      this._pushToDebugger(
+         "error",
+         ERRORS.any(
+            `Redirected import is found but its specifier is not found.`
+         )
       );
+      return;
    }
    let importedName;
    if (imported.type == "default") {
@@ -92,11 +102,6 @@ const symbols = {
    namespace: Symbol("Namespace"),
 };
 
-interface RedirectedId {
-   to: string;
-   name: string | Symbol;
-}
-
 export class UidTracker {
    private _map = new Map<
       string,
@@ -107,14 +112,11 @@ export class UidTracker {
       }
    >();
 
-   constructor(public uidGenerator: UidGenerator) {}
+   constructor(private _bundler: Toypack, public uidGenerator: UidGenerator) {}
 
+   // TODO: remove?
    public reset() {
       this._map.clear();
-   }
-
-   public remove(source: string) {
-      this._map.delete(source);
    }
 
    public getNamespaceFor(source: string) {
@@ -172,7 +174,7 @@ export class UidTracker {
       return id;
    }
 
-   public getModuleExports(source: string) {
+   public getModuleExports(source: string, _visited = new Set<string>()) {
       const exports = new Map<string, string>();
       const mapped = this._map.get(source);
       if (!mapped) return exports;
@@ -184,14 +186,17 @@ export class UidTracker {
       const aggrAllExports = mapped.module?.getExports(["aggregatedAll"]) || [];
       for (const exportInfo of aggrAllExports) {
          const module = mapped.module!;
-         const resolved = module.dependencyMap.get(exportInfo.source);
-         if (!resolved) {
-            throw new Error(
-               `Failed to resolve '${exportInfo.source}' in ${module.source}.`
-            );
-         }
+         const resolved = getResolvedWithError.call(
+            this._bundler,
+            module,
+            exportInfo.source
+         );
 
-         for (const [key, value] of this.getModuleExports(resolved)) {
+         // avoid circular error
+         if (_visited.has(resolved)) continue;
+         _visited.add(resolved);
+
+         for (const [key, value] of this.getModuleExports(resolved, _visited)) {
             if (key == "default") continue;
             exports.set(key, value);
          }
@@ -202,12 +207,11 @@ export class UidTracker {
          mapped.module?.getExports(["aggregatedName"]) || [];
       for (const exportInfo of aggrNameExports) {
          const module = mapped.module!;
-         const resolved = module.dependencyMap.get(exportInfo.source);
-         if (!resolved) {
-            throw new Error(
-               `Failed to resolve '${exportInfo.source}' in ${module.source}.`
-            );
-         }
+         const resolved = getResolvedWithError.call(
+            this._bundler,
+            module,
+            exportInfo.source
+         );
 
          exports.set(
             exportInfo.name,
@@ -216,44 +220,6 @@ export class UidTracker {
       }
 
       return exports;
-   }
-
-   public resyncModules(scriptModules: ScriptModule[]) {
-      const modulesMap = getModulesMap(scriptModules);
-
-      // delete module
-      for (const [source, mapped] of this._map) {
-         if (!isLocal(source)) continue;
-         const stillExists = source in modulesMap;
-         if (stillExists) {
-            mapped.module = modulesMap[source];
-         } else {
-            this._map.delete(source);
-         }
-      }
-
-      // delete id maps
-      for (const module of scriptModules) {
-         const mapped = this._map.get(module.source);
-         if (!mapped) continue;
-         const { exportsIdMap } = mapped;
-         const exports = module
-            .getExports([
-               "aggregatedNamespace",
-               "declared",
-               "declaredDefault",
-               "declaredDefaultExpression",
-            ])
-            .reduce((acc, cur) => {
-               acc[cur.name] = cur;
-               return acc;
-            }, {} as Record<string, ExportInfo>);
-
-         for (const [name, _] of exportsIdMap) {
-            if (exports[name]) continue;
-            exportsIdMap.delete(name);
-         }
-      }
    }
 
    private _instantiateModule(module: ScriptModule) {
@@ -327,11 +293,13 @@ export class UidTracker {
                      exportInfo.type == "declaredDefault")
                ) {
                   // redirect if it's from an import
-                  id = getImportedExportIdRedirection(
-                     module,
-                     exportInfo,
-                     importDecl
-                  );
+                  id =
+                     getImportedExportIdRedirection.call(
+                        this._bundler,
+                        module,
+                        exportInfo,
+                        importDecl
+                     ) || "";
                } else {
                   id = this.uidGenerator.generateBasedOnScope(
                      exportInfo.path.scope,
@@ -346,13 +314,11 @@ export class UidTracker {
             }
          } else if (type == "aggregatedNamespace") {
             const { source } = exportInfo;
-            const resolved = module.dependencyMap.get(source);
-
-            if (!resolved) {
-               throw new Error(
-                  `Failed to resolve '${source}' in ${module.source}.`
-               );
-            }
+            const resolved = getResolvedWithError.call(
+               this._bundler,
+               module,
+               source
+            );
 
             name = exportInfo.specifier.exported.name;
             exportsIdMap.set(name, {
@@ -392,21 +358,20 @@ export class UidTracker {
          if (name && id && !exportsIdMap.has(name)) {
             exportsIdMap.set(
                name,
-               this.uidGenerator.generateBasedOnScope(
-                  importInfo.path.scope,
-                  id
-               )
+               this.uidGenerator.generateBasedOnScope(importInfo.path.scope, id)
             );
          }
       });
    }
 
    public assignWithModules(scriptModules: ScriptModule[]) {
-      this.resyncModules(scriptModules);
-
-      // Instantiate
       for (const module of scriptModules) {
          this._assignWithModule(module);
       }
    }
+}
+
+interface RedirectedId {
+   to: string;
+   name: string | Symbol;
 }

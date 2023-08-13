@@ -19,19 +19,21 @@ import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
 import { renameBinding } from "../utils/renamer";
 import { CompilationChunks } from "..";
 import { isValidVar } from "../utils/is-valid-var";
-import { ModuleDescriptor } from "../utils/module-descriptor";
+import { ModuleTransformer } from "../utils/module-transformer";
 import { UidTracker } from "../link/UidTracker";
+import type { Toypack } from "src/types";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
 }
 
 export function formatEsm(
+   this: Toypack,
    uidTracker: UidTracker,
    chunks: CompilationChunks,
-   moduleDescriptors: ModuleDescriptor[]
+   moduleTransformers: ModuleTransformer[]
 ) {
-   const modules = moduleDescriptors.map((x) => x.module);
+   const modules = moduleTransformers.map((x) => x.module);
    const libImports = getLibImports(modules);
    const importDecls: Record<
       string,
@@ -50,7 +52,7 @@ export function formatEsm(
       const sourceStringNode = stringLiteral(source);
       importDecls[source] ??= {};
       for (const { importInfo, module } of importInfos) {
-         const moduleDescriptor = moduleDescriptors.find(
+         const moduleTransformer = moduleTransformers.find(
             (x) => x.module.source === module.source
          )!;
 
@@ -68,30 +70,36 @@ export function formatEsm(
          const binding = importScope.getBinding(local)!;
          if (type == "specifier") {
             const imported = getStringOrIdValue(specifier.imported);
-            const newName = getIdWithError(
+            const newName = getIdWithError.call(
+               this,
                uidTracker,
                importInfo.source,
                imported
             );
-            renameBinding(binding, newName, moduleDescriptor);
+            renameBinding(binding, newName, moduleTransformer);
             specifiers[newName] = importSpecifier(
                identifier(newName),
                specifier.imported
             );
          } else if (type == "default") {
-            const newName = getIdWithError(
+            const newName = getIdWithError.call(
+               this,
                uidTracker,
                importInfo.source,
                "default"
             );
-            renameBinding(binding, newName, moduleDescriptor);
+            renameBinding(binding, newName, moduleTransformer);
             specifiers[newName] = importSpecifier(
                identifier(newName),
                identifier("default")
             );
          } else if (type == "namespace") {
-            const newName = getNamespaceWithError(uidTracker, source);
-            renameBinding(binding, newName, moduleDescriptor);
+            const newName = getNamespaceWithError.call(
+               this,
+               uidTracker,
+               source
+            );
+            renameBinding(binding, newName, moduleTransformer);
             importDecls[source].namespaced ??= importDeclaration(
                [importNamespaceSpecifier(identifier(newName))],
                sourceStringNode

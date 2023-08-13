@@ -1,4 +1,4 @@
-import { ModuleDescriptor } from "../utils/module-descriptor";
+import { ModuleTransformer } from "../utils/module-transformer";
 import { renameBinding } from "../utils/renamer";
 import { UidTracker } from "./UidTracker";
 
@@ -7,10 +7,10 @@ import { UidTracker } from "./UidTracker";
  */
 export function deconflict(
    uidTracker: UidTracker,
-   moduleDescriptor: ModuleDescriptor
+   moduleTransformer: ModuleTransformer
 ) {
    const uidGenerator = uidTracker.uidGenerator;
-   const { module } = moduleDescriptor;
+   const { module } = moduleTransformer;
    const { scope } = module.programPath;
    const bindings = scope.getAllBindings();
 
@@ -38,7 +38,7 @@ export function deconflict(
          binding
       );
 
-      renameBinding(binding, newName, moduleDescriptor);
+      renameBinding(binding, newName, moduleTransformer);
    }
 
    uidGenerator.addReservedVars(...varsToReserve);

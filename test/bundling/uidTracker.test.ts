@@ -4,11 +4,14 @@
 
 import { expect, it } from "vitest";
 import { Toypack } from "../../build/Toypack";
+import { UidTracker } from "../../src/bundle-script/link/UidTracker";
+import { UidGenerator } from "../../src/bundle-script/link/UidGenerator";
+import { DependencyGraph, getDependencyGraph } from "../../src/parse";
+import { ScriptModule } from "../../build/types";
 
 const toypack = new Toypack();
-
-// @ts-ignore
-const uidTracker = toypack._uidTracker;
+const uidGenerator = new UidGenerator();
+const uidTracker = new UidTracker(toypack, uidGenerator);
 
 toypack.addOrUpdateAsset(
    "/index.js",
@@ -73,11 +76,16 @@ export default tavern;
 `
 );
 
-await toypack.run();
+const graph: DependencyGraph = await getDependencyGraph.call(toypack);
+const modules = Object.values(Object.fromEntries(graph)).filter(
+   (x) => x.isScript()
+) as ScriptModule[];
+uidTracker.assignWithModules(modules);
+uidGenerator.addReservedVars(...uidTracker.getAllNamespaces());
 
 it("should have correct import exports", () => {
    const exports = uidTracker.getModuleExports("/index.js");
-   
+
    expect(exports.get("getSomethingOne")).toEqual("getSomething");
    expect(exports.get("goGetSomething")).toEqual("getSomething");
    expect(exports.get("coolTavern")).toEqual(
@@ -96,7 +104,7 @@ it("should have correct import exports", () => {
 
 it("should have correct basic exports", () => {
    const exports = uidTracker.getModuleExports("/index.js");
-   
+
    // basics
    expect(exports.get("cat")).toEqual("cat");
    expect(exports.get("dog")).toEqual("dog");

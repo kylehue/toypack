@@ -105,8 +105,8 @@ export class FileManager {
       this._stored.set(newSource, stored);
       this._stored.delete(oldSource);
 
+      window.localStorage.removeItem(oldSource);
       if (typeof stored.bundlerAsset.content === "string") {
-         window.localStorage.removeItem(oldSource);
          window.localStorage.setItem(newSource, stored.bundlerAsset.content);
       }
    }

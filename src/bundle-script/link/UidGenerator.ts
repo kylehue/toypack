@@ -62,6 +62,7 @@ export class UidGenerator {
       return generated;
    }
 
+   // TODO: remove?
    public reset() {
       this._idCountMap.clear();
       this._reservedVars = new Set([...reservedWords]);

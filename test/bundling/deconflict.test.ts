@@ -14,7 +14,7 @@ toypack.addOrUpdateAsset(
 import * as module from "./module.js";
 const foo = "";
 const bar = "";
-const __export = "";
+const createNamespace = "";
 const moduleJs = "";
 `
 );
@@ -55,10 +55,9 @@ it("should deconflict", () => {
 
 it("should deconflict runtime keys", () => {
    // 2 because + the call
-   expect(getMatchCount(bundle, /\b__export\b/g)).toEqual(2);
+   expect(getMatchCount(bundle, /\bcreateNamespace\b/g)).toEqual(2);
 });
 
 it("should deconflict namespaces", () => {
-   // 2 because + the namespace ref
-   expect(getMatchCount(bundle, /\bmoduleJs\b/g)).toEqual(2);
+   expect(getMatchCount(bundle, /\bmoduleJs\b/g)).toEqual(1);
 });

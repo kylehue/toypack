@@ -7,7 +7,7 @@ export type ModuleType = "script" | "style" | "resource";
 
 export class Module {
    public id: string;
-   constructor(public type: ModuleType, public asset: Asset) {
+   constructor(public type: ModuleType, asset: Asset) {
       this.id = asset.id;
    }
 

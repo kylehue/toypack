@@ -43,19 +43,19 @@ const toypack = new Toypack({
          },
       }),
       sassPlugin(),
-      // babelPlugin({
-      //    presets: [
-      //       [
-      //          "env",
-      //          {
-      //             modules: false,
-      //          },
-      //       ],
-      //       "react",
-      //       "typescript",
-      //    ],
-      //    plugins: ["transform-runtime"],
-      // }),
+      babelPlugin({
+         presets: [
+            [
+               "env",
+               {
+                  modules: false,
+               },
+            ],
+            "react",
+            "typescript",
+         ],
+         plugins: ["transform-runtime"],
+      }),
    ],
    packageManager: {
       // dts: true,

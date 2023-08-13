@@ -1,15 +1,20 @@
 import template from "@babel/template";
 import { getNamespaceWithError } from "./get-with-error";
 import { isValidVar } from "./is-valid-var";
-import type { ScriptModule } from "src/types";
 import { UidTracker } from "../link/UidTracker";
+import { ERRORS } from "../../utils";
+import type { ScriptModule, Toypack } from "src/types";
 
-export function createNamespace(uidTracker: UidTracker, module: ScriptModule) {
-   const name = getNamespaceWithError(uidTracker, module.source);
+export function createNamespace(this: Toypack, uidTracker: UidTracker, module: ScriptModule) {
+   const name = getNamespaceWithError.call(this, uidTracker, module.source);
    const exportsMap = uidTracker.getModuleExports(module.source);
 
    if (!exportsMap) {
-      throw new Error(`No exports map found for '${module.source}'.`);
+      this._pushToDebugger(
+         "error",
+         ERRORS.any(`No exports map found for '${module.source}'.`)
+      );
+      return [];
    }
 
    const exports = Object.entries(Object.fromEntries(exportsMap));
@@ -27,8 +32,7 @@ export function createNamespace(uidTracker: UidTracker, module: ScriptModule) {
       "\n}";
 
    const builtTemplate = template.ast(`
-      var ${name} = {};
-      __export(${name}, ${exportObject});
+      var ${name} = createNamespace({}, ${exportObject});
    `);
 
    return builtTemplate;

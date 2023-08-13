@@ -249,11 +249,11 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
       `[parsing] Parsed ${parses} assets and cached ${caches} assets.`
    );
 
-   fixGraphOrder(graph);
+   fixGraphOrder.call(this, graph);
    return graph;
 }
 
-function fixGraphOrder(graph: DependencyGraph) {
+function fixGraphOrder(this: Toypack, graph: DependencyGraph) {
    const visitedModules = new Set<string>();
    const sortedModules: Dependency[] = [];
 
@@ -273,7 +273,18 @@ function fixGraphOrder(graph: DependencyGraph) {
          Object.fromEntries(module.dependencyMap)
       )) {
          // this should be guaranteed
-         const dep = graph.get(depSource)!;
+         const dep = graph.get(depSource);
+         if (!dep) {
+            this._pushToDebugger(
+               "error",
+               ERRORS.resolveFailure(
+                  depSource,
+                  module.source,
+                  getImportCodeFrame.call(this, module.source, depSource)
+               )
+            );
+            continue;
+         }
          depthFirstSearch(dep);
       }
 

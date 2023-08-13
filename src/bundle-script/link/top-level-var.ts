@@ -1,23 +1,20 @@
-import { ModuleDescriptor } from "../utils/module-descriptor";
+import { ModuleTransformer } from "../utils/module-transformer";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.
  */
-export function transformToVars(moduleDescriptor: ModuleDescriptor) {
-   const { module } = moduleDescriptor;
+export function transformToVars(moduleTransformer: ModuleTransformer) {
+   const { module } = moduleTransformer;
    const bindings = Object.values(module.programPath.scope.getAllBindings());
 
    for (const binding of bindings) {
       const { parentPath } = binding.path;
       if (!parentPath?.isVariableDeclaration()) continue;
       const { node } = parentPath;
-      if (node.kind == "var") continue;
-      moduleDescriptor.update(
+      moduleTransformer.update(
          node.start!,
          node.start! + node.kind.length,
          "var"
       );
-
-      node.kind = "var";
    }
 }

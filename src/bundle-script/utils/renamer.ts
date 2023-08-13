@@ -1,5 +1,5 @@
 import { Binding } from "@babel/traverse";
-import { ModuleDescriptor } from "./module-descriptor";
+import { ModuleTransformer } from "./module-transformer";
 import { Identifier, StringLiteral } from "@babel/types";
 
 function getStringOrIdValue(exported: StringLiteral | Identifier) {
@@ -9,7 +9,7 @@ function getStringOrIdValue(exported: StringLiteral | Identifier) {
 export function renameBinding(
    binding: Binding,
    newName: string,
-   moduleDescriptor: ModuleDescriptor
+   moduleTransformer: ModuleTransformer
 ) {
    const refs = [
       ...binding.referencePaths,
@@ -21,16 +21,6 @@ export function renameBinding(
       const ids = Object.values(ref.getOuterBindingIdentifierPaths());
       for (const id of ids) {
          if (id.node.name !== binding.identifier.name) continue;
-         if (
-            moduleDescriptor
-               .sliceGenerated(id.node.start!, id.node.end!)
-               .trim() == newName
-         ) {
-            continue;
-         }
-
-         // console.log("renamed!");
-
          let replacer;
          if (id.parentPath.isObjectProperty() && id.parentPath.node.shorthand) {
             replacer = `${id.node.name}: ${newName}`;
@@ -46,7 +36,7 @@ export function renameBinding(
          } else {
             replacer = newName;
          }
-         moduleDescriptor.update(id.node.start!, id.node.end!, replacer);
+         moduleTransformer.update(id.node.start!, id.node.end!, replacer);
       }
    }
 }

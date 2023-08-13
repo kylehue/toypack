@@ -8,7 +8,7 @@ export class StyleModule extends Module {
    public type = "style" as const;
    public dependencyMap = new Map<string, string>();
    constructor(
-      asset: Asset,
+      public asset: Asset,
       public source: string,
       public content: string,
       public importers: Importers,

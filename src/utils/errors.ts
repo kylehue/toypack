@@ -26,7 +26,7 @@ export function resolveFailure(
    parentSource: string,
    codeFrame = ""
 ): Error {
-   let reason = `Failed to resolve '${source}' from '${parentSource}'`;
+   let reason = `Failed to resolve '${source}' in '${parentSource}'.`;
    if (codeFrame) {
       reason += "\n" + codeFrame;
    }

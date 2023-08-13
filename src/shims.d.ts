@@ -17,13 +17,5 @@ declare module "babel-minify" {
 }
 
 // TODO: remove
-declare function dumpReference(
-   scope: Scope,
-   name: string,
-   source?: string,
-   deepness?: number
-): void;
-
-declare function getCode(
-   ast: any
-): string;
+declare function getHighlightedCode(ast: import("@babel/types").Node): string;
+declare function getHighlightedCode(code: string): string;

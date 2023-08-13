@@ -1,3 +1,4 @@
+import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import path from "path-browserify";
 import { PartialDeep } from "type-fest";
 import htmlPlugin from "./build-plugins/html-plugin.js";
@@ -8,6 +9,7 @@ import importMetaPlugin from "./build-plugins/import-meta-plugin.js";
 import bundleDepsPlugin from "./build-plugins/bundle-deps-plugin.js";
 import autoDepsPlugin from "./build-plugins/auto-deps-plugin.js";
 import { bundle } from "./bundle/index.js";
+import { ModuleTransformer } from "./bundle-script/utils/module-transformer.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Importers, getDependencyGraph } from "./parse/index.js";
 import { Hooks } from "./Hooks.js";
@@ -36,7 +38,6 @@ import { LoadChunkResult } from "./parse/load-chunk.js";
 import { ParsedScriptResult } from "./parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
-import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import { cloneDeep, merge, mergeWith, union } from "lodash-es";
 
 let _lastId = 0;
@@ -742,7 +743,7 @@ interface Cache {
    importers?: Importers;
    parsed?: ParsedScriptResult | ParsedStyleResult | null;
    loaded?: LoadChunkResult;
+   moduleTransformer?: ModuleTransformer;
    content?: string;
    map?: EncodedSourceMap | null;
-   module?: ScriptModule;
 }
