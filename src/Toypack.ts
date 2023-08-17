@@ -1,4 +1,5 @@
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
+import { cloneDeep, mergeWith, union } from "lodash-es";
 import path from "path-browserify";
 import { PartialDeep } from "type-fest";
 import htmlPlugin from "./build-plugins/html-plugin.js";
@@ -11,7 +12,6 @@ import autoDepsPlugin from "./build-plugins/auto-deps-plugin.js";
 import { bundle } from "./bundle/index.js";
 import { ModuleTransformer } from "./bundle-script/utils/module-transformer.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
-import { Importers, getDependencyGraph } from "./parse/index.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
 import type {
@@ -20,7 +20,6 @@ import type {
    Plugin,
    TextAsset,
    Error,
-   ScriptModule,
    BundleResult,
 } from "./types";
 import {
@@ -34,11 +33,12 @@ import {
 } from "./utils";
 import { createAsset } from "./utils/create-asset.js";
 import { resolve } from "./utils/resolve.js";
+import { Importers, getDependencyGraph } from "./parse";
 import { LoadChunkResult } from "./parse/load-chunk.js";
 import { ParsedScriptResult } from "./parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
-import { cloneDeep, merge, mergeWith, union } from "lodash-es";
+import { BuiltInPluginsConfig } from "./build-plugins/config.js";
 
 let _lastId = 0;
 export class Toypack extends Hooks {
@@ -65,7 +65,10 @@ export class Toypack extends Hooks {
    protected _virtualAssets = new Map<string, Asset>();
    protected _pluginManager = new PluginManager(this);
 
-   constructor(config?: PartialDeep<ToypackConfig>) {
+   constructor(
+      config?: PartialDeep<ToypackConfig>,
+      builtInPluginsConfig?: BuiltInPluginsConfig
+   ) {
       super();
       if (config) this.setConfig(config);
 
@@ -73,15 +76,33 @@ export class Toypack extends Hooks {
          this.usePlugin(plugin as any);
       }
 
-      this.usePlugin(
-         jsonPlugin(),
-         htmlPlugin(),
-         rawPlugin(),
-         importUrlPlugin(),
-         importMetaPlugin(),
-         bundleDepsPlugin(),
-         autoDepsPlugin()
-      );
+      if (builtInPluginsConfig?.autoDeps !== false) {
+         this.usePlugin(autoDepsPlugin());
+      }
+      if (builtInPluginsConfig?.bundleDeps !== false) {
+         this.usePlugin(bundleDepsPlugin());
+      }
+      if (builtInPluginsConfig?.html !== false) {
+         this.usePlugin(
+            htmlPlugin(
+               typeof builtInPluginsConfig?.html == "object"
+                  ? builtInPluginsConfig.html
+                  : {}
+            )
+         );
+      }
+      if (builtInPluginsConfig?.importMeta !== false) {
+         this.usePlugin(importMetaPlugin());
+      }
+      if (builtInPluginsConfig?.importUrl !== false) {
+         this.usePlugin(importUrlPlugin());
+      }
+      if (builtInPluginsConfig?.json !== false) {
+         this.usePlugin(jsonPlugin());
+      }
+      if (builtInPluginsConfig?.raw !== false) {
+         this.usePlugin(rawPlugin());
+      }
 
       this.usePackageProvider({
          host: "esm.sh",
