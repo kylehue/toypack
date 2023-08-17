@@ -50,7 +50,7 @@ export class Hooks implements IHooks {
     * @param eventName - The name of the event to trigger.
     * @param args - The arguments to pass to the event listeners.
     */
-   protected async _trigger<K extends keyof EventMap>(
+   protected _trigger<K extends keyof EventMap>(
       eventName: K,
       ...args: Parameters<EventMap[K]>
    ) {
