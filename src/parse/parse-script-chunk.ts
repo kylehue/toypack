@@ -121,15 +121,18 @@ export async function parseScriptAsset(
       },
    });
 
-   result.exports = extractExports(traverse);
-   result.imports = extractImports(traverse);
+   const isDts = parserOptions.plugins?.find(
+      (p) => Array.isArray(p) && p[0] == "typescript" && p[1].dts
+   );
+
+   if (!isDts) {
+      result.exports = extractExports(traverse);
+      result.imports = extractImports(traverse);
+   }
 
    /**
     * Scan `///<reference [path/types]="..." />` in dts files.
     */
-   const isDts = parserOptions.plugins?.find(
-      (p) => Array.isArray(p) && p[0] == "typescript" && p[1].dts
-   );
    if (isDts && result.ast.comments) {
       for (const comment of result.ast.comments) {
          if (comment.type == "CommentBlock") continue;
