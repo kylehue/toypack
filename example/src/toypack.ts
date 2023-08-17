@@ -2,6 +2,7 @@ import { Toypack } from "toypack";
 import vuePlugin from "toypack-vue";
 import sassPlugin from "toypack-sass";
 import babelPlugin from "toypack-babel";
+import * as monaco from "monaco-editor";
 var saveData = (function () {
    var a = document.createElement("a");
    document.body.appendChild(a);
@@ -16,6 +17,13 @@ var saveData = (function () {
    };
 })();
 
+const dtsFiles = new Map<
+   string,
+   {
+      content: string;
+      pathMap: Map<string, string>;
+   }
+>();
 const toypack = new Toypack({
    bundle: {
       entry: "index.html",
@@ -55,13 +63,45 @@ const toypack = new Toypack({
             "typescript",
          ],
          plugins: ["transform-runtime"],
+         exclude(file) {
+            return !!file?.startsWith("/node_modules/@babel/runtime");
+         },
       }),
    ],
    packageManager: {
-      // dts: true,
-      // onDts(dts) {
-      //    console.log(dts);
-      // },
+      dts: true,
+      onDts(dts) {
+         const pkgName = `${dts.packagePath}@${dts.packageVersion}`;
+         let file = dtsFiles.get(pkgName);
+         if (!file) {
+            file = {
+               pathMap: new Map(),
+               content: "",
+            };
+            dtsFiles.set(pkgName, file);
+         }
+
+         const oldSource = dts.source;
+         const newSource = dts.isEntry
+            ? dts.packagePath
+            : dts.source.replace(/\W/g, "_");
+         if (file.pathMap.has(oldSource)) return;
+         file.pathMap.set(oldSource, newSource);
+         file.content += "\n\n";
+         file.content += `declare module "${dts.source}" {\n${dts.content}\n};`;
+
+         for (const [orig, based] of file.pathMap) {
+            file.content = file.content.replace(
+               new RegExp(`["']${orig}["']`, "g"),
+               `"${based}"`
+            );
+         }
+
+         monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            file.content,
+            pkgName
+         );
+      },
    },
    logLevel: "verbose",
 });

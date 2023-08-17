@@ -20,8 +20,18 @@ console.log(monaco, editor, drawer, toypack);
 (window as any).drawer = drawer;
 (window as any).toypack = toypack;
 
+// add ones in test files while prioritizing the cache's content if there's any
+const addedFiles = new Set<string>();
 for (const [source, content] of Object.entries(testFiles)) {
    fileManager.addFile(source, window.localStorage.getItem(source) || content);
+   addedFiles.add(source);
+}
+
+// add the ones in cache but not in test files
+for (const [source, content] of Object.entries(window.localStorage)) {
+   if (addedFiles.has(source)) continue;
+   fileManager.addFile(source, content);
+   addedFiles.add(source);
 }
 
 toypack.run();
