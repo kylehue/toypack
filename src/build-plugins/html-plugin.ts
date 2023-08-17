@@ -169,60 +169,56 @@ export default function (options?: HTMLPluginOptions): Plugin {
             this.cache.delete(source);
          });
       },
-      load: {
-         handler(moduleInfo) {
-            const cached = this.cache.get(moduleInfo.source);
-            if (typeof cached?.content === "string") {
-               return {
-                  type: "style",
-                  content: cached.content,
-               };
-            }
+      load(moduleInfo) {
+         const cached = this.cache.get(moduleInfo.source);
+         if (typeof cached?.content === "string") {
+            return {
+               type: "style",
+               content: cached.content,
+            };
+         }
 
-            // guard
-            const isHtml = /\.html$/.test(moduleInfo.source.split("?")[0]);
-            if (!isHtml) return;
+         // guard
+         const isHtml = /\.html$/.test(moduleInfo.source.split("?")[0]);
+         if (!isHtml) return;
 
-            if (typeof moduleInfo.content != "string") {
-               this.emitError("Blob contents are not supported.");
-               return;
-            }
+         if (typeof moduleInfo.content != "string") {
+            this.emitError("Blob contents are not supported.");
+            return;
+         }
 
-            const compiled = compile.call(
-               this,
-               moduleInfo.source,
-               moduleInfo.content,
-               options
-            );
+         const compiled = compile.call(
+            this,
+            moduleInfo.source,
+            moduleInfo.content,
+            options
+         );
 
-            this.cache.set(symbols.importMap, compiled.importMap);
-            this.cache.set(symbols.ast, compiled.ast);
+         this.cache.set(symbols.importMap, compiled.importMap);
+         this.cache.set(symbols.ast, compiled.ast);
 
-            let mainVirtualModule = "";
+         let mainVirtualModule = "";
 
-            // Import dependencies
-            for (const depSource of compiled.dependencies) {
-               mainVirtualModule += this.getImportCode(depSource) + "\n";
-            }
+         // Import dependencies
+         for (const depSource of compiled.dependencies) {
+            mainVirtualModule += this.getImportCode(depSource) + "\n";
+         }
 
-            // Import inline styles as a virtual module
-            if (compiled.bundledInlineStyles.length) {
-               const styleId = `virtual:${
-                  moduleInfo.source
-               }?style&index=${_id++}`;
-               this.cache.set(styleId, {
-                  content: compiled.bundledInlineStyles,
-                  from: moduleInfo.source,
-               });
-               mainVirtualModule += this.getImportCode(styleId);
-            }
-
-            this.cache.set(moduleInfo.source, {
-               resourceDependencies: compiled.resourceDependencies,
+         // Import inline styles as a virtual module
+         if (compiled.bundledInlineStyles.length) {
+            const styleId = `virtual:${moduleInfo.source}?style&index=${_id++}`;
+            this.cache.set(styleId, {
+               content: compiled.bundledInlineStyles,
+               from: moduleInfo.source,
             });
+            mainVirtualModule += this.getImportCode(styleId);
+         }
 
-            return mainVirtualModule;
-         },
+         this.cache.set(moduleInfo.source, {
+            resourceDependencies: compiled.resourceDependencies,
+         });
+
+         return mainVirtualModule;
       },
       parsed({ chunk, parsed }) {
          const cached = this.cache.get(chunk.source);

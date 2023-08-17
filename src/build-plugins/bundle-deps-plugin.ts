@@ -1,10 +1,6 @@
 import { isLocal } from "../utils/is-local.js";
 import { Plugin } from "../types.js";
 
-/**
- * This plugin simply resolves the paths of the node module imports
- * so that the bundler can recognize them as local files.
- */
 export default function (): Plugin {
    return {
       name: "bundle-deps-plugin",
