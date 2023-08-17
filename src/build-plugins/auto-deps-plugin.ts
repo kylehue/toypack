@@ -2,13 +2,9 @@ import { merge } from "lodash-es";
 import { getFetchUrlFromProvider } from "../package-manager/utils.js";
 import { fetchVersion } from "../package-manager/fetch-version.js";
 import { Plugin } from "../types.js";
-import { parsePackageName, isLocal } from "../utils/index.js";
+import { parsePackageName, isLocal, isUrl } from "../utils/index.js";
 import { Node } from "node-html-parser";
 
-/**
- * If in production mode, it will auto-install packages, and if in development
- * mode, it will auto-add import-maps.
- */
 export default function (): Plugin {
    const importMaps = new Map<string, string>();
    return {
@@ -16,7 +12,7 @@ export default function (): Plugin {
       resolve: {
          async: true,
          async handler(id) {
-            if (isLocal(id)) return;
+            if (isLocal(id) || isUrl(id)) return;
             if (this.bundler.config.bundle.mode == "production") {
                const pkg = await this.bundler.installPackage(id);
                if (pkg) {
@@ -24,7 +20,6 @@ export default function (): Plugin {
                }
             } else {
                if (importMaps.get(id)) return;
-
                const provider = this.bundler.getPackageProviders()[0];
                if (!provider) return;
 
