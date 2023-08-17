@@ -178,6 +178,7 @@ export interface PackageManagerConfig {
       content: string;
       packagePath: string;
       packageVersion: string;
+      isEntry: boolean;
    }) => void;
    /**
     * An array of URLs used to remove duplicate packages. If a package's

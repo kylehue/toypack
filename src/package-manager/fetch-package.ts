@@ -61,7 +61,7 @@ export async function fetchPackage(
       subpath
    );
 
-   const recurse = async (url: string, isDts = false) => {
+   const recurse = async (url: string, isDts = false, prev?: PackageAsset) => {
       if (url in assets || url in dtsAssets) return true;
       const isEntry = entryUrl == url;
 
@@ -105,7 +105,7 @@ export async function fetchPackage(
             assets = {};
             dtsAssets = {};
          }
-         
+
          let backupProvider = providers[++providerIndex % providers.length];
          if (!provider || backupProvider === providers[0]) {
             throw new Error(
@@ -130,7 +130,7 @@ export async function fetchPackage(
        * If we're looking for a dts file but the response's content
        * isn't typescript, we should change the response by fetching
        * the url in provider's `dtsHeader`.
-       * 
+       *
        * This is for providers like skypack that stores the @types/...
        * types in dts header instead of storing it in the response's
        * content itself (like esm.sh).
@@ -160,7 +160,7 @@ export async function fetchPackage(
          );
       }
 
-      let source = getSource(
+      const source = getSource(
          name,
          packageVersion,
          subpath,
@@ -293,20 +293,6 @@ export async function fetchPackage(
          }
       }
 
-      // Get dts
-      if (config.packageManager.dts && isEntry && provider.dtsHeader) {
-         const dtsHeader = getDtsHeader(
-            provider.dtsHeader,
-            name,
-            packageVersion,
-            subpath
-         );
-         const dtsUrl = response.headers.get(dtsHeader || "");
-         if (dtsUrl) {
-            recurse(resolve(dtsUrl, url), true);
-         }
-      }
-
       const asset = createPackageAsset(
          type,
          source,
@@ -317,11 +303,26 @@ export async function fetchPackage(
          isDts
       );
 
+      // Get dts
+      if (config.packageManager.dts && isEntry && provider.dtsHeader) {
+         const dtsHeader = getDtsHeader(
+            provider.dtsHeader,
+            name,
+            packageVersion,
+            subpath
+         );
+         const dtsUrl = response.headers.get(dtsHeader || "");
+         if (dtsUrl) {
+            recurse(resolve(dtsUrl, url), true, asset);
+         }
+      }
+
       if (asset.type == "script" && asset.dts) {
          dtsAssets[url] = asset;
          config.packageManager.onDts?.({
             source: asset.source,
             content: asset.content,
+            isEntry: !!prev?.isEntry,
             packagePath,
             packageVersion,
          });
@@ -333,7 +334,7 @@ export async function fetchPackage(
       for (const depSource of dependencies) {
          const resolved = resolve(depSource, url);
 
-         const isSuccess = await recurse(resolved, isDts);
+         const isSuccess = await recurse(resolved, isDts, asset);
          // break if a dependency fails
          if (!isSuccess) return false;
       }
