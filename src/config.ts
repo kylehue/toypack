@@ -92,16 +92,6 @@ export type SourceMapConfig = {
    /** Paths to exclude from source maps. */
    exclude?: string[] | RegExp | ((source: string) => boolean | void);
 };
-export type ImportMapConfig = {
-   imports: Record<string, string>;
-   scopes: Record<string, Record<string, string>>;
-};
-export type TemplateConfig = {
-   head: string[];
-   body: string[];
-   bodyAttributes: Record<string, string>;
-};
-
 export type BabelParseConfig = Omit<
    ParserOptions,
    "sourceType" | "sourceFilename" | "strictMode"
