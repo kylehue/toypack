@@ -78,26 +78,26 @@ function getTraverseOption<T extends (typeof keys)[keyof typeof keys] | string>(
    }
 }
 
-export function isElementNode(ast: Node): ast is HTMLElement {
-   return ast.nodeType === NodeType.ELEMENT_NODE;
+export function isElementNode(node: Node): node is HTMLElement {
+   return node.nodeType === NodeType.ELEMENT_NODE;
 }
 
-export function isTextNode(ast: Node): ast is HTMLElement {
-   return ast.nodeType === NodeType.TEXT_NODE;
+export function isTextNode(node: Node): node is TextNode {
+   return node.nodeType === NodeType.TEXT_NODE;
 }
 
-export function isCommentNode(ast: Node): ast is HTMLElement {
-   return ast.nodeType === NodeType.COMMENT_NODE;
+export function isCommentNode(node: Node): node is CommentNode {
+   return node.nodeType === NodeType.COMMENT_NODE;
 }
 
-export function traverse(ast: Node, options: TraverseHtmlOptions) {
+export function traverse(node: Node, options: TraverseHtmlOptions) {
    let doStop = false;
-   const recurse = (ast: Node) => {
-      if (!ast) return;
+   const recurse = (node: Node) => {
+      if (!node) return;
       if (doStop) return;
 
       let doSkip = false;
-      const context = createContext(ast, {
+      const context = createContext(node, {
          onSkip: () => {
             doSkip = true;
          },
@@ -106,27 +106,27 @@ export function traverse(ast: Node, options: TraverseHtmlOptions) {
          },
       });
 
-      if (isElementNode(ast)) {
-         const tagSpecificTrigger = getTraverseOption(options, ast.tagName);
+      if (isElementNode(node)) {
+         const tagSpecificTrigger = getTraverseOption(options, node.tagName);
          const generalTrigger = getTraverseOption(options, keys.element);
-         tagSpecificTrigger?.call(context, ast);
-         generalTrigger?.call(context, ast);
-      } else if (isTextNode(ast)) {
+         tagSpecificTrigger?.call(context, node);
+         generalTrigger?.call(context, node);
+      } else if (isTextNode(node)) {
          const trigger = getTraverseOption(options, keys.text);
-         trigger?.call(context, ast);
-      } else if (isCommentNode(ast)) {
+         trigger?.call(context, node);
+      } else if (isCommentNode(node)) {
          const trigger = getTraverseOption(options, keys.comment);
-         trigger?.call(context, ast);
+         trigger?.call(context, node);
       }
 
       if (doSkip) return;
-      for (let node of ast.childNodes) {
+      for (let childNode of node.childNodes) {
          if (doStop) break;
-         recurse(node);
+         recurse(childNode);
       }
    };
 
-   recurse(ast);
+   recurse(node);
 }
 
 export async function transformHtml(
