@@ -1,6 +1,7 @@
 import { TraverseOptions } from "@babel/traverse";
 import { File } from "@babel/types";
 import { CssNode, EnterOrLeaveFn, WalkOptions } from "css-tree";
+import { HTMLElement } from "node-html-parser";
 import { Asyncify } from "type-fest";
 import { Importers } from "../parse/index.js";
 import { Toypack } from "../Toypack.js";
@@ -54,7 +55,7 @@ export type TransformStyleHook = (
 ) => EnterOrLeaveFn<CssNode> | WalkOptions | void;
 export type TransformHtmlHook = (
    this: PluginContextBase,
-   html: string,
+   ast: HTMLElement,
    indexScriptUrl: string,
    indexStyleUrl: string
 ) => TraverseHtmlOptions | void;

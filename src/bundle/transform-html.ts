@@ -135,19 +135,19 @@ export async function transformHtml(
    indexScriptUrl: string,
    indexStyleUrl: string
 ) {
-   const parsed = parse(html, {
+   const ast = parse(html, {
       comment: true,
    });
 
    await this._pluginManager.triggerHook({
       name: "transformHtml",
-      args: () => [parsed.toString(), indexScriptUrl, indexStyleUrl],
+      args: () => [ast, indexScriptUrl, indexStyleUrl],
       callback(result) {
-         traverse(parsed, result);
+         traverse(ast, result);
       },
    });
 
-   const transformed = parsed.toString();
+   const transformed = ast.toString();
 
    return transformed;
 }
