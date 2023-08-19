@@ -21,6 +21,7 @@ import { finalizeModule } from "./utils/finalize-module.js";
 import { formatEsm } from "./formats/esm.js";
 import {
    ERRORS,
+   isLocal,
    mergeSourceMapToBundle,
    shouldProduceSourceMap,
 } from "../utils/index.js";
@@ -73,6 +74,17 @@ function getNamespacedModules(modules: ScriptModule[]) {
    for (const module of modules) {
       scan(module, module.getImports(["namespace", "dynamic"]));
       scan(module, module.getExports(["aggregatedNamespace"]));
+
+      // modules that has aggregated export from external sources should
+      // have namespace
+      const exports = module.getExports([
+         "aggregatedAll",
+         "aggregatedName",
+         "aggregatedNamespace",
+      ]);
+      if (exports.some((x) => !isLocal(x.source))) {
+         needsNamespace.add(module.source);
+      }
    }
 
    return needsNamespace;
@@ -132,6 +144,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
          const arr = Array.isArray(statements) ? statements : [statements];
          chunks.namespace.set(module.source, arr);
          chunks.runtime.add("createNamespace");
+         chunks.runtime.add("removeDefault");
       }
    } catch (error: any) {
       this._pushToDebugger("error", ERRORS.bundle(error));

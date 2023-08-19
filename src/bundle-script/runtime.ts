@@ -8,4 +8,9 @@ var createNamespace = (target, all) => {
    return target;
 };
 `,
+   removeDefault: `
+var removeDefault = (obj) => {
+   return Object.assign(obj, { default: undefined });
+};
+`,
 } as const;

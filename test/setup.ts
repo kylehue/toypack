@@ -3,7 +3,9 @@
  */
 
 import { vi } from "vitest";
-
+import createFetchMock from "vitest-fetch-mock";
+const fetchMocker = createFetchMock(vi);
+fetchMocker.dontMock();
 class MockURL {
    public origin: string = "";
    public host: string = "";

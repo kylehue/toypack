@@ -26,7 +26,7 @@ const dtsFiles = new Map<
 >();
 const toypack = new Toypack({
    bundle: {
-      entry: "index.html",
+      // entry: "index.html",
       resolve: {
          alias: {
             "@classes": "/classes/",

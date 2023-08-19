@@ -1,24 +1,41 @@
 import { isLocal } from "../../utils";
-import type { ScriptModule, ImportInfo } from "src/types";
+import type {
+   ScriptModule,
+   ImportInfo,
+   AggregatedAllExport,
+   AggregatedNameExport,
+   AggregatedNamespaceExport,
+} from "src/types";
 
 export function getLibImports(scriptModules: ScriptModule[]) {
    const imports: Record<
       string,
       {
-         importInfo: ImportInfo;
+         portInfo:
+            | ImportInfo
+            | AggregatedAllExport
+            | AggregatedNameExport
+            | AggregatedNamespaceExport;
          module: ScriptModule;
       }[]
    > = {};
    for (const module of scriptModules) {
-      module.getImports().forEach((importInfo) => {
-         const resolved = module.dependencyMap.get(importInfo.source);
-         if (isLocal(importInfo.source) || !!resolved) return;
-         imports[importInfo.source] ??= [];
-         imports[importInfo.source].push({
-            importInfo,
-         module,
+      [
+         ...module.getImports(),
+         ...module.getExports([
+            "aggregatedAll",
+            "aggregatedName",
+            "aggregatedNamespace",
+         ]),
+      ].forEach((portInfo) => {
+         const resolved = module.dependencyMap.get(portInfo.source);
+         if (isLocal(portInfo.source) || !!resolved) return;
+         imports[portInfo.source] ??= [];
+         imports[portInfo.source].push({
+            portInfo: portInfo,
+            module,
+         });
       });
-   });
    }
 
    return imports;

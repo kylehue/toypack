@@ -3,6 +3,7 @@ import { Identifier, ImportDeclaration, StringLiteral } from "@babel/types";
 import path from "path-browserify";
 import { UidGenerator } from "./UidGenerator";
 import { ERRORS, isLocal } from "../../utils";
+import { getResolvedWithError } from "../utils/get-with-error";
 import type {
    ScriptModule,
    ExportInfo,
@@ -10,7 +11,6 @@ import type {
    DeclaredExport,
    Toypack,
 } from "src/types";
-import { getResolvedWithError } from "../utils/get-with-error";
 
 function getStringOrIdValue(exported: StringLiteral | Identifier) {
    return exported.type == "Identifier" ? exported.name : exported.value;
@@ -60,9 +60,11 @@ function getImportedExportIdRedirection(
    exportInfo: DeclaredDefaultExport | DeclaredExport,
    importDeclaration: NodePath<ImportDeclaration>
 ) {
-   const resolved = module.dependencyMap.get(
-      importDeclaration.node.source.value
-   );
+   const rawSource = importDeclaration.node.source.value;
+   const isExternal = !isLocal(rawSource);
+   const resolved = isExternal
+      ? rawSource
+      : module.dependencyMap.get(rawSource);
    if (!resolved) {
       this._pushToDebugger(
          "error",
@@ -98,8 +100,9 @@ function getImportedExportIdRedirection(
    return redirectId;
 }
 
-const symbols = {
+export const symbols = {
    namespace: Symbol("Namespace"),
+   aggregated: Symbol("Aggregated"),
 };
 
 export class UidTracker {
@@ -134,48 +137,59 @@ export class UidTracker {
    }
 
    public get(source: string, name: string): string | undefined {
-      const data = this._map.get(source);
-      if (!data) return;
-      const { module, exportsIdMap } = data;
-      let supposedId = exportsIdMap.get(name);
-      let id = typeof supposedId == "string" ? supposedId : undefined;
-      if (!supposedId && module) {
-         /**
-          * If export id is not found, try if it's in any of the
-          * aggregated exports e.g.
-          * export * from "./module.js";
-          * export { name } from "./module.js";
-          */
-         if (name !== "default") {
-            for (const exportInfo of module.getExports(["aggregatedAll"])) {
+      // @ts-ignore
+      const recurse = (source: string, name: string) => {
+         const data = this._map.get(source);
+         if (!data) return;
+         const { module, exportsIdMap } = data;
+         let supposedId = exportsIdMap.get(name);
+         let id = typeof supposedId == "string" ? supposedId : undefined;
+         if (!supposedId && module) {
+            /**
+             * If export id is not found, try if it's in any of the
+             * aggregated exports e.g.
+             * export * from "./module.js";
+             * export { name } from "./module.js";
+             */
+            if (name !== "default") {
+               for (const exportInfo of module.getExports(["aggregatedAll"])) {
+                  const resolved = module.dependencyMap.get(exportInfo.source)!;
+                  id = recurse(resolved, name);
+                  if (id) break;
+               }
+            }
+
+            for (const exportInfo of module.getExports(["aggregatedName"])) {
+               if (exportInfo.name !== name) continue;
                const resolved = module.dependencyMap.get(exportInfo.source)!;
-               id = this.get(resolved, name);
+               const local = getStringOrIdValue(exportInfo.specifier.local);
+               id = recurse(resolved, local);
                if (id) break;
             }
          }
 
-         for (const exportInfo of module.getExports(["aggregatedName"])) {
-            if (exportInfo.name !== name) continue;
-            const resolved = module.dependencyMap.get(exportInfo.source)!;
-            const local = getStringOrIdValue(exportInfo.specifier.local);
-            id = this.get(resolved, local);
-            if (id) break;
+         if (supposedId && typeof supposedId != "string") {
+            if (typeof supposedId.name === "string") {
+               id = recurse(supposedId.to, supposedId.name);
+            } else if (supposedId.name === symbols.namespace) {
+               id = this.getNamespaceFor(supposedId.to);
+            }
          }
-      }
 
-      if (supposedId && typeof supposedId != "string") {
-         if (typeof supposedId.name === "string") {
-            id = this.get(supposedId.to, supposedId.name);
-         } else if (supposedId.name === symbols.namespace) {
-            id = this.getNamespaceFor(supposedId.to);
-         }
+         return id;
+      };
+
+      let id = recurse(source, name);
+      if (!id) {
+         const namespace = this.getNamespaceFor(source);
+         id = `${namespace || "self"}.${name}`;
       }
 
       return id;
    }
 
    public getModuleExports(source: string, _visited = new Set<string>()) {
-      const exports = new Map<string, string>();
+      const exports = new Map<string, string | symbol>();
       const mapped = this._map.get(source);
       if (!mapped) return exports;
       for (const [name] of mapped.exportsIdMap) {
@@ -186,6 +200,12 @@ export class UidTracker {
       const aggrAllExports = mapped.module?.getExports(["aggregatedAll"]) || [];
       for (const exportInfo of aggrAllExports) {
          const module = mapped.module!;
+         const isExternal = !isLocal(exportInfo.source);
+         if (isExternal) {
+            exports.set(exportInfo.source, symbols.aggregated);
+            continue;
+         }
+
          const resolved = getResolvedWithError.call(
             this._bundler,
             module,
@@ -204,19 +224,28 @@ export class UidTracker {
 
       // extract aggregated name exports because they're not in `exportsIdMap`
       const aggrNameExports =
-         mapped.module?.getExports(["aggregatedName"]) || [];
+         mapped.module?.getExports(["aggregatedName", "aggregatedNamespace"]) ||
+         [];
       for (const exportInfo of aggrNameExports) {
          const module = mapped.module!;
-         const resolved = getResolvedWithError.call(
-            this._bundler,
-            module,
-            exportInfo.source
-         );
-
-         exports.set(
-            exportInfo.name,
-            this.get(resolved, exportInfo.specifier.local.name)!
-         );
+         const isExternal = !isLocal(exportInfo.source);
+         if (exportInfo.type === "aggregatedName" && !isExternal) {
+            const resolved = getResolvedWithError.call(
+               this._bundler,
+               module,
+               exportInfo.source
+            );
+            exports.set(
+               exportInfo.name,
+               this.get(resolved, exportInfo.specifier.local.name)!
+            );
+         } else if (exportInfo.type === "aggregatedName" && isExternal) {
+            const namespace = this.getNamespaceFor(exportInfo.source)!;
+            exports.set(exportInfo.name, `${namespace}.${exportInfo.local}`);
+         } else if (exportInfo.type === "aggregatedNamespace" && isExternal) {
+            const namespace = this.getNamespaceFor(exportInfo.source)!;
+            exports.set(exportInfo.name, namespace);
+         }
       }
 
       return exports;
@@ -285,7 +314,7 @@ export class UidTracker {
                exportsIdMap.set(name, assignedDeclId);
             } else if (!exportsIdMap.has(name)) {
                let id: string | RedirectedId;
-
+               let isExternal = false;
                const importDecl = getImportDeclaration(exportInfo);
                if (
                   importDecl &&
@@ -329,15 +358,22 @@ export class UidTracker {
       });
 
       // for external imports
-      module.getImports().forEach((importInfo) => {
-         const { type, source } = importInfo;
+      [
+         ...module.getImports(),
+         ...module.getExports([
+            "aggregatedAll",
+            "aggregatedName",
+            "aggregatedNamespace",
+         ]),
+      ].forEach((portInfo) => {
+         const { type, source } = portInfo;
          if (isLocal(source)) return;
          let data = this._map.get(source);
          if (!data) {
             data = {
                exportsIdMap: new Map(),
                namespace: this.uidGenerator.generateBasedOnScope(
-                  importInfo.path.scope,
+                  portInfo.path.scope,
                   createName(source)
                ),
             };
@@ -345,20 +381,22 @@ export class UidTracker {
          }
 
          const { exportsIdMap } = data;
-
          let name, id;
          if (type == "default") {
             name = "default";
             id = createDefaultName(source);
          } else if (type == "specifier") {
-            name = getStringOrIdValue(importInfo.specifier.imported);
-            id = name == "default" ? createDefaultName(module.source) : name;
-         }
+            name = getStringOrIdValue(portInfo.specifier.imported);
+            id = name == "default" ? createDefaultName(source) : name;
+         } /* else if (type == "aggregatedNamespace") {
+            name = portInfo.name;
+            id = name == "default" ? createDefaultName(source) : portInfo.local;
+         } */
 
          if (name && id && !exportsIdMap.has(name)) {
             exportsIdMap.set(
                name,
-               this.uidGenerator.generateBasedOnScope(importInfo.path.scope, id)
+               this.uidGenerator.generateBasedOnScope(portInfo.path.scope, id)
             );
          }
       });

@@ -16,6 +16,8 @@ const uidTracker = new UidTracker(toypack, uidGenerator);
 toypack.addOrUpdateAsset(
    "/index.js",
    `
+import "./test1.js";
+
 // Import exports
 import theTavern from "./module.js";
 export { theTavern as coolTavern };
@@ -76,9 +78,23 @@ export default tavern;
 `
 );
 
+toypack.addOrUpdateAsset(
+   "test1.js",
+   `
+import { UUID, Bundle } from "./test2.js";
+`
+);
+toypack.addOrUpdateAsset(
+   "test2.js",
+   `
+export * from "magic-string";
+export * as UUID from "uuid";
+`
+);
+
 const graph: DependencyGraph = await getDependencyGraph.call(toypack);
-const modules = Object.values(Object.fromEntries(graph)).filter(
-   (x) => x.isScript()
+const modules = Object.values(Object.fromEntries(graph)).filter((x) =>
+   x.isScript()
 ) as ScriptModule[];
 uidTracker.assignWithModules(modules);
 uidGenerator.addReservedVars(...uidTracker.getAllNamespaces());
@@ -159,4 +175,11 @@ it("should have correct namespace exports", () => {
    expect(exports.get("orca")).toEqual(
       uidTracker.getNamespaceFor("/module.js")
    );
+});
+
+it("should have correct ids for external aggregated exports", () => {
+   const exports = uidTracker.getModuleExports("/test2.js");
+   console.log(exports);
+   expect(exports.get("magic-string")).toBeTypeOf("symbol");
+   expect(exports.get("UUID")).toEqual(uidTracker.getNamespaceFor("uuid"));
 });
