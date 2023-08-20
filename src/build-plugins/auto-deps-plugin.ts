@@ -44,7 +44,10 @@ export default function (): Plugin {
          const objectImportMap = {
             imports: Object.entries(Object.fromEntries(importMaps)).reduce(
                (acc, [id, url]) => {
-                  acc[id] = url;
+                  const resolved = this.bundler.resolve(id, {
+                     includeCoreModules: true
+                  });
+                  if (!resolved) acc[id] = url;
                   return acc;
                },
                {} as Record<string, string>
