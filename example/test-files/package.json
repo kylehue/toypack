@@ -1,5 +1,5 @@
 {
-   "main": "/src/main",
+   "main": "/",
    "test": 123,
    "dependencies": {
       "foo": "bar"

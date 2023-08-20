@@ -108,8 +108,7 @@ function compile(
       }
 
       if (resourceSrcAttrTags.includes(node.tagName) && node.attributes.src) {
-         const relativeSource = node.attributes.src;
-         resourceDependencies.set(relativeSource, relativeSource);
+         resourceDependencies.set(node.attributes.src, node.attributes.src);
       }
    });
 
@@ -190,6 +189,12 @@ export default function (options?: HTMLPluginOptions): Plugin {
             mainVirtualModule += this.getImportCode(depSource) + "\n";
          }
 
+         // Import resource deps
+         for (const [_, depSource] of compiled.resourceDependencies) {
+            const relative = "./" + depSource.replace(/^\//, "");
+            mainVirtualModule += this.getImportCode(relative) + "\n";
+         }
+
          // Import inline styles as a virtual module
          if (compiled.bundledInlineStyles.length) {
             const styleId = `virtual:${moduleInfo.source}?style`;
@@ -206,7 +211,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
          const ast = this.cache.get(symbols.ast) as HTMLElement | null;
 
          // Edit resource urls to blob urls if in dev mode
-         if (ast && this.bundler.config.bundle.mode === "development") {
+         if (ast) {
             const sourcedElements = ast.querySelectorAll(
                resourceSrcAttrTags.map((x) => x.toLowerCase()).join(", ")
             );
@@ -220,10 +225,12 @@ export default function (options?: HTMLPluginOptions): Plugin {
                if (!assetSrc) continue;
                const asset = this.bundler.getAsset(assetSrc);
                if (asset?.type != "resource") continue;
-               const targetSrc = asset.contentURL;
-               el.setAttribute("src", targetSrc);
-               resourceDeps.delete(currentSrc);
-               resourceDeps.set(targetSrc, asset.source);
+               const targetSrc = this.getUsableResourcePath(asset.source, ".");
+               if (targetSrc) {
+                  el.setAttribute("src", targetSrc);
+                  resourceDeps.delete(currentSrc);
+                  resourceDeps.set(targetSrc, asset.source);
+               }
             }
          }
 
