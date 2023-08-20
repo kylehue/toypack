@@ -192,7 +192,13 @@ async function getGraphRecursive(this: Toypack, entry: TextAsset) {
 
          // skip externals
          if (!isLocal(resolved) || isUrl(resolved)) {
-            continue;
+            // try to resolve first before skipping
+            const resolution = this.resolve(resolved, {
+               baseDir: path.dirname(rawSource),
+               includeCoreModules: true,
+            });
+            if (!resolution) continue;
+            resolved = resolution;
          }
 
          // If not a virtual module, resolve source with bundler
