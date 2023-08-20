@@ -1,3 +1,4 @@
+import { merge } from "lodash-es";
 import {
    parse as parseHTML,
    Node,
@@ -5,10 +6,8 @@ import {
    NodeType,
    Options,
 } from "node-html-parser";
-import { PluginContext, Plugin, Toypack } from "../types.js";
 import { getHash } from "../utils/get-hash.js";
-import path from "path-browserify";
-import { merge } from "lodash-es";
+import type { PluginContext, Plugin } from "src/types";
 
 const resourceSrcAttrTags = [
    "EMBED",
@@ -22,6 +21,12 @@ const resourceSrcAttrTags = [
 
 const linkTagRelDeps = ["stylesheet", "icon"];
 let _id = 0;
+
+const symbols = {
+   importMap: Symbol("importMap"),
+   ast: Symbol("ast"),
+   resourceDeps: Symbol("resourceDeps"),
+};
 
 function traverse(ast: AST, callback: TraverseCallback) {
    if (!ast) return;
@@ -62,7 +67,7 @@ function compile(
 ) {
    const htmlAst = parseHTML(content, htmlPluginOptions?.parserOptions);
    const dependencies = new Set<string>();
-   const resourceDependencies = new Set<string>();
+   const resourceDependencies = new Map<string, string>();
    let importMap: Record<string, string> = {};
    let bundledInlineStyles = "";
    traverse(htmlAst, (node) => {
@@ -83,9 +88,6 @@ function compile(
          node.remove();
       }
 
-      /**
-       * Add import maps to config
-       */
       if (node.tagName == "SCRIPT" && node.attributes.type == "importmap") {
          node.remove();
          const text = node.structuredText.trim();
@@ -105,21 +107,9 @@ function compile(
          node.removeAttribute("style");
       }
 
-      /**
-       * As for html elements with `src` attribute, we can process the
-       * urls ourselves.
-       */
       if (resourceSrcAttrTags.includes(node.tagName) && node.attributes.src) {
-         const relativeSource = "./" + node.attributes.src;
-         const usableSource = this.getUsableResourcePath(
-            relativeSource,
-            path.dirname(source)
-         );
-
-         if (usableSource) {
-            node.setAttribute("src", usableSource);
-            resourceDependencies.add(relativeSource);
-         }
+         const relativeSource = node.attributes.src;
+         resourceDependencies.set(relativeSource, relativeSource);
       }
    });
 
@@ -127,7 +117,7 @@ function compile(
       ast: htmlAst,
       dependencies,
       resourceDependencies,
-      bundledInlineStyles,
+      bundledInlineStyles: bundledInlineStyles.trim(),
       importMap,
    };
 }
@@ -152,11 +142,6 @@ function injectImportMap(
    }
 }
 
-const symbols = {
-   importMap: Symbol("importMap"),
-   ast: Symbol("ast"),
-};
-
 export default function (options?: HTMLPluginOptions): Plugin {
    return {
       name: "html-plugin",
@@ -164,7 +149,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
       buildStart() {
          // Remove in plugin's cache if the asset no longer exists
          this.cache.forEach((_, source) => {
-            if (typeof source == "symbol") return;
+            if (typeof source === "symbol") return;
             if (this.bundler.getAsset(source)) return;
             this.cache.delete(source);
          });
@@ -196,6 +181,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
 
          this.cache.set(symbols.importMap, compiled.importMap);
          this.cache.set(symbols.ast, compiled.ast);
+         this.cache.set(symbols.resourceDeps, compiled.resourceDependencies);
 
          let mainVirtualModule = "";
 
@@ -206,7 +192,7 @@ export default function (options?: HTMLPluginOptions): Plugin {
 
          // Import inline styles as a virtual module
          if (compiled.bundledInlineStyles.length) {
-            const styleId = `virtual:${moduleInfo.source}?style&index=${_id++}`;
+            const styleId = `virtual:${moduleInfo.source}?style`;
             this.cache.set(styleId, {
                content: compiled.bundledInlineStyles,
                from: moduleInfo.source,
@@ -214,21 +200,33 @@ export default function (options?: HTMLPluginOptions): Plugin {
             mainVirtualModule += this.getImportCode(styleId);
          }
 
-         this.cache.set(moduleInfo.source, {
-            resourceDependencies: compiled.resourceDependencies,
-         });
-
          return mainVirtualModule;
-      },
-      parsed({ chunk, parsed }) {
-         const cached = this.cache.get(chunk.source);
-         if (!cached) return;
-         cached.resourceDependencies?.forEach((item: any) =>
-            parsed.dependencies.add(item)
-         );
       },
       transformHtml() {
          const ast = this.cache.get(symbols.ast) as HTMLElement | null;
+
+         // Edit resource urls to blob urls if in dev mode
+         if (ast && this.bundler.config.bundle.mode === "development") {
+            const sourcedElements = ast.querySelectorAll(
+               resourceSrcAttrTags.map((x) => x.toLowerCase()).join(", ")
+            );
+            for (const el of sourcedElements) {
+               const resourceDeps = this.cache.get(symbols.resourceDeps) as
+                  | ReturnType<typeof compile>["resourceDependencies"]
+                  | null;
+               if (!resourceDeps) continue;
+               const currentSrc = el.attributes.src;
+               const assetSrc = resourceDeps.get(currentSrc);
+               if (!assetSrc) continue;
+               const asset = this.bundler.getAsset(assetSrc);
+               if (asset?.type != "resource") continue;
+               const targetSrc = asset.contentURL;
+               el.setAttribute("src", targetSrc);
+               resourceDeps.delete(currentSrc);
+               resourceDeps.set(targetSrc, asset.source);
+            }
+         }
+
          const importMap = this.cache.get(symbols.importMap);
          if (!ast && !importMap) return;
          const head = ast?.querySelector("head");
