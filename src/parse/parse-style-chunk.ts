@@ -13,7 +13,6 @@ export async function parseStyleAsset(
    content: string,
    options?: ParseStyleOptions
 ): Promise<ParsedStyleResult> {
-   const config = this.config;
    const result: ParsedStyleResult = {
       type: "style",
       dependencies: new Set(),
@@ -24,7 +23,7 @@ export async function parseStyleAsset(
    // Parse
    const AST = cssTree.parse(content, {
       ...(options?.parserOptions || {}),
-      positions: !!config.bundle.sourceMap,
+      positions: true,
       filename: source,
       onParseError: (error: any) => {
          let message = error.formattedMessage;
