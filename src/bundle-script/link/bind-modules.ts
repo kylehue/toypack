@@ -3,12 +3,13 @@ import { isLocal } from "../../utils";
 import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
 import { renameBinding } from "../utils/renamer";
 import { UidTracker } from "./UidTracker";
-import { ModuleTransformer } from "../utils/module-transformer";
+import { ModuleTransformer } from "../../utils/module-transformer";
 import type {
    DependencyGraph,
    ImportInfo,
    ExportInfo,
    Toypack,
+   ScriptModule,
 } from "src/types";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
@@ -144,7 +145,7 @@ export function bindModules(
    this: Toypack,
    uidTracker: UidTracker,
    graph: DependencyGraph,
-   moduleTransformer: ModuleTransformer
+   moduleTransformer: ModuleTransformer<ScriptModule>
 ) {
    const { module } = moduleTransformer;
    // Bind ids

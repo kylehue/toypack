@@ -154,7 +154,9 @@ export class FileManager {
       if (!stored) return;
       stored.drawerFile.delete();
       this._bundler.removeAsset(source);
-      stored.monacoModel?.dispose();
+      if (stored.monacoModel && !stored.monacoModel.isDisposed()) {
+         stored.monacoModel.dispose();
+      }
       this._stored.delete(source);
       window.localStorage.removeItem(source);
    }

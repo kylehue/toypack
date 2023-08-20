@@ -1,9 +1,12 @@
-import { ModuleTransformer } from "../utils/module-transformer";
+import { ModuleTransformer } from "../../utils/module-transformer";
+import type { ScriptModule } from "src/types";
 
 /**
  * Transforms all `const`/`let` top-level declarations to `var`.
  */
-export function transformToVars(moduleTransformer: ModuleTransformer) {
+export function transformToVars(
+   moduleTransformer: ModuleTransformer<ScriptModule>
+) {
    const { module } = moduleTransformer;
    const bindings = Object.values(module.programPath.scope.getAllBindings());
 

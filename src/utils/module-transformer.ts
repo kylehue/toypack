@@ -2,18 +2,32 @@ import generate from "@babel/generator";
 import traverse, { TraverseOptions } from "@babel/traverse";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MagicString from "magic-string";
-import { parseScriptAsset } from "../../parse/parse-script-chunk";
-import { mergeSourceMaps, mergeTraverseOptions } from "../../utils";
-import type { DependencyGraph, ScriptModule, Toypack } from "src/types";
+import MapConverter from "convert-source-map";
+import * as CSSTree from "css-tree";
+import { parseScriptAsset } from "../parse/parse-script-chunk";
+import { parseStyleAsset } from "../parse/parse-style-chunk";
+import {
+   mergeSourceMaps,
+   mergeTraverseOptions,
+   shouldProduceSourceMap,
+} from ".";
+import type {
+   DependencyGraph,
+   ScriptModule,
+   StyleModule,
+   Toypack,
+} from "src/types";
 
-export class ModuleTransformer {
+export class ModuleTransformer<
+   T extends ScriptModule | StyleModule = ScriptModule | StyleModule
+> {
    private _s: MagicString;
    private _toUpdate: [[number, number], string][] = [];
    private _toInsert: [number, string][] = [];
    private _doneUpdates: [[number, number], string][] = [];
    private _doneInserts: [number, string][] = [];
    private _previousGenerated?: { content: string; map?: EncodedSourceMap };
-   constructor(public module: ScriptModule) {
+   constructor(public module: T) {
       this._s = new MagicString(this.module.content);
    }
 
@@ -87,7 +101,12 @@ export class ModuleTransformer {
    }
 
    public generate() {
-      if (!this.module.asset.modified && this._previousGenerated) {
+      if (
+         !this.module.asset.modified &&
+         this._previousGenerated &&
+         !this._toUpdate.length &&
+         !this._toInsert.length
+      ) {
          return this._previousGenerated;
       }
 
@@ -126,61 +145,108 @@ async function transformModulesWithPlugins(
    for (const moduleTransformer of moduleTransformers) {
       if (!moduleTransformer.needsChange()) continue;
       const { module } = moduleTransformer;
-      const traverseOptionsArray: TraverseOptions[] = [];
-      await this._pluginManager.triggerHook({
-         name: "transform",
-         args: [module.source, module.content, module.ast],
-         callback(result) {
-            traverseOptionsArray.push(result);
-         },
-         context: {
-            graph,
-            importers: module.importers,
-            source: module.source,
-         },
-      });
-      if (!traverseOptionsArray.length) continue;
-      traverse(module.ast, mergeTraverseOptions(traverseOptionsArray));
-
-      // generate
-      const transformed = generate(module.ast, {
-         sourceFileName: module.source,
-         sourceMaps: true,
-      });
-      const content = transformed.code;
-      const map = transformed.map as EncodedSourceMap | null;
-      module.content = content;
-      module.map =
-         map && module.map
-            ? mergeSourceMaps(map, module.map)
-            : map || module.map;
-
-      // re-parse
-      const newParsed = await parseScriptAsset.call(
-         this,
+      const shouldMap = shouldProduceSourceMap(
          module.source,
-         content
+         this.config.bundle.sourceMap
       );
-      module.ast = newParsed.ast;
-      module.exports = newParsed.exports;
-      module.imports = newParsed.imports;
-      module.programPath = newParsed.programPath;
+      if (module.type === "script") {
+         const traverseOptionsArray: TraverseOptions[] = [];
+         await this._pluginManager.triggerHook({
+            name: "transform",
+            args: [module.source, module.content, module.ast],
+            callback(result) {
+               traverseOptionsArray.push(result);
+            },
+            context: {
+               graph,
+               importers: module.importers,
+               source: module.source,
+            },
+         });
+         if (!traverseOptionsArray.length) continue;
+         traverse(module.ast, mergeTraverseOptions(traverseOptionsArray));
+
+         // re-compile
+         const transformed = generate(module.ast, {
+            sourceFileName: module.source,
+            sourceMaps: shouldMap,
+         });
+         const content = transformed.code;
+         const map = transformed.map as EncodedSourceMap | null;
+         module.content = content;
+         module.map =
+            map && module.map
+               ? mergeSourceMaps(map, module.map)
+               : map || module.map;
+
+         // re-parse
+         const newParsed = await parseScriptAsset.call(
+            this,
+            module.source,
+            content
+         );
+         module.ast = newParsed.ast;
+         module.exports = newParsed.exports;
+         module.imports = newParsed.imports;
+         module.programPath = newParsed.programPath;
+      } else {
+         await this._pluginManager.triggerHook({
+            name: "transformStyle",
+            args: [module.source, module.content, module.ast],
+            callback(opts) {
+               CSSTree.walk(module.ast, opts);
+            },
+            context: {
+               graph,
+               importers: module.importers,
+               source: module.source,
+            },
+         });
+
+         // re-compile
+         const recompilation = CSSTree.generate(module.ast, {
+            sourceMap: shouldMap,
+         }) as any as CSSTreeGeneratedResult;
+         const content =
+            typeof recompilation === "string"
+               ? recompilation
+               : recompilation.css;
+         const map =
+            typeof recompilation !== "string"
+               ? MapConverter.fromJSON(recompilation.map.toString()).toObject()
+               : null;
+         module.content = content;
+         module.map =
+            map && module.map
+               ? mergeSourceMaps(map, module.map)
+               : map || module.map;
+
+         // re-parse
+         const reparsed = await parseStyleAsset.call(
+            this,
+            module.source,
+            content
+         );
+         module.ast = reparsed.ast;
+         module.urlNodes = reparsed.urlNodes;
+      }
 
       moduleTransformer.reinstantiate();
    }
 }
 
-export async function getModuleTransformersFromGraph(
-   this: Toypack,
-   graph: DependencyGraph
-) {
+export async function getModuleTransformersFromGraph<
+   T extends "script" | "style"
+>(this: Toypack, type: T, graph: DependencyGraph) {
+   type ModuleType = T extends "script" ? ScriptModule : StyleModule;
    const moduleTransformers = Object.values(Object.fromEntries(graph))
-      .filter((g): g is ScriptModule => g.isScript())
+      .filter((g): g is ModuleType => g.type === type)
       .reverse()
       .map((x) => {
-         const cached = this._getCache(x.source)?.moduleTransformer;
+         const cached = this._getCache(x.source)
+            ?.moduleTransformer as ModuleTransformer<ModuleType> | null;
          if (x.asset.modified || !cached) {
-            const moduleDesc = new ModuleTransformer(x);
+            const moduleDesc = new ModuleTransformer<ModuleType>(x);
             this._setCache(x.source, {
                moduleTransformer: moduleDesc,
             });

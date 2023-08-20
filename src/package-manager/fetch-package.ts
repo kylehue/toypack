@@ -4,11 +4,9 @@ import type { ParserOptions } from "@babel/parser";
 import { EncodedSourceMap } from "@jridgewell/gen-mapping";
 import MapConverter from "convert-source-map";
 import { parseScriptAsset } from "../parse/parse-script-chunk.js";
-import type { Toypack } from "../types.js";
 import {
    mergeSourceMaps,
    parsePackageName,
-   removeSourceMapUrl,
    shouldProduceSourceMap,
 } from "../utils";
 import { PackageProvider } from "./index.js";
@@ -25,8 +23,7 @@ import {
 import { fetchSourceMapInContent } from "./fetch-source-map.js";
 import { fetchVersion } from "./fetch-version.js";
 import { parseStyleAsset } from "../parse/parse-style-chunk.js";
-import { CSSTreeGeneratedResult } from "../bundle-style/compile-style.js";
-import path from "path-browserify";
+import type { Toypack } from "src/types";
 
 function getDtsHeader(
    optionDtsHeader: PackageProvider["dtsHeader"],

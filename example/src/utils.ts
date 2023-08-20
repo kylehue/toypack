@@ -40,7 +40,9 @@ export function switchModelToNewUri(
    // @ts-ignore
    newModel._commandManager._undoRedoService._editStacks = newEditStacks;
 
-   oldModel.dispose();
+   if (!oldModel.isDisposed()) {
+      oldModel.dispose();
+   }
 
    return newModel;
 }

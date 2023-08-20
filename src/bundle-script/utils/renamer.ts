@@ -1,5 +1,5 @@
 import { Binding } from "@babel/traverse";
-import { ModuleTransformer } from "./module-transformer";
+import { ModuleTransformer } from "../../utils/module-transformer";
 import { Identifier, StringLiteral } from "@babel/types";
 
 function getStringOrIdValue(exported: StringLiteral | Identifier) {

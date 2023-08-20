@@ -1,5 +1,5 @@
 import { bundleScript } from "../bundle-script/index.js";
-import { bundleStyle } from "../bundle-style/bundle-style.js";
+import { bundleStyle } from "../bundle-style/index.js";
 import { getUsableResourcePath } from "../utils";
 import { transformHtml } from "./transform-html.js";
 import type { DependencyGraph, Toypack } from "src/types";

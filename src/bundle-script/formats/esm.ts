@@ -20,10 +20,10 @@ import { getLibImports } from "../utils/get-lib-imports";
 import { getIdWithError, getNamespaceWithError } from "../utils/get-with-error";
 import { renameBinding } from "../utils/renamer";
 import { isValidVar } from "../utils/is-valid-var";
-import { ModuleTransformer } from "../utils/module-transformer";
+import { ModuleTransformer } from "../../utils/module-transformer";
 import { UidTracker, symbols } from "../link/UidTracker";
 import { CompilationChunks } from "..";
-import type { Toypack } from "src/types";
+import type { ScriptModule, Toypack } from "src/types";
 
 function getStringOrIdValue(node: StringLiteral | Identifier) {
    return node.type == "Identifier" ? node.name : node.value;
@@ -33,7 +33,7 @@ export function formatEsm(
    this: Toypack,
    uidTracker: UidTracker,
    chunks: CompilationChunks,
-   moduleTransformers: ModuleTransformer[]
+   moduleTransformers: ModuleTransformer<ScriptModule>[]
 ) {
    const modules = moduleTransformers.map((x) => x.module);
    const libImports = getLibImports(modules);

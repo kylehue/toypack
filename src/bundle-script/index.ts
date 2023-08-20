@@ -16,7 +16,7 @@ import { createNamespace } from "./utils/create-namespace.js";
 import {
    ModuleTransformer,
    getModuleTransformersFromGraph,
-} from "./utils/module-transformer.js";
+} from "../utils/module-transformer.js";
 import { finalizeModule } from "./utils/finalize-module.js";
 import { formatEsm } from "./formats/esm.js";
 import {
@@ -91,10 +91,11 @@ function getNamespacedModules(modules: ScriptModule[]) {
 }
 
 export async function bundleScript(this: Toypack, graph: DependencyGraph) {
-   const moduleTransformers = await getModuleTransformersFromGraph.call(
+   const moduleTransformers = (await getModuleTransformersFromGraph.call(
       this,
+      "script",
       graph
-   );
+   )) as ModuleTransformer<ScriptModule>[];
    const modules = moduleTransformers.map((x) => x.module);
 
    const uidGenerator = new UidGenerator();

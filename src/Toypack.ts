@@ -10,7 +10,7 @@ import importMetaPlugin from "./build-plugins/import-meta-plugin.js";
 import bundleDepsPlugin from "./build-plugins/bundle-deps-plugin.js";
 import autoDepsPlugin from "./build-plugins/auto-deps-plugin.js";
 import { bundle } from "./bundle/index.js";
-import { ModuleTransformer } from "./bundle-script/utils/module-transformer.js";
+import { ModuleTransformer } from "./utils/module-transformer.js";
 import { ToypackConfig, defaultConfig } from "./config.js";
 import { Hooks } from "./Hooks.js";
 import { PluginManager } from "./plugin/PluginManager.js";
@@ -39,6 +39,7 @@ import { ParsedScriptResult } from "./parse/parse-script-chunk.js";
 import { ParsedStyleResult } from "./parse/parse-style-chunk.js";
 import { PackageProvider, getPackage } from "./package-manager/index.js";
 import { BuiltInPluginsConfig } from "./build-plugins/config.js";
+import MagicString from "magic-string";
 
 let _lastId = 0;
 export class Toypack extends Hooks {
@@ -598,6 +599,7 @@ export class Toypack extends Hooks {
       const newAsset = this.addOrUpdateAsset(newSource, oldAsset.content);
       newAsset.id = oldAsset.id;
       newAsset.metadata = oldAsset.metadata;
+      newAsset.modified = true;
       this.removeAsset(oldAsset.source);
       return newAsset;
    }
@@ -689,7 +691,7 @@ export class Toypack extends Hooks {
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
       const timeAfterGraph = performance.now();
-      // console.log(graph);
+      console.log(graph);
       const timeBeforeBundle = performance.now();
       const result = await bundle.call(this, graph);
       const timeAfterBundle = performance.now();
@@ -772,4 +774,5 @@ interface Cache {
    content?: string;
    map?: EncodedSourceMap | null;
    metadata?: any;
+   styleTransformer?: MagicString;
 }

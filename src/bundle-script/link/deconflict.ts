@@ -1,13 +1,14 @@
-import { ModuleTransformer } from "../utils/module-transformer";
+import { ModuleTransformer } from "../../utils/module-transformer";
 import { renameBinding } from "../utils/renamer";
 import { UidTracker } from "./UidTracker";
+import type { ScriptModule } from "src/types";
 
 /**
  * Deconflicts all of the top-level variables in script modules.
  */
 export function deconflict(
    uidTracker: UidTracker,
-   moduleTransformer: ModuleTransformer
+   moduleTransformer: ModuleTransformer<ScriptModule>
 ) {
    const uidGenerator = uidTracker.uidGenerator;
    const { module } = moduleTransformer;

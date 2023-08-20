@@ -1,10 +1,11 @@
-import { ModuleTransformer } from "./module-transformer";
+import { ModuleTransformer } from "../../utils/module-transformer";
 
 /**
  * Removes imports and exports.
  */
 function removeModulePorts(moduleTransformer: ModuleTransformer) {
    const { module } = moduleTransformer;
+   if (!module.isScript()) return;
    const imports = module.getImports();
    const visitedImports = new Set();
    for (const importInfo of imports) {
@@ -54,6 +55,7 @@ function removeModulePorts(moduleTransformer: ModuleTransformer) {
 
 function removeTopLevelComments(moduleTransformer: ModuleTransformer) {
    const { module } = moduleTransformer;
+   if (!module.isScript()) return;
    module.ast.comments?.forEach((comment) => {
       moduleTransformer.update(comment.start!, comment.end!, "");
    });

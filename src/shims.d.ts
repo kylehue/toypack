@@ -16,6 +16,13 @@ declare module "babel-minify" {
    ): { code: string; map: EncodedSourceMap };
 }
 
+declare type CSSTreeGeneratedResult =
+   | {
+        css: string;
+        map: import("source-map").SourceMapGenerator;
+     }
+   | string;
+
 // TODO: remove
 declare function getHighlightedCode(ast: import("@babel/types").Node): string;
 declare function getHighlightedCode(code: string): string;
