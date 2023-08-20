@@ -20,7 +20,6 @@ export type {
    LogLevelConfig,
    ModeConfig,
    FormatConfig,
-   ImportMapConfig,
 } from "./config.js";
 export type {
    PackageManagerConfig,
