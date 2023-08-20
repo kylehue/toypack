@@ -140,11 +140,14 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       for (const moduleTransformer of moduleTransformers) {
          const { module } = moduleTransformer;
          if (!needsNamespace.has(module.source)) continue;
-         const statements = createNamespace.call(this, uidTracker, module);
+         const statements = createNamespace.call(
+            this,
+            chunks.runtime,
+            uidTracker,
+            module
+         );
          const arr = Array.isArray(statements) ? statements : [statements];
          chunks.namespace.set(module.source, arr);
-         chunks.runtime.add("createNamespace");
-         chunks.runtime.add("removeDefault");
       }
    } catch (error: any) {
       this._pushToDebugger("error", ERRORS.bundle(error));

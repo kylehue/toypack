@@ -3,10 +3,12 @@ import { getNamespaceWithError } from "./get-with-error";
 import { isValidVar } from "./is-valid-var";
 import { UidTracker, symbols } from "../link/UidTracker";
 import { ERRORS } from "../../utils";
+import runtime from "../runtime";
 import type { ScriptModule, Toypack } from "src/types";
 
 export function createNamespace(
    this: Toypack,
+   runtimes: Set<keyof typeof runtime>,
    uidTracker: UidTracker,
    module: ScriptModule
 ) {
@@ -48,10 +50,20 @@ export function createNamespace(
          .join(",\n") +
       "\n}";
 
-   const builtTemplate = template.ast(`
-      var ${name} = createNamespace(removeDefault({${exportAllDecls
+   const targetObjStrBase = `{${exportAllDecls
       .map((x) => `...${x}`)
-      .join(`,\n`)}}), ${exportObject});
+      .join(`,\n`)}}`;
+   const targetObjStr = exportAllDecls.length
+      ? `removeDefault(${targetObjStrBase})`
+      : "{}";
+
+   if (exportAllDecls.length) {
+      runtimes.add("removeDefault");
+   }
+   runtimes.add("createNamespace");
+
+   const builtTemplate = template.ast(`
+      var ${name} = createNamespace(${targetObjStr}, ${exportObject});
    `);
 
    return builtTemplate;
