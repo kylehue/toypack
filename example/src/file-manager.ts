@@ -165,6 +165,7 @@ export class FileManager {
       for (const asset of assets) {
          this.removeFile(asset.source);
       }
+      this._drawer.root.delete(source);
    }
 
    addFile(source: string, content?: string | Blob) {
