@@ -1,7 +1,7 @@
 {
    "name": "toypack",
    "description": "A sandbox bundler for browsers.",
-   "version": "1.0.0-development",
+   "version": "1.0.0",
    "type": "module",
    "types": "./build/Toypack.d.ts",
    "license": "MIT",
