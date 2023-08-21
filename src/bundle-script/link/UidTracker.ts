@@ -111,7 +111,8 @@ export class UidTracker {
       {
          module?: ScriptModule;
          exportsIdMap: Map<string, string | RedirectedId>;
-         namespace: string;
+         namespace?: string;
+         redirectTo?: string;
       }
    >();
 
@@ -122,15 +123,21 @@ export class UidTracker {
       this._map.clear();
    }
 
-   public getNamespaceFor(source: string) {
-      const namespace = this._map.get(source)?.namespace;
-      return namespace;
+   public getNamespaceFor(source: string): string | undefined {
+      const mapped = this._map.get(source);
+      if (mapped?.redirectTo && mapped.redirectTo !== source) {
+         return this.getNamespaceFor(mapped.redirectTo);
+      }
+
+      return mapped?.namespace;
    }
 
    public getAllNamespaces() {
-      const namespaces: string[] = [];
-      for (const [_, data] of this._map) {
-         namespaces.push(data.namespace);
+      const namespaces = new Set<string>();
+      for (const [source, _] of this._map) {
+         const namespace = this.getNamespaceFor(source);
+         if (!namespace) continue;
+         namespaces.add(namespace);
       }
 
       return namespaces;
@@ -139,9 +146,13 @@ export class UidTracker {
    public get(source: string, name: string): string | undefined {
       // @ts-ignore
       const recurse = (source: string, name: string) => {
-         const data = this._map.get(source);
-         if (!data) return;
-         const { module, exportsIdMap } = data;
+         const mapped = this._map.get(source);
+         if (!mapped) return;
+         if (mapped.redirectTo && mapped.redirectTo !== source) {
+            return recurse(mapped.redirectTo, name);
+         }
+
+         const { module, exportsIdMap } = mapped;
          let supposedId = exportsIdMap.get(name);
          let id = typeof supposedId == "string" ? supposedId : undefined;
          if (!supposedId && module) {
@@ -182,16 +193,23 @@ export class UidTracker {
       let id = recurse(source, name);
       if (!id) {
          const namespace = this.getNamespaceFor(source);
-         id = `${namespace || "self"}.${name}`;
+         id = `${namespace || "window"}.${name}`;
       }
 
       return id;
    }
 
-   public getModuleExports(source: string, _visited = new Set<string>()) {
+   public getModuleExports(
+      source: string,
+      _visited = new Set<string>()
+   ): Map<string, string | symbol> {
       const exports = new Map<string, string | symbol>();
       const mapped = this._map.get(source);
       if (!mapped) return exports;
+      if (mapped.redirectTo && mapped.redirectTo !== source) {
+         return this.getModuleExports(mapped.redirectTo);
+      }
+
       for (const [name] of mapped.exportsIdMap) {
          exports.set(name, this.get(source, name)!);
       }
@@ -357,7 +375,7 @@ export class UidTracker {
          }
       });
 
-      // for external imports
+      // for external imports/exports
       [
          ...module.getImports(),
          ...module.getExports([
@@ -370,14 +388,18 @@ export class UidTracker {
          if (isLocal(source)) return;
          let data = this._map.get(source);
          if (!data) {
+            const resolved = this._bundler.resolve(source);
             data = {
                exportsIdMap: new Map(),
-               namespace: this.uidGenerator.generateBasedOnScope(
+               namespace: !resolved ? this.uidGenerator.generateBasedOnScope(
                   portInfo.path.scope,
                   createName(source)
-               ),
+               ) : undefined,
+               redirectTo: resolved || undefined,
             };
             this._map.set(source, data);
+
+            if (resolved) return;
          }
 
          const { exportsIdMap } = data;
@@ -388,10 +410,7 @@ export class UidTracker {
          } else if (type == "specifier") {
             name = getStringOrIdValue(portInfo.specifier.imported);
             id = name == "default" ? createDefaultName(source) : name;
-         } /* else if (type == "aggregatedNamespace") {
-            name = portInfo.name;
-            id = name == "default" ? createDefaultName(source) : portInfo.local;
-         } */
+         }
 
          if (name && id && !exportsIdMap.has(name)) {
             exportsIdMap.set(

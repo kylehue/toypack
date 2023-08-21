@@ -59,7 +59,7 @@ window.getHighlightedCode = function (ast: any) {
    );
 };
 
-function getNamespacedModules(modules: ScriptModule[]) {
+function getNamespacedModules(this: Toypack, modules: ScriptModule[]) {
    const needsNamespace = new Set<string>();
    const scan = (
       module: ScriptModule,
@@ -75,8 +75,7 @@ function getNamespacedModules(modules: ScriptModule[]) {
       scan(module, module.getImports(["namespace", "dynamic"]));
       scan(module, module.getExports(["aggregatedNamespace"]));
 
-      // modules that has aggregated export from external sources should
-      // have namespace
+      // Modules that has aggregated export from external sources
       const exports = module.getExports([
          "aggregatedAll",
          "aggregatedName",
@@ -84,6 +83,15 @@ function getNamespacedModules(modules: ScriptModule[]) {
       ]);
       if (exports.some((x) => !isLocal(x.source))) {
          needsNamespace.add(module.source);
+      }
+
+      // Also the external modules that has been exported aggregatedly
+      for (const exportInfo of exports) {
+         const source = exportInfo.source;
+         if (isLocal(source)) continue;
+         const resolved = this.resolve(source);
+         if (!resolved) continue;
+         needsNamespace.add(resolved);
       }
    }
 
@@ -103,6 +111,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    uidTracker.assignWithModules(modules);
    uidGenerator.addReservedVars(...Object.keys(runtime));
    uidGenerator.addReservedVars(...uidTracker.getAllNamespaces());
+   console.log(uidTracker);
 
    const chunks: CompilationChunks = {
       header: [],
@@ -137,7 +146,7 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
       }
 
       // chunks.namespace
-      const needsNamespace = getNamespacedModules(modules);
+      const needsNamespace = getNamespacedModules.call(this, modules);
       for (const moduleTransformer of moduleTransformers) {
          const { module } = moduleTransformer;
          if (!needsNamespace.has(module.source)) continue;

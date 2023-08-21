@@ -24,7 +24,7 @@ export function createNamespace(
    }
 
    const exports = Object.entries(Object.fromEntries(exportsMap));
-   const exportAllDecls: string[] = [];
+   const mergeNamespaces: string[] = [];
 
    const exportObject =
       "{\n" +
@@ -36,7 +36,7 @@ export function createNamespace(
                   uidTracker,
                   name
                );
-               exportAllDecls.push(namespace);
+               mergeNamespaces.push(namespace);
                return;
             }
 
@@ -50,17 +50,15 @@ export function createNamespace(
          .join(",\n") +
       "\n}";
 
-   const targetObjStrBase = `{${exportAllDecls
-      .map((x) => `...${x}`)
-      .join(`,\n`)}}`;
-   const targetObjStr = exportAllDecls.length
-      ? `removeDefault(${targetObjStrBase})`
+   const targetObjStr = mergeNamespaces.length
+      ? `removeDefault(mergeObjects(${mergeNamespaces.join(`, `)}))`
       : "{}";
 
-   if (exportAllDecls.length) {
+   runtimes.add("createNamespace");
+   if (mergeNamespaces.length) {
+      runtimes.add("mergeObjects");
       runtimes.add("removeDefault");
    }
-   runtimes.add("createNamespace");
 
    const builtTemplate = template.ast(`
       var ${name} = createNamespace(${targetObjStr}, ${exportObject});
