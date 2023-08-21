@@ -111,7 +111,6 @@ export async function bundleScript(this: Toypack, graph: DependencyGraph) {
    uidTracker.assignWithModules(modules);
    uidGenerator.addReservedVars(...Object.keys(runtime));
    uidGenerator.addReservedVars(...uidTracker.getAllNamespaces());
-   console.log(uidTracker);
 
    const chunks: CompilationChunks = {
       header: [],
