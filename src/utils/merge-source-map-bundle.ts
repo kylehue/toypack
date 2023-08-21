@@ -15,9 +15,7 @@ import {
  * @param targetMap The source map generator (bundle's source map)
  * to merge the source map from.
  * @param sourceMap The source map to merge to the bundle's source map.
- * @param source The file source path.
- * @param generatedContent The compiled content of the file.
- * @param bundleContent The current content of the bundle.
+ * @param position The position of the source map to the bundle.
  */
 export function mergeSourceMapToBundle(
    targetMap: GenMapping,
