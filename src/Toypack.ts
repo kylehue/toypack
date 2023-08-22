@@ -619,7 +619,11 @@ export class Toypack extends Hooks {
       if (typeof newSource != "string") return movedAssets;
       for (const [_, oldAsset] of this._assets) {
          if (!oldAsset.source.startsWith(oldSource)) continue;
-         const newAsset = this.moveAsset(oldAsset.source, newSource);
+         const targetSource = path.join(
+            newSource,
+            oldAsset.source.replace(oldSource, "")
+         );
+         const newAsset = this.moveAsset(oldAsset.source, targetSource);
          if (!newAsset) continue;
          movedAssets.push({
             oldSource: oldAsset.source,

@@ -179,7 +179,6 @@ it("should have correct namespace exports", () => {
 
 it("should have correct ids for external aggregated exports", () => {
    const exports = uidTracker.getModuleExports("/test2.js");
-   console.log(exports);
    expect(exports.get("magic-string")).toBeTypeOf("symbol");
    expect(exports.get("UUID")).toEqual(uidTracker.getNamespaceFor("uuid"));
 });
