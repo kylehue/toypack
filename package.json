@@ -21,6 +21,9 @@
    },
    "scripts": {
       "dev": "set NODE_ENV=development&&concurrently \"npm run build:main -- --watch\" \"npm run type:dts -- --watch\" \"cd ./example&&npm run dev\"",
+      "docs:dev": "cd ./docs&&npm run docs:dev",
+      "docs:build": "cd ./docs&&npm run docs:build",
+      "docs:preview": "cd ./docs&&npm run docs:preview",
       "build": "set NODE_ENV=production&&concurrently \"npm run clean\" \"npm run build:main\" \"npm run build:bundle\" \"npm run type:dts\"",
       "build:main": "node ./swc/make-swcrc.js&&swc ./src -d ./build --config-file ./swc/.swcrc",
       "build:bundle": "webpack",
