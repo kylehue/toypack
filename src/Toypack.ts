@@ -271,26 +271,25 @@ export class Toypack extends Hooks {
    }
 
    /**
-    * Adds plugins to the bundler.
+    * Adds a plugin.
     */
-   public usePlugin(...plugins: Plugin[]) {
-      for (const plugin of plugins) {
-         if (this.config.plugins.includes(plugin)) continue;
-         if (this._pluginManager.hasPlugin(plugin)) continue;
-         this._pluginManager.registerPlugin(plugin);
+   public usePlugin(plugin: Plugin) {
+      if (this._pluginManager.hasPlugin(plugin)) {
+         throw new Error(`The plugin ${plugin.name} already exists.`);
+      }
 
-         for (const ext of plugin.extensions || []) {
-            if (!this._hasExtension(ext[0], ext[1])) {
-               this._extensions[ext[0]].push(ext[1]);
-            }
+      this._pluginManager.registerPlugin(plugin);
+
+      for (const ext of plugin.extensions || []) {
+         if (!this._hasExtension(ext[0], ext[1])) {
+            this._extensions[ext[0]].push(ext[1]);
          }
-
-         this.config.plugins.push(plugin);
       }
 
-      if (plugins.length) {
-         this.clearCache();
-      }
+      this.config.plugins.push(plugin);
+
+      this.clearCache();
+      return plugin;
    }
 
    /**
