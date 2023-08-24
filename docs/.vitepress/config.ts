@@ -38,4 +38,6 @@ export default defineConfig({
          provider: "local",
       },
    },
+
+   base: "/toypack/"
 });
