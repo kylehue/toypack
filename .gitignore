@@ -6,5 +6,3 @@ node_modules/
 coverage/
 .DS_Store
 swc/.swcrc
-docs/.vitepress/dist
-docs/.vitepress/cache
