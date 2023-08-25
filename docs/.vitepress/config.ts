@@ -4,6 +4,7 @@ import { defineConfig } from "vitepress";
 export default defineConfig({
    title: "Toypack",
    description: "The sandbox bundler for static sites.",
+   cleanUrls: true,
    themeConfig: {
       // https://vitepress.dev/reference/default-theme-config
       nav: [
