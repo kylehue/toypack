@@ -74,10 +74,6 @@ export const defaultConfig = {
     * Configuration for the package manager.
     */
    packageManager: {} as PackageManagerConfig,
-   /**
-    * Toypack plugins.
-    */
-   plugins: [] as Plugin[],
 };
 
 export type ToypackConfig = typeof defaultConfig;

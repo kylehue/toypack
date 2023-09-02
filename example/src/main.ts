@@ -29,9 +29,11 @@ for (const [source, content] of Object.entries(testFiles)) {
 
 // add the ones in cache but not in test files
 for (const [source, content] of Object.entries(window.localStorage)) {
-   if (addedFiles.has(source)) continue;
-   fileManager.addFile(source, content);
-   addedFiles.add(source);
+   if (!source.startsWith("file.")) continue;
+   const src = source.replace(/^file\./, "");
+   if (addedFiles.has(src)) continue;
+   fileManager.addFile(src.replace(/^file\./, ""), content);
+   addedFiles.add(src);
 }
 
 toypack.run();

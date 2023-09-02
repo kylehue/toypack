@@ -73,10 +73,6 @@ export class Toypack extends Hooks {
       super();
       if (config) this.setConfig(config);
 
-      for (const plugin of this.config.plugins) {
-         this.usePlugin(plugin as any);
-      }
-
       if (builtInPluginsConfig?.autoDeps !== false) {
          this.usePlugin(autoDepsPlugin());
       }
@@ -286,8 +282,6 @@ export class Toypack extends Hooks {
          }
       }
 
-      this.config.plugins.push(plugin);
-
       this.clearCache();
       return plugin;
    }
@@ -299,7 +293,6 @@ export class Toypack extends Hooks {
     */
    public removePlugin(plugin: Plugin) {
       this._pluginManager.removePlugin(plugin);
-      this.config.plugins.splice(this.config.plugins.indexOf(plugin), 1);
       this.clearCache();
    }
 
@@ -340,11 +333,6 @@ export class Toypack extends Hooks {
 
       // config.packageManager
       mergeWith(_config.packageManager, config.packageManager);
-
-      // config.plugins
-      for (const plugin of config.plugins || []) {
-         this.usePlugin(plugin);
-      }
 
       this._configHash.current = this._getConfigHash();
    }

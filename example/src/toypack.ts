@@ -43,31 +43,6 @@ const toypack = new Toypack({
    parser: {
       plugins: ["typescript", "jsx"],
    },
-   plugins: [
-      vuePlugin({
-         featureFlags: {
-            __VUE_OPTIONS_API__: false,
-            __VUE_PROD_DEVTOOLS__: false,
-         },
-      }),
-      sassPlugin(),
-      babelPlugin({
-         presets: [
-            [
-               "env",
-               {
-                  modules: false,
-               },
-            ],
-            "react",
-            "typescript",
-         ],
-         plugins: ["transform-runtime"],
-         exclude(file) {
-            return !!file?.startsWith("/node_modules/@babel/runtime");
-         },
-      }),
-   ],
    packageManager: {
       dts: true,
       onDts(dts) {
@@ -106,6 +81,38 @@ const toypack = new Toypack({
    logLevel: "verbose",
 });
 
+toypack.usePlugin(
+   vuePlugin({
+      featureFlags: {
+         __VUE_OPTIONS_API__: false,
+         __VUE_PROD_DEVTOOLS__: false,
+      },
+   }),
+);
+
+toypack.usePlugin(
+   sassPlugin(),
+);
+
+toypack.usePlugin(
+   babelPlugin({
+      presets: [
+         [
+            "env",
+            {
+               modules: false,
+            },
+         ],
+         "react",
+         "typescript",
+      ],
+      plugins: ["transform-runtime"],
+      exclude(file) {
+         return !!file?.startsWith("/node_modules/@babel/runtime");
+      },
+   })
+);
+
 const iframe = document.querySelector("#preview") as HTMLIFrameElement;
 toypack.setIFrame(iframe);
 
@@ -114,7 +121,7 @@ toypack.setIFrame(iframe);
 // await toypack.installPackage("matter-js");
 // await toypack.installPackage("react", "18");
 // await toypack.installPackage("react-dom/client", "18");
-await toypack.installPackage("vue");
+// await toypack.installPackage("vue");
 // await toypack.installPackage("canvas-confetti");
 // await toypack.installPackage("path-browserify");
 // await toypack.installPackage("is-odd");

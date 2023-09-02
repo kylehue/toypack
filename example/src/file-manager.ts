@@ -93,7 +93,7 @@ export class FileManager {
          if (!model) return;
          const value = model.getValue();
          _bundler.addOrUpdateAsset(model.uri.path, value);
-         window.localStorage.setItem(model.uri.path, value);
+         window.localStorage.setItem("file." + model.uri.path, value);
       });
    }
 
@@ -133,9 +133,12 @@ export class FileManager {
       this._stored.set(newSource, stored);
       this._stored.delete(oldSource);
 
-      window.localStorage.removeItem(oldSource);
+      window.localStorage.removeItem("file." + oldSource);
       if (typeof stored.bundlerAsset.content === "string") {
-         window.localStorage.setItem(newSource, stored.bundlerAsset.content);
+         window.localStorage.setItem(
+            "file." + newSource,
+            stored.bundlerAsset.content
+         );
       }
    }
 
@@ -158,7 +161,7 @@ export class FileManager {
          stored.monacoModel.dispose();
       }
       this._stored.delete(source);
-      window.localStorage.removeItem(source);
+      window.localStorage.removeItem("file." + source);
    }
 
    removeDirectory(source: string) {
@@ -186,7 +189,7 @@ export class FileManager {
          this._editor.focus();
       }
       if (typeof content == "string") {
-         window.localStorage.setItem(source, content);
+         window.localStorage.setItem("file." + source, content);
       }
    }
 }
