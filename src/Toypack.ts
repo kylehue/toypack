@@ -682,7 +682,6 @@ export class Toypack extends Hooks {
       const timeBeforeGraph = performance.now();
       const graph = await getDependencyGraph.call(this);
       const timeAfterGraph = performance.now();
-      console.log(graph);
       const timeBeforeBundle = performance.now();
       const result = await bundle.call(this, graph);
       const timeAfterBundle = performance.now();
